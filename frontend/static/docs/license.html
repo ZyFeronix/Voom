@@ -187,6 +187,12 @@
             text-shadow: var(--neon-primary);
         }
 
+        #license-container {
+            max-height: none;
+            overflow-y: visible;
+            text-align: center;
+        }
+
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .content-panel { padding: 1.5rem; }
@@ -218,8 +224,8 @@
             <li><strong>Reconocimiento:</strong> Se debe mantener la atribución a los autores originales en todas las copias y derivados.</li>
         </ul>
         
-        <p style="margin-top: 2rem;"><strong>Texto oficial de la licencia:</strong></p>
-        <pre><code id="license-content">Cargando licencia...</code></pre>
+        <p style="margin-top: 2rem; text-align: center;"><strong>Texto oficial de la licencia:</strong></p>
+        <pre id="license-container"><code id="license-content">Cargando licencia...</code></pre>
 
         <h2><span class="material-icons-round">security</span> Protección Anti-Clonación (IP)</h2>
         <p>Más allá de la lógica de negocio cubierta por GPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de V-SOCIAL.</p>
