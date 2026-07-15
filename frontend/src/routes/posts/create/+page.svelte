@@ -43,31 +43,92 @@
   let posting = $state(false);
   let error = $state('');
   let dragOver = $state(false);
+  // --- Drag to Scroll for Moods ---
   let moodScrollerRef = $state(null);
-  let isDraggingMood = $state(false);
+  let isDraggingMood = false;
+  let isScrollingMood = $state(false);
   let moodStartX = 0;
   let moodScrollLeft = 0;
-
-  function scrollMoods(direction) {
-    if (moodScrollerRef) {
-      moodScrollerRef.scrollBy({ left: direction * 200, behavior: 'smooth' });
-    }
-  }
+  let moodVelocity = 0;
+  let moodLastX = 0;
+  let moodAnimationFrameId;
+  let moodOverscroll = 0;
+  let moodExactScroll = 0;
 
   function handleMoodPointerDown(e) {
     if (!moodScrollerRef) return;
     isDraggingMood = true;
+    isScrollingMood = true;
     moodStartX = e.pageX - moodScrollerRef.offsetLeft;
-    moodScrollLeft = moodScrollerRef.scrollLeft;
+    moodExactScroll = moodScrollerRef.scrollLeft;
+    moodScrollLeft = moodExactScroll - (moodOverscroll * 4);
+    moodLastX = e.pageX;
+    moodVelocity = 0;
+    cancelAnimationFrame(moodAnimationFrameId);
   }
-  function handleMoodPointerLeave() { isDraggingMood = false; }
-  function handleMoodPointerUp() { isDraggingMood = false; }
+  function handleMoodPointerLeave() {
+    if (isDraggingMood) { isDraggingMood = false; startMoodInertia(); }
+  }
+  function handleMoodPointerUp() {
+    if (isDraggingMood) { isDraggingMood = false; startMoodInertia(); }
+  }
   function handleMoodPointerMove(e) {
     if (!isDraggingMood || !moodScrollerRef) return;
     e.preventDefault();
     const x = e.pageX - moodScrollerRef.offsetLeft;
-    const walk = (x - moodStartX) * 1.5;
-    moodScrollerRef.scrollLeft = moodScrollLeft - walk;
+    const walk = (x - moodStartX) * 0.85;
+    const targetScroll = moodScrollLeft - walk;
+    const maxScroll = moodScrollerRef.scrollWidth - moodScrollerRef.clientWidth;
+
+    if (targetScroll < 0) {
+      moodExactScroll = 0;
+      moodScrollerRef.scrollLeft = 0;
+      moodOverscroll = -targetScroll * 0.25;
+    } else if (targetScroll > maxScroll) {
+      moodExactScroll = maxScroll;
+      moodScrollerRef.scrollLeft = maxScroll;
+      moodOverscroll = (maxScroll - targetScroll) * 0.25;
+    } else {
+      moodExactScroll = targetScroll;
+      moodScrollerRef.scrollLeft = targetScroll;
+      moodOverscroll = 0;
+    }
+    moodScrollerRef.style.transform = `translateX(${moodOverscroll}px)`;
+    moodVelocity = (e.pageX - moodLastX) * 0.85;
+    moodLastX = e.pageX;
+  }
+
+  function startMoodInertia() {
+    if (!moodScrollerRef) return;
+    const friction = 0.95;
+    let overscrollVelocity = 0;
+
+    function loop() {
+      const maxScroll = moodScrollerRef.scrollWidth - moodScrollerRef.clientWidth;
+      if (moodOverscroll !== 0 || overscrollVelocity !== 0) {
+        if (moodVelocity !== 0) { overscrollVelocity += moodVelocity * 0.5; moodVelocity = 0; }
+        overscrollVelocity -= moodOverscroll * 0.04;
+        overscrollVelocity *= 0.88;
+        moodOverscroll += overscrollVelocity;
+        if (Math.abs(moodOverscroll) < 0.5 && Math.abs(overscrollVelocity) < 0.5) { moodOverscroll = 0; overscrollVelocity = 0; }
+        moodScrollerRef.style.transform = moodOverscroll !== 0 ? `translateX(${moodOverscroll}px)` : '';
+        if (moodOverscroll !== 0) { moodAnimationFrameId = requestAnimationFrame(loop); } else { isScrollingMood = false; }
+        return;
+      }
+      if (Math.abs(moodVelocity) > 0.5) {
+        moodExactScroll -= (moodVelocity * 2);
+        let nextOverscroll = 0;
+        if (moodExactScroll < 0) { nextOverscroll = -moodExactScroll * 0.25; moodExactScroll = 0; }
+        else if (moodExactScroll > maxScroll) { nextOverscroll = (moodExactScroll - maxScroll) * 0.25; moodExactScroll = maxScroll; }
+        moodScrollerRef.scrollLeft = Math.round(moodExactScroll);
+        if (nextOverscroll !== 0) { moodOverscroll = nextOverscroll; moodScrollerRef.style.transform = `translateX(${moodOverscroll}px)`; }
+        moodVelocity *= friction;
+        moodAnimationFrameId = requestAnimationFrame(loop);
+        return;
+      }
+      isScrollingMood = false;
+    }
+    loop();
   }
 
   // Advanced Location State
@@ -460,13 +521,9 @@
       <div class="mood-section mb-4">
         <div class="section-label">MOOD:</div>
         <div class="mood-carousel">
-          <button class="scroll-btn left" onclick={() => scrollMoods(-1)} aria-label="Anterior">
-            <span class="material-icons-round">chevron_left</span>
-          </button>
-          
           <div 
             class="mood-scroller" 
-            class:dragging={isDraggingMood}
+            class:dragging={isScrollingMood}
             bind:this={moodScrollerRef}
             onpointerdown={handleMoodPointerDown}
             onpointerleave={handleMoodPointerLeave}
@@ -480,10 +537,6 @@
               </button>
             {/each}
           </div>
-
-          <button class="scroll-btn right" onclick={() => scrollMoods(1)} aria-label="Siguiente">
-            <span class="material-icons-round">chevron_right</span>
-          </button>
         </div>
       </div>
 
@@ -772,14 +825,15 @@
 
   /* ── Mood Section ── */
   .mood-section { width: 100%; }
-  .mood-carousel { position: relative; display: flex; align-items: center; }
+  .mood-carousel { position: relative; display: flex; align-items: center; overflow: hidden; }
   
   .mood-scroller { 
-    display: flex; gap: 10px; overflow-x: auto; padding: 0 32px 8px 32px; 
+    display: flex; gap: 10px; overflow-x: auto; padding: 0 16px 8px 16px; 
     scrollbar-width: none; flex: 1; -ms-overflow-style: none; scroll-behavior: smooth; 
-    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
     cursor: grab;
+    will-change: transform;
   }
   .mood-scroller.dragging { cursor: grabbing; scroll-behavior: auto; }
   .mood-scroller.dragging .mood-pill { pointer-events: none; }
@@ -794,21 +848,6 @@
   .mood-pill.selected { border-color: var(--aero-blue); background: rgba(74, 171, 223, 0.15); box-shadow: 0 4px 14px rgba(74, 171, 223, 0.3); color: var(--aero-sky); transform: translateY(-2px); }
   .m-icon { font-size: 1.1rem; }
   .m-label { font-size: 0.8rem; font-weight: 600; }
-  
-  .scroll-btn {
-    position: absolute;
-    display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 50%;
-    background: var(--bg-surface2); border: 1px solid var(--border-subtle);
-    color: var(--text-secondary); cursor: pointer;
-    z-index: 2;
-    transition: all 0.2s;
-    margin-top: -8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-  }
-  .scroll-btn:hover { background: var(--bg-overlay); color: var(--text-primary); border-color: var(--aero-blue); }
-  .scroll-btn.left { left: 0; }
-  .scroll-btn.right { right: 0; }
 
   /* ── Drag & Drop Area ── */
   .media-dropzone {
