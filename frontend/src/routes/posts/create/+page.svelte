@@ -178,7 +178,7 @@
   <div class="pc-layout">
 
     <!-- ── Columna Izquierda: Editor ────────────────────────────────── -->
-    <aside class="pc-editor glass-panel">
+    <aside class="pc-editor">
 
       <!-- Header -->
       <div class="pc-editor-header">
@@ -200,7 +200,7 @@
       {/if}
 
       <!-- Textarea principal -->
-      <div class="pc-compose-box glass-card">
+      <div class="pc-compose-box">
         {#if authStore.user?.avatar_url}
           <img src={authStore.user.avatar_url} alt="" class="pc-composer-avatar" />
         {:else}
@@ -689,16 +689,22 @@
     width: 440px;
     flex-shrink: 0;
     border-radius: 0;
-    border-right: 1px solid var(--glass-border);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
     padding: 24px;
     overflow-y: auto;
     position: sticky;
     top: 64px;
     height: calc(100vh - 64px);
     scrollbar-width: thin;
+  }
+  .pc-editor > * {
+    flex-shrink: 0;
   }
 
   /* Header */
@@ -760,16 +766,20 @@
   /* Compose box */
   .pc-compose-box {
     display: flex;
+    align-items: flex-start;
     gap: 12px;
-    padding: 14px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--glass-border);
-    background: var(--bg-overlay);
-    transition: border-color 0.2s, box-shadow 0.2s;
+    padding: 16px;
+    border-radius: var(--radius-lg, 16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .pc-compose-box:focus-within {
-    border-color: var(--aero-blue);
-    box-shadow: 0 0 0 3px rgba(27, 133, 243, 0.12);
+    border-color: rgba(27, 133, 243, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 8px 24px rgba(27, 133, 243, 0.2);
+    transform: translateY(-2px);
   }
 
   .pc-composer-avatar {
@@ -813,13 +823,12 @@
   /* ── Dock ─────────────────────────────────────────────────────── */
   .pc-dock {
     display: flex;
-    gap: 6px;
-    padding: 10px 8px;
+    gap: 8px;
+    padding: 12px 10px;
     border-radius: 20px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.08);
-    backdrop-filter: blur(12px);
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .pc-dock-btn {
@@ -827,46 +836,40 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
     flex: 1;
-    padding: 12px 6px 10px;
-    border-radius: 14px;
-    background: transparent;
-    border: 1px solid transparent;
+    padding: 14px 6px 12px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.08);
     cursor: pointer;
     position: relative;
-    transition: background 0.2s, transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .pc-dock-btn:hover {
-    background: rgba(255,255,255,0.06);
-    transform: translateY(-3px);
-    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.15);
   }
   .pc-dock-btn.active {
-    background: rgba(74, 171, 223, 0.1);
-    border-color: rgba(74, 171, 223, 0.28);
+    background: rgba(27, 133, 243, 0.15);
+    border-color: rgba(27, 133, 243, 0.4);
+    box-shadow: 0 8px 20px rgba(27, 133, 243, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(74, 171, 223, 0.2);
   }
-  .pc-dock-btn:active { transform: scale(0.93); }
+  .pc-dock-btn:active { transform: scale(0.95); }
 
   .pc-dock-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
-    min-width: 44px;
-    min-height: 44px;
-    border-radius: 14px;
-    font-size: 24px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
-    transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    font-size: 26px;
+    margin-bottom: 2px;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  .pc-dock-btn:hover .pc-dock-icon { transform: scale(1.08); background: rgba(255,255,255,0.09); }
+  .pc-dock-btn:hover .pc-dock-icon { transform: scale(1.15) translateY(-2px); }
   .pc-dock-btn.active .pc-dock-icon { transform: scale(1.1); }
 
   .pc-dock-icon.amber   { color: #fbbf24; }
@@ -874,12 +877,6 @@
   .pc-dock-icon.emerald { color: #34d399; }
   .pc-dock-icon.sky     { color: #38bdf8; }
   .pc-dock-icon.indigo  { color: #818cf8; }
-
-  .pc-dock-btn.active .pc-dock-icon.amber   { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); }
-  .pc-dock-btn.active .pc-dock-icon.fuchsia { background: rgba(232,121,249,0.12); border-color: rgba(232,121,249,0.3); }
-  .pc-dock-btn.active .pc-dock-icon.emerald { background: rgba(52,211,153,0.12); border-color: rgba(52,211,153,0.3); }
-  .pc-dock-btn.active .pc-dock-icon.sky     { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
-  .pc-dock-btn.active .pc-dock-icon.indigo  { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.3); }
 
   .pc-dock-label {
     font-size: 0.72rem;
@@ -1209,23 +1206,29 @@
   .pc-mood-pill {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 10px 18px;
     border-radius: 999px;
-    border: 1px solid var(--glass-border);
-    background: var(--bg-overlay);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.05);
     color: var(--text-primary);
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.2s;
-    font-size: 0.82rem;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-size: 0.85rem;
   }
-  .pc-mood-pill:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+  .pc-mood-pill:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  }
   .pc-mood-pill.active {
-    border-color: var(--aero-blue);
-    background: rgba(27,133,243,0.12);
+    border-color: rgba(27, 133, 243, 0.5);
+    background: rgba(27, 133, 243, 0.15);
     color: var(--aero-sky, #00E5FF);
-    box-shadow: 0 4px 12px rgba(27,133,243,0.25);
+    box-shadow: 0 8px 16px rgba(27, 133, 243, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.2);
     transform: translateY(-2px);
   }
   .pc-mood-icon { font-size: 1.1rem; }
@@ -1233,21 +1236,24 @@
 
   /* ── Dropzone ────────────────────────────────────────────────── */
   .pc-dropzone {
-    border: 2px dashed var(--border-subtle);
-    border-radius: 14px;
-    padding: 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    padding: 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     cursor: pointer;
     text-align: center;
-    transition: border-color 0.2s, background 0.2s;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .pc-dropzone:hover,
   .pc-dropzone.drag-active {
-    border-color: var(--aero-blue);
-    background: rgba(27,133,243,0.04);
+    border-color: rgba(27, 133, 243, 0.5);
+    background: rgba(27, 133, 243, 0.08);
+    box-shadow: 0 0 20px rgba(27, 133, 243, 0.15) inset;
+    transform: translateY(-2px);
   }
   .pc-dz-icon { font-size: 2rem; color: var(--text-muted); margin-bottom: 2px; }
   .pc-dropzone:hover .pc-dz-icon { color: var(--aero-blue); }
