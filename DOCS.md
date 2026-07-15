@@ -34,7 +34,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Reactividad | Runes de Svelte 5 (`$state`, `$derived`, `$props`) |
 | Estilos | Tailwind CSS + DaisyUI base + CSS puro para Glassmorphism |
 | Iconografía | Material Icons Round (Google Fonts) |
-| Emojis | Twemoji (renderizado via Svelte action) |
+| Emojis | Noto Color Emoji (Nativo). *Nota: Componentes internos conservan prefijo "Twemoji" por legado.* |
 | Empaquetado | Vite 8 |
 | Adapter | `@sveltejs/adapter-node` (servidor Node.js standalone) |
 | PWA | Service worker cache-first, manifest.json |
@@ -119,7 +119,7 @@ Vsocial/                     ← raíz del proyecto
 │   │   │   ├── rtc.js       ← lógica WebRTC cliente
 │   │   │   ├── components/  ← 20 componentes UI reutilizables
 │   │   │   ├── stores/      ← 4 stores reactivos Svelte 5
-│   │   │   ├── actions/     ← 1 Svelte action (twemoji)
+│   │   │   ├── actions/     ← 1 Svelte action (legacy twemoji stub)
 │   │   │   ├── server/      ← 13 módulos server-side
 │   │   │   ├── utils/       ← utilidades compartidas
 │   │   │   └── assets/      ← recursos estáticos importables
@@ -280,7 +280,7 @@ Vsocial/                     ← raíz del proyecto
 | `MediaPlayer.svelte` | Reproductor de audio/video |
 | `VoiceRecorder.svelte` | Widget de grabación de voz para mensajes |
 | `KlipyPicker.svelte` | Picker de emojis/GIFs/stickers (integración Klipy) |
-| `TwemojiPicker.svelte` | Picker de emojis Twemoji |
+| `TwemojiPicker.svelte` | Picker de emojis nativos (Noto Color Emoji). *Nombre legacy* |
 | `HashtagTextarea.svelte` | Textarea con soporte de hashtags |
 | `ReportModal.svelte` | Modal para reportar contenido |
 | `PwaPrompt.svelte` | Banner de instalación PWA |
