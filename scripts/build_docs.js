@@ -29,7 +29,7 @@ const html = `<!DOCTYPE html>
 <html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VSocial - Documentación Oficial</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -369,9 +369,9 @@ const html = `<!DOCTYPE html>
     </div>
 
     <!-- Raw Markdown Content (Escaped for JS Injection) -->
-    <script type="text/markdown" id="md-readme">\n\${readme.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
-    <script type="text/markdown" id="md-docs">\n\${docs.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
-    <script type="text/markdown" id="md-contributing">\n\${contributing.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-readme">\n${readme.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-docs">\n${docs.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-contributing">\n${contributing.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
