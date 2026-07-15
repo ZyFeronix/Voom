@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "workspace": {
+    "name": "Vsocial",
+    "createdAt": 1782236154566,
+    "preset": "starter"
+  },
+  "authorizedRoots": [
+    "D:\\Vsocial"
+  ],
+  "reload": null
+}

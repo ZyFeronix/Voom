@@ -1,0 +1,53 @@
+{
+	"name": "vsocial",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"start": "node server.js",
+		"prepare": "svelte-kit sync || echo ''",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write . && eslint --fix .",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@libsql/client": "^0.14.0",
+		"@sveltejs/adapter-node": "^2.1.0",
+		"bcryptjs": "^2.4.3",
+		"dompurify": "^3.1.0",
+		"dotenv": "^16.4.7",
+		"express-rate-limit": "^7.3.0",
+		"helmet": "^7.1.0",
+		"ioredis": "^5.11.1",
+		"jsonwebtoken": "^9.0.2",
+		"klipy-js": "^1.1.0",
+		"nodemailer": "^6.10.1",
+		"pino": "^9.0.0",
+		"pino-pretty": "^11.0.0",
+		"socket.io": "^4.8.3",
+		"socket.io-client": "^4.8.3",
+		"validator": "^13.11.0",
+		"vidstack": "^0.6.15",
+		"web-push": "^3.6.7"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.0.0",
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@testing-library/svelte": "^5.0.0",
+		"eslint": "^9.0.0",
+		"eslint-plugin-svelte": "^2.42.0",
+		"globals": "^15.0.0",
+		"prettier": "^3.8.1",
+		"prettier-plugin-svelte": "^3.5.1",
+		"supertest": "^7.0.0",
+		"svelte": "^5.55.2",
+		"terser": "^5.48.0",
+		"vite": "^8.0.7",
+		"vitest": "^2.0.3"
+	}
+}

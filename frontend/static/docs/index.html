@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <title>VSocial - Documentación Oficial</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --primary: #00f2fe; /* Celeste aero */
+            --success: #10b981; /* Green esmeralda */
+            
+            /* Glassmorphism 2.0 Tokens */
+            --glass-surface: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.15);
+            --neon-primary: 0 0 15px rgba(0, 242, 254, 0.2);
+            --neon-success: 0 0 15px rgba(16, 185, 129, 0.2);
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(circle at 50% 50%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 30%);
+            z-index: -1;
+            animation: liquid-rotate 30s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes liquid-rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-main), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: var(--neon-primary);
+            letter-spacing: -0.05em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            background: var(--glass-surface);
+            padding: 0.5rem;
+            border-radius: 100px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.75rem 1.5rem;
+            border-radius: 100px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s var(--ease-spring);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: var(--neon-primary), inset 0 1px 0 var(--glass-highlight);
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+        }
+
+        .content-panel {
+            background: var(--glass-surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 3rem;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-highlight);
+            min-height: 60vh;
+            display: none;
+            animation: fade-in-up 0.5s var(--ease-spring) forwards;
+        }
+
+        .content-panel.active {
+            display: block;
+        }
+
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .markdown-body {
+            color: var(--text-main);
+            font-size: 1.05rem;
+        }
+
+        .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #fff;
+        }
+
+        .markdown-body h1 {
+            font-size: 2.5rem;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 0.5rem;
+            margin-top: 0;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .markdown-body h2 {
+            font-size: 1.8rem;
+            border-bottom: 1px dashed var(--glass-border);
+            padding-bottom: 0.3rem;
+            color: var(--primary);
+        }
+
+        .markdown-body h3 { font-size: 1.4rem; color: var(--success); }
+
+        .markdown-body p { margin-bottom: 1.2rem; color: #cbd5e1; }
+        
+        .markdown-body a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-bottom: 1px solid transparent;
+        }
+        
+        .markdown-body a:hover {
+            border-bottom-color: var(--primary);
+            text-shadow: var(--neon-primary);
+        }
+
+        .markdown-body ul, .markdown-body ol {
+            margin-bottom: 1.2rem;
+            padding-left: 1.5rem;
+            color: #cbd5e1;
+        }
+
+        .markdown-body li { margin-bottom: 0.4rem; }
+
+        .markdown-body blockquote {
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.5rem;
+            margin: 1.5rem 0;
+            background: rgba(0, 242, 254, 0.05);
+            border-radius: 0 12px 12px 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+
+        .markdown-body th, .markdown-body td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .markdown-body th {
+            background: rgba(255,255,255,0.05);
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .markdown-body tr:last-child td { border-bottom: none; }
+        .markdown-body tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .markdown-body pre {
+            background: #0d1117 !important;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .markdown-body pre code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            background: transparent !important;
+            padding: 0;
+        }
+
+        .markdown-body code {
+            font-family: 'Fira Code', monospace;
+            background: rgba(255,255,255,0.1);
+            padding: 0.2rem 0.4rem;
+            border-radius: 6px;
+            font-size: 0.85em;
+            color: #e2e8f0;
+        }
+
+        .markdown-body hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--glass-border), transparent);
+            margin: 3rem 0;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 100px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            box-shadow: var(--neon-success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            header { flex-direction: column; gap: 1.5rem; align-items: flex-start; }
+            .tabs { flex-wrap: wrap; width: 100%; justify-content: center; }
+            .tab-btn { flex: 1; text-align: center; }
+            .content-panel { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <div class="logo">VSocial Docs</div>
+                <div style="margin-top: 0.5rem;">
+                    <div class="status-badge">
+                        <div class="status-dot"></div>
+                        Alpha v0.0.1 - Glassmorphism 2.0
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" data-target="readme">README</button>
+                <button class="tab-btn" data-target="docs">Arquitectura (DOCS)</button>
+                <button class="tab-btn" data-target="contributing">Contributing</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="readme" class="content-panel active markdown-body"></div>
+            <div id="docs" class="content-panel markdown-body"></div>
+            <div id="contributing" class="content-panel markdown-body"></div>
+        </main>
+    </div>
+
+    <!-- Raw Markdown Content (Escaped for JS Injection) -->
+    <script type="text/markdown" id="md-readme">
+${readme.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+</script>
+    <script type="text/markdown" id="md-docs">
+${docs.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+</script>
+    <script type="text/markdown" id="md-contributing">
+${contributing.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+</script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return hljs.highlight(code, { language }).value;
+                },
+                langPrefix: 'hljs language-',
+                gfm: true,
+                breaks: true
+            });
+
+            // Decode HTML entities from template
+            function decodeHtml(html) {
+                var txt = document.createElement("textarea");
+                txt.innerHTML = html;
+                return txt.value;
+            }
+
+            const renderMd = (id) => {
+                const raw = document.getElementById(`md-${id}`).innerHTML;
+                const decoded = decodeHtml(raw);
+                const html = DOMPurify.sanitize(marked.parse(decoded));
+                document.getElementById(id).innerHTML = html;
+            };
+
+            renderMd('readme');
+            renderMd('docs');
+            renderMd('contributing');
+
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const panels = document.querySelectorAll('.content-panel');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.getAttribute('data-target');
+                    
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    panels.forEach(p => {
+                        p.classList.remove('active');
+                        if(p.id === target) {
+                            p.style.animation = 'none';
+                            p.offsetHeight;
+                            p.style.animation = null;
+                            p.classList.add('active');
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

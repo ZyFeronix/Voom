@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "[husky] Running lint and build check..."
+cd frontend
+npm run lint
+npm run build
