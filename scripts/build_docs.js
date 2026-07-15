@@ -349,7 +349,7 @@ const html = `<!DOCTYPE html>
                 <div style="margin-top: 0.5rem;">
                     <div class="status-badge">
                         <div class="status-dot"></div>
-                        Alpha v0.0.1 - Glassmorphism 2.0
+                        Alpha v0.0.2 - Glassmorphism 2.0
                     </div>
                 </div>
             </div>

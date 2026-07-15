@@ -1,4 +1,4 @@
-# VSocial — Documentación Completa de Proyecto (Alpha v0.0.1)
+# VSocial — Documentación Completa de Proyecto (Alpha v0.0.2)
 
 > Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
 > operaciones y guía de desarrollo. Todo en un solo archivo.
@@ -12,7 +12,7 @@ WebSockets y diseño Glassmorphism 2.0 propio. Cubre el espectro completo de una
 social moderna: feed, posts, reels, stories, marketplace, mensajería en tiempo real,
 grupos, notificaciones push, gamificación y panel administrativo.
 
-- **Versión:** Alpha v0.0.1
+- **Versión:** Alpha v0.0.2
 - **Licencia:** GPLv3
 - **Estado:** Funcional completo — 16+ módulos implementados
 
@@ -548,6 +548,6 @@ Pendiente para el salto de Alpha → Beta:
 
 ---
 
-> **VSocial Alpha v0.0.1** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
+> **VSocial Alpha v0.0.2** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
 > WebSockets y diseño Glassmorphism propio. 31 páginas, 24 API endpoints, 35 tablas,
 > 13 módulos server-side. Lista para crecer.

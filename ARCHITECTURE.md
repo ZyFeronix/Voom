@@ -1,4 +1,4 @@
-# V-Social: Documentación Exhaustiva y Registro Arquitectónico (Alpha v0.0.1)
+# V-Social: Documentación Exhaustiva y Registro Arquitectónico (Alpha v0.0.2)
 
 > [!NOTE]
 > Este documento técnico refleja el **espectro completo** del desarrollo, decisiones de arquitectura, módulos implementados, ideologías de diseño y configuraciones de infraestructura de la plataforma **V-Social**. Nada ha sido omitido. Es el plano maestro de la aplicación.

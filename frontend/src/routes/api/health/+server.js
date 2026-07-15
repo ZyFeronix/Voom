@@ -5,7 +5,7 @@ export async function GET() {
 	const health = {
 		status: 'ok',
 		timestamp: new Date().toISOString(),
-		version: '0.0.1'
+		version: '0.0.2'
 	};
 
 	try {

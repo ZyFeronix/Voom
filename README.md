@@ -1,13 +1,13 @@
 # VSocial — Red Social Full-Stack
 
-[![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPLv3-blue)](#license)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
 
 **VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
 WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
 
-**Estado:** Alpha v0.0.1 — Funcional completo, 16 módulos, 35 tablas, 24 API endpoints.
+**Estado:** Alpha v0.0.2 — Funcional completo, 16 módulos, 35 tablas, 24 API endpoints.
 En desarrollo activo.
 
 > 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
