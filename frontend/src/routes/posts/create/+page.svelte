@@ -825,15 +825,16 @@
 
   /* ── Mood Section ── */
   .mood-section { width: 100%; }
-  .mood-carousel { position: relative; display: flex; align-items: center; overflow: hidden; }
+  .mood-carousel { 
+    position: relative; display: flex; align-items: center; 
+    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  }
   
   .mood-scroller { 
     display: flex; gap: 10px; overflow-x: auto; padding: 0 16px 8px 16px; 
     scrollbar-width: none; flex: 1; -ms-overflow-style: none; scroll-behavior: smooth; 
-    mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
     cursor: grab;
-    will-change: transform;
   }
   .mood-scroller.dragging { cursor: grabbing; scroll-behavior: auto; }
   .mood-scroller.dragging .mood-pill { pointer-events: none; }
