@@ -1032,7 +1032,7 @@ export const getFeed = (limit=20, offset=0) =>
         {#if faqOpenStates[1]}
         <div class="faq-answer-container" transition:slide>
           <div class="faq-answer">
-            <p>A diferencia de plataformas que cobran entre 5% y 30% por venta, <strong>V-Social cobra el 0%</strong>. Las transacciones se realizan mediante pasarelas de pago configurables o criptomonedas opcionales directas. El 100% de los ingresos va a la billetera del creador.</p>
+            <p>A diferencia de plataformas que cobran entre 5% y 30% por venta, <strong>V-Social cobra el 0%</strong>. Las transacciones se realizan mediante pasarelas de pago tradicionales, seguras y configurables. El 100% de los ingresos va a la cuenta del creador.</p>
           </div>
         </div>
         {/if}
