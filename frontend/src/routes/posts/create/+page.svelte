@@ -521,6 +521,7 @@
       <div class="mood-section mb-4">
         <div class="section-label">MOOD:</div>
         <div class="mood-carousel">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div 
             class="mood-scroller" 
             class:dragging={isScrollingMood}
