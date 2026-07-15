@@ -180,8 +180,7 @@ Good first contributions:
 1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
 2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
 3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Accessibility** — add ARIA labels, keyboard navigation, focus management.
-5. **Redis integration** — `ioredis` is installed but underused. Wire Redis into session storage and caching.
+4. **Testing** – `tests/auth.test.js` exists. Need more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
 6. **Email templates** — improve verification and password reset email HTML.
 
 ---

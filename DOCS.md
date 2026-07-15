@@ -75,7 +75,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 |------|-----------|
 | Contenedores | Docker + docker-compose (single service + healthcheck) |
 | Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
-| Redis | `ioredis` instalado (uso actual: limitado/opcional) |
+| Redis | No usado (arquitectura in-memory local) |
 | Tests | Vitest (`tests/auth.test.js`) |
 | Linting | ESLint 9 + Prettier 3 + plugin Svelte |
 | Git hooks | Husky (`.husky/`) |
@@ -536,12 +536,9 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 
 Pendiente para el salto de Alpha → Beta:
 
-- [ ] Redis como caché distribuida real (feeds, sesiones, rate limiting)
-- [ ] Cola de workers (BullMQ/Redis) para emails, push, thumbnails
-- [ ] CDN para uploads + transformación de imágenes (sharp/imgproxy)
-- [ ] Separación backend/frontend en servicios independientes
-- [ ] PostgreSQL o Turso distribuido como DB primaria en producción
-- [ ] Monitoreo (OpenTelemetry, Sentry, health checks avanzados)
+- [ ] Sincronización in-memory para múltiples instancias Node
+- [ ] Cola de workers interna para emails, push, thumbnails
+- [ ] Optimización continua en Turso/SQLite
 - [ ] Feed algorítmico con ML/recomendación real
 - [ ] CI/CD pipeline completo (GitHub Actions)
 - [ ] Tests de integración y e2e (Playwright)

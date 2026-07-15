@@ -150,7 +150,7 @@ Las relaciones en V-SOCIAL (seguidores, amigos, bloqueos, likes, compartidos) vi
 
 - **Tablas activas:** `users`, `posts`, `comments`, `likes`, `follows`, `notifications`.
 - **Índices quirúrgicos:** Índices compuestos en `likes(user_id, entity_type, entity_id)` para evitar duplicidad. Índices en `follows(follower_id, following_id)` para lookups O(log n).
-- **Cache de grafos:** Redis (cuando se integre) con sets ordenados (`ZSET`) para feeds y rankings. Hoy: precomputación en SQLite con views materializadas o tablas de resumen (`users.followers_count`, `posts.likes_count`).
+- **Cache de grafos:** Precomputación pura en SQLite con views materializadas o tablas de resumen (`users.followers_count`, `posts.likes_count`). Sin dependencias externas.
 - **Acceso:** Optimizar para O(1) en lecturas cacheadas/precomputadas. Las escrituras son transaccionales y atómicas en SQLite.
 
 #### D. Estrategia de Datos (SQLite Dominante)
@@ -177,7 +177,7 @@ Las relaciones en V-SOCIAL (seguidores, amigos, bloqueos, likes, compartidos) vi
 - **Inyección de Comandos:** Validación de tipos antes de cualquier `exec` o `spawn`.
 
 #### B. Autenticación y Autorización
-- **JWT en Cookies:** Access tokens cortos (15 min), refresh tokens largos (7 días) rotativos. Cookies `httpOnly`, `Secure`, `SameSite=Strict`. Blacklist de tokens en memoria o Redis.
+- **JWT en Cookies:** Access tokens cortos (15 min), refresh tokens largos (7 días) rotativos. Cookies `httpOnly`, `Secure`, `SameSite=Strict`. Blacklist de tokens en memoria o DB local.
 - **Hooks de SvelteKit:** Middleware de autenticación en `src/hooks.js` o `src/hooks.server.js`. Verificación de JWT en cada request protegido.
 - **RBAC + ABAC:** Role-Based Access Control + Attribute-Based Access Control. Un usuario puede ver un post si es público O si es seguidor O si está en la lista de permitidos.
 - **MFA:** Soporte para TOTP (Google Authenticator) y WebAuthn/FIDO2 para hardware keys.

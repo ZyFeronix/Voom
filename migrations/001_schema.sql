@@ -1,6 +1,6 @@
 -- =============================================================================
 -- VSocial - Migración Principal: Esquema Completo de Base de Datos
--- PostgreSQL 14+ | Row-Level Security habilitado en tablas críticas
+-- SQLite/LibSQL | Optimizaciones de alta concurrencia y seguridad
 -- =============================================================================
 
 BEGIN;
