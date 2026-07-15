@@ -442,15 +442,13 @@
 		<div class="media-container {post.media.length > 1 ? 'grid-2' : ''}">
 			{#each post.media.slice(0, 4) as media, i}
 				{#if media.media_type === 'video' || media.media_type === 'audio'}
-					<div class="video-wrapper {post.media.length === 1 ? 'video-wrapper-full' : 'video-wrapper-grid'}">
-						<MediaPlayer 
-							type={media.media_type} 
-							src={media.media_url} 
-							class="media-item video-media"
-							entityId={post.id}
-							entityType="video"
-						/>
-					</div>
+					<MediaPlayer 
+						type={media.media_type} 
+						src={media.media_url} 
+						class="media-item video-media {post.media.length === 1 ? 'video-solo' : 'video-grid'}"
+						entityId={post.id}
+						entityType="video"
+					/>
 				{:else}
 					<img
 						src={media.media_url}
@@ -895,29 +893,28 @@
 		object-fit: cover;
 	}
 
-	/* ── Wrapper de video — respeta proporciones, nunca recorta ── */
-	.video-wrapper {
-		position: relative;
-		width: 100%;
-		background: #000;
-		border-radius: var(--radius-xs);
-		overflow: hidden;
+	/* ── Videos: sin wrapper forzado, el player define su propio tamaño ── */
+	/* Video solo: ocupa el ancho completo, el MediaPlayer respeta el aspect-ratio nativo */
+	:global(.video-solo) {
+		width: 100% !important;
+		height: auto !important;
+		max-height: 560px !important;
+		min-height: 200px !important;
+		aspect-ratio: unset !important;
 	}
-	/* Video único: hasta 16:9 natural, sin recorte */
-	.video-wrapper-full {
-		max-height: 520px;
-		aspect-ratio: 16 / 9;
+	/* Video en grid: altura fija cómoda, sin recorte horizontal */
+	:global(.video-grid) {
+		width: 100% !important;
+		height: 220px !important;
+		min-height: 180px !important;
+		max-height: 260px !important;
 	}
-	/* Video en grid: 16:9 para mantener coherencia visual */
-	.video-wrapper-grid {
-		aspect-ratio: 16 / 9;
-	}
-	/* El MediaPlayer ocupa el 100% del wrapper sin recortar */
-	.video-media {
+	/* El video nativo dentro del player no debe estar forzado */
+	:global(.video-solo .v-native-video),
+	:global(.video-grid .v-native-video) {
+		object-fit: contain !important;
 		width: 100% !important;
 		height: 100% !important;
-		object-fit: contain !important;
-		max-height: unset !important;
 	}
 
 	.media-overlay {

@@ -503,7 +503,13 @@
 		border: 1px solid var(--glass-border);
 		box-shadow: var(--shadow-sm);
 		outline: none;
-		max-height: 80vh; 
+		max-height: 80vh;
+	}
+
+	/* Cuando el player es un video de feed (no reels), dejar que el padre controle la altura */
+	.media-player-wrapper.video-solo,
+	.media-player-wrapper.video-grid {
+		max-height: none;
 	}
 	
 	.v-video-container {
