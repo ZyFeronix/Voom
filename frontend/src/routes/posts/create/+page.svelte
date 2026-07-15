@@ -242,8 +242,9 @@
       <!-- ── Paneles expandibles ──────────────────────────────────── -->
 
       {#if activePanel === 'emoji'}
-        <div class="pc-panel">
+        <div class="pc-picker-wrapper">
           <TwemojiPicker
+            variant="inline"
             onClose={() => activePanel = ''}
             onSelect={(emoji) => { bodyText += emoji; activePanel = ''; }}
           />
@@ -251,7 +252,7 @@
       {/if}
 
       {#if activePanel === 'gif'}
-        <div class="pc-panel">
+        <div class="pc-picker-wrapper">
           <KlipyPicker
             onClose={() => activePanel = ''}
             onSelect={(url) => {
@@ -772,12 +773,14 @@
   }
 
   .pc-composer-avatar {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--glass-border);
-    flex-shrink: 0;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
   .pc-avatar-fallback {
     background: var(--grad-primary, linear-gradient(135deg, #1B85F3, #00E5FF));
@@ -787,6 +790,10 @@
     color: #fff;
     font-weight: 800;
     font-size: 1rem;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
   }
 
   .pc-textarea {
@@ -847,10 +854,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
-    border-radius: 13px;
-    font-size: 22px;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 14px;
+    font-size: 24px;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
@@ -893,10 +903,21 @@
   @keyframes pcPing { 75%, 100% { transform: scale(2.2); opacity: 0; } }
 
   /* ── Paneles expandibles ─────────────────────────────────────── */
+  .pc-picker-wrapper {
+    animation: pcSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .pc-picker-wrapper :global(.klipy-picker),
+  .pc-picker-wrapper :global(.emoji-picker) {
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 10px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+
   .pc-panel {
     border-radius: 16px;
-    border: 1px solid var(--glass-border);
+    border: 1px solid rgba(255,255,255,0.08);
     background: var(--bg-surface2);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 10px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
     overflow: hidden;
     animation: pcSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
   }
@@ -1440,11 +1461,13 @@
   }
 
   .pc-prev-avatar {
-    width: 42px; height: 42px;
+    width: 44px; height: 44px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--glass-border);
-    flex-shrink: 0;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
   }
   .pc-prev-avatar-fallback {
     background: var(--grad-primary, linear-gradient(135deg,#1B85F3,#00E5FF));
@@ -1454,6 +1477,10 @@
     color: #fff;
     font-weight: 800;
     font-size: 1rem;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
   }
 
   .pc-prev-meta { flex: 1; min-width: 0; }
