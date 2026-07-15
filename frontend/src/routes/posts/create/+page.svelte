@@ -746,26 +746,41 @@
   /* ── Mood Section ── */
   .mood-section { width: 100%; }
   .mood-carousel { position: relative; display: flex; align-items: center; }
-  .mood-scroller { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; flex: 1; -ms-overflow-style: none; scroll-behavior: smooth; }
+  
+  .mood-scroller { 
+    display: flex; gap: 10px; overflow-x: auto; padding: 0 32px 8px 32px; 
+    scrollbar-width: none; flex: 1; -ms-overflow-style: none; scroll-behavior: smooth; 
+    scroll-snap-type: x mandatory;
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
   .mood-scroller::-webkit-scrollbar { display: none; }
-  .mood-pill { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 9999px; border: 1px solid var(--glass-border); background: var(--bg-overlay); color: var(--text-primary); cursor: pointer; transition: all 0.2s; white-space: nowrap; box-shadow: var(--shadow-xs); }
+  
+  .mood-pill { 
+    display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 9999px; 
+    border: 1px solid var(--glass-border); background: var(--bg-overlay); color: var(--text-primary); 
+    cursor: pointer; transition: all 0.2s; white-space: nowrap; box-shadow: var(--shadow-xs); 
+    scroll-snap-align: center;
+  }
   .mood-pill:hover { border-color: rgba(255,255,255,0.2); background: var(--bg-surface-hover); transform: translateY(-2px); }
   .mood-pill.selected { border-color: var(--aero-blue); background: rgba(74, 171, 223, 0.15); box-shadow: 0 4px 14px rgba(74, 171, 223, 0.3); color: var(--aero-sky); transform: translateY(-2px); }
   .m-icon { font-size: 1.1rem; }
   .m-label { font-size: 0.8rem; font-weight: 600; }
   
   .scroll-btn {
+    position: absolute;
     display: flex; align-items: center; justify-content: center;
     width: 32px; height: 32px; border-radius: 50%;
     background: var(--bg-surface2); border: 1px solid var(--border-subtle);
     color: var(--text-secondary); cursor: pointer;
-    flex-shrink: 0; z-index: 2;
+    z-index: 2;
     transition: all 0.2s;
     margin-top: -8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   }
   .scroll-btn:hover { background: var(--bg-overlay); color: var(--text-primary); border-color: var(--aero-blue); }
-  .scroll-btn.left { margin-right: 8px; }
-  .scroll-btn.right { margin-left: 8px; }
+  .scroll-btn.left { left: 0; }
+  .scroll-btn.right { right: 0; }
 
   /* ── Drag & Drop Area ── */
   .media-dropzone {
