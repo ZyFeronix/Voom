@@ -3,193 +3,121 @@
   import { goto } from '$app/navigation';
   import { posts as postsApi } from '$lib/api.js';
   import { authStore } from '$lib/stores/auth.svelte.js';
-  import 'vidstack/define/media-player.js';
-	import 'vidstack/define/media-outlet.js';
-	import 'vidstack/define/media-community-skin.js';
-      import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
+  import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
   import KlipyPicker from '$lib/components/KlipyPicker.svelte';
   import CustomSelect from '$lib/components/CustomSelect.svelte';
 
-  let bodyText = $state('');
-  let showEmojis = $state(false);
-  let showGifPanel = $state(false);
-  let showPollCreator = $state(false);
-  let gifSearch = $state('');
-  const commonEmojis = ['😂','❤️','😍','🤣','😊','🙏','😭','🔥','🥰','👍','✨','🎉','👀','🙌','💯','🥺','🤍','🤩','💪','🙈','✨','🤔','🖤','🥳'];
+  // ── Estado del contenido ────────────────────────────────────────────────
+  let bodyText     = $state('');
+  let selectedFiles = $state([]);   // File[]
+  let uploadedMedia = $state([]);   // { url, type, klipy? }[]
+  let privacy      = $state('public');
+  let mood         = $state('');
+  let posting      = $state(false);
+  let error        = $state('');
+  let dragOver     = $state(false);
 
-  // Poll state
+  // ── Paneles activos ─────────────────────────────────────────────────────
+  let activePanel = $state('');  // '' | 'emoji' | 'gif' | 'poll' | 'location' | 'schedule'
+
+  // ── Poll ─────────────────────────────────────────────────────────────────
   let pollQuestion = $state('');
-  let pollOptions = $state(['', '']);
+  let pollOptions  = $state(['', '']);
   let pollDuration = $state(24);
   const pollDurations = [
-    { value: 1, label: '1 hora' },
-    { value: 6, label: '6 horas' },
-    { value: 24, label: '24 horas' },
-    { value: 72, label: '3 días' },
+    { value: 1,   label: '1 hora' },
+    { value: 6,   label: '6 horas' },
+    { value: 24,  label: '24 horas' },
+    { value: 72,  label: '3 días' },
     { value: 168, label: '7 días' }
   ];
 
-  // Curated GIFs
-  const gifCategories = [
-    { name: 'Reacciones', gifs: ['🎉 Party', '👏 Clap', '😂 Laughing', '🔥 Fire', '💯 100', '🤯 Mind Blown', '😱 Shocked', '🥳 Celebrate', '💪 Strong', '🙌 Praise'] },
-    { name: 'Emociones', gifs: ['❤️ Love', '🥰 Adore', '🥺 Plead', '😢 Cry', '😤 Angry', '🤔 Think', '😎 Cool', '🤩 Starstruck', '😬 Oops', '🫂 Hug'] },
-    { name: 'Respuestas', gifs: ['👍 Yes', '👎 No', '🤷 Shrug', '✅ Agree', '❌ Disagree', '👀 Watching', '🫡 Salute', '🤝 Deal', '✌️ Peace', '🫶 Love'] }
-  ];
-  let selectedGif = $state('');
-  let selectedFiles = $state([]);
-  let uploadedMedia = $state([]);
-  let privacy = $state('public');
-  let mood = $state('');
-  let posting = $state(false);
-  let error = $state('');
-  let dragOver = $state(false);
-
-  // Advanced Location State
-  let locationName = $state('');
-  let showLocationPanel = $state(false);
+  // ── Ubicación ─────────────────────────────────────────────────────────────
+  let locationName  = $state('');
   let locationQuery = $state('');
-  let locationSuggestions = $derived(
-    locationQuery.trim()
-      ? [
-          'Neo Tokyo',
-          'Estudio VTuber',
-          'Valhalla Café',
-          'Akihabara Virtual',
-          'La Luna',
-          'Habitación Gamer',
-          'Distrito Cyberpunk',
-          'Estación Virtual'
-        ].filter(loc => loc.toLowerCase().includes(locationQuery.toLowerCase()))
-      : [
-          'Neo Tokyo',
-          'Estudio VTuber',
-          'Valhalla Café',
-          'Akihabara Virtual',
-          'La Luna',
-          'Habitación Gamer'
-        ]
-  );
 
-  // Advanced Scheduling State
-  let scheduledAt = $state('');
-  let isScheduled = $state(false);
-  let showSchedulePanel = $state(false);
+  // ── Programación ─────────────────────────────────────────────────────────
+  let scheduledAt  = $state('');
+  let isScheduled  = $state(false);
 
+  // ── Refs ──────────────────────────────────────────────────────────────────
   let fileInput;
 
+  // ── Constantes ────────────────────────────────────────────────────────────
   const moods = [
-    { id: 'happy', label: 'Feliz', icon: '😄' },
-    { id: 'creative', label: 'Creativo', icon: '🎨' },
-    { id: 'gaming', label: 'Jugando', icon: '🎮' },
-    { id: 'music', label: 'Música', icon: '🎵' },
-    { id: 'thinking', label: 'Pensando', icon: '🤔' },
-    { id: 'excited', label: 'Emocionado', icon: '🔥' },
-    { id: 'traveling', label: 'Viajando', icon: '✈️' },
-    { id: 'celebrating', label: 'Celebrando', icon: '🥳' },
-    { id: 'working', label: 'Trabajando', icon: '💻' },
-    { id: 'eating', label: 'Comiendo', icon: '🍔' }
+    { id: 'happy',       label: 'Feliz',       icon: '😄' },
+    { id: 'creative',    label: 'Creativo',    icon: '🎨' },
+    { id: 'gaming',      label: 'Jugando',     icon: '🎮' },
+    { id: 'music',       label: 'Música',      icon: '🎵' },
+    { id: 'thinking',    label: 'Pensando',    icon: '🤔' },
+    { id: 'excited',     label: 'Emocionado',  icon: '🔥' },
+    { id: 'traveling',   label: 'Viajando',    icon: '✈️' },
+    { id: 'celebrating', label: 'Celebrando',  icon: '🥳' },
+    { id: 'working',     label: 'Trabajando',  icon: '💻' },
+    { id: 'eating',      label: 'Comiendo',    icon: '🍔' }
   ];
 
   const privacyOptions = [
-    { value: 'public', label: 'Público' },
+    { value: 'public',    label: 'Público' },
     { value: 'followers', label: 'Solo seguidores' },
-    { value: 'private', label: 'Privado' }
+    { value: 'private',   label: 'Privado' }
   ];
 
-  const canPost = $derived(bodyText.trim().length > 0 || selectedFiles.length > 0 || uploadedMedia.length > 0 || pollQuestion.trim().length > 0);
+  const DOCK_ACTIONS = [
+    { id: 'emoji',    icon: 'emoji_emotions', label: 'Emoji',    color: 'amber' },
+    { id: 'gif',      icon: 'gif_box',         label: 'GIF',      color: 'fuchsia' },
+    { id: 'poll',     icon: 'poll',            label: 'Encuesta', color: 'emerald' },
+    { id: 'location', icon: 'location_on',     label: 'Ubicación', color: 'sky' },
+    { id: 'schedule', icon: 'schedule',        label: 'Programar', color: 'indigo' }
+  ];
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const canPost = $derived(
+    bodyText.trim().length > 0 ||
+    selectedFiles.length > 0   ||
+    uploadedMedia.length > 0   ||
+    pollQuestion.trim().length > 0
+  );
+
+  const totalMedia = $derived(selectedFiles.length + uploadedMedia.length);
+
+  const selectedMood = $derived(moods.find(m => m.id === mood) ?? null);
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   onMount(() => {
     if (!authStore.isAuthenticated) goto('/login');
   });
 
-  function handleFiles(e) {
-    const files = Array.from(e.target.files || []);
-    selectedFiles = [...selectedFiles, ...files];
+  // ── Helpers de archivo ────────────────────────────────────────────────────
+  function processFiles(rawFiles) {
+    const allowed = Array.from(rawFiles).filter(
+      f => f.type.startsWith('image/') || f.type.startsWith('video/')
+    );
+    selectedFiles = [...selectedFiles, ...allowed];
   }
 
-  function removeFile(idx) {
-    selectedFiles = selectedFiles.filter((_, i) => i !== idx);
-  }
-
+  function handleFiles(e) { processFiles(e.target.files || []); }
   function handleDrop(e) {
     e.preventDefault();
     dragOver = false;
-    const files = Array.from(e.dataTransfer.files || []);
-    selectedFiles = [...selectedFiles, ...files];
+    processFiles(e.dataTransfer?.files || []);
   }
+  function removeFile(idx) { selectedFiles = selectedFiles.filter((_, i) => i !== idx); }
+  function removeUploadedMedia(idx) { uploadedMedia = uploadedMedia.filter((_, i) => i !== idx); }
 
-  function addPollOption() {
-    if (pollOptions.length < 6) pollOptions = [...pollOptions, ''];
-  }
-
+  // ── Helpers de Poll ───────────────────────────────────────────────────────
+  function addPollOption() { if (pollOptions.length < 6) pollOptions = [...pollOptions, '']; }
   function removePollOption(idx) {
     if (pollOptions.length > 2) pollOptions = pollOptions.filter((_, i) => i !== idx);
   }
-
   function updatePollOption(idx, val) {
     pollOptions = pollOptions.map((o, i) => i === idx ? val : o);
   }
 
-  function toggleGif(gif) {
-    if (selectedGif === gif) {
-      selectedGif = '';
-    } else {
-      selectedGif = gif;
-      bodyText += ` [${gif}]`;
-    }
-    showGifPanel = false;
-  }
+  // ── Toggle panel ─────────────────────────────────────────────────────────
+  function togglePanel(id) { activePanel = activePanel === id ? '' : id; }
 
-  function togglePoll() {
-    showPollCreator = !showPollCreator;
-    if (showPollCreator) {
-      showGifPanel = false;
-      showEmojis = false;
-      showLocationPanel = false;
-      showSchedulePanel = false;
-    }
-  }
-
-  function toggleEmojis() {
-    showEmojis = !showEmojis;
-    if (showEmojis) {
-      showGifPanel = false;
-      showPollCreator = false;
-      showLocationPanel = false;
-      showSchedulePanel = false;
-    }
-  }
-
-  function toggleGifPanel() {
-    showGifPanel = !showGifPanel;
-    if (showGifPanel) {
-      showEmojis = false;
-      showPollCreator = false;
-      showLocationPanel = false;
-      showSchedulePanel = false;
-    }
-  }
-
-  function toggleLocationPanel() {
-    showLocationPanel = !showLocationPanel;
-    if (showLocationPanel) {
-      showGifPanel = false;
-      showEmojis = false;
-      showPollCreator = false;
-      showSchedulePanel = false;
-    }
-  }
-
-  function toggleSchedulePanel() {
-    showSchedulePanel = !showSchedulePanel;
-    if (showSchedulePanel) {
-      showGifPanel = false;
-      showEmojis = false;
-      showPollCreator = false;
-      showLocationPanel = false;
-    }
-  }
-
+  // ── Publicar ──────────────────────────────────────────────────────────────
   async function handlePost() {
     if (!canPost || posting) return;
     posting = true;
@@ -213,10 +141,10 @@
         location_name: locationName || null
       };
 
-      if (showPollCreator && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2) {
+      if (activePanel === 'poll' && pollQuestion.trim() && pollOptions.filter(o => o.trim()).length >= 2) {
         postData.poll = {
           question: pollQuestion.trim(),
-          options: pollOptions.filter(o => o.trim()),
+          options:  pollOptions.filter(o => o.trim()),
           duration_hours: pollDuration
         };
       }
@@ -236,253 +164,323 @@
       handlePost();
     }
   }
+
+  // ── URL de objeto para previews (revocar al desmontar no es crítico en esta page) ──
+  function objectUrl(file) { return URL.createObjectURL(file); }
 </script>
 
 <svelte:head>
-  <title>Crear Post — VSocial</title>
+  <title>Nueva Publicación — VSocial</title>
+  <meta name="description" content="Crea y comparte una publicación en VSocial." />
 </svelte:head>
 
-<div class="creator-container">
-  <div class="creator-layout">
-    
-    <!-- Left Sidebar: Edición & Ajustes -->
-    <div class="tools-sidebar glass-panel">
-      <div class="create-header mb-4">
-        <a href="/feed" class="back-link" aria-label="Link">
+<div class="pc-root">
+  <div class="pc-layout">
+
+    <!-- ── Columna Izquierda: Editor ────────────────────────────────── -->
+    <aside class="pc-editor glass-panel">
+
+      <!-- Header -->
+      <div class="pc-editor-header">
+        <a href="/feed" class="pc-back" aria-label="Volver al feed">
           <span class="material-icons-round">arrow_back</span>
         </a>
-        <h1 class="create-title text-main">Nueva Publicación</h1>
+        <h1 class="pc-editor-title">Nueva Publicación</h1>
       </div>
 
+      <!-- Error -->
       {#if error}
-        <div class="error-bar mb-3">
-          <span class="material-icons-round text-sm">error_outline</span>
+        <div class="pc-error" role="alert">
+          <span class="material-icons-round">error_outline</span>
           <span>{error}</span>
+          <button onclick={() => error = ''} aria-label="Cerrar error">
+            <span class="material-icons-round">close</span>
+          </button>
         </div>
       {/if}
 
-      <!-- Contenido Principal -->
-      <div class="tool-section mb-4">
-        <label class="section-label" for="post-body-input">Contenido de la Publicación</label>
-        <div class="textarea-wrapper glass-card p-3" style="border-radius: var(--radius-md); border: 1px solid var(--glass-border); background: var(--bg-overlay);">
-          <textarea
-            id="post-body-input"
-            bind:value={bodyText}
-            onkeydown={handleKeyDown}
-            placeholder="¿Qué está pasando en tu mundo virtual?"
-            class="post-textarea"
-            rows="5"
-          ></textarea>
-        </div>
-        <div class="action-dock mt-3">
-          <button type="button" class="dock-btn" onclick={toggleEmojis} class:pressed={showEmojis} aria-label="Action button">
-            <span class="dock-icon amber">emoji_emotions</span>
-            <span class="dock-label">Emoji</span>
-            {#if showEmojis}<span class="dock-ping" ></span>{/if}
-          </button>
-          <button type="button" class="dock-btn" onclick={toggleGifPanel} class:pressed={showGifPanel} aria-label="Action button">
-            <span class="dock-icon fuchsia">gif_box</span>
-            <span class="dock-label">GIF</span>
-            {#if showGifPanel}<span class="dock-ping" ></span>{/if}
-          </button>
-          <button type="button" class="dock-btn" onclick={togglePoll} class:pressed={showPollCreator} aria-label="Action button">
-            <span class="dock-icon emerald">poll</span>
-            <span class="dock-label">Encuesta</span>
-            {#if showPollCreator}<span class="dock-ping" ></span>{/if}
-          </button>
-          <button type="button" class="dock-btn" onclick={toggleLocationPanel} class:pressed={showLocationPanel} aria-label="Action button">
-            <span class="dock-icon sky">location_on</span>
-            <span class="dock-label">Ubicacion</span>
-            {#if showLocationPanel}<span class="dock-ping" ></span>{/if}
-          </button>
-          <button type="button" class="dock-btn" onclick={toggleSchedulePanel} class:pressed={showSchedulePanel} aria-label="Action button">
-            <span class="dock-icon indigo">schedule</span>
-            <span class="dock-label">Programar</span>
-            {#if showSchedulePanel}<span class="dock-ping" ></span>{/if}
-          </button>
-        </div>
-        
-        <!-- Paneles Desplegables de Botones (Ahora dentro de tool-section) -->
-        {#if showEmojis}
-          <div class="dropdown-panel animate-slide-in-up mt-3 relative" style="border-radius: var(--radius-md); border: 1px solid var(--border-subtle); background: var(--bg-surface2); width: 100%; display: flex; justify-content: center; overflow: hidden; padding: 0; z-index: 10;">
-            <TwemojiPicker 
-              onClose={() => showEmojis = false}
-              onSelect={(emoji) => { bodyText += emoji; showEmojis = false; }} 
-            />
+      <!-- Textarea principal -->
+      <div class="pc-compose-box glass-card">
+        {#if authStore.user?.avatar_url}
+          <img src={authStore.user.avatar_url} alt="" class="pc-composer-avatar" />
+        {:else}
+          <div class="pc-composer-avatar pc-avatar-fallback">
+            {(authStore.user?.display_name?.[0] ?? 'U').toUpperCase()}
           </div>
         {/if}
-
-        {#if showGifPanel}
-          <div class="dropdown-panel animate-slide-in-up mt-3 relative" style="border-radius: var(--radius-md); border: 1px solid var(--border-subtle); background: var(--bg-surface2); width: 100%; display: flex; justify-content: center; overflow: hidden; padding: 0; z-index: 10;">
-            <KlipyPicker 
-              onClose={() => showGifPanel = false}
-              onSelect={(url, gif) => { 
-                uploadedMedia.push({ url: url, type: 'image', klipy: true });
-                showGifPanel = false; 
-              }} 
-            />
-          </div>
-        {/if}
-
-        {#if showPollCreator}
-          <div class="dropdown-panel glass-card aero-modal animate-slide-in-up mt-3 p-4 relative z-10">
-            <div class="panel-header mb-3 flex justify-between items-center">
-              <span class="panel-title text-main font-bold">Crear Encuesta</span>
-              <button class="panel-close w-7 h-7 rounded-full bg-surface hover:bg-rose-500/10 hover:text-rose-500 flex items-center justify-center transition border border-subtle" onclick={() => showPollCreator = false}><span class="material-icons-round text-sm">close</span></button>
-            </div>
-            <input type="text" bind:value={pollQuestion} placeholder="Pregunta algo..." class="vs-input mb-3 w-full aero-input" />
-            <div class="poll-options-list flex flex-col gap-2">
-              {#each pollOptions as opt, i}
-                <div class="poll-option-row flex gap-2 items-center">
-                  <span class="poll-num w-6 h-6 rounded-full bg-overlay border border-subtle flex items-center justify-center text-[10px] font-bold text-muted">{i + 1}</span>
-                  <input type="text" value={opt} oninput={(e) => updatePollOption(i, e.target.value)} placeholder="Opción {i + 1}" class="vs-input flex-1 aero-input" />
-                  {#if pollOptions.length > 2}
-                    <button class="poll-remove-btn w-6 h-6 flex items-center justify-center text-muted hover:text-rose-500 transition" onclick={() => removePollOption(i)}><span class="material-icons-round text-sm">close</span></button>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-            {#if pollOptions.length < 6}
-              <button class="poll-add-btn mt-3 w-full py-2 border border-dashed border-subtle rounded-xl text-muted text-sm font-bold hover:text-sky-400 hover:border-sky-400 transition hover:bg-sky-500/5 flex items-center justify-center gap-1" onclick={addPollOption} aria-label="Action button"><span class="material-icons-round text-sm">add</span> Añadir Opción</button>
-            {/if}
-            <div class="poll-duration-wrap mt-4 pt-3 border-t border-subtle flex items-center justify-between">
-              <span class="text-xs font-bold text-muted uppercase tracking-wider">Duración</span>
-              <select bind:value={pollDuration} class="vs-input aero-input py-1 px-3 w-auto text-sm">
-                {#each pollDurations as dur}
-                  <option value={dur.value}>{dur.label}</option>
-                {/each}
-              </select>
-            </div>
-          </div>
-        {/if}
-
-        {#if showLocationPanel}
-          <div class="dropdown-panel glass-card aero-modal animate-slide-in-up mt-3 p-4 relative z-10">
-            <div class="panel-header mb-3 flex justify-between items-center">
-              <span class="panel-title text-main font-bold">Buscar Ubicación</span>
-              <button class="panel-close w-7 h-7 rounded-full bg-surface hover:bg-rose-500/10 hover:text-rose-500 flex items-center justify-center transition border border-subtle" onclick={() => showLocationPanel = false}><span class="material-icons-round text-sm">close</span></button>
-            </div>
-            <input 
-              type="text" 
-              bind:value={locationQuery} 
-              placeholder="Escribe para buscar ubicación..." 
-              class="vs-input aero-input mb-3 w-full" 
-            />
-            <div class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-              {#each locationSuggestions as loc}
-                <button 
-                  type="button"
-                  class="w-full text-left p-2.5 rounded-xl border border-subtle bg-surface hover:bg-sky-500/10 hover:border-sky-400 transition cursor-pointer text-sm text-main flex items-center gap-2"
-                  onclick={() => { locationName = loc; showLocationPanel = false; }}
-                >
-                  <span class="material-icons-round text-xs text-muted">location_on</span>
-                  <span>{loc}</span>
-                </button>
-              {/each}
-              {#if locationSuggestions.length === 0 && locationQuery.trim()}
-                <button 
-                  type="button"
-                  class="w-full text-left p-2.5 rounded-xl border border-dashed border-subtle bg-transparent hover:bg-sky-500/10 hover:border-sky-400 transition cursor-pointer text-sm text-main flex items-center gap-2"
-                  onclick={() => { locationName = locationQuery.trim(); showLocationPanel = false; }}
-                >
-                  <span class="material-icons-round text-xs text-muted">add</span>
-                  <span>Crear "{locationQuery.trim()}"</span>
-                </button>
-              {/if}
-            </div>
-          </div>
-        {/if}
-
-        {#if showSchedulePanel}
-          <div class="dropdown-panel glass-card aero-modal animate-slide-in-up mt-3 p-4 relative z-10">
-            <div class="panel-header mb-3 flex justify-between items-center">
-              <span class="panel-title text-main font-bold">Programar Publicación</span>
-              <button class="panel-close w-7 h-7 rounded-full bg-surface hover:bg-rose-500/10 hover:text-rose-500 flex items-center justify-center transition border border-subtle" onclick={() => showSchedulePanel = false}><span class="material-icons-round text-sm">close</span></button>
-            </div>
-            <div class="flex flex-col gap-3">
-              <label class="aero-switch cursor-pointer flex items-center gap-3 p-2 rounded-xl hover:bg-surface transition">
-                <input type="checkbox" bind:checked={isScheduled} class="hidden-peer" />
-                <span class="switch-slider w-10 h-5 rounded-full bg-overlay border border-subtle relative transition-colors duration-300 before:content-[''] before:absolute before:w-3 before:h-3 before:bg-white before:rounded-full before:top-[3px] before:left-[3px] before:transition-transform"></span>
-                <span class="text-xs font-bold uppercase text-main">Activar Programación</span>
-              </label>
-              
-              {#if isScheduled}
-                <div class="flex flex-col gap-1 mt-2 p-3 bg-overlay border border-subtle rounded-xl">
-                  <span class="text-[10px] font-bold text-muted uppercase tracking-wider mb-1">Fecha y Hora de Publicación</span>
-                  <input 
-                    type="datetime-local" 
-                    bind:value={scheduledAt} 
-                    min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                    class="vs-input aero-input w-full" 
-                  />
-                </div>
-              {/if}
-              
-              <button 
-                type="button" 
-                class="btn-aero-primary w-full py-2.5 font-bold shadow-lg mt-2 text-sm" 
-                onclick={() => showSchedulePanel = false}
-              >
-                Confirmar Programación
-              </button>
-            </div>
-          </div>
-        {/if}
+        <textarea
+          id="post-body-input"
+          bind:value={bodyText}
+          onkeydown={handleKeyDown}
+          placeholder="¿Qué está pasando en tu mundo?"
+          class="pc-textarea"
+          rows="5"
+          aria-label="Contenido de la publicación"
+        ></textarea>
       </div>
 
-      <!-- Panel de Moods -->
-      <div class="mood-section mb-4">
-        <div class="section-label">MOOD:</div>
-        <div class="mood-scroller">
+      <!-- Dock de acciones -->
+      <div class="pc-dock">
+        {#each DOCK_ACTIONS as action}
+          <button
+            type="button"
+            class="pc-dock-btn"
+            class:active={activePanel === action.id}
+            onclick={() => togglePanel(action.id)}
+            aria-label={action.label}
+            aria-pressed={activePanel === action.id}
+          >
+            <span class="pc-dock-icon {action.color} material-icons-round">{action.icon}</span>
+            <span class="pc-dock-label">{action.label}</span>
+            {#if activePanel === action.id}
+              <span class="pc-dock-pip" aria-hidden="true"></span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+
+      <!-- ── Paneles expandibles ──────────────────────────────────── -->
+
+      {#if activePanel === 'emoji'}
+        <div class="pc-panel">
+          <TwemojiPicker
+            onClose={() => activePanel = ''}
+            onSelect={(emoji) => { bodyText += emoji; activePanel = ''; }}
+          />
+        </div>
+      {/if}
+
+      {#if activePanel === 'gif'}
+        <div class="pc-panel">
+          <KlipyPicker
+            onClose={() => activePanel = ''}
+            onSelect={(url) => {
+              uploadedMedia = [...uploadedMedia, { url, type: 'image', klipy: true }];
+              activePanel = '';
+            }}
+          />
+        </div>
+      {/if}
+
+      {#if activePanel === 'poll'}
+        <div class="pc-panel pc-panel-form">
+          <div class="pc-panel-header">
+            <span class="material-icons-round pc-panel-icon emerald">poll</span>
+            <span class="pc-panel-title">Crear Encuesta</span>
+            <button class="pc-panel-close" onclick={() => activePanel = ''} aria-label="Cerrar">
+              <span class="material-icons-round">close</span>
+            </button>
+          </div>
+
+          <input
+            type="text"
+            bind:value={pollQuestion}
+            placeholder="Haz una pregunta..."
+            class="pc-input"
+            maxlength="100"
+          />
+
+          <div class="pc-poll-options">
+            {#each pollOptions as opt, i}
+              <div class="pc-poll-row">
+                <span class="pc-poll-num">{i + 1}</span>
+                <input
+                  type="text"
+                  value={opt}
+                  oninput={(e) => updatePollOption(i, e.target.value)}
+                  placeholder="Opción {i + 1}"
+                  class="pc-input"
+                  maxlength="40"
+                />
+                {#if pollOptions.length > 2}
+                  <button class="pc-poll-remove" onclick={() => removePollOption(i)} aria-label="Eliminar opción">
+                    <span class="material-icons-round">close</span>
+                  </button>
+                {/if}
+              </div>
+            {/each}
+          </div>
+
+          {#if pollOptions.length < 6}
+            <button class="pc-poll-add" onclick={addPollOption}>
+              <span class="material-icons-round">add</span> Añadir opción
+            </button>
+          {/if}
+
+          <div class="pc-poll-duration">
+            <label class="pc-poll-duration-label" for="poll-duration">
+              <span class="material-icons-round">timer</span> Duración
+            </label>
+            <select id="poll-duration" bind:value={pollDuration} class="pc-select">
+              {#each pollDurations as dur}
+                <option value={dur.value}>{dur.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+      {/if}
+
+      {#if activePanel === 'location'}
+        <div class="pc-panel pc-panel-form">
+          <div class="pc-panel-header">
+            <span class="material-icons-round pc-panel-icon sky">location_on</span>
+            <span class="pc-panel-title">Ubicación</span>
+            <button class="pc-panel-close" onclick={() => activePanel = ''} aria-label="Cerrar">
+              <span class="material-icons-round">close</span>
+            </button>
+          </div>
+
+          <input
+            type="text"
+            bind:value={locationQuery}
+            placeholder="Escribe el nombre del lugar..."
+            class="pc-input"
+            autocomplete="off"
+          />
+
+          {#if locationQuery.trim()}
+            <div class="pc-location-actions">
+              <button
+                class="pc-location-confirm"
+                onclick={() => { locationName = locationQuery.trim(); activePanel = ''; }}
+              >
+                <span class="material-icons-round">check</span>
+                Usar "{locationQuery.trim()}"
+              </button>
+            </div>
+          {/if}
+
+          {#if locationName}
+            <div class="pc-location-active">
+              <span class="material-icons-round">location_on</span>
+              <span>{locationName}</span>
+              <button onclick={() => { locationName = ''; locationQuery = ''; }} aria-label="Quitar ubicación">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if activePanel === 'schedule'}
+        <div class="pc-panel pc-panel-form">
+          <div class="pc-panel-header">
+            <span class="material-icons-round pc-panel-icon indigo">schedule</span>
+            <span class="pc-panel-title">Programar publicación</span>
+            <button class="pc-panel-close" onclick={() => activePanel = ''} aria-label="Cerrar">
+              <span class="material-icons-round">close</span>
+            </button>
+          </div>
+
+          <label class="pc-toggle">
+            <input type="checkbox" bind:checked={isScheduled} />
+            <span class="pc-toggle-track"></span>
+            <span class="pc-toggle-label">Activar programación</span>
+          </label>
+
+          {#if isScheduled}
+            <div class="pc-schedule-input">
+              <label class="pc-sub-label" for="scheduled-at">Fecha y hora de publicación</label>
+              <input
+                id="scheduled-at"
+                type="datetime-local"
+                bind:value={scheduledAt}
+                min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                class="pc-input"
+              />
+            </div>
+          {/if}
+
+          <button
+            class="pc-btn-primary mt-2"
+            onclick={() => activePanel = ''}
+          >
+            Confirmar
+          </button>
+        </div>
+      {/if}
+
+      <!-- ── Mood selector ──────────────────────────────────────── -->
+      <div class="pc-section">
+        <p class="pc-section-label">
+          <span class="material-icons-round">mood</span>
+          Estado de ánimo
+        </p>
+        <div class="pc-mood-scroll">
           {#each moods as m}
-            <button class="mood-pill" class:selected={mood === m.id} onclick={() => mood = mood === m.id ? '' : m.id}>
-              <span class="m-icon">{m.icon}</span>
-              <span class="m-label">{m.label}</span>
+            <button
+              class="pc-mood-pill"
+              class:active={mood === m.id}
+              onclick={() => mood = mood === m.id ? '' : m.id}
+              title={m.label}
+            >
+              <span class="pc-mood-icon">{m.icon}</span>
+              <span class="pc-mood-label">{m.label}</span>
             </button>
           {/each}
         </div>
       </div>
 
-      <!-- Drag & Drop Media Zone -->
-      <div class="tool-section mb-4">
-        <div class="section-label">Archivos Adjuntos</div>
+      <!-- ── Media adjunta ────────────────────────────────────────── -->
+      <div class="pc-section">
+        <p class="pc-section-label">
+          <span class="material-icons-round">attach_file</span>
+          Archivos adjuntos
+          {#if totalMedia > 0}<span class="pc-badge">{totalMedia}</span>{/if}
+        </p>
+
+        <!-- Dropzone -->
         <div
-          class="media-dropzone"
-          class:drag-over={dragOver}
+          class="pc-dropzone"
+          class:drag-active={dragOver}
+          role="button"
+          tabindex="0"
           ondragover={(e) => { e.preventDefault(); dragOver = true; }}
           ondragleave={() => dragOver = false}
           ondrop={handleDrop}
-          role="button"
-          tabindex="0"
           onclick={() => fileInput.click()}
           onkeydown={(e) => e.key === 'Enter' && fileInput.click()}
         >
-          <span class="material-icons-round dropzone-icon">cloud_upload</span>
-          <p class="dropzone-text">Arrastra imágenes/videos o <span class="text-aero-blue">haz clic</span></p>
+          <span class="material-icons-round pc-dz-icon">cloud_upload</span>
+          <span class="pc-dz-text">Arrastra o haz clic</span>
+          <span class="pc-dz-hint">Imágenes y videos · Múltiples permitidos</span>
         </div>
-        <input type="file" bind:this={fileInput} multiple accept="image/*,video/*" style="display:none" onchange={handleFiles} />
-        
-        {#if selectedFiles.length > 0 || uploadedMedia.length > 0}
-          <div class="media-preview-grid mt-3">
+        <input
+          type="file"
+          bind:this={fileInput}
+          multiple
+          accept="image/*,video/*"
+          style="display:none"
+          onchange={handleFiles}
+        />
+
+        <!-- Grid de thumbs -->
+        {#if totalMedia > 0}
+          <div class="pc-media-grid">
             {#each uploadedMedia as media, idx}
-              <div class="media-preview-item border-2 border-aero-blue">
-                <img src={media.url} alt="" class="preview-thumb" />
-                <button class="remove-media-btn" onclick={(e) => { e.stopPropagation(); uploadedMedia.splice(idx, 1); }}>
-                  <span class="material-icons-round text-sm">close</span>
+              <div class="pc-thumb" class:klipy={media.klipy}>
+                <img src={media.url} alt="" />
+                {#if media.klipy}
+                  <span class="pc-thumb-badge">GIF</span>
+                {/if}
+                <button class="pc-thumb-remove" onclick={() => removeUploadedMedia(idx)} aria-label="Quitar">
+                  <span class="material-icons-round">close</span>
                 </button>
               </div>
             {/each}
             {#each selectedFiles as file, idx}
-              <div class="media-preview-item">
+              <div class="pc-thumb">
                 {#if file.type.startsWith('video/')}
-                  <media-player src={URL.createObjectURL(file)} class="preview-thumb" muted playsInline>
-                    <media-outlet></media-outlet>
-                  </media-player>
+                  <!-- Thumbnail de video: sin controles, solo preview muted -->
+                  <video src={objectUrl(file)} muted playsinline preload="metadata" class="pc-thumb-video"></video>
+                  <span class="pc-thumb-badge video-badge">
+                    <span class="material-icons-round">videocam</span>
+                  </span>
                 {:else}
-                  <img src={URL.createObjectURL(file)} alt="" class="preview-thumb" />
+                  <img src={objectUrl(file)} alt="" />
                 {/if}
-                <button class="remove-media-btn" onclick={(e) => { e.stopPropagation(); removeFile(idx); }}>
-                  <span class="material-icons-round text-sm">close</span>
+                <button class="pc-thumb-remove" onclick={() => removeFile(idx)} aria-label="Quitar">
+                  <span class="material-icons-round">close</span>
                 </button>
               </div>
             {/each}
@@ -490,471 +488,1134 @@
         {/if}
       </div>
 
-      <div style="flex: 1;"></div>
+      <div class="pc-flex-grow"></div>
 
-      <!-- Footer Actions -->
-      <div class="create-footer mt-5 pt-4 border-t border-glass-border flex justify-between items-center gap-3">
-        <div class="privacy-select-wrapper" style="width: 140px;">
-          <CustomSelect bind:value={privacy} options={privacyOptions} placeholder="Público" />
-        </div>
-        
-        <button class="btn-aero-primary px-6 publish-btn" disabled={!canPost || posting} onclick={handlePost} aria-label="Action button">
-          {#if posting}
-            <div class="loading-spinner"></div>
-          {:else}
-            <span class="material-icons-round text-sm mr-2">send</span> Publicar
+      <!-- ── Footer: privacidad + publicar ───────────────────────── -->
+      <div class="pc-footer">
+        <!-- Tags activos -->
+        <div class="pc-active-tags">
+          {#if locationName}
+            <span class="pc-tag sky">
+              <span class="material-icons-round">location_on</span>
+              {locationName}
+              <button onclick={() => { locationName = ''; locationQuery = ''; }} aria-label="Quitar ubicación">×</button>
+            </span>
           {/if}
-        </button>
+          {#if isScheduled && scheduledAt}
+            <span class="pc-tag indigo">
+              <span class="material-icons-round">schedule</span>
+              {new Date(scheduledAt).toLocaleDateString('es', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
+              <button onclick={() => { isScheduled = false; scheduledAt = ''; }} aria-label="Quitar programación">×</button>
+            </span>
+          {/if}
+          {#if selectedMood}
+            <span class="pc-tag amber">
+              {selectedMood.icon} {selectedMood.label}
+              <button onclick={() => mood = ''} aria-label="Quitar mood">×</button>
+            </span>
+          {/if}
+        </div>
+
+        <div class="pc-footer-actions">
+          <div class="pc-privacy-wrap">
+            <CustomSelect bind:value={privacy} options={privacyOptions} placeholder="Público" />
+          </div>
+
+          <button
+            class="pc-publish"
+            disabled={!canPost || posting}
+            onclick={handlePost}
+            aria-label="Publicar"
+          >
+            {#if posting}
+              <span class="pc-spinner"></span>
+              Publicando...
+            {:else}
+              <span class="material-icons-round">send</span>
+              Publicar
+            {/if}
+          </button>
+        </div>
+
+        <p class="pc-shortcut-hint">
+          <span class="material-icons-round">keyboard</span>
+          Ctrl+Enter para publicar rápido
+        </p>
       </div>
+    </aside>
 
-    </div>
+    <!-- ── Columna Derecha: Vista Previa Live ─────────────────────── -->
+    <section class="pc-preview-col">
+      <div class="pc-preview-inner">
+        <p class="pc-preview-label">
+          <span class="material-icons-round">preview</span>
+          Vista previa en vivo
+        </p>
 
-    <!-- Center/Right: Vista Previa en Vivo -->
-    <div class="preview-section">
-      <div class="preview-card-wrapper max-w-md w-full animate-slide-in-up">
-        <div class="preview-label font-bold text-xs uppercase tracking-wider text-muted mb-4 text-center">Vista Previa en Vivo</div>
-        
-        <article class="preview-post-card" aria-label="Link">
-          <!-- Header -->
-          <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <!-- Avatar -->
-              {#if authStore.user?.avatar_url}
-                <div class="w-11 h-11 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
-                  <img src={authStore.user.avatar_url} alt="" class="w-full h-full object-cover" />
-                </div>
-              {:else}
-                <div class="w-11 h-11 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center border border-white/20 flex-shrink-0">
-                  <span class="text-white font-bold">{(authStore.user?.username || '?')[0].toUpperCase()}</span>
-                </div>
-              {/if}
-              
-              <div>
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-bold text-sm text-main">{authStore.user?.display_name || authStore.user?.username}</span>
-                  {#if authStore.user?.is_verified}
-                    <span class="material-icons-round text-[16px] text-blue-500">verified</span>
-                  {/if}
-                  {#if mood}
-                    {@const selectedMood = moods.find(m => m.id === mood)}
-                    {#if selectedMood}
-                      <span class="post-mood-badge">
-                        <span>{selectedMood.icon}</span>
-                        <span>{selectedMood.label}</span>
-                      </span>
-                    {/if}
-                  {/if}
-                </div>
-                <div class="flex flex-col">
-                  <span class="text-[10px] text-muted">@{authStore.user?.username || 'usuario'} • Hace un momento</span>
-                  {#if locationName}
-                    <span class="text-[10px] text-sky-400 font-semibold flex items-center gap-0.5 mt-0.5">
-                      <span class="material-icons-round text-xs">location_on</span>
-                      {locationName}
-                    </span>
-                  {/if}
-                </div>
+        <article class="pc-preview-card">
+          <!-- Header del post -->
+          <div class="pc-prev-header">
+            {#if authStore.user?.avatar_url}
+              <img src={authStore.user.avatar_url} alt="" class="pc-prev-avatar" />
+            {:else}
+              <div class="pc-prev-avatar pc-prev-avatar-fallback">
+                {(authStore.user?.display_name?.[0] ?? 'U').toUpperCase()}
               </div>
+            {/if}
+
+            <div class="pc-prev-meta">
+              <div class="pc-prev-name-row">
+                <span class="pc-prev-name">{authStore.user?.display_name ?? authStore.user?.username ?? 'Tú'}</span>
+                {#if authStore.user?.is_verified}
+                  <span class="material-icons-round pc-verified">verified</span>
+                {/if}
+                {#if selectedMood}
+                  <span class="pc-prev-mood">{selectedMood.icon} {selectedMood.label}</span>
+                {/if}
+              </div>
+              <div class="pc-prev-sub">
+                <span>@{authStore.user?.username ?? 'usuario'} · ahora</span>
+                {#if locationName}
+                  <span class="pc-prev-location">
+                    <span class="material-icons-round">location_on</span>{locationName}
+                  </span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="pc-prev-privacy">
+              <span class="material-icons-round">
+                {privacy === 'public' ? 'public' : privacy === 'followers' ? 'group' : 'lock'}
+              </span>
             </div>
           </div>
 
-          <!-- Body -->
+          <!-- Cuerpo del post -->
           {#if bodyText.trim()}
-            <p class="post-body text-sm text-main my-3 whitespace-pre-wrap">{bodyText}</p>
+            <p class="pc-prev-body">{bodyText}</p>
           {:else}
-            <p class="post-body text-sm text-muted my-3 italic">Escribe algo en la caja de texto para verlo aquí...</p>
+            <p class="pc-prev-body pc-prev-empty">Escribe algo para verlo aquí...</p>
           {/if}
 
-          <!-- Poll Widget -->
-          {#if showPollCreator && pollQuestion.trim()}
-            <div class="poll-widget-container p-4 rounded-xl mb-4 bg-surface/30 border border-subtle max-w-sm">
-              <div class="poll-question font-bold text-xs text-main mb-3">
-                {pollQuestion}
-              </div>
-              <div class="flex flex-col gap-2">
-                {#each pollOptions.filter(o => o.trim()) as option}
-                  <div class="poll-option-btn w-full p-2.5 rounded-lg border border-subtle bg-surface/50 text-left font-semibold text-xs text-main flex justify-between items-center">
-                    <span>{option}</span>
-                    <span class="material-icons-round text-muted text-xs">radio_button_unchecked</span>
+          <!-- Poll preview -->
+          {#if activePanel === 'poll' && pollQuestion.trim()}
+            <div class="pc-prev-poll">
+              <p class="pc-prev-poll-q">{pollQuestion}</p>
+              <div class="pc-prev-poll-opts">
+                {#each pollOptions.filter(o => o.trim()) as opt}
+                  <div class="pc-prev-poll-opt">
+                    <span>{opt}</span>
+                    <span class="material-icons-round">radio_button_unchecked</span>
                   </div>
                 {/each}
               </div>
+              {#if isScheduled && scheduledAt}
+                <p class="pc-prev-poll-info">
+                  <span class="material-icons-round">timer</span>
+                  {pollDurations.find(d => d.value === pollDuration)?.label ?? '24 horas'}
+                </p>
+              {/if}
             </div>
           {/if}
 
-          <!-- Media Previews -->
-          {#if selectedFiles.length > 0 || uploadedMedia.length > 0}
-            <div class="grid gap-2 rounded-xl overflow-hidden mt-3 max-h-[300px]" style="grid-template-columns: {selectedFiles.length + uploadedMedia.length > 1 ? '1fr 1fr' : '1fr'};">
+          <!-- Media previews -->
+          {#if totalMedia > 0}
+            <div
+              class="pc-prev-media"
+              class:grid-single={totalMedia === 1}
+              class:grid-multi={totalMedia > 1}
+            >
               {#each uploadedMedia as media}
-                <div class="relative aspect-video bg-neutral-900 flex items-center justify-center">
-                  <img src={media.url} alt="" class="w-full h-full object-cover" />
+                <div class="pc-prev-media-item">
+                  <img src={media.url} alt="" />
                   {#if media.klipy}
-                    <span class="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/60 text-[10px] text-white font-bold tracking-wider">GIF</span>
+                    <span class="pc-prev-badge">GIF</span>
                   {/if}
                 </div>
               {/each}
               {#each selectedFiles as file}
-                <div class="relative aspect-video bg-neutral-900 flex items-center justify-center">
+                <div class="pc-prev-media-item">
                   {#if file.type.startsWith('video/')}
-                    <media-player src={URL.createObjectURL(file)} class="w-full h-full object-cover" muted playsInline>
-                      <media-outlet></media-outlet>
-                    </media-player>
-                    <span class="absolute top-2 right-2 bg-black/60 p-1 rounded-full"><span class="material-icons-round text-white text-xs">videocam</span></span>
+                    <video src={objectUrl(file)} muted playsinline preload="metadata" class="pc-prev-video"></video>
+                    <span class="pc-prev-badge">
+                      <span class="material-icons-round">videocam</span>
+                    </span>
                   {:else}
-                    <img src={URL.createObjectURL(file)} alt="" class="w-full h-full object-cover" />
+                    <img src={objectUrl(file)} alt="" />
                   {/if}
                 </div>
               {/each}
             </div>
           {/if}
 
-          <!-- Mock Actions -->
-          <div class="action-bar flex justify-between border-t border-subtle pt-3 mt-4 text-xs text-muted font-semibold">
-            <span class="flex items-center gap-1 cursor-pointer hover:text-rose-500 transition"><span class="material-icons-round text-sm">favorite_border</span> 0</span>
-            <span class="flex items-center gap-1 cursor-pointer hover:text-blue-500 transition"><span class="material-icons-round text-sm">chat_bubble_outline</span> 0</span>
-            <span class="flex items-center gap-1 cursor-pointer hover:text-green-500 transition"><span class="material-icons-round text-sm">share</span> Compartir</span>
-            <span class="flex items-center gap-1 cursor-pointer hover:text-amber-500 transition"><span class="material-icons-round text-sm">bookmark_border</span> Guardar</span>
+          <!-- Acciones del post (decorativas) -->
+          <div class="pc-prev-actions">
+            <span class="pc-prev-action">
+              <span class="material-icons-round">favorite_border</span> 0
+            </span>
+            <span class="pc-prev-action">
+              <span class="material-icons-round">chat_bubble_outline</span> 0
+            </span>
+            <span class="pc-prev-action">
+              <span class="material-icons-round">share</span> Compartir
+            </span>
+            <span class="pc-prev-action">
+              <span class="material-icons-round">bookmark_border</span>
+            </span>
           </div>
         </article>
       </div>
-    </div>
+    </section>
 
   </div>
 </div>
 
 <style>
-  .creator-container {
+  /* ── Root ──────────────────────────────────────────────────────── */
+  .pc-root {
     min-height: calc(100vh - 64px);
     background: transparent;
+    font-family: var(--font-sans);
   }
 
-  .creator-layout {
+  .pc-layout {
     display: flex;
     min-height: calc(100vh - 64px);
   }
 
-  /* ── 2-Column Widescreen Layout ── */
-  .tools-sidebar {
+  /* ── Editor (columna izquierda) ──────────────────────────────── */
+  .pc-editor {
     width: 440px;
-    background: var(--glass-bg);
+    flex-shrink: 0;
+    border-radius: 0;
     border-right: 1px solid var(--glass-border);
     display: flex;
     flex-direction: column;
+    gap: 16px;
     padding: 24px;
-    border-radius: 0;
     overflow-y: auto;
-    flex-shrink: 0;
     position: sticky;
     top: 64px;
     height: calc(100vh - 64px);
+    scrollbar-width: thin;
   }
 
-  .preview-section {
-    flex: 1;
+  /* Header */
+  .pc-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .pc-back {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at center, rgba(46, 134, 232, 0.05) 0%, transparent 70%);
-    position: relative;
-    padding: 40px 20px;
-  }
-
-  .create-header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .back-link {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.05);
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    text-decoration: none;
+    flex-shrink: 0;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .pc-back:hover { background: var(--bg-surface2); transform: translateX(-2px); }
+
+  .pc-editor-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  /* Error bar */
+  .pc-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(232, 74, 114, 0.1);
+    border: 1px solid rgba(232, 74, 114, 0.25);
+    color: var(--aero-rose, #e84a72);
+    font-size: 0.82rem;
+  }
+  .pc-error .material-icons-round { font-size: 18px; }
+  .pc-error button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+  }
+  .pc-error button:hover { opacity: 1; }
+
+  /* Compose box */
+  .pc-compose-box {
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border);
+    background: var(--bg-overlay);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .pc-compose-box:focus-within {
+    border-color: var(--aero-blue);
+    box-shadow: 0 0 0 3px rgba(27, 133, 243, 0.12);
+  }
+
+  .pc-composer-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  .pc-avatar-fallback {
+    background: var(--grad-primary, linear-gradient(135deg, #1B85F3, #00E5FF));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: all 0.2s;
-  }
-  .back-link:hover {
-    background: rgba(255,255,255,0.1);
-    transform: translateX(-2px);
+    color: #fff;
+    font-weight: 800;
+    font-size: 1rem;
   }
 
-  .create-title {
-    font-family: var(--font-display);
-    font-size: 1.35rem;
-    margin: 0;
+  .pc-textarea {
     flex: 1;
-  }
-
-  .tool-section { margin-bottom: 20px; width: 100%; }
-  .section-label { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
-
-  .post-textarea {
-    width: 100%;
     background: transparent;
     border: none;
     resize: none;
     font-size: 1rem;
     color: var(--text-primary);
-    outline: none;
-    line-height: 1.5;
     font-family: var(--font-sans);
+    outline: none;
+    line-height: 1.55;
+    min-height: 80px;
   }
-  .post-textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+  .pc-textarea::placeholder { color: var(--text-muted); opacity: 0.65; }
 
-  /* ── Dropdown Panels ── */
-  .dropdown-panel {
-    background: var(--glass-bg);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: var(--glass-shadow);
-  }
-
-
-
-  /* Poll Panel */
-  .poll-options-list { display: flex; flex-direction: column; gap: 8px; }
-  .poll-option-row { display: flex; align-items: center; gap: 8px; }
-  .poll-num { width: 24px; height: 24px; border-radius: 50%; background: var(--bg-overlay); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
-  .poll-remove-btn { color: var(--text-muted); background: transparent; border: none; cursor: pointer; transition: color 0.2s; }
-  .poll-remove-btn:hover { color: var(--aero-rose); }
-  .poll-add-btn { display: flex; align-items: center; gap: 4px; background: transparent; border: 1px dashed var(--glass-border); border-radius: 8px; padding: 6px 12px; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 8px; transition: all 0.2s; }
-  .poll-add-btn:hover { border-color: var(--aero-blue); color: var(--aero-blue); background: rgba(74, 171, 223, 0.05); }
-
-  /* ── Mood Section ── */
-  .mood-section { width: 100%; }
-  .mood-scroller { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
-  .mood-scroller::-webkit-scrollbar { display: none; }
-  .mood-pill { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 9999px; border: 1px solid var(--glass-border); background: var(--bg-overlay); color: var(--text-primary); cursor: pointer; transition: all 0.2s; white-space: nowrap; box-shadow: var(--shadow-xs); }
-  .mood-pill:hover { border-color: rgba(255,255,255,0.2); background: var(--bg-surface-hover); transform: translateY(-2px); }
-  .mood-pill.selected { border-color: var(--aero-blue); background: rgba(74, 171, 223, 0.15); box-shadow: 0 4px 14px rgba(74, 171, 223, 0.3); color: var(--aero-sky); transform: translateY(-2px); }
-  .m-icon { font-size: 1.1rem; }
-  .m-label { font-size: 0.8rem; font-weight: 600; }
-
-  /* ── Drag & Drop Area ── */
-  .media-dropzone {
-    border: 2px dashed var(--glass-border);
-    border-radius: 16px;
-    padding: 18px;
-    text-align: center;
-    background: var(--bg-overlay);
-    transition: all 0.2s;
-    cursor: pointer;
-  }
-  .media-dropzone:hover, .media-dropzone.drag-over {
-    border-color: var(--aero-blue);
-    background: rgba(74, 171, 223, 0.05);
-  }
-  .dropzone-icon { font-size: 2.2rem; color: var(--text-muted); margin-bottom: 4px; }
-  .media-dropzone:hover .dropzone-icon { color: var(--aero-blue); }
-  .dropzone-text { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-
-  /* ── Media Preview ── */
-  .media-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 10px; }
-  .media-preview-item { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1; box-shadow: var(--shadow-sm); }
-  .preview-thumb { width: 100%; height: 100%; object-fit: cover; }
-  .remove-media-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,0.6); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; }
-  .remove-media-btn:hover { background: rgba(232, 74, 114, 0.9); }
-
-  /* ── Live Preview Card Stylings (VSocial lookalike) ── */
-  .preview-card-wrapper {
+  /* ── Dock ─────────────────────────────────────────────────────── */
+  .pc-dock {
     display: flex;
-    flex-direction: column;
-  }
-  .preview-label {
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  }
-  .preview-post-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(25px) saturate(1.4);
-    -webkit-backdrop-filter: blur(25px) saturate(1.4);
-    border: 1px solid var(--glass-border);
-    border-top-color: var(--glass-border-t);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    box-shadow: var(--shadow-lg), var(--glass-inset);
-    width: 100%;
-  }
-
-  .text-main { color: var(--text-primary); }
-  .text-muted { color: var(--text-muted); }
-
-  .post-mood-badge {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    gap: 6px;
+    padding: 10px 8px;
+    border-radius: 20px;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    padding: 2px 8px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-  }
-
-  .poll-widget-container {
-    background: var(--bg-overlay);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-  }
-
-  .poll-option-btn {
-    transition: all 0.2s;
-  }
-
-  .action-bar {
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  /* ── Dock Action Bar ── */
-  .action-dock {
-    display: flex;
-    justify-content: space-between;
-    align-items: stretch;
-    gap: 8px;
-    padding: 12px 10px;
-    border-radius: 24px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-sm), inset 0 1px 1px rgba(255,255,255,0.1);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.08);
     backdrop-filter: blur(12px);
   }
 
-  .dock-btn {
+  .pc-dock-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     flex: 1;
-    min-width: 0;
-    padding: 16px 8px 14px 8px;
-    border-radius: 16px;
+    padding: 12px 6px 10px;
+    border-radius: 14px;
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
     position: relative;
-    transition: background 0.3s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+    transition: background 0.2s, transform 0.2s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, box-shadow 0.2s;
   }
-  .dock-btn:hover {
+  .pc-dock-btn:hover {
     background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.05);
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
   }
-  .dock-btn.pressed {
-    background: rgba(74,171,223,0.12);
-    border-color: rgba(74,171,223,0.3);
-    box-shadow: 0 8px 24px rgba(74,171,223,0.25), inset 0 0 16px rgba(74,171,223,0.1);
+  .pc-dock-btn.active {
+    background: rgba(74, 171, 223, 0.1);
+    border-color: rgba(74, 171, 223, 0.28);
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74, 171, 223, 0.2);
   }
-  .dock-btn:active {
-    transform: scale(0.94) translateY(0px);
-    background: rgba(255,255,255,0.1);
-    box-shadow: none;
-  }
+  .pc-dock-btn:active { transform: scale(0.93); }
 
-  .dock-icon {
+  .pc-dock-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
-    border-radius: 16px;
-    font-family: 'Material Icons Round';
-    font-size: 26px;
-    line-height: 1;
-    color: var(--text-secondary);
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    font-size: 22px;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: inset 0 1px 2px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.1);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    -webkit-font-smoothing: antialiased;
-    font-feature-settings: 'liga';
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.08);
+    transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
   }
-  .dock-btn:hover .dock-icon {
-    background: rgba(255,255,255,0.1);
-    border-color: rgba(255,255,255,0.15);
-    transform: scale(1.08);
-    box-shadow: inset 0 1px 3px rgba(255,255,255,0.2), 0 4px 8px rgba(0,0,0,0.15);
-  }
-  .dock-btn.pressed .dock-icon {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    transform: scale(1.1);
-  }
+  .pc-dock-btn:hover .pc-dock-icon { transform: scale(1.08); background: rgba(255,255,255,0.09); }
+  .pc-dock-btn.active .pc-dock-icon { transform: scale(1.1); }
 
-  /* ── Icon accent colors ── */
-  .dock-btn .dock-icon.amber  { color: #fbbf24; }
-  .dock-btn .dock-icon.fuchsia{ color: #e879f9; }
-  .dock-btn .dock-icon.emerald{ color: #34d399; }
-  .dock-btn .dock-icon.sky    { color: #38bdf8; }
-  .dock-btn .dock-icon.indigo { color: #818cf8; }
+  .pc-dock-icon.amber   { color: #fbbf24; }
+  .pc-dock-icon.fuchsia { color: #e879f9; }
+  .pc-dock-icon.emerald { color: #34d399; }
+  .pc-dock-icon.sky     { color: #38bdf8; }
+  .pc-dock-icon.indigo  { color: #818cf8; }
 
-  .dock-btn.pressed .dock-icon.amber   { background: rgba(251, 191, 36, 0.12);  border-color: rgba(251,191,36,0.30); box-shadow: 0 0 10px rgba(251,191,36,0.20); }
-  .dock-btn.pressed .dock-icon.fuchsia { background: rgba(232,121,249,0.12);  border-color: rgba(232,121,249,0.30); box-shadow: 0 0 10px rgba(232,121,249,0.20); }
-  .dock-btn.pressed .dock-icon.emerald { background: rgba( 52,211,153,0.12);  border-color: rgba( 52,211,153,0.30); box-shadow: 0 0 10px rgba(52,211,153,0.20); }
-  .dock-btn.pressed .dock-icon.sky     { background: rgba( 56,189,248,0.12);  border-color: rgba( 56,189,248,0.30); box-shadow: 0 0 10px rgba(56,189,248,0.20); }
-  .dock-btn.pressed .dock-icon.indigo  { background: rgba(129,140,248,0.12);  border-color: rgba(129,140,248,0.30); box-shadow: 0 0 10px rgba(129,140,248,0.20); }
+  .pc-dock-btn.active .pc-dock-icon.amber   { background: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); }
+  .pc-dock-btn.active .pc-dock-icon.fuchsia { background: rgba(232,121,249,0.12); border-color: rgba(232,121,249,0.3); }
+  .pc-dock-btn.active .pc-dock-icon.emerald { background: rgba(52,211,153,0.12); border-color: rgba(52,211,153,0.3); }
+  .pc-dock-btn.active .pc-dock-icon.sky     { background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); }
+  .pc-dock-btn.active .pc-dock-icon.indigo  { background: rgba(129,140,248,0.12); border-color: rgba(129,140,248,0.3); }
 
-  .dock-label {
-    font-size: 0.8rem;
+  .pc-dock-label {
+    font-size: 0.72rem;
     font-weight: 700;
     color: var(--text-muted);
-    transition: color 0.3s ease, text-shadow 0.3s ease;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    line-height: 1.2;
+    transition: color 0.2s;
   }
-  .dock-btn:hover .dock-label {
-    color: var(--text-primary);
-  }
-  .dock-btn.pressed .dock-label {
-    color: var(--text-primary);
-    text-shadow: 0 0 12px rgba(255,255,255,0.4);
-  }
+  .pc-dock-btn:hover .pc-dock-label,
+  .pc-dock-btn.active .pc-dock-label { color: var(--text-primary); }
 
-  .dock-ping {
+  .pc-dock-pip {
     position: absolute;
-    top: 4px;
-    right: 6px;
-    width: 8px;
-    height: 8px;
+    top: 5px; right: 7px;
+    width: 7px; height: 7px;
     border-radius: 50%;
-    background: var(--aero-rose);
-    box-shadow: 0 0 6px var(--aero-rose);
-    animation: ping 1.2s cubic-bezier(0,0,0.2,1) infinite;
-    pointer-events: none;
+    background: var(--aero-rose, #e84a72);
+    box-shadow: 0 0 5px var(--aero-rose, #e84a72);
+    animation: pcPing 1.2s ease infinite;
   }
-  @keyframes ping {
-    75%, 100% { transform: scale(2); opacity: 0; }
+  @keyframes pcPing { 75%, 100% { transform: scale(2.2); opacity: 0; } }
+
+  /* ── Paneles expandibles ─────────────────────────────────────── */
+  .pc-panel {
+    border-radius: 16px;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-surface2);
+    overflow: hidden;
+    animation: pcSlideIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pcSlideIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
-  /* ── Footer / Submit ── */
-  .publish-btn {
+  .pc-panel-form {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pc-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .pc-panel-icon { font-size: 18px; }
+  .pc-panel-icon.emerald { color: #34d399; }
+  .pc-panel-icon.sky     { color: #38bdf8; }
+  .pc-panel-icon.indigo  { color: #818cf8; }
+
+  .pc-panel-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .pc-panel-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .pc-panel-close:hover { background: rgba(232,74,114,0.1); color: var(--aero-rose, #e84a72); }
+  .pc-panel-close .material-icons-round { font-size: 16px; }
+
+  /* Inputs */
+  .pc-input {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: var(--font-sans);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+  .pc-input:focus {
+    outline: none;
+    border-color: var(--aero-blue);
+    box-shadow: 0 0 0 3px rgba(27,133,243,0.15);
+  }
+
+  /* Poll */
+  .pc-poll-options { display: flex; flex-direction: column; gap: 8px; }
+  .pc-poll-row { display: flex; align-items: center; gap: 8px; }
+  .pc-poll-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .pc-poll-remove {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+  .pc-poll-remove:hover { color: var(--aero-rose, #e84a72); }
+  .pc-poll-remove .material-icons-round { font-size: 16px; }
+  .pc-poll-add {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px dashed var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    width: 100%;
+    justify-content: center;
+  }
+  .pc-poll-add:hover { border-color: var(--aero-blue); color: var(--aero-blue); background: rgba(27,133,243,0.05); }
+  .pc-poll-add .material-icons-round { font-size: 16px; }
+
+  .pc-poll-duration {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .pc-poll-duration-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .pc-poll-duration-label .material-icons-round { font-size: 14px; }
+
+  .pc-select {
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .pc-select:focus { outline: none; border-color: var(--aero-blue); }
+
+  /* Location */
+  .pc-location-actions { display: flex; }
+  .pc-location-confirm {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(56,189,248,0.1);
+    border: 1px solid rgba(56,189,248,0.25);
+    color: #38bdf8;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+    justify-content: center;
+  }
+  .pc-location-confirm:hover { background: rgba(56,189,248,0.2); }
+  .pc-location-confirm .material-icons-round { font-size: 16px; }
+
+  .pc-location-active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(56,189,248,0.08);
+    border: 1px solid rgba(56,189,248,0.2);
+    color: #38bdf8;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .pc-location-active .material-icons-round { font-size: 16px; }
+  .pc-location-active button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+    opacity: 0.7;
+  }
+  .pc-location-active button:hover { opacity: 1; }
+
+  /* Schedule */
+  .pc-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+  .pc-toggle input { display: none; }
+  .pc-toggle-track {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--border-subtle);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.25s;
+  }
+  .pc-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .pc-toggle input:checked ~ .pc-toggle-track { background: var(--aero-blue); }
+  .pc-toggle input:checked ~ .pc-toggle-track::after { transform: translateX(16px); }
+  .pc-toggle-label { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+
+  .pc-schedule-input { display: flex; flex-direction: column; gap: 4px; }
+  .pc-sub-label { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); }
+
+  .pc-btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--grad-primary, linear-gradient(135deg, #1B85F3, #00E5FF));
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .pc-btn-primary:hover { opacity: 0.9; }
+  .mt-2 { margin-top: 8px; }
+
+  /* ── Sección genérica ─────────────────────────────────────────── */
+  .pc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pc-section-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .pc-section-label .material-icons-round { font-size: 14px; color: var(--aero-blue); }
+
+  .pc-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--aero-blue);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 800;
+  }
+
+  /* ── Mood scroll ─────────────────────────────────────────────── */
+  .pc-mood-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .pc-mood-scroll::-webkit-scrollbar { display: none; }
+
+  .pc-mood-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-overlay);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-size: 0.82rem;
+  }
+  .pc-mood-pill:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+  .pc-mood-pill.active {
+    border-color: var(--aero-blue);
+    background: rgba(27,133,243,0.12);
+    color: var(--aero-sky, #00E5FF);
+    box-shadow: 0 4px 12px rgba(27,133,243,0.25);
+    transform: translateY(-2px);
+  }
+  .pc-mood-icon { font-size: 1.1rem; }
+  .pc-mood-label { font-weight: 600; }
+
+  /* ── Dropzone ────────────────────────────────────────────────── */
+  .pc-dropzone {
+    border: 2px dashed var(--border-subtle);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .pc-dropzone:hover,
+  .pc-dropzone.drag-active {
+    border-color: var(--aero-blue);
+    background: rgba(27,133,243,0.04);
+  }
+  .pc-dz-icon { font-size: 2rem; color: var(--text-muted); margin-bottom: 2px; }
+  .pc-dropzone:hover .pc-dz-icon { color: var(--aero-blue); }
+  .pc-dz-text { font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+  .pc-dz-hint { font-size: 0.7rem; color: var(--text-muted); }
+
+  /* ── Media grid de thumbs ─────────────────────────────────────── */
+  .pc-media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+    gap: 8px;
+  }
+  .pc-thumb {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+  }
+  .pc-thumb img,
+  .pc-thumb-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .pc-thumb-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    padding: 2px 5px;
+    border-radius: 5px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .pc-thumb-badge .material-icons-round { font-size: 11px; }
+  .video-badge { padding: 2px; border-radius: 50%; }
+
+  .pc-thumb-remove {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    opacity: 0;
+  }
+  .pc-thumb:hover .pc-thumb-remove { opacity: 1; }
+  .pc-thumb-remove:hover { background: rgba(232,74,114,0.85); }
+  .pc-thumb-remove .material-icons-round { font-size: 13px; }
+
+  .pc-flex-grow { flex: 1; }
+
+  /* ── Footer ──────────────────────────────────────────────────── */
+  .pc-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .pc-active-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 0;
+  }
+  .pc-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .pc-tag .material-icons-round { font-size: 13px; }
+  .pc-tag button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 0 0 2px;
+    font-size: 0.85rem;
+    opacity: 0.7;
+    color: inherit;
+    line-height: 1;
+  }
+  .pc-tag button:hover { opacity: 1; }
+  .pc-tag.sky    { background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.25); color: #38bdf8; }
+  .pc-tag.indigo { background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.25); color: #818cf8; }
+  .pc-tag.amber  { background: rgba(251,191,36,0.1); border-color: rgba(251,191,36,0.25); color: #fbbf24; }
+
+  .pc-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pc-privacy-wrap { width: 150px; flex-shrink: 0; }
+
+  .pc-publish {
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-display);
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--grad-primary, linear-gradient(135deg, #1B85F3, #00E5FF));
+    border: none;
+    color: #fff;
+    font-size: 0.95rem;
     font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(27,133,243,0.35);
+    transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
   }
-  .loading-spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.75s linear infinite; }
-  .error-bar { background: rgba(232, 74, 114, 0.1); color: var(--aero-rose); padding: 10px 14px; border-radius: 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; }
-  
-  @keyframes popIn {
-    0% { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .pc-publish:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .pc-publish:not(:disabled):hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 22px rgba(27,133,243,0.45); }
+  .pc-publish:not(:disabled):active { transform: scale(0.97); }
 
-  @media (max-width: 1000px) {
-    .creator-layout { flex-direction: column; overflow-y: auto; }
-    .tools-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--glass-border); }
-    .preview-section { padding: 40px 20px; }
+  .pc-spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: pcSpin 0.7s linear infinite;
+  }
+  @keyframes pcSpin { to { transform: rotate(360deg); } }
+
+  .pc-shortcut-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin: 0;
+    justify-content: center;
+  }
+  .pc-shortcut-hint .material-icons-round { font-size: 13px; }
+
+  /* ── Preview column ──────────────────────────────────────────── */
+  .pc-preview-col {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 24px;
+    background: radial-gradient(ellipse at 50% 30%, rgba(27,133,243,0.04) 0%, transparent 70%);
+    overflow-y: auto;
+  }
+
+  .pc-preview-inner {
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pc-preview-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin: 0;
+    justify-content: center;
+  }
+  .pc-preview-label .material-icons-round { font-size: 14px; }
+
+  /* Card de preview */
+  .pc-preview-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border: 1px solid var(--glass-border);
+    border-top-color: var(--glass-border-t, rgba(255,255,255,0.15));
+    border-radius: var(--radius-lg, 20px);
+    padding: 20px;
+    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.08);
+    animation: pcCardIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pcCardIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .pc-prev-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .pc-prev-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--glass-border);
+    flex-shrink: 0;
+  }
+  .pc-prev-avatar-fallback {
+    background: var(--grad-primary, linear-gradient(135deg,#1B85F3,#00E5FF));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1rem;
+  }
+
+  .pc-prev-meta { flex: 1; min-width: 0; }
+  .pc-prev-name-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .pc-prev-name { font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+  .pc-verified  { font-size: 16px !important; color: #3b82f6; }
+  .pc-prev-mood {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  .pc-prev-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 2px;
+  }
+  .pc-prev-sub span { font-size: 0.72rem; color: var(--text-muted); }
+  .pc-prev-location {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #38bdf8 !important;
+    font-weight: 600;
+  }
+  .pc-prev-location .material-icons-round { font-size: 12px; }
+
+  .pc-prev-privacy {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+  .pc-prev-privacy .material-icons-round { font-size: 16px; }
+
+  .pc-prev-body {
+    font-size: 0.92rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    line-height: 1.55;
+    margin: 0 0 12px;
+  }
+  .pc-prev-empty { color: var(--text-muted); font-style: italic; }
+
+  /* Poll preview */
+  .pc-prev-poll {
+    background: var(--bg-overlay);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pc-prev-poll-q { font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin: 0; }
+  .pc-prev-poll-opts { display: flex; flex-direction: column; gap: 6px; }
+  .pc-prev-poll-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface2);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .pc-prev-poll-opt .material-icons-round { font-size: 14px; color: var(--text-muted); }
+  .pc-prev-poll-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin: 0;
+  }
+  .pc-prev-poll-info .material-icons-round { font-size: 12px; }
+
+  /* Media preview en la card */
+  .pc-prev-media {
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    max-height: 320px;
+  }
+  .pc-prev-media.grid-single .pc-prev-media-item { aspect-ratio: 16/9; }
+  .pc-prev-media.grid-multi {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+  }
+  .pc-prev-media.grid-multi .pc-prev-media-item { aspect-ratio: 1; }
+
+  .pc-prev-media-item {
+    position: relative;
+    background: var(--bg-overlay);
+    overflow: hidden;
+  }
+  .pc-prev-media-item img,
+  .pc-prev-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .pc-prev-badge {
+    position: absolute;
+    top: 6px; right: 6px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .pc-prev-badge .material-icons-round { font-size: 12px; }
+
+  /* Action bar */
+  .pc-prev-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .pc-prev-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: default;
+  }
+  .pc-prev-action .material-icons-round { font-size: 18px; }
+
+  /* ── Responsive ──────────────────────────────────────────────── */
+  @media (max-width: 1024px) {
+    .pc-editor { width: 380px; }
+  }
+
+  @media (max-width: 768px) {
+    .pc-layout { flex-direction: column; }
+    .pc-editor {
+      width: 100%;
+      position: static;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .pc-preview-col { padding: 20px 16px; }
   }
 </style>
