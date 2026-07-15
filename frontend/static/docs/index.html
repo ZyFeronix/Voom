@@ -485,6 +485,12 @@ grupos, notificaciones push, gamificación y panel administrativo.
 - **Licencia:** GPLv3
 - **Estado:** Funcional completo — 16+ módulos implementados
 
+### Características Principales:
+- **Sistema de Feeds Transparentes (Anti-Caja Negra):** El usuario tiene control total sobre su contenido mediante tres algoritmos sin opacidad:
+  - **Radar en Vivo (Línea de Tiempo):** 100% cronológico estricto, sin filtros. Muestra exactamente lo que publican las cuentas que sigues en el instante en que lo hacen.
+  - **Feed Inteligente (Personalizado):** Ordenamiento lógico basado explícitamente en los hashtags, categorías y creadores con los que más interactúas, sin ocultar contenido deliberadamente.
+  - **Descubrimiento (Para Ti):** Muestra contenido en tendencia y de nuevos creadores basado en la relevancia global y frescura, dando oportunidades equitativas de visibilidad sin usar ML tóxico de retención.
+
 ---
 
 ## 2. Tech Stack
@@ -1014,10 +1020,6 @@ Pendiente para el salto de Alpha → Beta:
 - [ ] Sincronización in-memory para múltiples instancias Node
 - [ ] Cola de workers interna para emails, push, thumbnails
 - [ ] Optimización continua en Turso/SQLite
-- [ ] **Sistema de Feeds Transparentes (Anti-Caja Negra):**
-  - **Radar en Vivo (Línea de Tiempo):** 100% cronológico estricto, sin filtros. Muestra exactamente lo que publican las cuentas que sigues en el instante en que lo hacen.
-  - **Feed Inteligente (Personalizado):** Ordenamiento lógico basado explícitamente en los hashtags, categorías y creadores con los que más interactúas, sin ocultar contenido deliberadamente.
-  - **Descubrimiento (Para Ti):** Muestra contenido en tendencia y de nuevos creadores basado en la relevancia global y frescura, dando oportunidades equitativas de visibilidad sin usar ML tóxico de retención.
 - [ ] CI/CD pipeline completo (GitHub Actions)
 - [ ] Tests de integración y e2e (Playwright)
 
