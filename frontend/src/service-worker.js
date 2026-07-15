@@ -34,6 +34,9 @@ function shouldIntercept(request) {
 	// Nunca interceptar rutas SSE / WebSocket-like
 	if (url.pathname.startsWith('/api/notifications/stream')) return false;
 
+	// Nunca interceptar HTML estático (para evitar problemas de caché con /docs/index.html)
+	if (url.pathname.endsWith('.html') || url.pathname.includes('/docs/')) return false;
+
 	// Solo interceptar si es un asset estático conocido
 	if (!isStaticAsset(url.href) && !ASSETS.includes(url.pathname)) return false;
 
