@@ -3,9 +3,20 @@
   import { onMount } from 'svelte';
   
   let isMounted = $state(false);
+  let licenseText = $state('');
 
-  onMount(() => {
+  onMount(async () => {
     isMounted = true;
+    try {
+      const res = await fetch('/LICENSE.txt');
+      if (res.ok) {
+        licenseText = await res.text();
+      } else {
+        licenseText = 'No se pudo cargar el archivo de licencia.';
+      }
+    } catch (e) {
+      licenseText = 'Error al cargar la licencia.';
+    }
   });
 </script>
 
@@ -44,7 +55,17 @@
               <li><strong>Sin Garantía:</strong> El software se proporciona "tal cual", sin ninguna garantía implícita o explícita.</li>
               <li><strong>Reconocimiento:</strong> Se debe mantener la atribución a los autores originales en todas las copias y derivados.</li>
             </ul>
-            <p class="mt-4"><a href="/LICENSE.txt" target="_blank" class="neon-link">Ver el texto completo de la Licencia GPLv3 &rarr;</a></p>
+            <p class="mt-4"><span class="neon-link" style="cursor: default">Texto completo de la Licencia GPLv3 &darr;</span></p>
+            
+            {#if licenseText}
+              <div class="license-box">
+                <pre><code>{licenseText}</code></pre>
+              </div>
+            {:else}
+              <div class="license-box loading-pulse">
+                Cargando licencia...
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -247,6 +268,44 @@
   .neon-link:hover {
     text-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
     transform: translateX(4px);
+  }
+
+  .license-box {
+    margin-top: 1.5rem;
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+  }
+
+  .license-box pre {
+    margin: 0;
+  }
+
+  .license-box code {
+    font-family: 'Fira Code', 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    color: #a8b2d1;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .loading-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    text-align: center;
+    color: #64748b;
+    padding: 2rem;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
 
   @media (max-width: 768px) {
