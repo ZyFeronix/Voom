@@ -50,31 +50,39 @@ export async function POST({ request, url, params }) {
 	// POST /api/stories — create story
 	if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
 		const contentType = request.headers.get('content-type') || '';
-		let mediaUrl = '', mediaType = 'image', caption = '', bgColor = '#00E5FF';
+		let mediaUrl = '', mediaType = 'text', caption = '', bgColor = '#1B85F3';
 
 		if (contentType.includes('multipart/form-data')) {
 			const formData = await request.formData();
 			caption = formData.get('caption') || '';
-			bgColor = formData.get('background_color') || '#00E5FF';
+			bgColor = formData.get('background_color') || '#1B85F3';
 			const file = formData.get('media');
-			if (!file) return json({ error: 'Media file is required' }, { status: 400 });
 
-			const uploadDir = getUploadsDir('stories');
-			const ext = file.name.split('.').pop() || 'jpg';
-			const newName = `story_${Date.now()}_${randomBytes(4).toString('hex')}.${ext}`;
-			const buffer = Buffer.from(await file.arrayBuffer());
-			writeFileSync(resolve(uploadDir, newName), buffer);
-			mediaUrl = `/uploads/stories/${newName}`;
-			mediaType = file.type.includes('video') ? 'video' : 'image';
+			if (file && file.size > 0) {
+				// Validar tamaño: máx 100 MB
+				if (file.size > 100 * 1024 * 1024) {
+					return json({ error: 'El archivo no puede superar los 100 MB.' }, { status: 400 });
+				}
+				const uploadDir = getUploadsDir('stories');
+				const ext = file.name.split('.').pop() || 'jpg';
+				const newName = `story_${Date.now()}_${randomBytes(4).toString('hex')}.${ext}`;
+				const buffer = Buffer.from(await file.arrayBuffer());
+				writeFileSync(resolve(uploadDir, newName), buffer);
+				mediaUrl = `/uploads/stories/${newName}`;
+				mediaType = file.type.includes('video') ? 'video' : 'image';
+			}
 		} else {
 			const body = await request.json();
 			mediaUrl = body.media_url || '';
-			mediaType = body.media_type || 'image';
+			mediaType = body.media_type || 'text';
 			caption = body.caption || '';
-			bgColor = body.background_color || '#000000';
+			bgColor = body.background_color || '#1B85F3';
 		}
 
-		if (!mediaUrl) return json({ error: 'Media URL is required' }, { status: 400 });
+		// Requiere al menos media o caption
+		if (!mediaUrl && !caption.trim()) {
+			return json({ error: 'Se requiere al menos una imagen, video o texto.' }, { status: 400 });
+		}
 
 		const result = await db.prepare(
 			"INSERT INTO stories (user_id, media_url, media_type, caption, background_color, expires_at) VALUES (?, ?, ?, ?, ?, datetime('now', '+1 day'))"
