@@ -772,12 +772,24 @@ export const getFeed = (limit=20, offset=0) =>
           <h3>Badges de Logro</h3>
           <p>Desbloquea insignias únicas por hitos reales: primer post viral, 10 días seguidos activo, verificación de creador, contribuciones al código abierto.</p>
           <div class="gami-badges-preview">
-            <span class="gbp-badge" title="Artista">🎨</span>
-            <span class="gbp-badge" title="Racha">🔥</span>
-            <span class="gbp-badge" title="Verificado">✅</span>
-            <span class="gbp-badge" title="Legendario">⚡</span>
-            <span class="gbp-badge" title="Código Abierto">🐙</span>
-            <span class="gbp-badge gbp-locked" title="Por desbloquear">🔒</span>
+            <div class="gbp-badge" style="--badge-glow: #e81cff" title="Artista">
+              <span class="material-icons-round">palette</span>
+            </div>
+            <div class="gbp-badge" style="--badge-glow: #ff5722" title="Racha">
+              <span class="material-icons-round">local_fire_department</span>
+            </div>
+            <div class="gbp-badge" style="--badge-glow: #00f2fe" title="Verificado">
+              <span class="material-icons-round">verified</span>
+            </div>
+            <div class="gbp-badge" style="--badge-glow: #ffc107" title="Legendario">
+              <span class="material-icons-round">bolt</span>
+            </div>
+            <div class="gbp-badge" style="--badge-glow: #00e676" title="Código Abierto">
+              <span class="material-icons-round">code</span>
+            </div>
+            <div class="gbp-badge gbp-locked" title="Por desbloquear">
+              <span class="material-icons-round">lock</span>
+            </div>
           </div>
         </div>
 
@@ -1817,9 +1829,23 @@ export const getFeed = (limit=20, offset=0) =>
   .gami-xp-track { height: 6px; background: var(--glass-panel-bg); border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
   .gami-xp-fill { height: 100%; background: var(--liquid-gradient); border-radius: 99px; transition: width 1s var(--ease-spring); }
   .gami-xp-label { font-size: 0.65rem; color: var(--text-muted); }
-  .gami-badges-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
-  .gbp-badge { font-size: 1.25rem; cursor: default; transition: transform var(--t-fast); }
-  .gbp-badge:hover { transform: scale(1.2); }
+  .gami-badges-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem; }
+  .gbp-badge { 
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 12px;
+    background: var(--glass-surface); border: 1px solid var(--glass-border);
+    color: var(--badge-glow, var(--text-muted));
+    transition: all var(--t-fast) var(--ease-spring); cursor: default;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .gbp-badge .material-icons-round { font-size: 1.3rem; }
+  .gbp-badge:hover { 
+    transform: translateY(-4px) scale(1.1); 
+    background: rgba(255,255,255,0.05);
+    border-color: var(--badge-glow, var(--accent-primary));
+    box-shadow: 0 4px 15px var(--badge-glow, rgba(0,0,0,0.2)), inset 0 1px 0 rgba(255,255,255,0.2);
+    text-shadow: 0 0 10px var(--badge-glow, transparent);
+  }
   .gbp-locked { opacity: 0.3; filter: grayscale(1); }
   .gami-lb-preview { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
   .glb-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; background: var(--glass-panel-bg); }
