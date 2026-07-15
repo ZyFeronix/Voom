@@ -528,7 +528,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 
 | Capa | Tecnología |
 |------|-----------|
-| Motor primario | `@libsql/client` (soporta local WAL + remoto Turso) |
+| Motor primario | `@libsql/client` v0.17+ (soporta local WAL + remoto Turso) |
 | Fallback | `better-sqlite3` (nativo, síncrono envuelto en async) |
 | API unificada | Adaptador universal en `db.js` — misma interfaz para ambos |
 | Esquema | 783 líneas SQL idempotente (`schema_sqlite.sql`) |
