@@ -44,11 +44,30 @@
   let error = $state('');
   let dragOver = $state(false);
   let moodScrollerRef = $state(null);
+  let isDraggingMood = $state(false);
+  let moodStartX = 0;
+  let moodScrollLeft = 0;
 
   function scrollMoods(direction) {
     if (moodScrollerRef) {
-      moodScrollerRef.scrollBy({ left: direction * 150, behavior: 'smooth' });
+      moodScrollerRef.scrollBy({ left: direction * 200, behavior: 'smooth' });
     }
+  }
+
+  function handleMoodPointerDown(e) {
+    if (!moodScrollerRef) return;
+    isDraggingMood = true;
+    moodStartX = e.pageX - moodScrollerRef.offsetLeft;
+    moodScrollLeft = moodScrollerRef.scrollLeft;
+  }
+  function handleMoodPointerLeave() { isDraggingMood = false; }
+  function handleMoodPointerUp() { isDraggingMood = false; }
+  function handleMoodPointerMove(e) {
+    if (!isDraggingMood || !moodScrollerRef) return;
+    e.preventDefault();
+    const x = e.pageX - moodScrollerRef.offsetLeft;
+    const walk = (x - moodStartX) * 1.5;
+    moodScrollerRef.scrollLeft = moodScrollLeft - walk;
   }
 
   // Advanced Location State
@@ -445,7 +464,15 @@
             <span class="material-icons-round">chevron_left</span>
           </button>
           
-          <div class="mood-scroller" bind:this={moodScrollerRef}>
+          <div 
+            class="mood-scroller" 
+            class:dragging={isDraggingMood}
+            bind:this={moodScrollerRef}
+            onpointerdown={handleMoodPointerDown}
+            onpointerleave={handleMoodPointerLeave}
+            onpointerup={handleMoodPointerUp}
+            onpointermove={handleMoodPointerMove}
+          >
             {#each moods as m}
               <button class="mood-pill" class:selected={mood === m.id} onclick={() => mood = mood === m.id ? '' : m.id}>
                 <span class="m-icon">{m.icon}</span>
@@ -752,7 +779,10 @@
     scrollbar-width: none; flex: 1; -ms-overflow-style: none; scroll-behavior: smooth; 
     mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
     -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    cursor: grab;
   }
+  .mood-scroller.dragging { cursor: grabbing; scroll-behavior: auto; }
+  .mood-scroller.dragging .mood-pill { pointer-events: none; }
   .mood-scroller::-webkit-scrollbar { display: none; }
   
   .mood-pill { 
