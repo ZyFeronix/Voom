@@ -442,13 +442,15 @@
 		<div class="media-container {post.media.length > 1 ? 'grid-2' : ''}">
 			{#each post.media.slice(0, 4) as media, i}
 				{#if media.media_type === 'video' || media.media_type === 'audio'}
-					<MediaPlayer 
-						type={media.media_type} 
-						src={media.media_url} 
-						class="media-item {post.media.length === 1 ? 'full-media' : 'square-media'}" 
-						entityId={post.id}
-						entityType="video"
-					/>
+					<div class="video-wrapper {post.media.length === 1 ? 'video-wrapper-full' : 'video-wrapper-grid'}">
+						<MediaPlayer 
+							type={media.media_type} 
+							src={media.media_url} 
+							class="media-item video-media"
+							entityId={post.id}
+							entityType="video"
+						/>
+					</div>
 				{:else}
 					<img
 						src={media.media_url}
@@ -876,6 +878,7 @@
 		border-radius: var(--radius-xs);
 	}
 
+	/* ── Imágenes únicas ── */
 	.full-media { 
 		width: auto;
 		height: auto;
@@ -885,10 +888,36 @@
 		object-fit: cover;
 	}
 	
+	/* ── Imágenes en grid ── */
 	.square-media { 
 		width: 100%;
 		aspect-ratio: 1; 
 		object-fit: cover;
+	}
+
+	/* ── Wrapper de video — respeta proporciones, nunca recorta ── */
+	.video-wrapper {
+		position: relative;
+		width: 100%;
+		background: #000;
+		border-radius: var(--radius-xs);
+		overflow: hidden;
+	}
+	/* Video único: hasta 16:9 natural, sin recorte */
+	.video-wrapper-full {
+		max-height: 520px;
+		aspect-ratio: 16 / 9;
+	}
+	/* Video en grid: 16:9 para mantener coherencia visual */
+	.video-wrapper-grid {
+		aspect-ratio: 16 / 9;
+	}
+	/* El MediaPlayer ocupa el 100% del wrapper sin recortar */
+	.video-media {
+		width: 100% !important;
+		height: 100% !important;
+		object-fit: contain !important;
+		max-height: unset !important;
 	}
 
 	.media-overlay {
