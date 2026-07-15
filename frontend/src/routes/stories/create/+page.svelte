@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { stories as storiesApi } from '$lib/api.js';
   import { authStore } from '$lib/stores/auth.svelte.js';
+  import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 
   // ── Estado principal ──────────────────────────────────────────────────────
   let selectedFile = $state(null);
@@ -317,13 +318,12 @@
                 autoplay
                 playsinline
               ></video>
-              <video
+              <MediaPlayer
                 src={preview}
-                class="sc-main-media"
-                controls
-                loop
-                playsinline
-              ></video>
+                type="video"
+                class="sc-main-media sc-video-player"
+                autoplay={false}
+              />
             {:else}
               <img src={preview} alt="" class="sc-backdrop" />
               <img src={preview} alt="Preview de la historia" class="sc-main-media" />
@@ -777,7 +777,7 @@
     pointer-events: none;
   }
 
-  /* Media principal */
+  /* Media principal (imágenes) */
   .sc-main-media {
     position: absolute;
     inset: 0;
@@ -786,6 +786,22 @@
     object-fit: contain;
     z-index: 2;
     display: block;
+  }
+
+  /* MediaPlayer (video) dentro del phone frame */
+  :global(.sc-video-player) {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 2;
+    border-radius: 0 !important;
+    border: none !important;
+    max-height: none !important;
+  }
+  :global(.sc-video-player .v-native-video) {
+    object-fit: contain !important;
+    background: transparent !important;
   }
 
   /* Overlay de texto */

@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { reels as reelsApi } from '$lib/api.js';
   import { authStore } from '$lib/stores/auth.svelte.js';
+  import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 
   let selectedFile = $state(null);
   let preview = $state(null);
@@ -126,14 +127,12 @@
         </video>
         <div class="dark-overlay"></div>
         <div class="main-video-container">
-          <video 
-            src={preview} 
-            class="main-video" 
-            autoplay loop playsinline controls
-            ontimeupdate={syncBackdrop}
-          >
-            <track kind="captions" />
-          </video>
+          <MediaPlayer
+            src={preview}
+            type="video"
+            class="main-video"
+            autoplay={true}
+          />
         </div>
       </div>
 
@@ -296,11 +295,17 @@
     display: flex; justify-content: center; align-items: center;
   }
 
-  .main-video {
-    width: 100%; height: 90%; max-width: 450px;
-    object-fit: contain; border-radius: 16px;
+  .main-video-container :global(.main-video) {
+    width: 100%;
+    height: 90%;
+    max-width: 450px;
+    border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-    background: #000;
+    overflow: hidden;
+  }
+  /* El video nativo dentro del player ocupa todo sin recortar */
+  .main-video-container :global(.main-video .v-native-video) {
+    object-fit: contain;
   }
 
   /* ── Creator Side Console (Sidebar) ── */
