@@ -345,9 +345,20 @@
     <script type="text/markdown" id="md-readme">
 # VSocial — Red Social Full-Stack
 
-[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue)](./CHANGELOG)
 [![License](https://img.shields.io/badge/license-GPLv3-blue)](#license)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
+
+**VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
+# VSocial — Red Social Full-Stack
+
+[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue)](./CHANGELOG)
+[![License](https://img.shields.io/badge/license-GPLv3-blue)](#license)
+[![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
+
+## Novedades recientes
+- **Físicas de Arrastre:** Integración de motor de físicas inerciales en `/posts/create`.
+- **MediaPlayer:** Nuevo componente propio para reproducción multimedia en Reels/Stories.
 
 **VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
 WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
@@ -355,8 +366,8 @@ WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
 **Estado:** Alpha v0.0.2 — Funcional completo, 16 módulos, 35 tablas, 24 API endpoints.
 En desarrollo activo.
 
-&gt; 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
-&gt; componentes, API, configuración, operaciones y roadmap.
+> 📖 **Documentación completa:** [`DOCS`](./DOCS) — arquitectura, schema, rutas,
+> componentes, API, configuración, operaciones y roadmap.
 
 ---
 
@@ -451,11 +462,11 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 
 | Archivo | Contenido |
 |---------|-----------|
-| [`DOCS.md`](./DOCS.md) | Documentación técnica completa (17 secciones) |
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Decisiones de diseño y filosofía del proyecto |
-| [`Personality & SOUL.md`](./Personality & SOUL.md) | Identidad, estándares de ingeniería y métricas SLA |
-| [`CHANGELOG.md`](./CHANGELOG.md) | Historial de versiones |
-| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Guía para contribuir al proyecto |
+| [`DOCS`](./DOCS) | Documentación técnica completa (17 secciones) |
+| [`ARCHITECTURE`](./ARCHITECTURE) | Decisiones de diseño y filosofía del proyecto |
+| [`Personality & SOUL`](./Personality & SOUL) | Identidad, estándares de ingeniería y métricas SLA |
+| [`CHANGELOG`](./CHANGELOG) | Historial de versiones |
+| [`CONTRIBUTING`](./CONTRIBUTING) | Guía para contribuir al proyecto |
 | [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (783 líneas) |
 | [`.env.example`](./.env.example) | Template de variables de entorno |
 
@@ -469,8 +480,8 @@ GNU GPLv3. Ver archivo `LICENSE`.
     <script type="text/markdown" id="md-docs">
 # VSocial — Documentación Completa de Proyecto (Alpha v0.0.2)
 
-&gt; Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
-&gt; operaciones y guía de desarrollo. Todo en un solo archivo.
+> Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
+> operaciones y guía de desarrollo. Todo en un solo archivo.
 
 ---
 
@@ -485,97 +496,11 @@ grupos, notificaciones push, gamificación y panel administrativo.
 - **Licencia:** GPLv3
 - **Estado:** Funcional completo — 16+ módulos implementados
 
-### Características Principales:
-- **Sistema de Feeds Transparentes (Anti-Caja Negra):** El usuario tiene control total sobre su contenido mediante tres algoritmos sin opacidad:
-  - **Radar en Vivo (Línea de Tiempo):** 100% cronológico estricto y global, sin filtros ocultos. Muestra absolutamente todo lo que se publica en la plataforma en tiempo real, segmentado únicamente por tu idioma principal (para evitar ruido irrelevante).
-  - **Feed Inteligente (Personalizado):** Ordenamiento lógico basado explícitamente en los hashtags, categorías y creadores con los que más interactúas, sin ocultar contenido deliberadamente.
-  - **Descubrimiento (Para Ti):** Muestra contenido en tendencia y de nuevos creadores basado en la relevancia global y frescura, dando oportunidades equitativas de visibilidad sin usar ML tóxico de retención.
+### Novedades Recientes
+- **Físicas de Arrastre:** El creador de posts (`/posts/create`) ahora usa el mismo motor de físicas inerciales (drag-to-scroll) de la Landing Page para la selección de moods.
+- **Reproductor Multimedia Glassmorphism:** Se reemplazó el reproductor de video nativo en `/stories/create` y `/reels/create` por el componente `MediaPlayer` propio de la plataforma.
+- **Historias de Solo Texto:** El backend ahora soporta la creación y visualización de historias sin media, puramente basadas en color de fondo y texto.
 
----
-
-## 2. Tech Stack
-
-### 2.1 Frontend
-
-| Capa | Tecnología |
-|------|-----------|
-| Framework | SvelteKit 5 (SSR + CSR híbrido) |
-| Reactividad | Runes de Svelte 5 (`$state`, `$derived`, `$props`) |
-| Estilos | Tailwind CSS + DaisyUI base + CSS puro para Glassmorphism |
-| Iconografía | Material Icons Round (Google Fonts) |
-| Emojis | Noto Color Emoji (Nativo). *Nota: Componentes internos conservan prefijo "Twemoji" por legado.* |
-| Empaquetado | Vite 8 |
-| Adapter | `@sveltejs/adapter-node` (servidor Node.js standalone) |
-| PWA | Service worker cache-first, manifest.json |
-
-### 2.2 Backend
-
-| Capa | Tecnología |
-|------|-----------|
-| API | Rutas SvelteKit `+server.js` (mismo proceso Node.js) |
-| Auth | JWT (`jsonwebtoken`) en cookies `httpOnly` |
-| Sesiones | Tabla `user_sessions` con token hash + IP + user-agent |
-| OAuth | Google, Apple (estructura lista, implementación parcial) |
-| Hashing | bcryptjs |
-| Validación | `validator` + módulo `security.js` propio |
-| Rate Limiting | In-memory (150 req/min por IP) en `hooks.server.js` |
-| Email | Nodemailer (verificación, reset password) |
-| Logging | Pino + pino-pretty (structured JSON logs) |
-| Seguridad HTTP | Helmet + headers manuales (HSTS, X-Frame-Options, etc.) |
-| CSRF | Validación de Origin/Referer en `hooks.server.js` |
-
-### 2.3 Base de Datos
-
-| Capa | Tecnología |
-|------|-----------|
-| Motor primario | `@libsql/client` v0.17+ (soporta local WAL + remoto Turso) |
-| Fallback | `better-sqlite3` (nativo, síncrono envuelto en async) |
-| API unificada | Adaptador universal en `db.js` — misma interfaz para ambos |
-| Esquema | 783 líneas SQL idempotente (`schema_sqlite.sql`) |
-| Migraciones | Carpeta `migrations/` + scripts `migrate-up.js` / `migrate-down.js` |
-| ORM | No se usa. Raw SQL con prepared statements |
-
-### 2.4 Tiempo Real
-
-| Capa | Tecnología |
-|------|-----------|
-| WebSockets | `socket.io` (servidor + cliente) |
-| Chat | Mensajería DM + grupos con media, voz, reacciones, replies |
-| WebRTC | Señalización para llamadas via `rtc_signals` |
-| SSE | Stream de notificaciones via `/api/notifications` |
-
-### 2.5 Infraestructura / DevOps
-
-| Capa | Tecnología |
-|------|-----------|
-| Contenedores | Docker + docker-compose (single service + healthcheck) |
-| Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
-| Redis | No usado (arquitectura in-memory local) |
-| Tests | Vitest (`tests/auth.test.js`) |
-| Linting | ESLint 9 + Prettier 3 + plugin Svelte |
-| Git hooks | Husky (`.husky/`) |
-| CI/CD | Pre-commit linting + build verification |
-
----
-
-## 3. Estructura del Proyecto
-
-```
-Vsocial/                     ← raíz del proyecto
-├── .env                     ← configuración real (gitignored)
-├── .env.example             ← template de configuración
-├── .gitignore
-├── .husky/                  ← git hooks
-├── ARCHITECTURE.md          ← decisiones de diseño y filosofía
-├── CHANGELOG.md             ← registro de versiones
-├── DOCS.md                  ← este documento
-├── README.md                ← overview rápido
-├── Personality & SOUL.md    ← identidad de la plataforma
-│
-├── frontend/                ← aplicación SvelteKit principal
-│   ├── package.json         ← dependencias y scripts
-│   ├── svelte.config.js     ← config SvelteKit (runes mode, adapter-node)
-│   ├── vite.config.js       ← config Vite + Vitest
 │   ├── jsconfig.json
 │   ├── server.js            ← entrypoint de producción (node server.js)
 │   ├── src/
@@ -1030,116 +955,115 @@ Pendiente para el salto de Alpha → Beta:
 &gt; 13 módulos server-side. Lista para crecer.
 </script>
     <script type="text/markdown" id="md-contributing">
-# Contributing to VSocial
+# Contribuyendo a VSocial
 
-Thanks for your interest in contributing to VSocial. This document outlines the
-rules, conventions, and workflow for submitting changes.
-
----
-
-## Code of Conduct
-
-- Be respectful, constructive, and professional.
-- No toxicity, no gatekeeping, no bikeshedding.
-- Critique ideas, not people.
+Gracias por tu interés en contribuir a VSocial. Este documento describe las
+reglas, convenciones y flujo de trabajo para enviar cambios.
 
 ---
 
-## Project Philosophy (Read Before Coding)
+## Código de Conducta
 
-VSocial has strong architectural convictions documented in:
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — design decisions and ideology
-- [`DOCS.md`](./DOCS.md) — complete technical reference
-- [`Personality & SOUL.md`](./Personality & SOUL.md) — engineering standards
+- Sé respetuoso, constructivo y profesional.
+- Cero toxicidad, cero exclusión, cero discusiones triviales (bikeshedding).
+- Critica las ideas, no a las personas.
 
-Key principles you must respect:
+---
 
-| Principle | What it means |
+## Filosofía del Proyecto (Leer antes de programar)
+
+VSocial tiene fuertes convicciones arquitectónicas documentadas en:
+- [`ARCHITECTURE`](./ARCHITECTURE) — decisiones de diseño e ideología
+- [`DOCS`](./DOCS) — referencia técnica completa
+- [`Personality & SOUL`](./Personality & SOUL) — estándares de ingeniería
+
+Principios clave que debes respetar:
+
+| Principio | Qué significa |
 |-----------|---------------|
-| **Raw SQL only** | No ORMs. Every query is prepared SQL in `+server.js` or `$lib/server/`. |
-| **Svelte 5 Runes** | `$state`, `$derived`, `$props` for reactivity. Traditional stores only for complex global state. |
-| **libSQL-first** | DB adapter in `db.js` prefers `@libsql/client`. `better-sqlite3` is fallback only. |
-| **Glassmorphism 2.0** | Use tokenized design system. No arbitrary colors, no raw hex values. |
-| **Deploy-ready always** | No `// TODO`, no stubs, no half-implemented features. PR is production code. |
-| **Security by default** | Every input validated. Every endpoint rate-limited or auth-gated. Prepared statements always. |
+| **Solo SQL Puro** | Sin ORMs. Cada consulta es SQL preparado en `+server.js` o `$lib/server/`. |
+| **Runes de Svelte 5** | `$state`, `$derived`, `$props` para reactividad. Stores tradicionales solo para estado global complejo. |
+| **libSQL primero** | El adaptador de DB en `db.js` prefiere `@libsql/client`. `better-sqlite3` es solo respaldo. |
+| **Glassmorphism 2.0** | Usa el sistema de diseño tokenizado. Sin colores arbitrarios, sin valores hex puros. |
+| **Listo para Producción siempre** | Sin `// TODO`, sin stubs, sin funciones a medias. Un PR es código de producción. |
+| **Seguridad por defecto** | Toda entrada se valida. Todo endpoint tiene rate-limit o auth. Consultas preparadas siempre. |
 
 ---
 
-## Development Setup
+## Configuración de Desarrollo
 
 ```bash
-# 1. Clone and install
-git clone &lt;repo-url&gt;
+# 1. Clonar e instalar
+git clone <repo-url>
 cd vsocial/frontend
 npm install
 
-# 2. Configure environment
+# 2. Configurar entorno
 cd ..
 cp .env.example .env
-# edit .env — at minimum set JWT_SECRET
+# editar .env — como mínimo establecer JWT_SECRET
 
-# 3. Seed database (optional but recommended)
+# 3. Poblar base de datos (opcional pero recomendado)
 node scripts/seed.js
 
-# 4. Start dev server
+# 4. Iniciar servidor de desarrollo
 cd frontend
 npm run dev
 ```
 
 ---
 
-## Branch Strategy
+## Estrategia de Ramas
 
-- `main` — production-ready code. Protected.
-- Feature branches: `feature/&lt;name&gt;` or `fix/&lt;name&gt;`.
-- No direct commits to `main`. Always via PR.
+- `main` — código listo para producción. Protegida.
+- Ramas de características: `feature/<nombre>` o `fix/<nombre>`.
+- Sin commits directos a `main`. Siempre vía PR.
 
 ---
 
-## Commit Convention
+## Convención de Commits
 
 ```
-&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
+<type>(<scope>): <subject>
 
 [optional body]
 ```
 
-Types: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
+Tipos: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
 
-Scopes: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
+Alcances: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
 `notifications`, `wallet`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`, 
 `security`, `api`, `gamification`, `docs`, `deps`
 
-Examples:
+Ejemplos:
 ```
-feat(feed): add intelligent ranking with cursor-based pagination
-fix(notifications): prevent undefined actor link crash
-docs(docs): add API endpoint reference section
-perf(db): add composite index on posts(user_id, created_at)
+feat(feed): agregar ranking inteligente con paginación basada en cursor
+fix(notifications): prevenir error por enlace de actor indefinido
+docs(docs): agregar sección de referencia de endpoints API
+perf(db): agregar índice compuesto en posts(user_id, created_at)
 ```
 
 ---
 
-## Code Conventions
+## Convenciones de Código
 
-### SvelteKit Routes
+### Rutas SvelteKit
 
-- Pages: `src/routes/&lt;path&gt;/+page.svelte`
-- API: `src/routes/api/&lt;path&gt;/+server.js`
-- Catch-all APIs use `[...path]/+server.js` pattern.
-- Export named functions (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`).
+- Páginas: `src/routes/<ruta>/+page.svelte`
+- API: `src/routes/api/<ruta>/+server.js`
+- APIs comodín (catch-all) usan el patrón `[...path]/+server.js`.
+- Exportar funciones nombradas (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`).
 
-### Database
+### Base de Datos
 
-- Schema changes go into `schema_sqlite.sql` (idempotent, `CREATE TABLE IF NOT EXISTS`).
-- Non-destructive migrations go into `migrations/&lt;NNN&gt;_&lt;description&gt;.sql`.
-- Rollback scripts go into `migrations/&lt;NNN&gt;_&lt;description&gt;.down.sql`.
-- Never concatenate strings into SQL. Always prepared statements:
+- Cambios de esquema van en `schema_sqlite.sql` (idempotente, `CREATE TABLE IF NOT EXISTS`).
+- Migraciones no destructivas van en `migrations/<NNN>_<descripcion>.sql`.
+- Scripts de reversión (rollback) van en `migrations/<NNN>_<descripcion>.down.sql`.
+- Nunca concatenar cadenas en SQL. Siempre usar sentencias preparadas:
   ```js
   db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   ```
 
-### Components
 
 - File: `src/lib/components/&lt;Name&gt;.svelte`
 - Use runes for internal state.
@@ -1166,61 +1090,61 @@ perf(db): add composite index on posts(user_id, created_at)
 
 ```bash
 cd frontend
-npm run test        # run all tests
-npm run test:watch  # watch mode
+npm run test        # ejecutar todas las pruebas
+npm run test:watch  # modo observador (watch)
 ```
 
-- Unit tests for server modules and utilities.
-- Integration tests for API endpoints.
-- Current test file: `tests/auth.test.js` (security validators + DB connectivity).
-- Add tests in `tests/` with `.test.js` extension.
+- Pruebas unitarias para módulos de servidor y utilidades.
+- Pruebas de integración para endpoints de la API.
+- Archivo de pruebas actual: `tests/auth.test.js` (validadores de seguridad + conectividad DB).
+- Agregar pruebas en `tests/` con la extensión `.test.js`.
 
 ---
 
-## Linting & Formatting
+## Linting y Formateo
 
-Before submitting a PR:
+Antes de enviar un PR:
 
 ```bash
 cd frontend
 npm run format   # prettier --write + eslint --fix
-npm run lint     # verify everything passes
+npm run lint     # verificar que todo pase
 ```
 
-Husky pre-commit hooks will also run lint checks automatically.
+Los hooks de pre-commit de Husky también ejecutarán revisiones de lint automáticamente.
 
 ---
 
-## Pull Request Checklist
+## Lista de Verificación para Pull Request
 
-- [ ] Code follows project conventions (Runes, Raw SQL, Glassmorphism tokens).
-- [ ] No `// TODO`, no commented-out code, no debug logs.
-- [ ] Security reviewed: inputs validated, SQL parameterized, auth checked.
-- [ ] Performance considered: DB queries indexed, pagination cursor-based.
-- [ ] `npm run lint` passes cleanly.
-- [ ] `npm run test` passes cleanly.
-- [ ] Schema changes are in `schema_sqlite.sql` (idempotent).
-- [ ] New migrations have corresponding `.down.sql` rollback.
-- [ ] PR description explains WHAT, WHY, and HOW to test.
-
----
-
-## Where to Start
-
-Good first contributions:
-
-1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
-2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
-3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Testing** – `tests/auth.test.js` exists. Need more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
-6. **Email templates** — improve verification and password reset email HTML.
+- [ ] El código sigue las convenciones del proyecto (Runes, SQL Puro, Tokens de Glassmorphism).
+- [ ] Sin `// TODO`, sin código comentado, sin logs de depuración.
+- [ ] Seguridad revisada: entradas validadas, SQL parametrizado, autenticación verificada.
+- [ ] Rendimiento considerado: consultas a BD indexadas, paginación basada en cursor.
+- [ ] `npm run lint` pasa limpiamente.
+- [ ] `npm run test` pasa limpiamente.
+- [ ] Cambios de esquema están en `schema_sqlite.sql` (idempotentes).
+- [ ] Nuevas migraciones tienen su correspondiente `.down.sql` para reversión.
+- [ ] La descripción del PR explica QUÉ, POR QUÉ y CÓMO probar.
 
 ---
 
-## Questions?
+## Por Dónde Empezar
 
-Open an issue or discuss in the repository. For architectural decisions,
-consult [`ARCHITECTURE.md`](./ARCHITECTURE.md) first.
+Buenas contribuciones para iniciar:
+
+1. **Agregar pruebas** — la cobertura es mínima. Agrega pruebas de Vitest para endpoints API y consultas BD.
+2. **Mejorar manejo de errores** — muchos endpoints tienen try/catch básicos. Agregar respuestas de error estructuradas.
+3. **Documentar API** — agregar anotaciones OpenAPI/Swagger o una referencia de API dedicada.
+4. **Pruebas (E2E)** – `tests/auth.test.js` existe. Se necesitan más pruebas unitarias de Vitest y E2E de Playwright para flujos críticos (mensajería, reels).
+5. **Plantillas de Email** — mejorar el HTML de los emails de verificación y restablecimiento de contraseña.
+
+---
+
+## ¿Preguntas?
+
+Abre un issue o discute en el repositorio. Para decisiones arquitectónicas,
+consulta [`ARCHITECTURE`](./ARCHITECTURE) primero.
 </script>
 
     <script>
