@@ -493,6 +493,97 @@ grupos, notificaciones push, gamificación y panel administrativo.
 - **Reproductor Multimedia Glassmorphism:** Se reemplazó el reproductor de video nativo en `/stories/create` y `/reels/create` por el componente `MediaPlayer` propio de la plataforma.
 - **Historias de Solo Texto:** El backend ahora soporta la creación y visualización de historias sin media, puramente basadas en color de fondo y texto.
 
+### Características Principales:
+- **Sistema de Feeds Transparentes (Anti-Caja Negra):** El usuario tiene control total sobre su contenido mediante tres algoritmos sin opacidad:
+  - **Radar en Vivo (Línea de Tiempo):** 100% cronológico estricto y global, sin filtros ocultos. Muestra absolutamente todo lo que se publica en la plataforma en tiempo real, segmentado únicamente por tu idioma principal (para evitar ruido irrelevante).
+  - **Feed Inteligente (Personalizado):** Ordenamiento lógico basado explícitamente en los hashtags, categorías y creadores con los que más interactúas, sin ocultar contenido deliberadamente.
+  - **Descubrimiento (Para Ti):** Muestra contenido en tendencia y de nuevos creadores basado en la relevancia global y frescura, dando oportunidades equitativas de visibilidad sin usar ML tóxico de retención.
+
+---
+
+## 2. Tech Stack
+
+### 2.1 Frontend
+
+| Capa | Tecnología |
+|------|-----------|
+| Framework | SvelteKit 5 (SSR + CSR híbrido) |
+| Reactividad | Runes de Svelte 5 (`$state`, `$derived`, `$props`) |
+| Estilos | Tailwind CSS + DaisyUI base + CSS puro para Glassmorphism |
+| Iconografía | Material Icons Round (Google Fonts) |
+| Emojis | Noto Color Emoji (Nativo). *Nota: Componentes internos conservan prefijo "Twemoji" por legado.* |
+| Empaquetado | Vite 8 |
+| Adapter | `@sveltejs/adapter-node` (servidor Node.js standalone) |
+| PWA | Service worker cache-first, manifest.json |
+
+### 2.2 Backend
+
+| Capa | Tecnología |
+|------|-----------|
+| API | Rutas SvelteKit `+server.js` (mismo proceso Node.js) |
+| Auth | JWT (`jsonwebtoken`) en cookies `httpOnly` |
+| Sesiones | Tabla `user_sessions` con token hash + IP + user-agent |
+| OAuth | Google, Apple (estructura lista, implementación parcial) |
+| Hashing | bcryptjs |
+| Validación | `validator` + módulo `security.js` propio |
+| Rate Limiting | In-memory (150 req/min por IP) en `hooks.server.js` |
+| Email | Nodemailer (verificación, reset password) |
+| Logging | Pino + pino-pretty (structured JSON logs) |
+| Seguridad HTTP | Helmet + headers manuales (HSTS, X-Frame-Options, etc.) |
+| CSRF | Validación de Origin/Referer en `hooks.server.js` |
+
+### 2.3 Base de Datos
+
+| Capa | Tecnología |
+|------|-----------|
+| Motor primario | `@libsql/client` v0.17+ (soporta local WAL + remoto Turso) |
+| Fallback | `better-sqlite3` (nativo, síncrono envuelto en async) |
+| API unificada | Adaptador universal en `db.js` — misma interfaz para ambos |
+| Esquema | 783 líneas SQL idempotente (`schema_sqlite.sql`) |
+| Migraciones | Carpeta `migrations/` + scripts `migrate-up.js` / `migrate-down.js` |
+| ORM | No se usa. Raw SQL con prepared statements |
+
+### 2.4 Tiempo Real
+
+| Capa | Tecnología |
+|------|-----------|
+| WebSockets | `socket.io` (servidor + cliente) |
+| Chat | Mensajería DM + grupos con media, voz, reacciones, replies |
+| WebRTC | Señalización para llamadas via `rtc_signals` |
+| SSE | Stream de notificaciones via `/api/notifications` |
+
+### 2.5 Infraestructura / DevOps
+
+| Capa | Tecnología |
+|------|-----------|
+| Contenedores | Docker + docker-compose (single service + healthcheck) |
+| Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
+| Redis | No usado (arquitectura in-memory local) |
+| Tests | Vitest (`tests/auth.test.js`) |
+| Linting | ESLint 9 + Prettier 3 + plugin Svelte |
+| Git hooks | Husky (`.husky/`) |
+| CI/CD | Pre-commit linting + build verification |
+
+---
+
+## 3. Estructura del Proyecto
+
+```text
+Vsocial/                     ← raíz del proyecto
+├── .env                     ← configuración real (gitignored)
+├── .env.example             ← template de configuración
+├── .gitignore
+├── .husky/                  ← git hooks
+├── ARCHITECTURE               ← decisiones de diseño y filosofía
+├── CHANGELOG                  ← registro de versiones
+├── DOCS                       ← este documento
+├── README                   ← overview rápido
+├── Personality & SOUL       ← identidad de la plataforma
+│
+├── frontend/                ← aplicación SvelteKit principal
+│   ├── package.json         ← dependencias y scripts
+│   ├── svelte.config.js     ← config SvelteKit (runes mode, adapter-node)
+│   ├── vite.config.js       ← config Vite + Vitest
 │   ├── jsconfig.json
 │   ├── server.js            ← entrypoint de producción (node server.js)
 │   ├── src/
