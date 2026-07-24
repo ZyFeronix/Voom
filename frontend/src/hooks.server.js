@@ -2,8 +2,10 @@
  * VSocial — Server Hooks
  * Setup wizard guard · Cron workers · Security headers
  */
-import { initDb, getDb, getDriverInfo } from '$lib/server/db.js';
+import { initDb, getDb, getDriverInfo, getUploadsDir } from '$lib/server/db.js';
 import { decodeToken } from '$lib/server/jwt.js';
+import { existsSync, unlinkSync } from 'fs';
+import { resolve, basename } from 'path';
 
 // Auto-initialize database on server start
 try {
@@ -18,7 +20,7 @@ try {
 
 // In-Memory Rate Limiter Map
 const rateLimits = new Map();
-const MAX_REQUESTS = 150; // max peticiones por minuto por IP
+const MAX_REQUESTS = 1000; // max peticiones por minuto por IP
 
 let cronsStarted = false;
 
@@ -30,20 +32,28 @@ function startCrons() {
 	setInterval(async () => {
 		try {
 			const db = getDb();
-			const due = await db.prepare(`
+			const due = await db
+				.prepare(
+					`
 				SELECT id, user_id FROM posts
 				WHERE status = 'scheduled' AND scheduled_at <= datetime('now')
 				LIMIT 50
-			`).all();
+			`
+				)
+				.all();
 
 			if (due.length > 0) {
 				for (const post of due) {
 					await db.prepare("UPDATE posts SET status = 'published' WHERE id = ?").run(post.id);
-					await db.prepare(`
+					await db
+						.prepare(
+							`
 						INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message)
 						SELECT f.follower_id, ?, 'new_post', 'post', ?, 'Nueva publicación programada.'
 						FROM follows f WHERE f.following_id = ?
-					`).run(post.user_id, post.id, post.user_id);
+					`
+						)
+						.run(post.user_id, post.id, post.user_id);
 				}
 				console.log(`[cron] Published ${due.length} scheduled post(s)`);
 			}
@@ -59,22 +69,34 @@ function startCrons() {
 			if (now.getHours() !== 0 || now.getMinutes() !== 1) return;
 
 			const db = getDb();
-			const memories = await db.prepare(`
+			const memories = await db
+				.prepare(
+					`
 				SELECT p.id, p.user_id, p.created_at
 				FROM posts p
 				WHERE strftime('%m-%d', p.created_at) = strftime('%m-%d', 'now')
 				  AND strftime('%Y', p.created_at) != strftime('%Y', 'now')
 				LIMIT 200
-			`).all();
+			`
+				)
+				.all();
 
 			if (memories.length > 0) {
 				for (const m of memories) {
 					const yearsAgo = now.getFullYear() - new Date(m.created_at).getFullYear();
-					await db.prepare(`
+					await db
+						.prepare(
+							`
 						INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message)
 						VALUES (?, ?, 'memory', 'post', ?, ?)
-					`).run(m.user_id, m.user_id, m.id,
-						`📸 Un día como hoy, hace ${yearsAgo} año(s), publicaste un recuerdo.`);
+					`
+						)
+						.run(
+							m.user_id,
+							m.user_id,
+							m.id,
+							`📸 Un día como hoy, hace ${yearsAgo} año(s), publicaste un recuerdo.`
+						);
 				}
 				console.log(`[cron] Generated ${memories.length} memory notification(s)`);
 			}
@@ -87,7 +109,9 @@ function startCrons() {
 	setInterval(async () => {
 		try {
 			const db = getDb();
-			const result = await db.prepare("DELETE FROM stories WHERE expires_at < datetime('now')").run();
+			const result = await db
+				.prepare("DELETE FROM stories WHERE expires_at < datetime('now')")
+				.run();
 			if (result.changes > 0) {
 				console.log(`[cron] Cleaned ${result.changes} expired story(ies)`);
 			}
@@ -110,11 +134,56 @@ function startCrons() {
 	setInterval(() => {
 		const now = Date.now();
 		for (const [ip, data] of rateLimits.entries()) {
-			if (now - data.start > 60_000) { // Si expiró la ventana de 1 minuto, liberar memoria
+			if (now - data.start > 60_000) {
+				// Si expiró la ventana de 1 minuto, liberar memoria
 				rateLimits.delete(ip);
 			}
 		}
 	}, 120_000);
+
+	// ── 6. RGPD Erasure: hard-delete cuentas soft-deleteradas hace >30 días + ficheros huérfanos (daily) ──
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			// Cuentas que superan la ventana de gracia de 30 días
+			const expired = await db
+				.prepare(
+					`
+				SELECT id, avatar_url, cover_url FROM users
+				WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-30 days')
+			`
+				)
+				.all();
+
+			if (expired.length === 0) return;
+
+			// Limpiar ficheros de avatar/portada en disco antes de perder las URLs
+			for (const u of expired) {
+				for (const url of [u.avatar_url, u.cover_url]) {
+					if (!url || !url.startsWith('/uploads/')) continue;
+					const sub = url.startsWith('/uploads/avatars/') ? 'avatars' : 'covers';
+					try {
+						const filePath = resolve(getUploadsDir(sub), basename(url));
+						if (existsSync(filePath)) unlinkSync(filePath);
+					} catch (_e) {
+						/* fichero ya ausente — ignorar */
+					}
+				}
+			}
+
+			// Hard-delete: ON DELETE CASCADE elimina wallets/transacciones, posts, comentarios,
+			// messages, reacciones, follows, stories, reels, marketplace, gigs, activity_logs,
+			// notifications, oauth_accounts, check_ins, sesiones, ajustes, etc.
+			const ids = expired.map((u) => u.id);
+			const ph = ids.map(() => '?').join(',');
+			const result = await db.prepare(`DELETE FROM users WHERE id IN (${ph})`).run(...ids);
+			console.log(
+				`[cron] GDPR erasure: hard-deleted ${result.changes} user(s) + cascaded records + orphaned files`
+			);
+		} catch (err) {
+			console.error('[cron] GDPR erasure error:', err.message);
+		}
+	}, 86_400_000);
 
 	console.log('[boot] All cron workers started');
 }
@@ -125,7 +194,7 @@ export async function handle({ event, resolve }) {
 	let clientIp = 'unknown';
 	try {
 		clientIp = event.getClientAddress();
-	} catch (e) {
+	} catch (_e) {
 		const forwarded = event.request.headers.get('x-forwarded-for');
 		clientIp = forwarded ? forwarded.split(',')[0] : '127.0.0.1';
 	}
@@ -144,24 +213,35 @@ export async function handle({ event, resolve }) {
 					const decoded = decodeToken(match[1]);
 					if (decoded && decoded.user_id) {
 						const db = getDb();
-						const user = await db.prepare("SELECT COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') as effective_role FROM users u WHERE u.id = ?").get(decoded.user_id);
-						
-						event.locals.user = { 
-							id: decoded.user_id, 
-							role: user ? user.effective_role : 'user' 
+						const user = await db
+							.prepare(
+								"SELECT COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') as effective_role, is_verified FROM users u WHERE u.id = ?"
+							)
+							.get(decoded.user_id);
+
+						event.locals.user = {
+							id: decoded.user_id,
+							role: user ? user.effective_role : 'user',
+							is_verified: user ? user.is_verified : 0
 						};
 
-						if (user && ['admin', 'super_admin', 'moderator', 'team'].includes(user.effective_role)) {
+						if (
+							user &&
+							(['admin', 'super_admin', 'moderator', 'team', 'staff'].includes(
+								user.effective_role
+							) ||
+								user.is_verified === 1)
+						) {
 							isStaff = true;
 						}
 					}
 				}
 			}
-		} catch (e) {
+		} catch (_e) {
 			// Ignorar errores de BD aquí; si falla, asume que no es staff y aplica rate limit.
 		}
 
-		if (!isStaff) {
+		if (!isStaff && clientIp !== '127.0.0.1' && clientIp !== '::1') {
 			const now = Date.now();
 			const rlData = rateLimits.get(clientIp);
 
@@ -190,7 +270,7 @@ export async function handle({ event, resolve }) {
 		const origin = event.request.headers.get('origin');
 		const referer = event.request.headers.get('referer');
 		const host = event.url.host;
-		
+
 		// Validar que el origen o referer venga estrictamente de nuestro propio dominio
 		if (origin && new URL(origin).host !== host) {
 			console.warn(`[security] CSRF Origin rechazado: ${origin} vs ${host}`);
@@ -199,6 +279,63 @@ export async function handle({ event, resolve }) {
 		if (!origin && referer && new URL(referer).host !== host) {
 			console.warn(`[security] CSRF Referer rechazado: ${referer} vs ${host}`);
 			return new Response('Forbidden - Invalid Referer', { status: 403 });
+		}
+	}
+
+	// ── Feature Flags Guard ──
+	if (
+		!pathname.startsWith('/_app/') &&
+		!pathname.startsWith('/admin') &&
+		pathname !== '/setup' &&
+		pathname !== '/install'
+	) {
+		try {
+			const db = getDb();
+			const settingsRows = await db
+				.prepare(
+					"SELECT key, value FROM system_settings WHERE key IN ('reels_enabled', 'stories_enabled', 'groups_enabled', 'marketplace_enabled', 'gamification_enabled')"
+				)
+				.all();
+			const settings = {};
+			for (const r of settingsRows) {
+				try {
+					settings[r.key] = JSON.parse(r.value);
+				} catch {
+					settings[r.key] = r.value;
+				}
+			}
+
+			const parseBool = (val) => val !== '0' && val !== false && val !== 'false';
+			const isApi = pathname.startsWith('/api/');
+			const checkPath = isApi ? pathname.substring(4) : pathname; // remove /api
+
+			if (checkPath.startsWith('/reels') && !parseBool(settings.reels_enabled)) {
+				return isApi
+					? new Response(JSON.stringify({ error: 'Feature disabled' }), { status: 403 })
+					: new Response('', { status: 302, headers: { Location: '/' } });
+			}
+			if (checkPath.startsWith('/stories') && !parseBool(settings.stories_enabled)) {
+				return isApi
+					? new Response(JSON.stringify({ error: 'Feature disabled' }), { status: 403 })
+					: new Response('', { status: 302, headers: { Location: '/' } });
+			}
+			if (checkPath.startsWith('/groups') && !parseBool(settings.groups_enabled)) {
+				return isApi
+					? new Response(JSON.stringify({ error: 'Feature disabled' }), { status: 403 })
+					: new Response('', { status: 302, headers: { Location: '/' } });
+			}
+			if (checkPath.startsWith('/marketplace') && !parseBool(settings.marketplace_enabled)) {
+				return isApi
+					? new Response(JSON.stringify({ error: 'Feature disabled' }), { status: 403 })
+					: new Response('', { status: 302, headers: { Location: '/' } });
+			}
+			if (checkPath.startsWith('/leaderboard') && !parseBool(settings.gamification_enabled)) {
+				return isApi
+					? new Response(JSON.stringify({ error: 'Feature disabled' }), { status: 403 })
+					: new Response('', { status: 302, headers: { Location: '/' } });
+			}
+		} catch (_e) {
+			// ignore DB errors during guard, fallback to allow
 		}
 	}
 
@@ -237,7 +374,11 @@ export async function handle({ event, resolve }) {
 		// Si es un bloqueo temporal (SQLITE_BUSY) inducido por el rate limiter, NO redirigir.
 		const msg = err.message || '';
 		if (msg.includes('no such table') || msg.includes('not initialized')) {
-			if (pathname !== '/install' && !pathname.startsWith('/api/install') && !pathname.startsWith('/_app/')) {
+			if (
+				pathname !== '/install' &&
+				!pathname.startsWith('/api/install') &&
+				!pathname.startsWith('/_app/')
+			) {
 				return new Response('', {
 					status: 302,
 					headers: { Location: '/install' }
@@ -269,7 +410,11 @@ export function handleError({ error, event }) {
 	});
 
 	// DB-specific errors: provide helpful context
-	if (err.message.includes('DB run error') || err.message.includes('DB get error') || err.message.includes('DB all error')) {
+	if (
+		err.message.includes('DB run error') ||
+		err.message.includes('DB get error') ||
+		err.message.includes('DB all error')
+	) {
 		return {
 			status: 500,
 			message: 'Database operation failed'

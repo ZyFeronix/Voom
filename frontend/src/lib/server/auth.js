@@ -26,9 +26,9 @@ export async function requireAuth(request) {
 	const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 	const db = getDb();
 
-	const session = await db.prepare(
-		'SELECT id, user_id, expires_at FROM user_sessions WHERE token_hash = ? LIMIT 1'
-	).get(tokenHash);
+	const session = await db
+		.prepare('SELECT id, user_id, expires_at FROM user_sessions WHERE token_hash = ? LIMIT 1')
+		.get(tokenHash);
 
 	if (!session) {
 		throw error(401, 'Sesión inválida');
@@ -63,12 +63,15 @@ export async function createSession(userId, request) {
 	const db = getDb();
 
 	const userAgent = request.headers.get('user-agent') || 'unknown';
-	const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
+	const ip =
+		request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || '127.0.0.1';
 	const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
-	await db.prepare(
-		'INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)'
-	).run(userId, tokenHash, ip, userAgent, expiresAt);
+	await db
+		.prepare(
+			'INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, expires_at) VALUES (?, ?, ?, ?, ?)'
+		)
+		.run(userId, tokenHash, ip, userAgent, expiresAt);
 
 	return token;
 }

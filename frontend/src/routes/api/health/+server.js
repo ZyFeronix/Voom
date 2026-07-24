@@ -5,14 +5,14 @@ export async function GET() {
 	const health = {
 		status: 'ok',
 		timestamp: new Date().toISOString(),
-		version: '0.0.2'
+		version: '0.5.0'
 	};
 
 	try {
 		const db = getDb();
 		db.prepare('SELECT 1').get();
 		health.database = 'connected';
-	} catch (err) {
+	} catch (_err) {
 		health.database = 'disconnected';
 		health.status = 'degraded';
 	}

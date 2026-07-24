@@ -16,30 +16,38 @@ export async function GET({ request, url }) {
 
 	let where = "n.recipient_id = ? AND n.type != 'message'";
 	const params = [userId];
-	
+
 	if (unreadOnly) {
 		where += ' AND n.is_read = 0';
 	}
-	
+
 	if (cursor) {
 		where += ' AND n.id < ?';
 		params.push(parseInt(cursor));
 	}
 
-	const notifs = await db.prepare(`
+	const notifs = await db
+		.prepare(
+			`
 		SELECT n.*, u.username as actor_username, u.display_name as actor_name, u.avatar_url as actor_avatar
 		FROM notifications n LEFT JOIN users u ON n.actor_id = u.id
 		WHERE ${where} ORDER BY n.id DESC LIMIT ?
-	`).all(...params, limit);
+	`
+		)
+		.all(...params, limit);
 
-	const countRes = await db.prepare("SELECT COUNT(*) as cnt FROM notifications WHERE recipient_id = ? AND is_read = 0 AND type != 'message'").get(userId);
+	const countRes = await db
+		.prepare(
+			"SELECT COUNT(*) as cnt FROM notifications WHERE recipient_id = ? AND is_read = 0 AND type != 'message'"
+		)
+		.get(userId);
 	const count = countRes ? countRes.cnt : 0;
-	
+
 	const hasMore = notifs.length === limit;
 	const nextCursor = notifs.length > 0 ? notifs[notifs.length - 1].id : null;
 
-	return json({ 
-		notifications: notifs, 
+	return json({
+		notifications: notifs,
 		count,
 		pagination: {
 			has_more: hasMore,
@@ -49,7 +57,7 @@ export async function GET({ request, url }) {
 	});
 }
 
-export async function POST({ request, url, params }) {
+export async function POST({ request, _url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
 	const userId = await requireAuth(request);
 	const db = getDb();
@@ -59,18 +67,22 @@ export async function POST({ request, url, params }) {
 		return json({ success: true });
 	}
 	if (parts[1] === 'read') {
-		await db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND recipient_id = ?').run(parseInt(parts[0]), userId);
+		await db
+			.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND recipient_id = ?')
+			.run(parseInt(parts[0]), userId);
 		return json({ success: true });
 	}
 	return json({ error: 'Endpoint no encontrado' }, { status: 404 });
 }
 
-export async function DELETE({ request, url, params }) {
+export async function DELETE({ request, _url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
 	const userId = await requireAuth(request);
 	const db = getDb();
 	if (parts[0]) {
-		await db.prepare('DELETE FROM notifications WHERE id = ? AND recipient_id = ?').run(parseInt(parts[0]), userId);
+		await db
+			.prepare('DELETE FROM notifications WHERE id = ? AND recipient_id = ?')
+			.run(parseInt(parts[0]), userId);
 		return json({ success: true });
 	}
 	return json({ error: 'Endpoint no encontrado' }, { status: 404 });

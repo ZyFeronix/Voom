@@ -18,19 +18,21 @@
         :root {
             --bg-base: #0f172a;
             --primary: #00f2fe; /* Celeste aero */
+            --primary-glow: #1b85f3;
             --success: #10b981; /* Green esmeralda */
             
             /* Glassmorphism 2.0 Tokens */
-            --glass-surface: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-highlight: rgba(255, 255, 255, 0.15);
-            --neon-primary: 0 0 15px rgba(0, 242, 254, 0.2);
-            --neon-success: 0 0 15px rgba(16, 185, 129, 0.2);
+            --glass-surface: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-highlight: rgba(255, 255, 255, 0.25);
+            --neon-primary: 0 0 15px rgba(27, 133, 243, 0.25);
+            --neon-success: 0 0 15px rgba(16, 185, 129, 0.25);
             
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
             
             --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * {
@@ -128,7 +130,7 @@
 
         .tab-btn.active {
             color: var(--text-main);
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.12);
             box-shadow: var(--neon-primary), inset 0 1px 0 var(--glass-highlight);
             text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
         }
@@ -166,6 +168,7 @@
             font-weight: 600;
             line-height: 1.25;
             color: #fff;
+            scroll-margin-top: 2rem;
         }
 
         .markdown-body h1 {
@@ -194,6 +197,7 @@
             text-decoration: none;
             transition: all 0.2s;
             border-bottom: 1px solid transparent;
+            cursor: pointer;
         }
         
         .markdown-body a:hover {
@@ -277,6 +281,36 @@
             margin: 3rem 0;
         }
 
+        /* Perfectly Centered License Code Box */
+        .license-pre-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 2rem 0;
+        }
+
+        .license-pre {
+            background: #0d1117 !important;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin: 0 auto;
+            width: fit-content;
+            max-width: 100%;
+            box-shadow: inset 0 2px 20px rgba(0,0,0,0.6), 0 10px 30px rgba(0,0,0,0.3);
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        .license-pre code {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9em;
+            color: #a8b2d1;
+            line-height: 1.6;
+            white-space: pre;
+            display: block;
+        }
+
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -311,6 +345,7 @@
             .tabs { flex-wrap: wrap; width: 100%; justify-content: center; }
             .tab-btn { flex: 1; text-align: center; }
             .content-panel { padding: 1.5rem; }
+            .license-pre { padding: 1.5rem; width: 100%; }
         }
     </style>
 </head>
@@ -322,7 +357,7 @@
                 <div style="margin-top: 0.5rem;">
                     <div class="status-badge">
                         <div class="status-dot"></div>
-                        Alpha v0.0.2 - Glassmorphism 2.0
+                        Alpha v0.5 - Glassmorphism 2.0
                     </div>
                 </div>
             </div>
@@ -331,6 +366,7 @@
                 <button class="tab-btn active" data-target="readme">README</button>
                 <button class="tab-btn" data-target="docs">Arquitectura (DOCS)</button>
                 <button class="tab-btn" data-target="contributing">Contributing</button>
+                <button class="tab-btn" data-target="license">Licencia</button>
             </div>
         </header>
 
@@ -338,28 +374,64 @@
             <div id="readme" class="content-panel active markdown-body"></div>
             <div id="docs" class="content-panel markdown-body"></div>
             <div id="contributing" class="content-panel markdown-body"></div>
+            <div id="license" class="content-panel markdown-body">
+                <h1>Licencia y Protección Legal</h1>
+                <p>Acuerdo de usuario, términos de uso de V-SOCIAL y protecciones de propiedad intelectual.</p>
+
+                <h2>Licencia AGPLv3</h2>
+                <p>V-SOCIAL es software libre bajo la Licencia Pública General Affero de GNU (AGPLv3). Esto garantiza libertades esenciales, pero impone obligaciones estrictamente respetadas:</p>
+                <ul>
+                    <li><strong>Código Abierto:</strong> Si distribuyes o modificas esta plataforma, debes compartir el código fuente resultante bajo la misma licencia.</li>
+                    <li><strong>Uso en Red (cláusula §13):</strong> A diferencia de la GPLv3, la AGPLv3 exige que quien ponga una versión modificada de V-SOCIAL a disposición de usuarios a través de una red ofrezca también el código fuente a esos usuarios.</li>
+                    <li><strong>Sin Garantía:</strong> El software se proporciona "tal cual", sin ninguna garantía implícita o explícita.</li>
+                    <li><strong>Reconocimiento:</strong> Se debe mantener la atribución a los autores originales en todas las copias y derivados.</li>
+                </ul>
+
+                <p style="margin-top: 2rem;"><strong>Texto oficial completo de la licencia GNU AGPLv3:</strong></p>
+                <div class="license-pre-container">
+                    <pre class="license-pre"><code id="raw-license-text"></code></pre>
+                </div>
+
+                <h2>Protección Anti-Clonación (IP)</h2>
+                <p>Más allá de la lógica de negocio cubierta por AGPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de V-SOCIAL.</p>
+                <ul>
+                    <li><strong>Identidad de Marca:</strong> No se permite el uso del nombre "V-SOCIAL", los logotipos, la tipografía distintiva ni el esquema de colores para engañar a usuarios o hacerse pasar por la plataforma oficial.</li>
+                    <li><strong>Protección de Interfaz (Look & Feel):</strong> El clonado exacto de la interfaz de usuario con fines comerciales competidores está estrictamente prohibido sin autorización.</li>
+                    <li><strong>Rate Limiting & Anti-Scraping:</strong> La infraestructura incluye protecciones activas. El scraping automatizado o la ingeniería inversa de los algoritmos de feeds privados se considerará un abuso de los términos de servicio.</li>
+                </ul>
+
+                <h2>Términos de Servicio (SLA)</h2>
+                <p>Al utilizar o alojar una instancia de V-SOCIAL, te comprometes a seguir los estándares de ingeniería y respeto al usuario (<em>Anti-Caja Negra</em>).</p>
+                <ul>
+                    <li><strong>Privacidad del Usuario:</strong> Los feeds de Radar y Descubrimiento no deben ser manipulados con algoritmos ocultos.</li>
+                    <li><strong>Uso Responsable:</strong> Queda prohibido el uso de la plataforma para distribuir malware, contenido ilícito o esquemas de fraude.</li>
+                </ul>
+                <blockquote>
+                    Los <a href="/terms" target="_blank" rel="noopener noreferrer">Términos de Servicio completos</a> y la
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">Política de Privacidad</a> (incluido el cumplimiento RGPD de la UE)
+                    están disponibles en sus páginas dedicadas. Esta sección es un resumen de los
+                    principios de ingeniería; en caso de conflicto, prevalecen las páginas legales oficiales.
+                </blockquote>
+            </div>
         </main>
     </div>
 
     <!-- Raw Markdown Content (Escaped for JS Injection) -->
-    <script type="text/markdown" id="md-readme"># VSocial — Red Social Full-Stack
+    <script type="text/markdown" id="md-readme">
+# VSocial — Red Social Full-Stack
 
-[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue)]()
-[![License](https://img.shields.io/badge/license-GPLv3-blue)](/docs/license.html)
+[![Version](https://img.shields.io/badge/version-0.5--alpha-blue)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-AGPLv3-blue)](#licencia)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
-
-## Novedades recientes
-- **Físicas de Arrastre:** Integración de motor de físicas inerciales en `/posts/create`.
-- **MediaPlayer:** Nuevo componente propio para reproducción multimedia en Reels/Stories.
 
 **VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
 WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
 
-**Estado:** Alpha v0.0.2 — Funcional completo, 16 módulos, 35 tablas, 24 API endpoints.
+**Estado:** Alpha v0.5 — Funcional completo, 16 módulos, 35 tablas, 24 API endpoints.
 En desarrollo activo.
 
-> 📖 **Documentación completa:** **DOCS** — arquitectura, schema, rutas,
-> componentes, API, configuración, operaciones y roadmap.
+&gt; 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
+&gt; componentes, API, configuración, operaciones y roadmap.
 
 ---
 
@@ -367,7 +439,7 @@ En desarrollo activo.
 
 | Módulo | Descripción |
 |--------|-------------|
-| **Social Core** | Posts, comentarios anidados, reacciones, hashtags, check-ins geolocalizados |
+| **Social Core** | Posts, comentarios anidados, reacciones, hashtags, check-ins geolocalizados, **moods** (estados de ánimo) y **encuestas** |
 | **Reels** | Videos cortos con likes, comentarios y métricas |
 | **Stories** | Historias efímeras (24h) + highlights permanentes |
 | **Mensajería** | Chat DM + grupos con media, voz, replies, reacciones, typing indicators |
@@ -376,10 +448,11 @@ En desarrollo activo.
 | **Freelance Gigs** | Tablón de encargos y postulaciones |
 | **Grupos & Páginas** | Comunidades públicas/privadas, posts grupales, eventos con RSVP |
 | **Wallet** | Monedero virtual con balance y transacciones |
-| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard |
+| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas) |
 | **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings |
 | **Push Notifications** | Web Push (VAPID), suscripciones por usuario |
-| **Seguridad** | JWT (httpOnly cookies), rate limiting, CSRF, Helmet, HSTS, bloqueos, snooze |
+| **Legal & RGPD** | Páginas `/privacy` `/terms` `/cookies`, banner de cookies, consentimiento + age gate 13+, borrado de cuenta con ventana de 30 días, exportación de datos JSON |
+| **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting, CSRF, Helmet, HSTS, bloqueos, snooze |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
 | **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado, perfiles customizables |
 
@@ -454,11 +527,10 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 
 | Archivo | Contenido |
 |---------|-----------|
-| **DOCS** | Documentación técnica completa (17 secciones) |
-| **ARCHITECTURE** | Decisiones de diseño y filosofía del proyecto |
-| **Personality & SOUL** | Identidad, estándares de ingeniería y métricas SLA |
-| **CHANGELOG** | Historial de versiones |
-| **CONTRIBUTING** | Guía para contribuir al proyecto |
+| [`DOCS.md`](./DOCS.md) | Documentación técnica completa (17 secciones) |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Decisiones de diseño y filosofía del proyecto |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Historial de versiones |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Guía para contribuir al proyecto |
 | [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (783 líneas) |
 | [`.env.example`](./.env.example) | Template de variables de entorno |
 
@@ -466,14 +538,14 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 
 ## Licencia
 
-GNU GPLv3. Ver página de [Licencia y Protección](/docs/license.html).
+GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE) o la página renderizada en [`/docs/license`](./license.html).
 
 </script>
     <script type="text/markdown" id="md-docs">
-# VSocial — Documentación Completa de Proyecto (Alpha v0.0.2)
+# VSocial — Documentación Completa de Proyecto (Alpha v0.5)
 
-> Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
-> operaciones y guía de desarrollo. Todo en un solo archivo.
+&gt; Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
+&gt; operaciones y guía de desarrollo. Todo en un solo archivo.
 
 ---
 
@@ -484,20 +556,19 @@ WebSockets y diseño Glassmorphism 2.0 propio. Cubre el espectro completo de una
 social moderna: feed, posts, reels, stories, marketplace, mensajería en tiempo real,
 grupos, notificaciones push, gamificación y panel administrativo.
 
-- **Versión:** Alpha v0.0.2
-- **Licencia:** GPLv3
+- **Versión:** Alpha v0.5
+- **Licencia:** AGPLv3
 - **Estado:** Funcional completo — 16+ módulos implementados
-
-### Novedades Recientes
-- **Físicas de Arrastre:** El creador de posts (`/posts/create`) ahora usa el mismo motor de físicas inerciales (drag-to-scroll) de la Landing Page para la selección de moods.
-- **Reproductor Multimedia Glassmorphism:** Se reemplazó el reproductor de video nativo en `/stories/create` y `/reels/create` por el componente `MediaPlayer` propio de la plataforma.
-- **Historias de Solo Texto:** El backend ahora soporta la creación y visualización de historias sin media, puramente basadas en color de fondo y texto.
 
 ### Características Principales:
 - **Sistema de Feeds Transparentes (Anti-Caja Negra):** El usuario tiene control total sobre su contenido mediante tres algoritmos sin opacidad:
   - **Radar en Vivo (Línea de Tiempo):** 100% cronológico estricto y global, sin filtros ocultos. Muestra absolutamente todo lo que se publica en la plataforma en tiempo real, segmentado únicamente por tu idioma principal (para evitar ruido irrelevante).
   - **Feed Inteligente (Personalizado):** Ordenamiento lógico basado explícitamente en los hashtags, categorías y creadores con los que más interactúas, sin ocultar contenido deliberadamente.
   - **Descubrimiento (Para Ti):** Muestra contenido en tendencia y de nuevos creadores basado en la relevancia global y frescura, dando oportunidades equitativas de visibilidad sin usar ML tóxico de retención.
+- **Moods & Encuestas en Posts:** Cada publicación puede etiquetarse con un *mood* (estado de ánimo, 10 opciones) y/o adjuntar una encuesta con 2-6 opciones y duración configurable. Las encuestas se serializan como JSON en el cuerpo del post y se votan vía API con un voto por usuario. Ver §4.3.
+- **Reproductor Multimedia Unificado:** `MediaPlayer.svelte` (sin Vidstack ni `&lt;video&gt;` nativo del navegador) se usa en feed, reels y stories: PiP, velocidades, atajos de teclado, *autoplay* al entrar en viewport y *media session* del SO. Ver §10.1.
+- **Cumplimiento RGPD (UE):** Páginas legales (`/privacy`, `/terms`, `/cookies`), banner de consentimiento de cookies, registro con consentimiento + age gate 13+, borrado de cuenta self-service con ventana de reactivación de 30 días, y exportación de datos en JSON (derecho de portabilidad). Ver §13.1.
+- **Leaderboard Rediseñado:** Tabla de clasificación con podio top-3, pestañas entre rankings, tarjeta del usuario actual y transiciones con caché en cliente.
 
 ---
 
@@ -521,7 +592,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Capa | Tecnología |
 |------|-----------|
 | API | Rutas SvelteKit `+server.js` (mismo proceso Node.js) |
-| Auth | JWT (`jsonwebtoken`) en cookies `httpOnly` |
+| Auth | JWT (`jsonwebtoken`) — token en `localStorage` + cookie client-side `SameSite=Strict; Secure` (no httpOnly: el cliente lo lee en `lib/api.js`) |
 | Sesiones | Tabla `user_sessions` con token hash + IP + user-agent |
 | OAuth | Google, Apple (estructura lista, implementación parcial) |
 | Hashing | bcryptjs |
@@ -562,26 +633,29 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Tests | Vitest (`tests/auth.test.js`) |
 | Linting | ESLint 9 + Prettier 3 + plugin Svelte |
 | Git hooks | Husky (`.husky/`) |
-| CI/CD | Pre-commit linting + build verification |
+| CI/CD | Pre-commit linting + build verification (Husky) + GitHub Actions (`lint` + `build` en cada push/PR, ver `.github/workflows/ci.yml`) |
 
 ---
 
 ## 3. Estructura del Proyecto
 
-```text
+```
 Vsocial/                     ← raíz del proyecto
 ├── .env                     ← configuración real (gitignored)
 ├── .env.example             ← template de configuración
 ├── .gitignore
 ├── .husky/                  ← git hooks
-├── ARCHITECTURE               ← decisiones de diseño y filosofía
-├── CHANGELOG                  ← registro de versiones
-├── DOCS                       ← este documento
-├── README                   ← overview rápido
-├── Personality & SOUL       ← identidad de la plataforma
+├── ARCHITECTURE.md          ← decisiones de diseño y filosofía
+├── CHANGELOG.md             ← registro de versiones
+├── DOCS.md                  ← este documento
+├── README.md                ← overview rápido
+├── Personality-and-SOUL.md    ← identidad de la plataforma
 │
 ├── frontend/                ← aplicación SvelteKit principal
 │   ├── package.json         ← dependencias y scripts
+│   ├── eslint.config.js     ← config ESLint 9 (flat) — aquí, no en la raíz (deps en frontend/node_modules)
+│   ├── .prettierrc          ← config Prettier (tabs) + plugin Svelte
+│   ├── .prettierignore      ← excluye style_dump.css y scripts de debug ad-hoc
 │   ├── svelte.config.js     ← config SvelteKit (runes mode, adapter-node)
 │   ├── vite.config.js       ← config Vite + Vitest
 │   ├── jsconfig.json
@@ -618,7 +692,7 @@ Vsocial/                     ← raíz del proyecto
 ├── docker-compose.yml       ← orquestación Docker
 ├── Dockerfile               ← build multi-stage (alpine, precompress)
 ├── nginx.conf               ← proxy reverso (WebSocket, buffering off)
-└── eslint.config.js         ← config ESLint 9
+└── (eslint.config.js vive en frontend/, ver abajo — sus deps están en frontend/node_modules)
 ```
 
 ---
@@ -635,18 +709,12 @@ Vsocial/                     ← raíz del proyecto
 - **Transacciones ACID**: WAL mode, foreign keys ON, busy_timeout 5000ms.
 - ** Índices estratégicos**: Cada tabla tiene índices para los patrones de consulta más frecuentes.
 
-
-### 4.3 Persistence Architecture & Concurrency
-- **SQLite Unique Index**: We heavily rely on SQLite's constraints to prevent race conditions. For example, `unique_activity_idx` ensures that activity logs (views, likes) are not duplicated even under high concurrency.
-- **Svelte Runes**: The UI aggressively uses `$state` and `$derived` to reflect the database state immediately, utilizing an Optimistic UI pattern backed by reliable SQLite backend sync.
-- **WAL Mode**: Essential for scaling. Allows concurrent reads while writes are occurring, effectively handling viral traffic patterns.
-
 ### 4.2 Dominios del Esquema (15 dominios, ~35 tablas)
 
 | Dominio | Tablas | Función |
 |---------|--------|---------|
-| **1. Users & Auth** | `users`, `user_roles`, `user_titles`, `user_sessions`, `user_settings` | Perfil, roles, sesiones, preferencias |
-| **2. Posts & Content** | `posts`, `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins` | Publicaciones, media, reacciones, comentarios anidados, hashtags, check-ins geolocalizados |
+| **1. Users & Auth** | `users`, `user_roles`, `user_titles`, `user_sessions`, `user_settings` | Perfil, roles, sesiones, preferencias. `users` incluye columnas RGPD: `birth_date`, `deleted_at` (soft-delete + ventana 30 días), `terms_accepted_at`, `privacy_accepted_at` (migración `003_gdpr.sql`) |
+| **2. Posts & Content** | `posts`, `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins` | Publicaciones (con `mood` y encuesta serializada en `body`), media, reacciones, comentarios anidados, hashtags, check-ins geolocalizados |
 | **3. Stories** | `stories`, `story_highlights`, `story_highlight_items` | Historias efímeras (24h) + highlights permanentes |
 | **4. Reels** | `reels`, `reel_likes`, `reel_comments` | Videos cortos estilo TikTok/Reels |
 | **5. Messaging** | `conversations`, `conversation_participants`, `messages_new`, `message_reactions`, `message_read_receipts` | Chat DM + grupos, voz, media, replies, reacciones, recibos de lectura |
@@ -661,6 +729,22 @@ Vsocial/                     ← raíz del proyecto
 | **13. Security** | `oauth_accounts`, `email_tokens`, `blocked_users`, `snoozed_users` | OAuth, verificación email, bloqueos, silenciados temporales |
 | **14. Aesthetics** | `profile_customizations` | Glassmorphism 2.0: colores, blur, opacidad, CSS custom, bloques |
 | **15. Infrastructure** | `system_cache`, `rtc_signals`, `daily_xp_limits`, `activity_logs` | Caché, señalización WebRTC, gamificación, registro de actividad |
+
+### 4.3 Arquitectura de Persistencia y Concurrencia
+
+- **Índice Único en SQLite**: Dependencia estricta en constraints de SQLite para prevenir condiciones de carrera. Por ejemplo, `unique_activity_idx` asegura que los registros de actividad (vistas, likes) no se dupliquen incluso bajo alta concurrencia.
+- **Runes de Svelte 5**: La interfaz utiliza `$state` y `$derived` para reflejar el estado de la base de datos inmediatamente, aplicando un patrón de UI optimista respaldado por sincronización confiable con SQLite.
+- **Modo WAL**: Esencial para escalabilidad. Permite lecturas concurrentes mientras ocurren escrituras, manejando de forma efectiva patrones de tráfico viral.
+
+### 4.4 Moods, Encuestas y Creación de Historias
+
+Funcionalidades de creación añadidas sobre el núcleo social:
+
+- **Moods (estados de ánimo):** el creador de posts (`/posts/create`) ofrece un carrusel de 10 moods (Feliz 😄, Creativo 🎨, Jugando 🎮, Música 🎵, Pensando 🤔, Emocionado 🔥, Viajando ✈️, Celebrando 🥳, Trabajando 💻, Comiendo 🍔). El mood seleccionado se envía en el campo `mood` y se persiste en `posts.mood` (`VARCHAR(30)`); se renderiza en el feed. El carrusel implementa física de *drag-to-scroll* con inercia, *overscroll* elástico y *edge fading* (sin *scroll-snap*, scroll libre y fluido), replicando el carrusel de la landing; las flechas de navegación se reemplazaron por esta física.
+- **Encuestas (polls):** el creador permite añadir una pregunta con 2-6 opciones y duración (1h / 6h / 24h / 3 días / 7 días). La encuesta **no** tiene tabla propia: se serializa como JSON en un bloque `\n[METADATA]` al final del `body` del post, junto con la ubicación. Estructura: `{ poll: { question, options: [{text, votes}], voted_user_ids: [] } }`.
+  - **Votación:** `POST /api/posts/:id/vote` con `{ option_index }`. El servidor parsea el `[METADATA]`, rechaza votos duplicados (comprueba `voted_user_ids`), incrementa `votes` del option elegido, añade el `user_id` al array y reescribe el `body`. Devuelve `{ poll }` actualizado.
+  - **Render:** `PostCard.svelte` muestra el widget con botones de opción (si el usuario puede votar) o barras de porcentaje + recuento (tras votar o si no está autenticado), total de votos y marca "Voto registrado".
+- **Creación de historias (`/stories/create`):** reescritura completa de mockup a página funcional. Soporta *drag & drop* de archivos, **historias de solo texto** (caption sobre fondo de color), previsualización en vivo dentro de un marco de teléfono, texto arrastrable (posición X/Y, alineación), 10 colores de fondo, 6 de texto y 5 familias tipográficas, con mapeo real a la API de stories.
 
 ---
 
@@ -689,7 +773,7 @@ Vsocial/                     ← raíz del proyecto
 | `/stories/create` | `stories/create/+page.svelte` | Crear historia |
 | `/u/[username]` | `u/[username]/+page.svelte` | Perfil de usuario público |
 | `/u/[username]/following` | `u/[username]/following/+page.svelte` | Lista de seguidos |
-| `/settings` | `settings/+page.svelte` | Configuración de cuenta |
+| `/settings` | `settings/+page.svelte` | Configuración de cuenta (perfil, privacidad, notificaciones, algoritmo, **Mis Datos RGPD**) |
 | `/settings/design` | `settings/design/+page.svelte` | Personalización de diseño/theme |
 | `/settings/activity` | `settings/activity/+page.svelte` | Registro de actividad personal |
 | `/leaderboard` | `leaderboard/+page.svelte` | Tabla de clasificación |
@@ -701,21 +785,26 @@ Vsocial/                     ← raíz del proyecto
 | `/admin/apis` | `admin/apis/+page.svelte` | Gestión de APIs |
 | `/about` | `about/+page.svelte` | Acerca de VSocial |
 | `/about/verified` | `about/verified/+page.svelte` | Info sobre verificación |
+| `/privacy` | `privacy/+page.svelte` | Política de Privacidad (RGPD) |
+| `/terms` | `terms/+page.svelte` | Términos de Servicio (RGPD) |
+| `/cookies` | `cookies/+page.svelte` | Política de Cookies (RGPD) |
+| `/docs` | `static/docs/index.html` | Portal de documentación (README + DOCS + Contributing en pestañas). Generado por `scripts/build_docs.js` |
+| `/docs/license` | `static/docs/license.html` | Página de Licencia y Protección (AGPLv3) — HTML estático autocontenido, diseño Glassmorphism 2.0 |
 
 ### 5.2 API Endpoints — 24 grupos de endpoints
 
 | Ruta API | Métodos | Función |
 |----------|---------|---------|
-| `/api/auth/[action]` | POST | login, register, logout, reset-password, verify-email |
+| `/api/auth/[action]` | POST, GET, PUT | login, register, logout, me, change-password. *(reset-password/verify-email: la maquinaria existe en `email.js` pero las rutas no están cableadas — código muerto)* |
+| `/api/users/[...path]` | GET, POST, PUT, DELETE | Perfiles, follows/unfollow, bloquear/snoozear, búsqueda, avatar/cover, **`/export` (JSON portabilidad RGPD)**, **`/delete-account` (borrado soft + ventana 30 días)** |
 | `/api/health` | GET | Health check (`{ status: 'ok', uptime, db }`) |
 | `/api/install` | POST | Instalación inicial: crea tablas, admin user, system settings |
 | `/api/setup` | POST | Wizard post-instalación |
-| `/api/posts/[...path]` | GET, POST, PUT, DELETE | CRUD de posts + like/unlike + save/unsave + pin/unpin |
+| `/api/posts/[...path]` | GET, POST, PUT, DELETE | CRUD de posts + like/unlike + save/unsave + pin/unpin + `/media` (upload) + **`/:id/vote` (votar encuesta, un voto por usuario)** + `/:id/restore`. El POST de creación acepta `mood`, `scheduled_at`, `location_name` y `poll` (JSON con pregunta, opciones y duración) |
 | `/api/feed/[...path]` | GET | Feed inteligente, timeline, trending, explore |
 | `/api/reels/[...path]` | GET, POST, PUT, DELETE | CRUD de reels + like/unlike + comentarios |
 | `/api/stories/[...path]` | GET, POST, DELETE | CRUD de stories + highlights |
 | `/api/comments/[...path]` | GET, POST, DELETE | Comentarios anidados en posts/reels |
-| `/api/users/[...path]` | GET, PUT | Perfiles, follows/unfollow, bloquear/snoozear, búsqueda |
 | `/api/notifications/[...path]` | GET, PUT, PATCH, SSE | Lista, marcar leídas, marcar todas leídas, stream SSE |
 | `/api/messages/[...path]` | GET, POST | Conversaciones, mensajes, media, creación de grupos |
 | `/api/marketplace/[...path]` | GET, POST, PUT, DELETE | Listings, categorías, búsqueda, flag |
@@ -760,13 +849,14 @@ Vsocial/                     ← raíz del proyecto
 | `CommentItem.svelte` | Comentario individual con replies anidados |
 | `ProfileHoverCard.svelte` | Popup de perfil al hacer hover en username/avatar |
 | `VerifiedBadge.svelte` | Insignia de cuenta verificada |
-| `MediaPlayer.svelte` | Reproductor de audio/video |
+| `MediaPlayer.svelte` | Reproductor de audio/vídeo propio y unificado (sin Vidstack ni `&lt;video&gt;` nativo): PiP, velocidades, atajos, *autoplay* en viewport, *media session* y *tracking* de vistas. Usado en feed, reels y stories (ver §10.1) |
 | `VoiceRecorder.svelte` | Widget de grabación de voz para mensajes |
 | `KlipyPicker.svelte` | Picker de emojis/GIFs/stickers (integración Klipy) |
 | `TwemojiPicker.svelte` | Picker de emojis nativos (Noto Color Emoji). *Nombre legacy* |
 | `HashtagTextarea.svelte` | Textarea con soporte de hashtags |
 | `ReportModal.svelte` | Modal para reportar contenido |
 | `PwaPrompt.svelte` | Banner de instalación PWA |
+| `CookieBanner.svelte` | Banner de consentimiento de cookies (RGPD) — localStorage `vsocial_cookie_consent` + cookie `Secure; SameSite=Strict` |
 | `QuickChatWidget.svelte` | Widget flotante de chat rápido |
 | `CustomSelect.svelte` | Select/dropdown personalizado |
 | `PasswordMeter.svelte` | Medidor de fortaleza de contraseña |
@@ -775,7 +865,11 @@ Vsocial/                     ← raíz del proyecto
 | **Gamificación:** | |
 | `gamification/CheckinButton.svelte` | Botón de check-in diario |
 | `gamification/LevelBadge.svelte` | Insignia de nivel |
-| `gamification/PodiumCard.svelte` | Tarjeta de podium en leaderboard |
+| `gamification/PodiumCard.svelte` | Tarjeta de podium (top 3) en leaderboard |
+| `gamification/AuroraPillar.svelte` | Pilar aurora decorativo del leaderboard rediseñado |
+| `gamification/LeaderboardTabs.svelte` | Pestañas para cambiar de ranking (nivel/XP/…) |
+| `gamification/LeaderboardRow.svelte` | Fila de usuario en el listado del leaderboard |
+| `gamification/CurrentUserCard.svelte` | Tarjeta del usuario actual con su posición |
 | `gamification/UserTitleBadge.svelte` | Insignia de título personalizado |
 
 ---
@@ -809,7 +903,7 @@ Vsocial/                     ← raíz del proyecto
 | **Check-in Streak** | Rachas diarias con recompensa progresiva |
 | **Daily XP Limits** | Límites por fuente (`daily_xp_limits`) para prevenir grinding |
 | **User Titles** | Títulos personalizados otorgados por admins con color asignado |
-| **Leaderboard** | Rankings públicos de usuarios por nivel/XP |
+| **Leaderboard** | Rankings públicos de usuarios por nivel/XP. Rediseñado (rama `feature/leaderboard-redesign`): podio top-3 (`PodiumCard`), filas para el resto (`LeaderboardRow`), pestañas entre tipos de ranking (`LeaderboardTabs`), tarjeta del usuario actual (`CurrentUserCard`), caché en cliente para transiciones instantáneas. Endpoint `GET /api/gamification/leaderboard?type=`. |
 | **Heartbeat** | Tracking de sesión activa para medir engagement |
 
 ---
@@ -825,6 +919,16 @@ Vsocial/                     ← raíz del proyecto
 | Hover lift | `hover:-translate-y-0.5` + `scale-105` en imágenes internas |
 | Reflexiones | Divs superpuestos con gradientes simulando reflexión de cristal |
 | Defensa volumétrica | `flex: 0 0 44px; min-width: 44px; min-height: 44px` en avatares (anti-colapso WebKit/Blink) |
+
+### 10.1 Reproductor Multimedia Unificado
+
+`MediaPlayer.svelte` es el reproductor de audio/vídeo propio de la plataforma. Reemplazó a **Vidstack** (dependencia eliminada) y al `&lt;video&gt;` nativo del navegador en todas las páginas de creación (`stories/create`, `reels/create`) y en el feed (`PostCard`), dando una experiencia consistente. Características:
+
+- Controles: play/pausa, volumen/mute, *seek* con barra y *tooltip* de tiempo, retroceder/avanzar 10s, velocidades (0.5x–2x), pantalla completa, *Picture-in-Picture*, bucle y menú de contexto.
+- Atajos de teclado (espacio/k, f, m, flechas, Home/End) y *media session* del SO (controles de bloqueo/notificación).
+- *Autoplay* al entrar en el viewport (IntersectionObserver, umbral 35%) y pausa al salir; pausa cualquier otro reproductor activo (un solo audio/vídeo sonando a la vez).
+- *Tracking* de vistas: registra `activity.view` cuando el usuario reproduce más del 25% / 3s de un vídeo con `entityType`/`entityId`.
+- Panel "Acerca de este reproductor" con la versión del proyecto (v0.5 Alpha) y la nota de licencia AGPLv3.
 
 ### Personalización de Perfil
 
@@ -963,12 +1067,27 @@ npm run format                  # prettier --write + eslint --fix
 | **Rate Limiting** | In-memory Map en `hooks.server.js`: 150 req/min por IP para `/api/`. Staff exento. GC cada 2 min. |
 | **CSRF** | Validación de headers `Origin`/`Referer` contra host en POST/PUT/DELETE. 403 si no coinciden. |
 | **Headers HTTP** | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security` (max-age=63072000 + includeSubDomains + preload), `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (cámara off, mic/geolocalización self) |
-| **Auth** | JWT en cookie `httpOnly` + Secure + SameSite=Lax. Tokens hasheados en `user_sessions`. |
+| **Auth** | JWT en `localStorage` + cookie client-side `SameSite=Strict; Secure`. Hash del token (SHA-256) almacenado en `user_sessions` con IP + user-agent. `requireAuth`/`optionalAuth` verifican JWT + sesión no expirada en cada petición. |
 | **Passwords** | bcryptjs con salt automático |
 | **Input** | Validación con `validator` (email, username, password strength). Sanitización HTML con `dompurify`. |
 | **Helmet** | Middleware de seguridad HTTP (activado en producción) |
 | **Bloqueos** | Tabla `blocked_users` (bloqueo bidireccional). Tabla `snoozed_users` (silencio temporal). |
 | **Reportes** | Sistema de reportes con estados (pending, reviewed, resolved, dismissed). |
+
+### 13.1 Cumplimiento RGPD (UE)
+
+VSocial implementa los derechos del interesado (arts. 15-21 RGPD) de forma self-service:
+
+| Derecho | Implementación |
+|---------|----------------|
+| **Información** | Páginas legales públicas `/privacy`, `/terms`, `/cookies` (sin login, listadas en `publicRoutes` del layout). Enlaces en footer, login y registro. |
+| **Consentimiento** | Registro con checkbox obligatorio de Términos + Privacidad + confirmación de edad ≥13. Sellado con `terms_accepted_at` / `privacy_accepted_at` (migración `003_gdpr.sql`). Validación autoritativa en servidor (cliente es solo UX). |
+| **Edad (art. 8)** | Age gate 13+: campo `birth_date` en registro, validación server-side (rechaza &lt;13 con 403). |
+| **Cookies** | `CookieBanner.svelte` muestra consentimiento en la primera visita; elección en `localStorage` + cookie `vsocial_cookie_consent` (`Secure; SameSite=Strict`). Sin analítica/publicidad de terceros — solo cookies esenciales de auth. |
+| **Acceso / Portabilidad (art. 20)** | `GET /api/users/export` → JSON descargable (`Content-Disposition: attachment`) con perfil, posts, comentarios, mensajes, reacciones, follows, stories, reels, marketplace, gigs, cartera, notificaciones, activity_logs, check_ins, oauth. Omite `password_hash` y tokens OAuth. Botón en Ajustes → Mis Datos. |
+| **Supresión / olvido (art. 17)** | `POST /api/users/delete-account` (confirmación con contraseña) → soft-delete (`deleted_at=now`, `is_active=0`) + cierre de todas las sesiones. Reactivación al login dentro de 30 días; pasado ese plazo, el cron diario hard-deletea en cascada + limpia ficheros huérfanos. |
+
+**Notas y límites del MVP:** el consentimiento de cookies se registra solo en cliente (sin log server-side). El borrado en cascada elimina también los registros financieros (wallet/transactions) — si el operador debe conservarlos por ley, habría que anonimizarlos en vez de borrarlos (fuera del MVP). Quedan pendientes: verificación de email (código muerto en `email.js`), cambio de email, "cerrar todas las sesiones" self-service, purga/retención general de `activity_logs`, refactor a cookies httpOnly.
 
 ---
 
@@ -983,6 +1102,7 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 | **Expired Stories Cleanup** | 5 min | Elimina stories con `expires_at &lt; now` |
 | **Expired Snooze Cleanup** | 1 hora | Limpia snoozes expirados |
 | **Rate Limiter GC** | 2 min | Elimina entradas expiradas del Map de rate limiting |
+| **GDPR Erasure** | 24 h | Hard-deletea en cascada (`ON DELETE CASCADE`) los usuarios con `deleted_at` &gt; 30 días y borra sus ficheros huérfanos de `uploads/avatars` y `uploads/covers` |
 
 ---
 
@@ -1028,125 +1148,126 @@ Pendiente para el salto de Alpha → Beta:
 - [ ] Sincronización in-memory para múltiples instancias Node
 - [ ] Cola de workers interna para emails, push, thumbnails
 - [ ] Optimización continua en Turso/SQLite
-- [ ] CI/CD pipeline completo (GitHub Actions)
+- [x] CI/CD pipeline (GitHub Actions) — `.github/workflows/ci.yml` corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`, con cancelación de runs obsoletos y subida del artifact `build/`. *(El job de tests queda deshabilitado: `npm run test` está roto — vitest no arranca y `tests/auth.test.js` asume better-sqlite3 sync, pero solo está instalado `@libsql/client` async. Re-habilitar cuando se arregle el entorno de test.)*
 - [ ] Tests de integración y e2e (Playwright)
 
 ---
 
-&gt; **VSocial Alpha v0.0.2** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
+&gt; **VSocial Alpha v0.5** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
 &gt; WebSockets y diseño Glassmorphism propio. 31 páginas, 24 API endpoints, 35 tablas,
 &gt; 13 módulos server-side. Lista para crecer.
 </script>
     <script type="text/markdown" id="md-contributing">
-# Contribuyendo a VSocial
+# Contributing to VSocial
 
-Gracias por tu interés en contribuir a VSocial. Este documento describe las
-reglas, convenciones y flujo de trabajo para enviar cambios.
-
----
-
-## Código de Conducta
-
-- Sé respetuoso, constructivo y profesional.
-- Cero toxicidad, cero exclusión, cero discusiones triviales (bikeshedding).
-- Critica las ideas, no a las personas.
+Thanks for your interest in contributing to VSocial. This document outlines the
+rules, conventions, and workflow for submitting changes.
 
 ---
 
-## Filosofía del Proyecto (Leer antes de programar)
+## Code of Conduct
 
-VSocial tiene fuertes convicciones arquitectónicas documentadas en:
-- **ARCHITECTURE** — decisiones de diseño e ideología
-- **DOCS** — referencia técnica completa
-- **Personality & SOUL** — estándares de ingeniería
+- Be respectful, constructive, and professional.
+- No toxicity, no gatekeeping, no bikeshedding.
+- Critique ideas, not people.
 
-Principios clave que debes respetar:
+---
 
-| Principio | Qué significa |
+## Project Philosophy (Read Before Coding)
+
+VSocial has strong architectural convictions documented in:
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — design decisions and ideology
+- [`DOCS.md`](./DOCS.md) — complete technical reference
+- [`Personality-and-SOUL.md`](./Personality-and-SOUL.md) — engineering standards
+
+Key principles you must respect:
+
+| Principle | What it means |
 |-----------|---------------|
-| **Solo SQL Puro** | Sin ORMs. Cada consulta es SQL preparado en `+server.js` o `$lib/server/`. |
-| **Runes de Svelte 5** | `$state`, `$derived`, `$props` para reactividad. Stores tradicionales solo para estado global complejo. |
-| **libSQL primero** | El adaptador de DB en `db.js` prefiere `@libsql/client`. `better-sqlite3` es solo respaldo. |
-| **Glassmorphism 2.0** | Usa el sistema de diseño tokenizado. Sin colores arbitrarios, sin valores hex puros. |
-| **Listo para Producción siempre** | Sin `// TODO`, sin stubs, sin funciones a medias. Un PR es código de producción. |
-| **Seguridad por defecto** | Toda entrada se valida. Todo endpoint tiene rate-limit o auth. Consultas preparadas siempre. |
+| **Raw SQL only** | No ORMs. Every query is prepared SQL in `+server.js` or `$lib/server/`. |
+| **Svelte 5 Runes** | `$state`, `$derived`, `$props` for reactivity. Traditional stores only for complex global state. |
+| **libSQL-first** | DB adapter in `db.js` prefers `@libsql/client`. `better-sqlite3` is fallback only. |
+| **Glassmorphism 2.0** | Use tokenized design system. No arbitrary colors, no raw hex values. |
+| **Deploy-ready always** | No `// TODO`, no stubs, no half-implemented features. PR is production code. |
+| **Security by default** | Every input validated. Every endpoint rate-limited or auth-gated. Prepared statements always. |
 
 ---
 
-## Configuración de Desarrollo
+## Development Setup
 
 ```bash
-# 1. Clonar e instalar
-git clone <repo-url>
+# 1. Clone and install
+git clone &lt;repo-url&gt;
 cd vsocial/frontend
 npm install
 
-# 2. Configurar entorno
+# 2. Configure environment
 cd ..
 cp .env.example .env
-# editar .env — como mínimo establecer JWT_SECRET
+# edit .env — at minimum set JWT_SECRET
 
-# 3. Poblar base de datos (opcional pero recomendado)
+# 3. Seed database (optional but recommended)
 node scripts/seed.js
 
-# 4. Iniciar servidor de desarrollo
+# 4. Start dev server
 cd frontend
 npm run dev
 ```
 
 ---
 
-## Estrategia de Ramas
+## Branch Strategy
 
-- `main` — código listo para producción. Protegida.
-- Ramas de características: `feature/<nombre>` o `fix/<nombre>`.
-- Sin commits directos a `main`. Siempre vía PR.
+- `main` — production-ready code. Protected.
+- Feature branches: `feature/&lt;name&gt;` or `fix/&lt;name&gt;`.
+- No direct commits to `main`. Always via PR.
 
 ---
 
-## Convención de Commits
+## Commit Convention
 
 ```
-<type>(<scope>): <subject>
+&lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
 
 [optional body]
 ```
 
-Tipos: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
+Types: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
 
-Alcances: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
-`notifications`, `wallet`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`, 
-`security`, `api`, `gamification`, `docs`, `deps`
+Scopes: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
+`notifications`, `wallet`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`,
+`security`, `api`, `gamification`, `docs`, `deps`, `gdpr`, `legal`, `settings`
 
-Ejemplos:
+Examples:
 ```
-feat(feed): agregar ranking inteligente con paginación basada en cursor
-fix(notifications): prevenir error por enlace de actor indefinido
-docs(docs): agregar sección de referencia de endpoints API
-perf(db): agregar índice compuesto en posts(user_id, created_at)
+feat(feed): add intelligent ranking with cursor-based pagination
+fix(notifications): prevent undefined actor link crash
+docs(docs): add API endpoint reference section
+perf(db): add composite index on posts(user_id, created_at)
 ```
 
 ---
 
-## Convenciones de Código
+## Code Conventions
 
-### Rutas SvelteKit
+### SvelteKit Routes
 
-- Páginas: `src/routes/<ruta>/+page.svelte`
-- API: `src/routes/api/<ruta>/+server.js`
-- APIs comodín (catch-all) usan el patrón `[...path]/+server.js`.
-- Exportar funciones nombradas (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`).
+- Pages: `src/routes/&lt;path&gt;/+page.svelte`
+- API: `src/routes/api/&lt;path&gt;/+server.js`
+- Catch-all APIs use `[...path]/+server.js` pattern.
+- Export named functions (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`).
 
-### Base de Datos
+### Database
 
-- Cambios de esquema van en `schema_sqlite.sql` (idempotente, `CREATE TABLE IF NOT EXISTS`).
-- Migraciones no destructivas van en `migrations/<NNN>_<descripcion>.sql`.
-- Scripts de reversión (rollback) van en `migrations/<NNN>_<descripcion>.down.sql`.
-- Nunca concatenar cadenas en SQL. Siempre usar sentencias preparadas:
+- Schema changes go into `schema_sqlite.sql` (idempotent, `CREATE TABLE IF NOT EXISTS`).
+- Non-destructive migrations go into `migrations/&lt;NNN&gt;_&lt;description&gt;.sql`.
+- Rollback scripts go into `migrations/&lt;NNN&gt;_&lt;description&gt;.down.sql`.
+- Never concatenate strings into SQL. Always prepared statements:
   ```js
   db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
   ```
 
+### Components
 
 - File: `src/lib/components/&lt;Name&gt;.svelte`
 - Use runes for internal state.
@@ -1173,114 +1294,911 @@ perf(db): agregar índice compuesto en posts(user_id, created_at)
 
 ```bash
 cd frontend
-npm run test        # ejecutar todas las pruebas
-npm run test:watch  # modo observador (watch)
+npm run test        # run all tests
+npm run test:watch  # watch mode
 ```
 
-- Pruebas unitarias para módulos de servidor y utilidades.
-- Pruebas de integración para endpoints de la API.
-- Archivo de pruebas actual: `tests/auth.test.js` (validadores de seguridad + conectividad DB).
-- Agregar pruebas en `tests/` con la extensión `.test.js`.
+- Unit tests for server modules and utilities.
+- Integration tests for API endpoints.
+- Current test file: `tests/auth.test.js` (security validators + DB connectivity).
+- Add tests in `tests/` with `.test.js` extension.
 
 ---
 
-## Linting y Formateo
+## Linting & Formatting
 
-Antes de enviar un PR:
+Before submitting a PR:
 
 ```bash
 cd frontend
 npm run format   # prettier --write + eslint --fix
-npm run lint     # verificar que todo pase
+npm run lint     # verify everything passes
 ```
 
-Los hooks de pre-commit de Husky también ejecutarán revisiones de lint automáticamente.
+Husky pre-commit hooks will also run lint checks automatically.
 
 ---
 
-## Lista de Verificación para Pull Request
+## Pull Request Checklist
 
-- [ ] El código sigue las convenciones del proyecto (Runes, SQL Puro, Tokens de Glassmorphism).
-- [ ] Sin `// TODO`, sin código comentado, sin logs de depuración.
-- [ ] Seguridad revisada: entradas validadas, SQL parametrizado, autenticación verificada.
-- [ ] Rendimiento considerado: consultas a BD indexadas, paginación basada en cursor.
-- [ ] `npm run lint` pasa limpiamente.
-- [ ] `npm run test` pasa limpiamente.
-- [ ] Cambios de esquema están en `schema_sqlite.sql` (idempotentes).
-- [ ] Nuevas migraciones tienen su correspondiente `.down.sql` para reversión.
-- [ ] La descripción del PR explica QUÉ, POR QUÉ y CÓMO probar.
-
----
-
-## Por Dónde Empezar
-
-Buenas contribuciones para iniciar:
-
-1. **Agregar pruebas** — la cobertura es mínima. Agrega pruebas de Vitest para endpoints API y consultas BD.
-2. **Mejorar manejo de errores** — muchos endpoints tienen try/catch básicos. Agregar respuestas de error estructuradas.
-3. **Documentar API** — agregar anotaciones OpenAPI/Swagger o una referencia de API dedicada.
-4. **Pruebas (E2E)** – `tests/auth.test.js` existe. Se necesitan más pruebas unitarias de Vitest y E2E de Playwright para flujos críticos (mensajería, reels).
-5. **Plantillas de Email** — mejorar el HTML de los emails de verificación y restablecimiento de contraseña.
+- [ ] Code follows project conventions (Runes, Raw SQL, Glassmorphism tokens).
+- [ ] No `// TODO`, no commented-out code, no debug logs.
+- [ ] Security reviewed: inputs validated, SQL parameterized, auth checked.
+- [ ] Performance considered: DB queries indexed, pagination cursor-based.
+- [ ] `npm run lint` passes cleanly.
+- [ ] `npm run test` passes cleanly.
+- [ ] Schema changes are in `schema_sqlite.sql` (idempotent).
+- [ ] New migrations are reversible via `node scripts/migrate-down.js [N]` (revert last N).
+- [ ] **RGPD review** if the change touches user data: deletion/export/consent/cookies/age-gate needs extra care — never log secrets, omit `password_hash`/OAuth tokens from any export, and ensure the erasure cascade covers new PII tables.
+- [ ] PR description explains WHAT, WHY, and HOW to test.
 
 ---
 
-## ¿Preguntas?
+## Where to Start
 
-Abre un issue o discute en el repositorio. Para decisiones arquitectónicas,
-consulta **ARCHITECTURE** primero.
+Good first contributions:
+
+1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
+2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
+3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
+4. **Testing** – `tests/auth.test.js` exists. Need more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
+6. **Email templates** — improve verification and password reset email HTML.
+
+---
+
+## Questions?
+
+Open an issue or discuss in the repository. For architectural decisions,
+consult [`ARCHITECTURE.md`](./ARCHITECTURE.md) first.
+</script>
+    <script type="text/plain" id="raw-license-content">
+              GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ Copyright (C) 2007 Free Software Foundation, Inc. &lt;https://fsf.org/&gt;
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The GNU Affero General Public License is a free, copyleft license for
+software and other kinds of works, specifically designed to ensure
+cooperation with the community in the case of network server software.
+
+  The licenses for most software and other practical works are designed
+to take away your freedom to share and change the works.  By contrast,
+our General Public Licenses are intended to guarantee your freedom to
+share and change all versions of a program--to make sure it remains free
+software for all its users.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+them if you wish), that you receive source code or can get it if you
+want it, that you can change the software or use pieces of it in new
+free programs, and that you know you can do these things.
+
+  Developers that use our General Public Licenses protect your rights
+with two steps: (1) assert copyright on the software, and (2) offer
+you this License which gives you legal permission to copy, distribute
+and/or modify the software.
+
+  A secondary benefit of defending all users' freedom is that
+improvements made in alternate versions of the program, if they
+receive widespread use, become available for other developers to
+incorporate.  Many developers of free software are heartened and
+encouraged by the resulting cooperation.  However, in the case of
+software used on network servers, this result may fail to come about.
+The GNU General Public License permits making a modified version and
+letting the public access it on a server without ever releasing its
+source code to the public.
+
+  The GNU Affero General Public License is designed specifically to
+ensure that, in such cases, the modified source code becomes available
+to the community.  It requires the operator of a network server to
+provide the source code of the modified version running there to the
+users of that server.  Therefore, public use of a modified version, on
+a publicly accessible server, gives the public access to the source
+code of the modified version.
+
+  An older license, called the Affero General Public License and
+published by Affero, was designed to accomplish similar goals.  This is
+a different license, not a version of the Affero GPL, but Affero has
+released a new version of the Affero GPL which permits relicensing under
+this license.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                       TERMS AND CONDITIONS
+
+  0. Definitions.
+
+  "This License" refers to version 3 of the GNU Affero General Public License.
+
+  "Copyright" also means copyright-like laws that apply to other kinds of
+works, such as semiconductor masks.
+
+  "The Program" refers to any copyrightable work licensed under this
+License.  Each licensee is addressed as "you".  "Licensees" and
+"recipients" may be individuals or organizations.
+
+  To "modify" a work means to copy from or adapt all or part of the work
+in a fashion requiring copyright permission, other than the making of an
+exact copy.  The resulting work is called a "modified version" of the
+earlier work or a work "based on" the earlier work.
+
+  A "covered work" means either the unmodified Program or a work based
+on the Program.
+
+  To "propagate" a work means to do anything with it that, without
+permission, would make you directly or secondarily liable for
+infringement under applicable copyright law, except executing it on a
+computer or modifying a private copy.  Propagation includes copying,
+distribution (with or without modification), making available to the
+public, and in some countries other activities as well.
+
+  To "convey" a work means any kind of propagation that enables other
+parties to make or receive copies.  Mere interaction with a user through
+a computer network, with no transfer of a copy, is not conveying.
+
+  An interactive user interface displays "Appropriate Legal Notices"
+to the extent that it includes a convenient and prominently visible
+feature that (1) displays an appropriate copyright notice, and (2)
+tells the user that there is no warranty for the work (except to the
+extent that warranties are provided), that licensees may convey the
+work under this License, and how to view a copy of this License.  If
+the interface presents a list of user commands or options, such as a
+menu, a prominent item in the list meets this criterion.
+
+  1. Source Code.
+
+  The "source code" for a work means the preferred form of the work
+for making modifications to it.  "Object code" means any non-source
+form of a work.
+
+  A "Standard Interface" means an interface that either is an official
+standard defined by a recognized standards body, or, in the case of
+interfaces specified for a particular programming language, one that
+is widely used among developers working in that language.
+
+  The "System Libraries" of an executable work include anything, other
+than the work as a whole, that (a) is included in the normal form of
+packaging a Major Component, but which is not part of that Major
+Component, and (b) serves only to enable use of the work with that
+Major Component, or to implement a Standard Interface for which an
+implementation is available to the public in source code form.  A
+"Major Component", in this context, means a major essential component
+(kernel, window system, and so on) of the specific operating system
+(if any) on which the executable work runs, or a compiler used to
+produce the work, or an object code interpreter used to run it.
+
+  The "Corresponding Source" for a work in object code form means all
+the source code needed to generate, install, and (for an executable
+work) run the object code and to modify the work, including scripts to
+control those activities.  However, it does not include the work's
+System Libraries, or general-purpose tools or generally available free
+programs which are used unmodified in performing those activities but
+which are not part of the work.  For example, Corresponding Source
+includes interface definition files associated with source files for
+the work, and the source code for shared libraries and dynamically
+linked subprograms that the work is specifically designed to require,
+such as by intimate data communication or control flow between those
+subprograms and other parts of the work.
+
+  The Corresponding Source need not include anything that users
+can regenerate automatically from other parts of the Corresponding
+Source.
+
+  The Corresponding Source for a work in source code form is that
+same work.
+
+  2. Basic Permissions.
+
+  All rights granted under this License are granted for the term of
+copyright on the Program, and are irrevocable provided the stated
+conditions are met.  This License explicitly affirms your unlimited
+permission to run the unmodified Program.  The output from running a
+covered work is covered by this License only if the output, given its
+content, constitutes a covered work.  This License acknowledges your
+rights of fair use or other equivalent, as provided by copyright law.
+
+  You may make, run and propagate covered works that you do not
+convey, without conditions so long as your license otherwise remains
+in force.  You may convey covered works to others for the sole purpose
+of having them make modifications exclusively for you, or provide you
+with facilities for running those works, provided that you comply with
+the terms of this License in conveying all material for which you do
+not control copyright.  Those thus making or running the covered works
+for you must do so exclusively on your behalf, under your direction
+and control, on terms that prohibit them from making any copies of
+your copyrighted material outside their relationship with you.
+
+  Conveying under any other circumstances is permitted solely under
+the conditions stated below.  Sublicensing is not allowed; section 10
+makes it unnecessary.
+
+  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
+
+  No covered work shall be deemed part of an effective technological
+measure under any applicable law fulfilling obligations under article
+11 of the WIPO copyright treaty adopted on 20 December 1996, or
+similar laws prohibiting or restricting circumvention of such
+measures.
+
+  When you convey a covered work, you waive any legal power to forbid
+circumvention of technological measures to the extent such circumvention
+is effected by exercising rights under this License with respect to
+the covered work, and you disclaim any intention to limit operation or
+modification of the work as a means of enforcing, against the work's
+users, your or third parties' legal rights to forbid circumvention of
+technological measures.
+
+  4. Conveying Verbatim Copies.
+
+  You may convey verbatim copies of the Program's source code as you
+receive it, in any medium, provided that you conspicuously and
+appropriately publish on each copy an appropriate copyright notice;
+keep intact all notices stating that this License and any
+non-permissive terms added in accord with section 7 apply to the code;
+keep intact all notices of the absence of any warranty; and give all
+recipients a copy of this License along with the Program.
+
+  You may charge any price or no price for each copy that you convey,
+and you may offer support or warranty protection for a fee.
+
+  5. Conveying Modified Source Versions.
+
+  You may convey a work based on the Program, or the modifications to
+produce it from the Program, in the form of source code under the
+terms of section 4, provided that you also meet all of these conditions:
+
+    a) The work must carry prominent notices stating that you modified
+    it, and giving a relevant date.
+
+    b) The work must carry prominent notices stating that it is
+    released under this License and any conditions added under section
+    7.  This requirement modifies the requirement in section 4 to
+    "keep intact all notices".
+
+    c) You must license the entire work, as a whole, under this
+    License to anyone who comes into possession of a copy.  This
+    License will therefore apply, along with any applicable section 7
+    additional terms, to the whole of the work, and all its parts,
+    regardless of how they are packaged.  This License gives no
+    permission to license the work in any other way, but it does not
+    invalidate such permission if you have separately received it.
+
+    d) If the work has interactive user interfaces, each must display
+    Appropriate Legal Notices; however, if the Program has interactive
+    interfaces that do not display Appropriate Legal Notices, your
+    work need not make them do so.
+
+  A compilation of a covered work with other separate and independent
+works, which are not by their nature extensions of the covered work,
+and which are not combined with it such as to form a larger program,
+in or on a volume of a storage or distribution medium, is called an
+"aggregate" if the compilation and its resulting copyright are not
+used to limit the access or legal rights of the compilation's users
+beyond what the individual works permit.  Inclusion of a covered work
+in an aggregate does not cause this License to apply to the other
+parts of the aggregate.
+
+  6. Conveying Non-Source Forms.
+
+  You may convey a covered work in object code form under the terms
+of sections 4 and 5, provided that you also convey the
+machine-readable Corresponding Source under the terms of this License,
+in one of these ways:
+
+    a) Convey the object code in, or embodied in, a physical product
+    (including a physical distribution medium), accompanied by the
+    Corresponding Source fixed on a durable physical medium
+    customarily used for software interchange.
+
+    b) Convey the object code in, or embodied in, a physical product
+    (including a physical distribution medium), accompanied by a
+    written offer, valid for at least three years and valid for as
+    long as you offer spare parts or customer support for that product
+    model, to give anyone who possesses the object code either (1) a
+    copy of the Corresponding Source for all the software in the
+    product that is covered by this License, on a durable physical
+    medium customarily used for software interchange, for a price no
+    more than your reasonable cost of physically performing this
+    conveying of source, or (2) access to copy the
+    Corresponding Source from a network server at no charge.
+
+    c) Convey individual copies of the object code with a copy of the
+    written offer to provide the Corresponding Source.  This
+    alternative is allowed only occasionally and noncommercially, and
+    only if you received the object code with such an offer, in accord
+    with subsection 6b.
+
+    d) Convey the object code by offering access from a designated
+    place (gratis or for a charge), and offer equivalent access to the
+    Corresponding Source in the same way through the same place at no
+    further charge.  You need not require recipients to copy the
+    Corresponding Source along with the object code.  If the place to
+    copy the object code is a network server, the Corresponding Source
+    may be on a different server (operated by you or a third party)
+    that supports equivalent copying facilities, provided you maintain
+    clear directions next to the object code saying where to find the
+    Corresponding Source.  Regardless of what server hosts the
+    Corresponding Source, you remain obligated to ensure that it is
+    available for as long as needed to satisfy these requirements.
+
+    e) Convey the object code using peer-to-peer transmission, provided
+    you inform other peers where the object code and Corresponding
+    Source of the work are being offered to the general public at no
+    charge under subsection 6d.
+
+  A separable portion of the object code, whose source code is excluded
+from the Corresponding Source as a System Library, need not be
+included in conveying the object code work.
+
+  A "User Product" is either (1) a "consumer product", which means any
+tangible personal property which is normally used for personal, family,
+or household purposes, or (2) anything designed or sold for incorporation
+into a dwelling.  In determining whether a product is a consumer product,
+doubtful cases shall be resolved in favor of coverage.  For a particular
+product received by a particular user, "normally used" refers to a
+typical or common use of that class of product, regardless of the status
+of the particular user or of the way in which the particular user
+actually uses, or expects or is expected to use, the product.  A product
+is a consumer product regardless of whether the product has substantial
+commercial, industrial or non-consumer uses, unless such uses represent
+the only significant mode of use of the product.
+
+  "Installation Information" for a User Product means any methods,
+procedures, authorization keys, or other information required to install
+and execute modified versions of a covered work in that User Product from
+a modified version of its Corresponding Source.  The information must
+suffice to ensure that the continued functioning of the modified object
+code is in no case prevented or interfered with solely because
+modification has been made.
+
+  If you convey an object code work under this section in, or with, or
+specifically for use in, a User Product, and the conveying occurs as
+part of a transaction in which the right of possession and use of the
+User Product is transferred to the recipient in perpetuity or for a
+fixed term (regardless of how the transaction is characterized), the
+Corresponding Source conveyed under this section must be accompanied
+by the Installation Information.  But this requirement does not apply
+if neither you nor any third party retains the ability to install
+modified object code on the User Product (for example, the work has
+been installed in ROM).
+
+  The requirement to provide Installation Information does not include a
+requirement to continue to provide support service, warranty, or updates
+for a work that has been modified or installed by the recipient, or for
+the User Product in which it has been modified or installed.  Access to a
+network may be denied when the modification itself materially and
+adversely affects the operation of the network or violates the rules and
+protocols for communication across the network.
+
+  Corresponding Source conveyed, and Installation Information provided,
+in accord with this section must be in a format that is publicly
+documented (and with an implementation available to the public in
+source code form), and must require no special password or key for
+unpacking, reading or copying.
+
+  7. Additional Terms.
+
+  "Additional permissions" are terms that supplement the terms of this
+License by making exceptions from one or more of its conditions.
+Additional permissions that are applicable to the entire Program shall
+be treated as though they were included in this License, to the extent
+that they are valid under applicable law.  If additional permissions
+apply only to part of the Program, that part may be used separately
+under those permissions, but the entire Program remains governed by
+this License without regard to the additional permissions.
+
+  When you convey a copy of a covered work, you may at your option
+remove any additional permissions from that copy, or from any part of
+it.  (Additional permissions may be written to require their own
+removal in certain cases when you modify the work.)  You may place
+additional permissions on material, added by you to a covered work,
+for which you have or can give appropriate copyright permission.
+
+  Notwithstanding any other provision of this License, for material you
+add to a covered work, you may (if authorized by the copyright holders of
+that material) supplement the terms of this License with terms:
+
+    a) Disclaiming warranty or limiting liability differently from the
+    terms of sections 15 and 16 of this License; or
+
+    b) Requiring preservation of specified reasonable legal notices or
+    author attributions in that material or in the Appropriate Legal
+    Notices displayed by works containing it; or
+
+    c) Prohibiting misrepresentation of the origin of that material, or
+    requiring that modified versions of such material be marked in
+    reasonable ways as different from the original version; or
+
+    d) Limiting the use for publicity purposes of names of licensors or
+    authors of the material; or
+
+    e) Declining to grant rights under trademark law for use of some
+    trade names, trademarks, or service marks; or
+
+    f) Requiring indemnification of licensors and authors of that
+    material by anyone who conveys the material (or modified versions of
+    it) with contractual assumptions of liability to the recipient, for
+    any liability that these contractual assumptions directly impose on
+    those licensors and authors.
+
+  All other non-permissive additional terms are considered "further
+restrictions" within the meaning of section 10.  If the Program as you
+received it, or any part of it, contains a notice stating that it is
+governed by this License along with a term that is a further
+restriction, you may remove that term.  If a license document contains
+a further restriction but permits relicensing or conveying under this
+License, you may add to a covered work material governed by the terms
+of that license document, provided that the further restriction does
+not survive such relicensing or conveying.
+
+  If you add terms to a covered work in accord with this section, you
+must place, in the relevant source files, a statement of the
+additional terms that apply to those files, or a notice indicating
+where to find the applicable terms.
+
+  Additional terms, permissive or non-permissive, may be stated in the
+form of a separately written license, or stated as exceptions;
+the above requirements apply either way.
+
+  8. Termination.
+
+  You may not propagate or modify a covered work except as expressly
+provided under this License.  Any attempt otherwise to propagate or
+modify it is void, and will automatically terminate your rights under
+this License (including any patent licenses granted under the third
+paragraph of section 11).
+
+  However, if you cease all violation of this License, then your
+license from a particular copyright holder is reinstated (a)
+provisionally, unless and until the copyright holder explicitly and
+finally terminates your license, and (b) permanently, if the copyright
+holder fails to notify you of the violation by some reasonable means
+prior to 60 days after the cessation.
+
+  Moreover, your license from a particular copyright holder is
+reinstated permanently if the copyright holder notifies you of the
+violation by some reasonable means, this is the first time you have
+received notice of violation of this License (for any work) from that
+copyright holder, and you cure the violation prior to 30 days after
+your receipt of the notice.
+
+  Termination of your rights under this section does not terminate the
+licenses of parties who have received copies or rights from you under
+this License.  If your rights have been terminated and not permanently
+reinstated, you do not qualify to receive new licenses for the same
+material under section 10.
+
+  9. Acceptance Not Required for Having Copies.
+
+  You are not required to accept this License in order to receive or
+run a copy of the Program.  Ancillary propagation of a covered work
+occurring solely as a consequence of using peer-to-peer transmission
+to receive a copy likewise does not require acceptance.  However,
+nothing other than this License grants you permission to propagate or
+modify any covered work.  These actions infringe copyright if you do
+not accept this License.  Therefore, by modifying or propagating a
+covered work, you indicate your acceptance of this License to do so.
+
+  10. Automatic Licensing of Downstream Recipients.
+
+  Each time you convey a covered work, the recipient automatically
+receives a license from the original licensors, to run, modify and
+propagate that work, subject to this License.  You are not responsible
+for enforcing compliance by third parties with this License.
+
+  An "entity transaction" is a transaction transferring control of an
+organization, or substantially all assets of one, or subdividing an
+organization, or merging organizations.  If propagation of a covered
+work results from an entity transaction, each party to that
+transaction who receives a copy of the work also receives whatever
+licenses to the work the party's predecessor in interest had or could
+give under the previous paragraph, plus a right to possession of the
+Corresponding Source of the work from the predecessor in interest, if
+the predecessor has it or can get it with reasonable efforts.
+
+  You may not impose any further restrictions on the exercise of the
+rights granted or affirmed under this License.  For example, you may
+not impose a license fee, royalty, or other charge for exercise of
+rights granted under this License, and you may not initiate litigation
+(including a cross-claim or counterclaim in a lawsuit) alleging that
+any patent claim is infringed by making, using, selling, offering for
+sale, or importing the Program or any portion of it.
+
+  11. Patents.
+
+  A "contributor" is a copyright holder who authorizes use under this
+License of the Program or a work on which the Program is based.  The
+work thus licensed is called the contributor's "contributor version".
+
+  A contributor's "essential patent claims" are all patent claims
+owned or controlled by the contributor, whether already acquired or
+hereafter acquired, that would be infringed by some manner, permitted
+by this License, of making, using, or selling its contributor version,
+but do not include claims that would be infringed only as a
+consequence of further modification of the contributor version.  For
+purposes of this definition, "control" includes the right to grant
+patent sublicenses in a manner consistent with the requirements of
+this License.
+
+  Each contributor grants you a non-exclusive, worldwide, royalty-free
+patent license under the contributor's essential patent claims, to
+make, use, sell, offer for sale, import and otherwise run, modify and
+propagate the contents of its contributor version.
+
+  In the following three paragraphs, a "patent license" is any express
+agreement or commitment, however denominated, not to enforce a patent
+(such as an express permission to practice a patent or covenant not to
+sue for patent infringement).  To "grant" such a patent license to a
+party means to make such an agreement or commitment not to enforce a
+patent against the party.
+
+  If you convey a covered work, knowingly relying on a patent license,
+and the Corresponding Source of the work is not available for anyone
+to copy, free of charge and under the terms of this License, through a
+publicly available network server or other readily accessible means,
+then you must either (1) cause the Corresponding Source to be so
+available, or (2) arrange to deprive yourself of the benefit of the
+patent license for this particular work, or (3) arrange, in a manner
+consistent with the requirements of this License, to extend the patent
+license to downstream recipients.  "Knowingly relying" means you have
+actual knowledge that, but for the patent license, your conveying the
+covered work in a country, or your recipient's use of the covered work
+in a country, would infringe one or more identifiable patents in that
+country that you have reason to believe are valid.
+
+  If, pursuant to or in connection with a single transaction or
+arrangement, you convey, or propagate by procuring conveyance of, a
+covered work, and grant a patent license to some of the parties
+receiving the covered work authorizing them to use, propagate, modify
+or convey a specific copy of the covered work, then the patent license
+you grant is automatically extended to all recipients of the covered
+work and works based on it.
+
+  A patent license is "discriminatory" if it does not include within
+the scope of its coverage, prohibits the exercise of, or is
+conditioned on the non-exercise of one or more of the rights that are
+specifically granted under this License.  You may not convey a covered
+work if you are a party to an arrangement with a third party that is
+in the business of distributing software, under which you make payment
+to the third party based on the extent of your activity of conveying
+the work, and under which the third party grants, to any of the
+parties who would receive the covered work from you, a discriminatory
+patent license (a) in connection with copies of the covered work
+conveyed by you (or copies made from those copies), or (b) primarily
+for and in connection with specific products or compilations that
+contain the covered work, unless you entered into that arrangement,
+or that patent license was granted, prior to 28 March 2007.
+
+  Nothing in this License shall be construed as excluding or limiting
+any implied license or other defenses to infringement that may
+otherwise be available to you under applicable patent law.
+
+  12. No Surrender of Others' Freedom.
+
+  If conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot convey a
+covered work so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you may
+not convey it at all.  For example, if you agree to terms that obligate you
+to collect a royalty for further conveying from those to whom you convey
+the Program, the only way you could satisfy both those terms and this
+License would be to refrain entirely from conveying the Program.
+
+  13. Remote Network Interaction; Use with the GNU General Public License.
+
+  Notwithstanding any other provision of this License, if you modify the
+Program, your modified version must prominently offer all users
+interacting with it remotely through a computer network (if your version
+supports such interaction) an opportunity to receive the Corresponding
+Source of your version by providing access to the Corresponding Source
+from a network server at no charge, through some standard or customary
+means of facilitating copying of software.  This Corresponding Source
+shall include the Corresponding Source for any work covered by version 3
+of the GNU General Public License that is incorporated pursuant to the
+following paragraph.
+
+  Notwithstanding any other provision of this License, you have
+permission to link or combine any covered work with a work licensed
+under version 3 of the GNU General Public License into a single
+combined work, and to convey the resulting work.  The terms of this
+License will continue to apply to the part which is the covered work,
+but the work with which it is combined will remain governed by version
+3 of the GNU General Public License.
+
+  14. Revised Versions of this License.
+
+  The Free Software Foundation may publish revised and/or new versions of
+the GNU Affero General Public License from time to time.  Such new versions
+will be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+  Each version is given a distinguishing version number.  If the
+Program specifies that a certain numbered version of the GNU Affero General
+Public License "or any later version" applies to it, you have the
+option of following the terms and conditions either of that numbered
+version or of any later version published by the Free Software
+Foundation.  If the Program does not specify a version number of the
+GNU Affero General Public License, you may choose any version ever published
+by the Free Software Foundation.
+
+  If the Program specifies that a proxy can decide which future
+versions of the GNU Affero General Public License can be used, that proxy's
+public statement of acceptance of a version permanently authorizes you
+to choose that version for the Program.
+
+  Later license versions may give you additional or different
+permissions.  However, no additional obligations are imposed on any
+author or copyright holder as a result of your choosing to follow a
+later version.
+
+  15. Disclaimer of Warranty.
+
+  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
+APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
+HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
+OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
+IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
+ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
+
+  16. Limitation of Liability.
+
+  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
+THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY
+GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
+USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF
+DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD
+PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),
+EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGES.
+
+  17. Interpretation of Sections 15 and 16.
+
+  If the disclaimer of warranty and limitation of liability provided
+above cannot be given local legal effect according to their terms,
+reviewing courts shall apply local law that most closely approximates
+an absolute waiver of all civil liability in connection with the
+Program, unless a warranty or assumption of liability accompanies a
+copy of the Program in return for a fee.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+state the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    &lt;one line to give the program's name and a brief idea of what it does.&gt;
+    Copyright (C) &lt;year&gt;  &lt;name of author&gt;
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.
+
+Also add information on how to contact you by electronic and paper mail.
+
+  If your software can interact with users remotely through a computer
+network, you should also make sure that it provides a way for users to
+get its source.  For example, if your program is a web application, its
+interface could display a "Source" link that leads users to an archive
+of the code.  There are many ways you could offer source, and different
+solutions will be better for different programs; see section 13 for the
+specific requirements.
+
+  You should also get your employer (if you work as a programmer) or school,
+if any, to sign a "copyright disclaimer" for the program, if necessary.
+For more information on this, and how to apply and follow the GNU AGPL, see
+&lt;https://www.gnu.org/licenses/&gt;.
+
 </script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            marked.setOptions({
-                highlight: function(code, lang) {
-                    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-                    return hljs.highlight(code, { language }).value;
-                },
-                langPrefix: 'hljs language-',
-                gfm: true,
-                breaks: true
-            });
+            try {
+                marked.setOptions({
+                    highlight: function(code, lang) {
+                        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                        return hljs.highlight(code, { language }).value;
+                    },
+                    langPrefix: 'hljs language-',
+                    gfm: true,
+                    breaks: true
+                });
 
-            // Decode HTML entities from template
-            function decodeHtml(html) {
-                var txt = document.createElement("textarea");
-                txt.innerHTML = html;
-                return txt.value;
-            }
+                // Slugify function robust to markdown formatting, code ticks, and links
+                const slugify = (text) =>
+                    String(text)
+                        .replace(/`([^`]+)`/g, '$1')
+                        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                        .toLowerCase()
+                        .replace(/<[^>]+>/g, '')
+                        .replace(/&[a-z]+;/g, '')
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^\w\s-]/g, '')
+                        .trim()
+                        .replace(/\s+/g, '-');
 
-            const renderMd = (id) => {
-                const raw = document.getElementById(`md-${id}`).innerHTML;
-                const decoded = decodeHtml(raw);
-                const html = DOMPurify.sanitize(marked.parse(decoded));
-                document.getElementById(id).innerHTML = html;
-            };
+                const renderer = new marked.Renderer();
+                renderer.heading = function (arg1, arg2, arg3) {
+                    let text = typeof arg1 === 'object' ? arg1.text : arg1;
+                    let depth = typeof arg1 === 'object' ? arg1.depth : arg2;
+                    let tokens = typeof arg1 === 'object' ? arg1.tokens : null;
 
-            renderMd('readme');
-            renderMd('docs');
-            renderMd('contributing');
+                    const slug = slugify(text || '');
+                    let inner = text || '';
+                    if (tokens && this.parser) {
+                        inner = this.parser.parseInline(tokens);
+                    } else if (typeof marked.parseInline === 'function') {
+                        inner = marked.parseInline(text || '');
+                    }
+                    return `<h${depth} id="${slug}">${inner}</h${depth}>`;
+                };
+                marked.use({ renderer });
 
-            const tabBtns = document.querySelectorAll('.tab-btn');
-            const panels = document.querySelectorAll('.content-panel');
+                function decodeHtml(html) {
+                    var txt = document.createElement("textarea");
+                    txt.innerHTML = html;
+                    return txt.value;
+                }
 
-            tabBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = btn.getAttribute('data-target');
-                    
-                    tabBtns.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    panels.forEach(p => {
+                const renderMd = (id) => {
+                    const el = document.getElementById(`md-${id}`);
+                    if (!el) return;
+                    const raw = el.innerHTML;
+                    const decoded = decodeHtml(raw);
+                    const parsedHtml = marked.parse(decoded);
+                    const cleanHtml = DOMPurify.sanitize(parsedHtml, { ADD_ATTR: ['target', 'id'] });
+                    const targetEl = document.getElementById(id);
+                    if (targetEl) targetEl.innerHTML = cleanHtml;
+                };
+
+                renderMd('readme');
+                renderMd('docs');
+                renderMd('contributing');
+
+                // Populate raw license code block
+                const rawLic = document.getElementById('raw-license-content');
+                if (rawLic) {
+                    const codeEl = document.getElementById('raw-license-text');
+                    if (codeEl) codeEl.textContent = decodeHtml(rawLic.innerHTML).trim();
+                }
+
+                const switchTab = (tabId, anchorId = '') => {
+                    const tabBtn = document.querySelector(`.tab-btn[data-target="${tabId}"]`);
+                    if (!tabBtn) return;
+
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    tabBtn.classList.add('active');
+
+                    document.querySelectorAll('.content-panel').forEach(p => {
                         p.classList.remove('active');
-                        if(p.id === target) {
+                        if (p.id === tabId) {
                             p.style.animation = 'none';
                             p.offsetHeight;
                             p.style.animation = null;
                             p.classList.add('active');
                         }
                     });
+
+                    const targetHash = anchorId ? `#${anchorId}` : `#${tabId}`;
+                    if (window.location.hash !== targetHash) {
+                        history.pushState(null, '', targetHash);
+                    }
+
+                    if (anchorId) {
+                        setTimeout(() => {
+                            const elem = document.getElementById(anchorId);
+                            if (elem) {
+                                elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 50);
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                };
+
+                const setupLinks = () => {
+                    document.querySelectorAll('.markdown-body a').forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (!href) return;
+
+                        const isMdDoc = /^\.?\/?(README|DOCS|CONTRIBUTING)\.md(#.*)?$/i.test(href);
+                        const isLicenseLink = /^(\.\/)?LICENSE$/i.test(href) || 
+                                              href.includes('license.html') || 
+                                              href.includes('/docs/license');
+                        const isHashLink = href.startsWith('#');
+
+                        if (isMdDoc || isLicenseLink || isHashLink) {
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                let targetTab = 'readme';
+                                let anchorId = '';
+
+                                if (isLicenseLink) {
+                                    targetTab = 'license';
+                                } else if (isHashLink) {
+                                    anchorId = href.substring(1);
+                                    const targetElem = document.getElementById(anchorId);
+                                    if (targetElem) {
+                                        const parentPanel = targetElem.closest('.content-panel');
+                                        if (parentPanel) targetTab = parentPanel.id;
+                                    } else {
+                                        targetTab = document.querySelector('.content-panel.active')?.id || 'readme';
+                                    }
+                                } else {
+                                    const match = href.match(/^\.?\/?(README|DOCS|CONTRIBUTING)\.md(#.*)?$/i);
+                                    if (match) {
+                                        const name = match[1].toLowerCase();
+                                        targetTab = name === 'readme' ? 'readme' : name === 'docs' ? 'docs' : 'contributing';
+                                        if (match[2]) anchorId = match[2].substring(1);
+                                    }
+                                }
+
+                                switchTab(targetTab, anchorId);
+                            });
+                        } else {
+                            link.setAttribute('target', '_blank');
+                            link.setAttribute('rel', 'noopener noreferrer');
+                        }
+                    });
+                };
+
+                setupLinks();
+
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const target = btn.getAttribute('data-target');
+                        switchTab(target);
+                    });
                 });
-            });
+
+                const handleInitialNavigation = () => {
+                    const hash = window.location.hash.substring(1);
+                    if (!hash) return;
+
+                    if (['readme', 'docs', 'contributing', 'license'].includes(hash)) {
+                        switchTab(hash);
+                        return;
+                    }
+
+                    const targetElem = document.getElementById(hash);
+                    if (targetElem) {
+                        const parentPanel = targetElem.closest('.content-panel');
+                        if (parentPanel) {
+                            switchTab(parentPanel.id, hash);
+                        }
+                    }
+                };
+
+                window.addEventListener('hashchange', handleInitialNavigation);
+                handleInitialNavigation();
+            } catch (err) {
+                console.error('Error initializing docs portal JS:', err);
+            }
         });
     </script>
 </body>

@@ -26,25 +26,39 @@ export async function POST({ request }) {
 	const adminEmail = (data.admin_email || '').trim();
 	const adminPass = data.admin_password || '';
 
-	if (!siteName || siteName.length < 2) return json({ error: 'Nombre del sitio requerido' }, { status: 400 });
-	if (!adminUser || !/^[a-zA-Z0-9_]{3,32}$/.test(adminUser)) return json({ error: 'Usuario invalido' }, { status: 400 });
-	if (!adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) return json({ error: 'Email invalido' }, { status: 400 });
-	if (adminPass.length < 8) return json({ error: 'Contraseña minimo 8 caracteres' }, { status: 400 });
+	if (!siteName || siteName.length < 2)
+		return json({ error: 'Nombre del sitio requerido' }, { status: 400 });
+	if (!adminUser || !/^[a-zA-Z0-9_]{3,32}$/.test(adminUser))
+		return json({ error: 'Usuario invalido' }, { status: 400 });
+	if (!adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail))
+		return json({ error: 'Email invalido' }, { status: 400 });
+	if (adminPass.length < 8)
+		return json({ error: 'Contraseña minimo 8 caracteres' }, { status: 400 });
 
 	try {
 		const hash = await bcrypt.hash(adminPass, 12);
 
-		const result = await db.prepare(
-			"INSERT INTO users (username, email, password_hash, display_name, role, is_verified, email_verified) VALUES (?, ?, ?, ?, 'super_admin', 1, 1)"
-		).run(adminUser, adminEmail, hash, adminUser);
+		const result = await db
+			.prepare(
+				"INSERT INTO users (username, email, password_hash, display_name, role, is_verified, email_verified) VALUES (?, ?, ?, ?, 'super_admin', 1, 1)"
+			)
+			.run(adminUser, adminEmail, hash, adminUser);
 		const userId = result.lastInsertRowid;
 
-		await db.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'super_admin')").run(userId);
-		await db.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')").run(userId);
+		await db
+			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'super_admin')")
+			.run(userId);
+		await db
+			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')")
+			.run(userId);
 		await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(userId);
-		await db.prepare('INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, 1000)').run(userId);
+		await db
+			.prepare('INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, 1000)')
+			.run(userId);
 
-		const upsert = await db.prepare("INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+		const upsert = await db.prepare(
+			'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+		);
 		await upsert.run('site_name', siteName);
 		await upsert.run('setup_completed', '1');
 		await upsert.run('setup_completed_at', new Date().toISOString());
@@ -56,7 +70,9 @@ export async function POST({ request }) {
 
 		const catCount = await db.prepare('SELECT COUNT(*) as cnt FROM marketplace_categories').get();
 		if (catCount.cnt === 0) {
-			const insertCat = db.prepare('INSERT INTO marketplace_categories (name, icon, slug) VALUES (?, ?, ?)');
+			const insertCat = db.prepare(
+				'INSERT INTO marketplace_categories (name, icon, slug) VALUES (?, ?, ?)'
+			);
 			await insertCat.run('Arte Digital', 'palette', 'arte-digital');
 			await insertCat.run('Servicios Creativos', 'brush', 'servicios');
 			await insertCat.run('Electrónica', 'devices', 'electronica');

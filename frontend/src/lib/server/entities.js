@@ -24,22 +24,16 @@ export function parseEntities(raw) {
 	);
 
 	// #hashtags
-	text = text.replace(
-		/(?:^|\s)#([a-zA-ZÀ-ÿ0-9_]{1,50})/g,
-		(match, tag) => {
-			const prefix = match.startsWith(' ') || match.startsWith('\n') ? match[0] : '';
-			return `${prefix}<a href="/explore?q=%23${encodeURIComponent(tag)}" class="entity-hashtag">#${tag}</a>`;
-		}
-	);
+	text = text.replace(/(?:^|\s)#([a-zA-ZÀ-ÿ0-9_]{1,50})/g, (match, tag) => {
+		const prefix = match.startsWith(' ') || match.startsWith('\n') ? match[0] : '';
+		return `${prefix}<a href="/explore?q=%23${encodeURIComponent(tag)}" class="entity-hashtag">#${tag}</a>`;
+	});
 
 	// @mentions
-	text = text.replace(
-		/(?:^|\s)@([a-zA-Z0-9_]{1,32})/g,
-		(match, user) => {
-			const prefix = match.startsWith(' ') || match.startsWith('\n') ? match[0] : '';
-			return `${prefix}<a href="/u/${encodeURIComponent(user)}" class="entity-mention">@${user}</a>`;
-		}
-	);
+	text = text.replace(/(?:^|\s)@([a-zA-Z0-9_]{1,32})/g, (match, user) => {
+		const prefix = match.startsWith(' ') || match.startsWith('\n') ? match[0] : '';
+		return `${prefix}<a href="/u/${encodeURIComponent(user)}" class="entity-mention">@${user}</a>`;
+	});
 
 	return text;
 }
@@ -47,13 +41,13 @@ export function parseEntities(raw) {
 export function extractHashtags(raw) {
 	if (!raw) return [];
 	const matches = raw.matchAll(/(?:^|\s)#([a-zA-ZÀ-ÿ0-9_]{1,50})/g);
-	return [...matches].map(m => m[1].toLowerCase());
+	return [...matches].map((m) => m[1].toLowerCase());
 }
 
 export function extractMentions(raw) {
 	if (!raw) return [];
 	const matches = raw.matchAll(/(?:^|\s)@([a-zA-Z0-9_]{1,32})/g);
-	return [...matches].map(m => m[1].toLowerCase());
+	return [...matches].map((m) => m[1].toLowerCase());
 }
 
 export function sanitizeHtml(html) {

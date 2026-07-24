@@ -1,15 +1,15 @@
 <script>
 	import { fade, scale, slide } from 'svelte/transition';
 	import { untrack } from 'svelte';
-	import { createEventDispatcher, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
 	import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
 	import HashtagTextarea from '$lib/components/HashtagTextarea.svelte';
 
-	import { backOut, quintOut, expoOut } from 'svelte/easing';
+	import { backOut, expoOut } from 'svelte/easing';
 	import { goto } from '$app/navigation';
-	import { posts as postsApi, activity as activityApi } from '$lib/api.js';
+	import { posts as postsApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import CommentItem from '$lib/components/CommentItem.svelte';
 	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
@@ -18,6 +18,7 @@
 	import { compressImage } from '$lib/utils/imageCompression.js';
 	import { formatHashtags } from '$lib/utils/textFormatting.js';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
+	import { getProxiedMediaUrl } from '$lib/utils/mediaProxy.js';
 
 	let { post, onDelete } = $props();
 
@@ -37,9 +38,12 @@
 		if (!text) return false;
 		const stripped = text.replace(/[\s\uFE0F]/g, '');
 		if (!stripped) return false;
-		if (!/^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|\u200D)+$/u.test(stripped)) return false;
+		if (!/^(\p{Emoji_Presentation}|\p{Extended_Pictographic}|\u200D)+$/u.test(stripped))
+			return false;
 		if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-			return [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(stripped)].length <= 3;
+			return (
+				[...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(stripped)].length <= 3
+			);
 		}
 		return Array.from(stripped).length <= 5;
 	}
@@ -51,16 +55,16 @@
 	let commentsLoading = $state(false);
 	let commentPollInterval = null;
 	let newCommentCount = $state(0);
-	
+
 	let showCommentEmojis = $state(false);
 	let showCommentGifs = $state(false);
 	let showCommentMedia = $state(false);
 	let attachedCommentGif = $state('');
-	
+
 	let commentFileInput = $state(null);
 	let attachedCommentImage = $state('');
 	let uploadingCommentImage = $state(false);
-	
+
 	let showDeleteModal = $state(false);
 	let deleteError = $state('');
 
@@ -82,19 +86,21 @@
 		commentsLoading = true;
 
 		// Safety: never show loading skeleton more than 5s
-		const safetyTimer = setTimeout(() => { commentsLoading = false; }, 5000);
+		const safetyTimer = setTimeout(() => {
+			commentsLoading = false;
+		}, 5000);
 
 		try {
 			const data = await postsApi.comments.list(post.id);
 			const loaded = data.comments || [];
-			
+
 			const commentMap = new Map();
 			const topLevel = [];
-			loaded.forEach(c => {
+			loaded.forEach((c) => {
 				c.replies = [];
 				commentMap.set(c.id, c);
 			});
-			loaded.forEach(c => {
+			loaded.forEach((c) => {
 				if (c.parent_id) {
 					const parent = commentMap.get(c.parent_id);
 					if (parent) parent.replies.push(c);
@@ -120,7 +126,9 @@
 						el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 						el.style.transition = 'background-color 0.5s';
 						el.style.backgroundColor = 'var(--glass-highlight)';
-						setTimeout(() => { el.style.backgroundColor = ''; }, 2000);
+						setTimeout(() => {
+							el.style.backgroundColor = '';
+						}, 2000);
 					}
 				}, 100);
 			}
@@ -148,7 +156,10 @@
 	}
 
 	async function toggleLike() {
-		if (!authStore.isAuthenticated) { goto('/login'); return; }
+		if (!authStore.isAuthenticated) {
+			goto('/login');
+			return;
+		}
 		const prev = liked;
 		liked = !liked;
 		likeCount += liked ? 1 : -1;
@@ -157,11 +168,14 @@
 			// Generate burst particles
 			likeParticles = Array.from({ length: 6 }, (_, i) => ({
 				id: Date.now() + i,
-				angle: (i * 60) + Math.random() * 30,
+				angle: i * 60 + Math.random() * 30,
 				distance: 20 + Math.random() * 15,
 				delay: i * 40
 			}));
-			setTimeout(() => { likeAnim = false; likeParticles = []; }, 600);
+			setTimeout(() => {
+				likeAnim = false;
+				likeParticles = [];
+			}, 600);
 		}
 		try {
 			if (liked) await postsApi.like(post.id);
@@ -173,7 +187,10 @@
 	}
 
 	async function toggleSave() {
-		if (!authStore.isAuthenticated) { goto('/login'); return; }
+		if (!authStore.isAuthenticated) {
+			goto('/login');
+			return;
+		}
 		const savedPrev = saved;
 		saved = !saved;
 		try {
@@ -185,7 +202,8 @@
 	}
 
 	async function submitComment() {
-		if ((!commentText.trim() && !attachedCommentGif && !attachedCommentImage) || submittingComment) return;
+		if ((!commentText.trim() && !attachedCommentGif && !attachedCommentImage) || submittingComment)
+			return;
 		submittingComment = true;
 		try {
 			let finalBody = commentText.trim();
@@ -228,8 +246,8 @@
 			const res = await postsApi.uploadMedia(fd);
 			attachedCommentImage = res.media?.[0]?.url || res.url;
 		} catch (err) {
-			console.error("Error uploading comment image:", err);
-			alert("Error al subir la imagen");
+			console.error('Error uploading comment image:', err);
+			alert('Error al subir la imagen');
 		} finally {
 			uploadingCommentImage = false;
 			if (commentFileInput) commentFileInput.value = '';
@@ -262,7 +280,7 @@
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${authStore.token}`
+					Authorization: `Bearer ${authStore.token}`
 				},
 				body: JSON.stringify({ option_index: optionIndex })
 			});
@@ -280,44 +298,61 @@
 	let cardRef;
 </script>
 
-<article 
+<article
 	bind:this={cardRef}
-	class="aero-post-card animate-slide-in-up" 
-	onmouseenter={() => isCardHovered = true}
-	onmouseleave={() => isCardHovered = false}
-	style="position: relative; z-index: {showCommentEmojis || showCommentGifs || showMenu || isCardHovered ? 40 : 1};"
+	class="aero-post-card animate-slide-in-up"
+	onmouseenter={() => (isCardHovered = true)}
+	onmouseleave={() => (isCardHovered = false)}
+	style="position: relative; z-index: {showCommentEmojis ||
+	showCommentGifs ||
+	showMenu ||
+	isCardHovered
+		? 40
+		: 1};"
 >
 	<!-- Header -->
 	<div class="flex items-start justify-between mb-3">
-		<ProfileHoverCard username={post.username} basicUser={{
-			id: post.user_id,
-			username: post.username,
-			display_name: post.display_name,
-			avatar_url: post.avatar_url,
-			is_verified: post.is_verified,
-			level: post.level
-		}}>
+		<ProfileHoverCard
+			username={post.username}
+			basicUser={{
+				id: post.user_id,
+				username: post.username,
+				display_name: post.display_name,
+				avatar_url: post.avatar_url,
+				is_verified: post.is_verified,
+				level: post.level
+			}}
+		>
 			<a href={`/u/${post.username}`} class="flex items-center gap-3 group text-decoration-none">
 				<!-- Avatar -->
 				{#if post.avatar_url}
-					<div class="avatar-ring {post.is_virtual ? 'avatar-ring-vtuber' : ''} w-11 h-11 flex-shrink-0">
+					<div
+						class="avatar-ring {post.is_virtual
+							? 'avatar-ring-vtuber'
+							: ''} w-11 h-11 flex-shrink-0"
+					>
 						<img
 							src={post.avatar_url}
 							alt={post.username}
 							class="w-10 h-10 rounded-full object-cover"
+							width="40"
+							height="40"
 							loading="lazy"
+							decoding="async"
 						/>
 					</div>
 				{:else}
 					<div class="vs-avatar-letter avatar-lg">
-						{ (post.display_name || post.username || '?')[0].toUpperCase() }
+						{(post.display_name || post.username || '?')[0].toUpperCase()}
 					</div>
 				{/if}
 
 				<!-- Name & meta -->
 				<div class="user-meta">
 					<div class="flex items-center gap-1">
-						<span class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors">
+						<span
+							class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors"
+						>
 							{post.display_name || post.username}
 						</span>
 						<VerifiedBadge role={post.role} isVerified={post.is_verified == 1} size="16px" />
@@ -349,7 +384,10 @@
 						<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
 						{#if post.location}
 							<span>·</span>
-							<span class="flex items-center gap-0.5 text-blue-500 font-semibold" title="Ubicación de check-in">
+							<span
+								class="flex items-center gap-0.5 text-blue-500 font-semibold"
+								title="Ubicación de check-in"
+							>
 								<span class="material-icons-round text-xs">location_on</span>
 								{post.location}
 							</span>
@@ -361,27 +399,40 @@
 
 		<!-- Post menu -->
 		<div class="relative">
-			<button
-				onclick={() => showMenu = !showMenu}
-				class="aero-icon-btn btn-small"
-			>
+			<button onclick={() => (showMenu = !showMenu)} class="aero-icon-btn btn-small">
 				<span class="material-icons-round text-[18px]">more_horiz</span>
 			</button>
 			{#if showMenu}
 				<div class="aero-dropdown-menu animate-slide-in-up">
 					{#if post.user_id === authStore.user?.id}
-						<button onclick={() => { showMenu = false; goto(`/posts/${post.id}/edit`); }} class="aero-dropdown-item">
+						<button
+							onclick={() => {
+								showMenu = false;
+								goto(`/posts/${post.id}/edit`);
+							}}
+							class="aero-dropdown-item"
+						>
 							<span class="material-icons-round text-[16px]">edit</span> Editar
 						</button>
 						<button onclick={promptDelete} class="aero-dropdown-item text-red-500">
 							<span class="material-icons-round text-[16px]">delete</span> Eliminar
 						</button>
 					{:else}
-						<button onclick={() => { showMenu = false; }} class="aero-dropdown-item">
+						<button
+							onclick={() => {
+								showMenu = false;
+							}}
+							class="aero-dropdown-item"
+						>
 							<span class="material-icons-round text-[16px]">flag</span> Reportar
 						</button>
 					{/if}
-					<button onclick={() => { showMenu = false; }} class="aero-dropdown-item">
+					<button
+						onclick={() => {
+							showMenu = false;
+						}}
+						class="aero-dropdown-item"
+					>
 						<span class="material-icons-round text-[16px]">link</span> Copiar enlace
 					</button>
 				</div>
@@ -391,7 +442,9 @@
 
 	<!-- Post Body -->
 	{#if post.body}
-		<p class="post-body" class:emoji-only-text={isEmojiOnly(post.body)}>{@html formatHashtags(post.body)}</p>
+		<p class="post-body" class:emoji-only-text={isEmojiOnly(post.body)}>
+			{@html formatHashtags(post.body)}
+		</p>
 	{/if}
 
 	<!-- Poll Widget -->
@@ -403,22 +456,28 @@
 			<div class="poll-question font-bold text-sm text-main mb-3">
 				{post.poll.question}
 			</div>
-			
+
 			<div class="poll-options flex flex-col gap-2">
 				{#each post.poll.options as option, idx}
 					{@const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0}
-					
+
 					{#if canVote}
-						<button 
+						<button
 							onclick={() => handleVote(idx)}
 							class="poll-option-btn w-full p-3 rounded-xl text-left font-semibold text-xs text-main transition flex justify-between items-center"
 						>
 							<span>{option.text}</span>
-							<span class="material-icons-round text-muted select-none">radio_button_unchecked</span>
+							<span class="material-icons-round text-muted select-none">radio_button_unchecked</span
+							>
 						</button>
 					{:else}
-						<div class="poll-result-row relative w-full p-3 rounded-xl flex justify-between items-center overflow-hidden text-xs">
-							<div class="absolute inset-y-0 left-0 bg-aero-blue/15 transition-all duration-500" style="width: {percentage}%"></div>
+						<div
+							class="poll-result-row relative w-full p-3 rounded-xl flex justify-between items-center overflow-hidden text-xs"
+						>
+							<div
+								class="absolute inset-y-0 left-0 bg-aero-blue/15 transition-all duration-500"
+								style="width: {percentage}%"
+							></div>
 							<span class="relative font-semibold text-main z-10 flex items-center gap-1.5">
 								{option.text}
 							</span>
@@ -427,11 +486,15 @@
 					{/if}
 				{/each}
 			</div>
-			
-			<div class="flex justify-between items-center text-[10px] text-muted font-bold mt-3 pt-2 border-t border-glass-border">
+
+			<div
+				class="flex justify-between items-center text-[10px] text-muted font-bold mt-3 pt-2 border-t border-glass-border"
+			>
 				<span>{totalVotes} votos</span>
 				{#if hasVoted}
-					<span class="text-emerald-500 flex items-center gap-0.5"><span class="material-icons-round text-[12px]">check_circle</span> Voto registrado</span>
+					<span class="text-emerald-500 flex items-center gap-0.5"
+						><span class="material-icons-round text-[12px]">check_circle</span> Voto registrado</span
+					>
 				{/if}
 			</div>
 		</div>
@@ -442,18 +505,23 @@
 		<div class="media-container {post.media.length > 1 ? 'grid-2' : ''}">
 			{#each post.media.slice(0, 4) as media, i}
 				{#if media.media_type === 'video' || media.media_type === 'audio'}
-					<MediaPlayer 
-						type={media.media_type} 
-						src={media.media_url} 
+					<MediaPlayer
+						type={media.media_type}
+						src={media.media_url}
 						class="media-item video-media {post.media.length === 1 ? 'video-solo' : 'video-grid'}"
 						entityId={post.id}
 						entityType="video"
 					/>
 				{:else}
 					<img
-						src={media.media_url}
+						src={getProxiedMediaUrl(media.media_url)}
 						alt="Post media {i + 1}"
 						loading="lazy"
+						decoding="async"
+						width={media.width || 800}
+						height={media.height || 600}
+						crossorigin="anonymous"
+						referrerpolicy="no-referrer"
 						class="media-item {post.media.length === 1 ? 'full-media' : 'square-media'}"
 					/>
 					{#if i === 3 && post.media.length > 4}
@@ -483,9 +551,13 @@
 				<button
 					onclick={toggleLike}
 					class="action-btn {liked ? 'liked' : ''}"
-					aria-label="{liked ? 'Quitar like' : 'Dar like'}"
+					aria-label="{liked ? 'Quitar me gusta' : 'Dar me gusta'}{likeCount > 0
+						? ' ' + likeCount.toLocaleString()
+						: ''}"
 				>
-					<span class="material-icons-round text-[18px] icon {likeAnim ? 'heart-pop' : ''}">{liked ? 'favorite' : 'favorite_border'}</span>
+					<span class="material-icons-round text-[18px] icon {likeAnim ? 'heart-pop' : ''}"
+						>{liked ? 'favorite' : 'favorite_border'}</span
+					>
 					<span class="count">{likeCount > 0 ? likeCount.toLocaleString() : ''}</span>
 				</button>
 				<!-- Burst particles -->
@@ -493,22 +565,30 @@
 					<span
 						class="like-particle"
 						style="--angle: {p.angle}deg; --dist: {p.distance}px; animation-delay: {p.delay}ms;"
-					>♥</span>
+						>♥</span
+					>
 				{/each}
 			</div>
 
 			<!-- Comment -->
 			<button
-				onclick={() => showComments = !showComments}
+				onclick={() => (showComments = !showComments)}
 				class="action-btn"
-				aria-label="Comentar"
+				aria-label="Comentar{post.comment_count > 0
+					? ' ' + post.comment_count.toLocaleString()
+					: ''}"
 			>
 				<span class="material-icons-round text-[18px] icon">chat_bubble_outline</span>
-				<span class="count">{post.comment_count > 0 ? post.comment_count.toLocaleString() : ''}</span>
+				<span class="count"
+					>{post.comment_count > 0 ? post.comment_count.toLocaleString() : ''}</span
+				>
 			</button>
 
 			<!-- Share -->
-			<button class="action-btn" aria-label="Compartir">
+			<button
+				class="action-btn"
+				aria-label="Compartir{post.share_count > 0 ? ' ' + post.share_count.toLocaleString() : ''}"
+			>
 				<span class="material-icons-round text-[18px] icon">share</span>
 				<span class="count">{post.share_count > 0 ? post.share_count.toLocaleString() : ''}</span>
 			</button>
@@ -518,9 +598,11 @@
 		<button
 			onclick={toggleSave}
 			class="action-btn-save {saved ? 'saved' : ''}"
-			aria-label="{saved ? 'Quitar guardado' : 'Guardar'}"
+			aria-label={saved ? 'Quitar guardado' : 'Guardar'}
 		>
-			<span class="material-icons-round text-[20px] icon">{saved ? 'bookmark' : 'bookmark_border'}</span>
+			<span class="material-icons-round text-[20px] icon"
+				>{saved ? 'bookmark' : 'bookmark_border'}</span
+			>
 		</button>
 	</div>
 
@@ -534,33 +616,70 @@
 							src={authStore.user.avatar_url}
 							alt="You"
 							class="w-8 h-8 rounded-full border border-white object-cover"
+							width="32"
+							height="32"
+							loading="lazy"
+							decoding="async"
 							style="flex: 0 0 32px; min-width: 32px; min-height: 32px;"
 						/>
 					{:else}
-						<div class="vs-avatar-letter avatar-sm" style="flex: 0 0 32px; min-width: 32px; min-height: 32px;">
+						<div
+							class="vs-avatar-letter avatar-sm"
+							style="flex: 0 0 32px; min-width: 32px; min-height: 32px;"
+						>
 							{(authStore.user?.display_name || authStore.user?.username || 'U')[0].toUpperCase()}
 						</div>
 					{/if}
-					
+
 					<div class="flex-1 flex flex-col">
 						<!-- Previews (Above input) -->
 						{#if attachedCommentGif || attachedCommentImage}
 							<div class="flex items-center gap-2 mb-2">
 								{#if attachedCommentGif}
-									<div class="flex items-center gap-1.5 p-1.5 pr-3 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-xl text-xs font-bold text-fuchsia-400 w-fit shadow-md">
-										<span class="material-icons-round text-sm">gif_box</span>
+									<div
+										class="flex items-center gap-2 p-1.5 pr-3 bg-fuchsia-500/10 border border-fuchsia-500/30 rounded-xl text-xs font-bold text-fuchsia-400 w-fit shadow-md"
+									>
+										<img
+											src={getProxiedMediaUrl(attachedCommentGif)}
+											alt="GIF Preview"
+											class="w-10 h-10 object-cover rounded-lg"
+											width="40"
+											height="40"
+											loading="lazy"
+											decoding="async"
+											crossorigin="anonymous"
+											referrerpolicy="no-referrer"
+										/>
 										<span>GIF Adjunto</span>
-										<button type="button" class="bg-transparent border-none cursor-pointer text-muted hover:text-white" onclick={() => attachedCommentGif = ''}>
-											<span class="material-icons-round text-[12px]">close</span>
+										<button
+											type="button"
+											class="bg-transparent border-none cursor-pointer text-muted hover:text-white"
+											onclick={() => (attachedCommentGif = '')}
+										>
+											<span class="material-icons-round text-[14px]">close</span>
 										</button>
 									</div>
 								{/if}
-								
+
 								{#if attachedCommentImage}
-									<div class="flex items-center gap-2 p-1.5 pr-3 bg-slate-800/80 border border-white/10 rounded-xl shadow-md w-fit backdrop-blur-md">
-										<img src={attachedCommentImage} alt="Preview" class="w-10 h-10 object-cover rounded-lg" />
+									<div
+										class="flex items-center gap-2 p-1.5 pr-3 bg-slate-800/80 border border-white/10 rounded-xl shadow-md w-fit backdrop-blur-md"
+									>
+										<img
+											src={attachedCommentImage}
+											alt="Preview"
+											class="w-10 h-10 object-cover rounded-lg"
+											width="40"
+											height="40"
+											loading="lazy"
+											decoding="async"
+										/>
 										<span class="text-xs font-medium text-white/80">Imagen Adjunta</span>
-										<button type="button" class="bg-transparent border-none cursor-pointer text-muted hover:text-white" onclick={() => attachedCommentImage = ''}>
+										<button
+											type="button"
+											class="bg-transparent border-none cursor-pointer text-muted hover:text-white"
+											onclick={() => (attachedCommentImage = '')}
+										>
 											<span class="material-icons-round text-[14px]">close</span>
 										</button>
 									</div>
@@ -583,39 +702,68 @@
 								type="button"
 								class="comment-gif-btn"
 								style="right: 110px;"
-								onclick={() => { showCommentGifs = !showCommentGifs; showCommentEmojis = false; showCommentMedia = false; }}
+								onclick={() => {
+									showCommentGifs = !showCommentGifs;
+									showCommentEmojis = false;
+									showCommentMedia = false;
+								}}
 								title="GIFs"
 							>
-								<span class="material-icons-round text-muted hover:text-fuchsia-400 transition text-[22px]">gif_box</span>
+								<span
+									class="material-icons-round text-muted hover:text-fuchsia-400 transition text-[22px]"
+									>gif_box</span
+								>
 							</button>
 
 							<button
 								type="button"
 								class="comment-emoji-btn"
-								onclick={() => { showCommentEmojis = !showCommentEmojis; showCommentGifs = false; showCommentMedia = false; }}
+								onclick={() => {
+									showCommentEmojis = !showCommentEmojis;
+									showCommentGifs = false;
+									showCommentMedia = false;
+								}}
 								title="Emojis"
 							>
-								<span class="material-icons-round text-muted hover:text-cyan-400 transition text-[20px]">mood</span>
+								<span
+									class="material-icons-round text-muted hover:text-cyan-400 transition text-[20px]"
+									>mood</span
+								>
 							</button>
 
 							<button
 								type="button"
 								class="comment-photo-btn"
-								onclick={() => { showCommentMedia = !showCommentMedia; showCommentGifs = false; showCommentEmojis = false; }}
+								onclick={() => {
+									showCommentMedia = !showCommentMedia;
+									showCommentGifs = false;
+									showCommentEmojis = false;
+								}}
 								disabled={uploadingCommentImage}
 								title="Multimedia"
 							>
 								{#if uploadingCommentImage}
-									<span class="material-icons-round text-cyan-400 animate-spin text-[20px]">autorenew</span>
+									<span class="material-icons-round text-cyan-400 animate-spin text-[20px]"
+										>autorenew</span
+									>
 								{:else}
-									<span class="material-icons-round hover:text-green-400 transition text-[20px]">add_photo_alternate</span>
+									<span class="material-icons-round hover:text-green-400 transition text-[20px]"
+										>add_photo_alternate</span
+									>
 								{/if}
 							</button>
-							<input type="file" bind:this={commentFileInput} accept="image/*,video/*" style="display: none;" onchange={handleCommentImageSelect} />
+							<input
+								type="file"
+								bind:this={commentFileInput}
+								accept="image/*,video/*"
+								style="display: none;"
+								onchange={handleCommentImageSelect}
+							/>
 
 							<button
 								onclick={submitComment}
-								disabled={(!commentText.trim() && !attachedCommentGif && !attachedCommentImage) || submittingComment}
+								disabled={(!commentText.trim() && !attachedCommentGif && !attachedCommentImage) ||
+									submittingComment}
 								class="comment-submit-btn"
 							>
 								<span class="material-icons-round">send</span>
@@ -625,9 +773,9 @@
 						{#if showCommentMedia}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
 								<div class="glass-panel p-4" style="min-height: max-content;">
-									<div 
-										role="button" 
-										tabindex="0" 
+									<div
+										role="button"
+										tabindex="0"
 										class="media-dropzone"
 										onclick={() => commentFileInput.click()}
 										onkeydown={(e) => e.key === 'Enter' && commentFileInput.click()}
@@ -642,7 +790,10 @@
 										}}
 									>
 										<div class="dropzone-icon">
-											<span class="material-icons-round" style="color: rgba(34,211,238,0.8); font-size: 22px;">cloud_upload</span>
+											<span
+												class="material-icons-round"
+												style="color: rgba(34,211,238,0.8); font-size: 22px;">cloud_upload</span
+											>
 										</div>
 										<p class="dropzone-text">Arrastra imágenes/videos o haz clic</p>
 									</div>
@@ -652,11 +803,16 @@
 
 						{#if showCommentEmojis}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
-								<div class="glass-panel p-4" style="position: relative; display: flex; justify-content: center; min-height: max-content;">
-									<TwemojiPicker 
+								<div
+									class="glass-panel p-4"
+									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
+								>
+									<TwemojiPicker
 										variant="inline"
-										onSelect={(emoji) => { commentText += emoji; }}
-										onClose={() => showCommentEmojis = false}
+										onSelect={(emoji) => {
+											commentText += emoji;
+										}}
+										onClose={() => (showCommentEmojis = false)}
 									/>
 								</div>
 							</div>
@@ -664,26 +820,30 @@
 
 						{#if showCommentGifs}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
-								<div class="glass-panel p-4" style="position: relative; display: flex; justify-content: center; min-height: max-content;">
-									<KlipyPicker 
-										onClose={() => showCommentGifs = false} 
-										onSelect={(url, gif) => { attachedCommentGif = url; showCommentGifs = false; }} 
+								<div
+									class="glass-panel p-4"
+									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
+								>
+									<KlipyPicker
+										onClose={() => (showCommentGifs = false)}
+										onSelect={(url, _gif) => {
+											attachedCommentGif = url;
+											showCommentGifs = false;
+										}}
 									/>
 								</div>
 							</div>
 						{/if}
 					</div>
 				</div>
-
-
-
-
 			{/if}
 
 			{#if newCommentCount > 0}
 				<div class="new-comments-indicator">
 					<span class="material-icons-round">arrow_upward</span>
-					{newCommentCount} comentario{newCommentCount > 1 ? 's' : ''} nuevo{newCommentCount > 1 ? 's' : ''}
+					{newCommentCount} comentario{newCommentCount > 1 ? 's' : ''} nuevo{newCommentCount > 1
+						? 's'
+						: ''}
 				</div>
 			{/if}
 
@@ -712,7 +872,11 @@
 				</div>
 				{#if comments.length > 10}
 					<div class="text-center py-2">
-						<a href="/posts/{post.id}" class="text-blue-500 hover:underline font-semibold" style="font-size:0.8rem;">Ver los {comments.length} comentarios</a>
+						<a
+							href="/posts/{post.id}"
+							class="text-blue-500 hover:underline font-semibold"
+							style="font-size:0.8rem;">Ver los {comments.length} comentarios</a
+						>
 					</div>
 				{/if}
 			{:else}
@@ -723,28 +887,53 @@
 </article>
 
 {#if showDeleteModal}
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="aero-modal-backdrop" onclick={(e) => { if(e.target === e.currentTarget) showDeleteModal = false; }} transition:fade={{ duration: 150 }}>
-	<div class="aero-modal-content" transition:scale={{ duration: 250, start: 0.95, easing: backOut }} style="padding: 24px;">
-		<div class="flex items-center gap-3 mb-3">
-			<div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: rgba(232, 74, 114, 0.15); color: #e84a72;">
-				<span class="material-icons-round">warning</span>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="aero-modal-backdrop"
+		onclick={(e) => {
+			if (e.target === e.currentTarget) showDeleteModal = false;
+		}}
+		transition:fade={{ duration: 150 }}
+	>
+		<div
+			class="aero-modal-content"
+			transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
+			style="padding: 24px;"
+		>
+			<div class="flex items-center gap-3 mb-3">
+				<div
+					class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+					style="background: rgba(232, 74, 114, 0.15); color: #e84a72;"
+				>
+					<span class="material-icons-round">warning</span>
+				</div>
+				<h3 class="font-bold text-lg text-main m-0">¿Eliminar post?</h3>
 			</div>
-			<h3 class="font-bold text-lg text-main m-0">¿Eliminar post?</h3>
-		</div>
-		<p class="text-sm text-muted mb-6 leading-relaxed">
-			¿Estás seguro que quieres eliminar este post? Al aceptar la eliminación, recuerda que puedes reestablecerlo en un plazo máximo de 30 días.
-		</p>
-		{#if deleteError}
-			<p class="text-xs text-red-400 mb-4 bg-red-500/10 p-2 rounded-md">{deleteError}</p>
-		{/if}
-		<div class="flex gap-3 justify-end">
-			<button onclick={() => { showDeleteModal = false; deleteError = ''; }} class="btn-aero-secondary" style="padding: 8px 16px; font-size: 0.85rem;">Cancelar</button>
-			<button onclick={executeDelete} class="btn-aero-danger" style="padding: 8px 16px; font-size: 0.85rem;">Eliminar</button>
+			<p class="text-sm text-muted mb-6 leading-relaxed">
+				¿Estás seguro que quieres eliminar este post? Al aceptar la eliminación, recuerda que puedes
+				reestablecerlo en un plazo máximo de 30 días.
+			</p>
+			{#if deleteError}
+				<p class="text-xs text-red-400 mb-4 bg-red-500/10 p-2 rounded-md">{deleteError}</p>
+			{/if}
+			<div class="flex gap-3 justify-end">
+				<button
+					onclick={() => {
+						showDeleteModal = false;
+						deleteError = '';
+					}}
+					class="btn-aero-secondary"
+					style="padding: 8px 16px; font-size: 0.85rem;">Cancelar</button
+				>
+				<button
+					onclick={executeDelete}
+					class="btn-aero-danger"
+					style="padding: 8px 16px; font-size: 0.85rem;">Eliminar</button
+				>
+			</div>
 		</div>
 	</div>
-</div>
 {/if}
 
 <style>
@@ -762,7 +951,9 @@
 		border-top-color: var(--glass-border-t);
 		box-shadow: var(--glass-shadow), var(--glass-inset);
 		margin-bottom: 2rem;
-		transition: transform var(--t-base), box-shadow var(--t-base);
+		transition:
+			transform var(--t-base),
+			box-shadow var(--t-base);
 	}
 
 	.emoji-only-text {
@@ -776,9 +967,12 @@
 		box-shadow: var(--shadow-md), var(--glass-inset);
 	}
 
-	.text-main { color: var(--text-primary); }
-	.text-muted { color: var(--text-muted); }
-
+	.text-main {
+		color: var(--text-primary);
+	}
+	.text-muted {
+		color: var(--text-muted);
+	}
 
 	.group:hover .text-main {
 		color: var(--aero-blue);
@@ -802,7 +996,10 @@
 		box-shadow: var(--shadow-xs);
 	}
 
-	.btn-small { width: 28px; height: 28px; }
+	.btn-small {
+		width: 28px;
+		height: 28px;
+	}
 
 	.aero-dropdown-menu {
 		position: absolute;
@@ -834,7 +1031,9 @@
 		color: var(--text-secondary);
 		border-radius: var(--radius-xs);
 		cursor: pointer;
-		transition: background var(--t-fast), color var(--t-fast);
+		transition:
+			background var(--t-fast),
+			color var(--t-fast);
 	}
 
 	.aero-dropdown-item:hover {
@@ -864,7 +1063,7 @@
 		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 		gap: 4px;
 	}
-	
+
 	@media (min-width: 640px) {
 		.grid-2 {
 			grid-template-columns: 1fr 1fr;
@@ -877,7 +1076,7 @@
 	}
 
 	/* ── Imágenes únicas ── */
-	.full-media { 
+	.full-media {
 		width: auto;
 		height: auto;
 		max-width: 100%;
@@ -885,11 +1084,11 @@
 		margin: 0 auto;
 		object-fit: cover;
 	}
-	
+
 	/* ── Imágenes en grid ── */
-	.square-media { 
+	.square-media {
 		width: 100%;
-		aspect-ratio: 1; 
+		aspect-ratio: 1;
 		object-fit: cover;
 	}
 
@@ -919,8 +1118,9 @@
 
 	.media-overlay {
 		position: absolute;
-		bottom: 0; right: 0;
-		background: rgba(0,0,0,0.6);
+		bottom: 0;
+		right: 0;
+		background: rgba(0, 0, 0, 0.6);
 		color: white;
 		padding: 4px 8px;
 		border-top-left-radius: var(--radius-xs);
@@ -942,7 +1142,7 @@
 	.aero-hashtag:hover {
 		background: var(--aero-sky);
 		color: white;
-		box-shadow: 0 2px 5px rgba(74,171,223, 0.4);
+		box-shadow: 0 2px 5px rgba(74, 171, 223, 0.4);
 	}
 
 	.action-bar {
@@ -987,12 +1187,33 @@
 		transform-origin: center;
 	}
 	@keyframes heartPop {
-		0% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
-		15% { transform: scale(0.8); filter: drop-shadow(0 0 4px var(--aero-rose, #ec4899)); }
-		30% { transform: scale(1.6) rotate(-12deg); filter: drop-shadow(0 0 10px var(--aero-rose, #ec4899)); color: var(--aero-rose, #ec4899); }
-		50% { transform: scale(1.3) rotate(8deg); filter: drop-shadow(0 0 6px var(--aero-rose, #ec4899)); color: var(--aero-rose, #ec4899); }
-		70% { transform: scale(1.1) rotate(-4deg); color: var(--aero-rose, #ec4899); }
-		100% { transform: scale(1) rotate(0); filter: drop-shadow(0 0 0 transparent); color: var(--aero-rose, #ec4899); }
+		0% {
+			transform: scale(1);
+			filter: drop-shadow(0 0 0 transparent);
+		}
+		15% {
+			transform: scale(0.8);
+			filter: drop-shadow(0 0 4px var(--aero-rose, #ec4899));
+		}
+		30% {
+			transform: scale(1.6) rotate(-12deg);
+			filter: drop-shadow(0 0 10px var(--aero-rose, #ec4899));
+			color: var(--aero-rose, #ec4899);
+		}
+		50% {
+			transform: scale(1.3) rotate(8deg);
+			filter: drop-shadow(0 0 6px var(--aero-rose, #ec4899));
+			color: var(--aero-rose, #ec4899);
+		}
+		70% {
+			transform: scale(1.1) rotate(-4deg);
+			color: var(--aero-rose, #ec4899);
+		}
+		100% {
+			transform: scale(1) rotate(0);
+			filter: drop-shadow(0 0 0 transparent);
+			color: var(--aero-rose, #ec4899);
+		}
 	}
 
 	.action-btn.liked .icon {
@@ -1022,10 +1243,13 @@
 			opacity: 1;
 			transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0) scale(1);
 		}
-		50% { opacity: 0.8; }
+		50% {
+			opacity: 0.8;
+		}
 		100% {
 			opacity: 0;
-			transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--dist) * -1)) scale(0.3);
+			transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--dist) * -1))
+				scale(0.3);
 		}
 	}
 
@@ -1050,10 +1274,8 @@
 
 	.action-btn-save.saved {
 		color: var(--aero-blue);
-		background: rgba(46,134,232,0.08);
+		background: rgba(46, 134, 232, 0.08);
 	}
-
-
 
 	.post-mood-badge {
 		font-size: 0.7rem;
@@ -1086,13 +1308,17 @@
 		border: 1.5px solid var(--glass-border);
 		border-radius: 22px;
 		overflow: hidden;
-		transition: border-color 0.2s ease, box-shadow 0.2s ease;
+		transition:
+			border-color 0.2s ease,
+			box-shadow 0.2s ease;
 		box-shadow: var(--shadow-xs), var(--glass-inset-highlight);
 	}
 
 	.comment-input-wrapper:focus-within {
 		border-color: var(--aero-sky);
-		box-shadow: 0 0 0 3px rgba(46, 134, 232, 0.10), var(--shadow-xs);
+		box-shadow:
+			0 0 0 3px rgba(46, 134, 232, 0.1),
+			var(--shadow-xs);
 	}
 
 	.comment-gif-btn {
@@ -1185,8 +1411,8 @@
 		width: 44px;
 		height: 44px;
 		border-radius: 50%;
-		background: rgba(34,211,238,0.1);
-		border: 1px solid rgba(34,211,238,0.2);
+		background: rgba(34, 211, 238, 0.1);
+		border: 1px solid rgba(34, 211, 238, 0.2);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1195,7 +1421,7 @@
 	.dropzone-text {
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: rgba(255,255,255,0.5);
+		color: rgba(255, 255, 255, 0.5);
 		text-align: center;
 	}
 
@@ -1244,8 +1470,14 @@
 
 	/* Animations */
 	@keyframes slideInUp {
-		from { opacity: 0; transform: translateY(20px); }
-		to { opacity: 1; transform: translateY(0); }
+		from {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.animate-slide-in-up {
@@ -1291,13 +1523,22 @@
 	}
 
 	@keyframes fadeIn {
-		from { opacity: 0; }
-		to { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.7;
+		}
 	}
 
 	/* Poll styling */
@@ -1341,13 +1582,13 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 50%;
-		background: rgba(255,255,255,0.06);
+		background: rgba(255, 255, 255, 0.06);
 		flex-shrink: 0;
 		background-image: linear-gradient(
 			90deg,
-			rgba(255,255,255,0.04) 0%,
-			rgba(255,255,255,0.12) 40%,
-			rgba(255,255,255,0.04) 80%
+			rgba(255, 255, 255, 0.04) 0%,
+			rgba(255, 255, 255, 0.12) 40%,
+			rgba(255, 255, 255, 0.04) 80%
 		);
 		background-size: 200% 100%;
 		animation: skeleton-shimmer 1.4s ease-in-out infinite;
@@ -1364,21 +1605,29 @@
 	.skeleton-line {
 		height: 10px;
 		border-radius: 6px;
-		background: rgba(255,255,255,0.06);
+		background: rgba(255, 255, 255, 0.06);
 		background-image: linear-gradient(
 			90deg,
-			rgba(255,255,255,0.04) 0%,
-			rgba(255,255,255,0.12) 40%,
-			rgba(255,255,255,0.04) 80%
+			rgba(255, 255, 255, 0.04) 0%,
+			rgba(255, 255, 255, 0.12) 40%,
+			rgba(255, 255, 255, 0.04) 80%
 		);
 		background-size: 200% 100%;
 		animation: skeleton-shimmer 1.4s ease-in-out infinite;
 	}
 
-	.skeleton-line.w-3\/4  { width: 75%; }
-	.skeleton-line.w-1\/2  { width: 50%; }
-	.skeleton-line.w-full  { width: 100%; }
-	.skeleton-line.w-2\/3  { width: 66%; }
+	.skeleton-line.w-3\/4 {
+		width: 75%;
+	}
+	.skeleton-line.w-1\/2 {
+		width: 50%;
+	}
+	.skeleton-line.w-full {
+		width: 100%;
+	}
+	.skeleton-line.w-2\/3 {
+		width: 66%;
+	}
 
 	.comment-skeleton:nth-child(2) .skeleton-avatar,
 	.comment-skeleton:nth-child(2) .skeleton-line {
@@ -1386,7 +1635,22 @@
 	}
 
 	@keyframes skeleton-shimmer {
-		0%   { background-position: 200% 0; }
-		100% { background-position: -200% 0; }
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
+	}
+
+	/* Móvil: blur más ligero en las superficies hardcoded de la tarjeta (dropdown + input
+	   de comentario). Solo ≤768px; desktop idéntico. La cabecera glass de PostCard usa
+	   var(--glass-blur) y se cubre desde layout.css. */
+	@media (max-width: 768px) {
+		.aero-dropdown-menu,
+		.comment-input-wrapper {
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+		}
 	}
 </style>

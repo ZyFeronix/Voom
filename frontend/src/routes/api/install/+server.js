@@ -11,15 +11,17 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { closeDb, getDriverInfo } from '$lib/server/db.js';
+import { initDb, closeDb } from '$lib/server/db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..', '..', '..', '..');
 
 function getInstallStatus() {
-	return existsSync(resolve(ROOT, 'install.lock'))
-		|| existsSync(resolve(ROOT, 'installed.lock'))
-		|| existsSync(resolve(ROOT, 'public', 'install.lock'));
+	return (
+		existsSync(resolve(ROOT, 'install.lock')) ||
+		existsSync(resolve(ROOT, 'installed.lock')) ||
+		existsSync(resolve(ROOT, 'public', 'install.lock'))
+	);
 }
 
 async function getRequirements() {
@@ -29,8 +31,15 @@ async function getRequirements() {
 	if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 
 	let dbDriver = 'none';
-	try { await import('@libsql/client'); dbDriver = '@libsql/client'; }
-	catch { try { await import('better-sqlite3'); dbDriver = 'better-sqlite3'; } catch {} }
+	try {
+		await import('@libsql/client');
+		dbDriver = '@libsql/client';
+	} catch {
+		try {
+			await import('better-sqlite3');
+			dbDriver = 'better-sqlite3';
+		} catch {}
+	}
 
 	return {
 		node_version: nodeVersion,
@@ -88,7 +97,9 @@ export async function POST({ request, url }) {
 		for (const suffix of ['', '-wal', '-shm']) {
 			const filePath = dbPath + suffix;
 			if (existsSync(filePath)) {
-				try { unlinkSync(filePath); } catch {}
+				try {
+					unlinkSync(filePath);
+				} catch {}
 			}
 		}
 
@@ -114,8 +125,14 @@ export async function POST({ request, url }) {
 			});
 			const userId = result.lastInsertRowid;
 
-			await client.execute({ sql: "INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')", args: [userId] });
-			await client.execute({ sql: 'INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)', args: [userId] });
+			await client.execute({
+				sql: "INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')",
+				args: [userId]
+			});
+			await client.execute({
+				sql: 'INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)',
+				args: [userId]
+			});
 			client.close();
 			driverUsed = '@libsql/client';
 		} catch (libsqlErr) {
@@ -132,14 +149,21 @@ export async function POST({ request, url }) {
 					"INSERT INTO users (username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'admin')"
 				);
 				const result = await stmt.run(adminUser, data.admin_email, hash, adminUser);
-				db.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')").run(result.lastInsertRowid);
-				await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(result.lastInsertRowid);
+				db.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')").run(
+					result.lastInsertRowid
+				);
+				await db
+					.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)')
+					.run(result.lastInsertRowid);
 				db.close();
 				driverUsed = 'better-sqlite3';
 			} catch (bs3Err) {
-				return json({
-					error: `Ningun driver disponible. @libsql/client: ${libsqlErr.message} | better-sqlite3: ${bs3Err.message}`
-				}, { status: 500 });
+				return json(
+					{
+						error: `Ningun driver disponible. @libsql/client: ${libsqlErr.message} | better-sqlite3: ${bs3Err.message}`
+					},
+					{ status: 500 }
+				);
 			}
 		}
 
@@ -158,7 +182,11 @@ export async function POST({ request, url }) {
 		// Create install lock
 		writeFileSync(
 			resolve(ROOT, 'install.lock'),
-			JSON.stringify({ installed_at: new Date().toISOString(), site_name: data.site_name, db_driver: driverUsed })
+			JSON.stringify({
+				installed_at: new Date().toISOString(),
+				site_name: data.site_name,
+				db_driver: driverUsed
+			})
 		);
 
 		// Re-initialize the database connection for the running server process

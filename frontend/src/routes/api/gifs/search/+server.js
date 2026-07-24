@@ -11,14 +11,17 @@ export async function GET({ url }) {
 
 	try {
 		const db = getDb();
-		const klipyKeyRow = await db.prepare("SELECT value FROM system_settings WHERE key = 'klipy_api_key'").get();
+		const klipyKeyRow = await db
+			.prepare("SELECT value FROM system_settings WHERE key = 'klipy_api_key'")
+			.get();
 		const apiKey = klipyKeyRow?.value;
 
 		if (!apiKey) {
 			return json({
 				success: false,
 				error: 'KLIPY_API_KEY_NOT_CONFIGURED',
-				message: 'La API de Klipy no está configurada. Ve a Panel de Admin > Sistema para configurarla.',
+				message:
+					'La API de Klipy no está configurada. Ve a Panel de Admin > Sistema para configurarla.',
 				gifs: []
 			});
 		}
@@ -29,7 +32,7 @@ export async function GET({ url }) {
 		try {
 			const { KlipyClient } = await import('klipy-js');
 			const klipy = new KlipyClient({ apiKey });
-			
+
 			let results;
 			if (query) {
 				results = await klipy.gifs.search({ q: query, limit });
@@ -39,14 +42,14 @@ export async function GET({ url }) {
 			klipyData = results.data || [];
 		} catch (sdkError) {
 			// Fallback si klipy-js no resuelve, usar HTTP Fetch
-			console.log("Klipy SDK Error, usando HTTP Fetch", sdkError.message);
-			const endpoint = query 
+			console.log('Klipy SDK Error, usando HTTP Fetch', sdkError.message);
+			const endpoint = query
 				? `https://api.klipy.co/v2/gifs/search?q=${encodeURIComponent(query)}&limit=${limit}`
 				: `https://api.klipy.co/v2/gifs/trending?limit=${limit}`;
-				
+
 			const response = await fetch(endpoint, {
 				headers: {
-					'Authorization': `Bearer ${apiKey}`,
+					Authorization: `Bearer ${apiKey}`,
 					'Content-Type': 'application/json'
 				}
 			});

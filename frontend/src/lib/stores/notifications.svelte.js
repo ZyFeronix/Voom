@@ -12,18 +12,33 @@ let _unreadCount = $state(0);
 let _unreadMessageCount = $state(0);
 let _connected = $state(false);
 let _socket = null;
+let _heartbeatTimer = null;
+
+// Presencia en tiempo real: set reactivo de IDs de usuarios en línea AHORA.
+// Los componentes derivan de aquí si un peer está conectado.
+let _onlineUsers = $state(new Set());
 
 // Track processed event IDs to prevent duplicates
 let _processedMessageIds = new Set();
 let _processedNotificationIds = new Set();
 let _processedSignalIds = new Set();
 
+const HEARTBEAT_INTERVAL_MS = 30000;
+
+function setUserOnline(userId, online) {
+	const id = Number(userId);
+	const next = new Set(_onlineUsers);
+	if (online) next.add(id);
+	else next.delete(id);
+	_onlineUsers = next; // reasignación para disparar reactividad de runes
+}
+
 /**
  * Connect to the real-time Socket.IO server.
  */
 function connect(token) {
 	if (!token) return;
-	
+
 	// Close existing connection before creating new one
 	if (_socket) {
 		_socket.disconnect();
@@ -37,7 +52,7 @@ function connect(token) {
 			reconnectionAttempts: Infinity,
 			reconnectionDelay: 1000,
 			reconnectionDelayMax: 5000,
-			timeout: 20000,
+			timeout: 20000
 		});
 
 		_socket.on('connect', () => {
@@ -46,13 +61,35 @@ function connect(token) {
 			// Initial fetch to sync any missed events while disconnected
 			fetchInitialNotifications();
 			fetchUnreadMessageCount();
+			startHeartbeat();
+		});
+
+		// Sincronización inicial de presencia: qué pares ya están en línea.
+		_socket.on('presence:sync', (data) => {
+			try {
+				const ids = (data?.onlineUserIds || []).map(Number);
+				_onlineUsers = new Set(ids);
+			} catch (err) {
+				console.error('[Socket] Error parsing presence:sync:', err);
+			}
+		});
+
+		// Cambio de presencia en vivo de un peer (conectó/desconectó).
+		_socket.on('presence:update', (data) => {
+			try {
+				if (data && data.userId != null) {
+					setUserOnline(data.userId, !!data.online);
+				}
+			} catch (err) {
+				console.error('[Socket] Error parsing presence:update:', err);
+			}
 		});
 
 		_socket.on('new_message', (data) => {
 			try {
 				if (data.messages && data.messages.length > 0) {
 					// Deduplicate by message ID before adding
-					const uniqueMessages = data.messages.filter(msg => {
+					const uniqueMessages = data.messages.filter((msg) => {
 						if (_processedMessageIds.has(msg.id)) return false;
 						_processedMessageIds.add(msg.id);
 						return true;
@@ -60,7 +97,7 @@ function connect(token) {
 					if (uniqueMessages.length > 0) {
 						_newMessages = [..._newMessages, ...uniqueMessages].slice(-50);
 						// Increase unread message count when a new message arrives (if it's not ours)
-						const unreadToAdd = uniqueMessages.filter(m => !m.is_own_message).length;
+						const unreadToAdd = uniqueMessages.filter((m) => !m.is_own_message).length;
 						if (unreadToAdd > 0) {
 							_unreadMessageCount += unreadToAdd;
 						}
@@ -75,7 +112,7 @@ function connect(token) {
 			try {
 				if (data.notifications && data.notifications.length > 0) {
 					// Deduplicate by notification ID before adding
-					const uniqueNotifs = data.notifications.filter(notif => {
+					const uniqueNotifs = data.notifications.filter((notif) => {
 						if (_processedNotificationIds.has(notif.id)) return false;
 						if (notif.type === 'message') return false; // Ignorar notificaciones de tipo mensaje
 						_processedNotificationIds.add(notif.id);
@@ -83,21 +120,25 @@ function connect(token) {
 					});
 					if (uniqueNotifs.length > 0) {
 						_notifications = [...uniqueNotifs, ..._notifications];
-						_unreadCount += uniqueNotifs.filter(n => !n.is_read).length;
-						
+						_unreadCount += uniqueNotifs.filter((n) => !n.is_read).length;
+
 						// Dispatch global event for message reactions so chat UI can update
-						uniqueNotifs.filter(n => n.type === 'message_reaction').forEach(n => {
-							if (typeof window !== 'undefined') {
-								// message format: "username reaccionó a tu mensaje con ❤️"
-								const emojiMatch = n.message.match(/con (.+)$/);
-								const emoji = emojiMatch ? emojiMatch[1] : null;
-								if (emoji) {
-									window.dispatchEvent(new CustomEvent('message_reaction', {
-										detail: { messageId: n.entity_id, emoji }
-									}));
+						uniqueNotifs
+							.filter((n) => n.type === 'message_reaction')
+							.forEach((n) => {
+								if (typeof window !== 'undefined') {
+									// message format: "username reaccionó a tu mensaje con ❤️"
+									const emojiMatch = n.message.match(/con (.+)$/);
+									const emoji = emojiMatch ? emojiMatch[1] : null;
+									if (emoji) {
+										window.dispatchEvent(
+											new CustomEvent('message_reaction', {
+												detail: { messageId: n.entity_id, emoji }
+											})
+										);
+									}
 								}
-							}
-						});
+							});
 					}
 				}
 			} catch (err) {
@@ -109,7 +150,7 @@ function connect(token) {
 			try {
 				if (data.signals && data.signals.length > 0) {
 					// Deduplicate by signal ID before adding
-					const uniqueSignals = data.signals.filter(sig => {
+					const uniqueSignals = data.signals.filter((sig) => {
 						if (_processedSignalIds.has(sig.id)) return false;
 						_processedSignalIds.add(sig.id);
 						return true;
@@ -123,18 +164,43 @@ function connect(token) {
 			}
 		});
 
+		_socket.on('global_settings_update', () => {
+			if (typeof window !== 'undefined') {
+				window.dispatchEvent(new CustomEvent('global_settings_update'));
+			}
+		});
+
 		_socket.on('disconnect', () => {
 			console.log('[Socket] Disconnected.');
 			_connected = false;
+			stopHeartbeat();
+			// Al perder conexión no sabemos el estado de los pares; se
+			// re-sincroniza vía presence:sync en la próxima reconexión.
+			_onlineUsers = new Set();
 		});
 
 		_socket.on('connect_error', (err) => {
 			console.error('[Socket] Connection error:', err.message);
 			_connected = false;
 		});
-
 	} catch (err) {
 		console.error('[Socket] Initialization error:', err);
+	}
+}
+
+function startHeartbeat() {
+	stopHeartbeat();
+	_heartbeatTimer = setInterval(() => {
+		if (_socket && _connected) {
+			_socket.emit('heartbeat');
+		}
+	}, HEARTBEAT_INTERVAL_MS);
+}
+
+function stopHeartbeat() {
+	if (_heartbeatTimer) {
+		clearInterval(_heartbeatTimer);
+		_heartbeatTimer = null;
 	}
 }
 
@@ -143,10 +209,12 @@ async function fetchInitialNotifications() {
 		const data = await notifApi.list();
 		const newItems = data.notifications || [];
 		// Deduplicate initial fetch
-		const uniqueItems = newItems.filter(n => !_processedNotificationIds.has(n.id) && n.type !== 'message');
-		uniqueItems.forEach(n => _processedNotificationIds.add(n.id));
+		const uniqueItems = newItems.filter(
+			(n) => !_processedNotificationIds.has(n.id) && n.type !== 'message'
+		);
+		uniqueItems.forEach((n) => _processedNotificationIds.add(n.id));
 		_notifications = uniqueItems;
-		_unreadCount = uniqueItems.filter(n => !n.is_read).length;
+		_unreadCount = uniqueItems.filter((n) => !n.is_read).length;
 	} catch (err) {
 		console.error('[SSE] Failed to fetch initial notifications:', err);
 	}
@@ -165,12 +233,23 @@ async function fetchUnreadMessageCount() {
  * Disconnect SSE stream.
  */
 function disconnect() {
+	stopHeartbeat();
 	if (_socket) {
 		_socket.disconnect();
 		_socket = null;
 	}
 	_connected = false;
 	_newMessages = [];
+	_onlineUsers = new Set();
+}
+
+/**
+ * Indica si un usuario está conectado en este momento (presencia en vivo).
+ * @param {number|string} userId
+ * @returns {boolean}
+ */
+function isUserOnline(userId) {
+	return _onlineUsers.has(Number(userId));
 }
 
 export function getSocket() {
@@ -188,9 +267,7 @@ function clearNewMessages() {
  * Mark a notification as read.
  */
 function markRead(id) {
-	_notifications = _notifications.map(n =>
-		n.id === id ? { ...n, is_read: true } : n
-	);
+	_notifications = _notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n));
 	_unreadCount = Math.max(0, _unreadCount - 1);
 }
 
@@ -198,8 +275,8 @@ function markRead(id) {
  * Mark all notifications as read.
  */
 function markAllRead() {
-	_notifications = _notifications.map(n => ({ ...n, is_read: true }));
-	_unreadCount = 0
+	_notifications = _notifications.map((n) => ({ ...n, is_read: true }));
+	_unreadCount = 0;
 }
 
 /**
@@ -215,7 +292,7 @@ function addLocal(notification) {
  */
 function setNotifications(items) {
 	_notifications = items;
-	_unreadCount = items.filter(n => !n.is_read).length;
+	_unreadCount = items.filter((n) => !n.is_read).length;
 }
 
 function decreaseUnreadMessageCount() {
@@ -225,12 +302,29 @@ function decreaseUnreadMessageCount() {
 }
 
 export const notificationsStore = {
-	get items() { return _notifications; },
-	get newMessages() { return _newMessages; },
-	get rtcSignals() { return _rtcSignals; },
-	get unreadCount() { return _unreadCount; },
-	get unreadMessageCount() { return _unreadMessageCount; },
-	get connected() { return _connected; },
+	get items() {
+		return _notifications;
+	},
+	get newMessages() {
+		return _newMessages;
+	},
+	get rtcSignals() {
+		return _rtcSignals;
+	},
+	get unreadCount() {
+		return _unreadCount;
+	},
+	get unreadMessageCount() {
+		return _unreadMessageCount;
+	},
+	get connected() {
+		return _connected;
+	},
+	get onlineUsers() {
+		return _onlineUsers;
+	},
+	isUserOnline,
+	getSocket,
 	connect,
 	disconnect,
 	clearNewMessages,

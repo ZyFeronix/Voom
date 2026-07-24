@@ -9,14 +9,25 @@
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { initTheme } from '$lib/stores/theme.svelte.js';
 	import { uiStore } from '$lib/stores/ui.svelte.js';
+	import { featureStore } from '$lib/stores/features.svelte.js';
 	import SideNav from '$lib/components/SideNav.svelte';
 	import TopBar from '$lib/components/TopBar.svelte';
 	import MobileNav from '$lib/components/MobileNav.svelte';
 	import LiquidBackground from '$lib/components/LiquidBackground.svelte';
 	import PwaPrompt from '$lib/components/PwaPrompt.svelte';
+	import CookieBanner from '$lib/components/CookieBanner.svelte';
 
 	onNavigate((navigation) => {
 		if (!document.startViewTransition) return;
+		// En móvil las view transitions snapshot+crossfadeean la página entera (incluido glass con blur),
+		// lo que es costoso por navegación en低端. Navegación instantánea en móvil; PC mantiene la transición.
+		if (window.matchMedia('(max-width: 768px)').matches) return;
+		if (navigation.to?.url.href === navigation.from?.url.href) return;
+		if (
+			navigation.to?.url.pathname === navigation.from?.url.pathname &&
+			navigation.to?.url.hash !== navigation.from?.url.hash
+		)
+			return;
 
 		return new Promise((resolve) => {
 			const transition = document.startViewTransition(async () => {
@@ -32,30 +43,70 @@
 
 	initTheme();
 
-	let { children } = $props();
+	let { children, data } = $props();
 
-	let installChecked = $state(false);
-	let isInstalled = $state(false);
+	$effect(() => {
+		if (data?.globalSettings) {
+			featureStore.initFeatures(data.globalSettings);
+		}
+	});
 
-	const publicRoutes = ['/', '/login', '/register', '/install', '/setup'];
+	// Modo de plataforma → atributo en <html>, mismo patrón que data-theme.
+	// Como el socket 'global_settings_update' dispara invalidateAll(), este $effect
+	// re-corre y el layout muta sin recargar en todos los clientes conectados.
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		const mode = data?.globalSettings?.platform_mode || 'custom';
+		document.documentElement.setAttribute('data-platform-mode', mode);
+	});
+
+	$effect(() => {
+		const handleSettingsUpdate = () => {
+			import('$app/navigation').then(({ invalidateAll }) => {
+				invalidateAll();
+			});
+		};
+		window.addEventListener('global_settings_update', handleSettingsUpdate);
+		return () => window.removeEventListener('global_settings_update', handleSettingsUpdate);
+	});
+
+	let installChecked = $derived(data?.isInstalled !== undefined);
+	let isInstalled = $derived(data?.isInstalled ?? false);
+
+	const publicRoutes = [
+		'/',
+		'/login',
+		'/register',
+		'/install',
+		'/setup',
+		'/privacy',
+		'/terms',
+		'/cookies'
+	];
 	const isPublicRoute = $derived(
-		publicRoutes.some(r => page.url.pathname === r || page.url.pathname.startsWith('/install') || page.url.pathname.startsWith('/setup'))
+		publicRoutes.some(
+			(r) =>
+				page.url.pathname === r ||
+				page.url.pathname.startsWith('/install') ||
+				page.url.pathname.startsWith('/setup')
+		)
 	);
 	const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
 	const isReelsRoute = $derived(page.url.pathname.startsWith('/reels'));
-	const isAppRoute = $derived(!isPublicRoute && !isAdminRoute);
 
 	onMount(async () => {
-		await authStore.initialize();
+		authStore.initialize();
 
-		try {
-			const res = await fetch('/api/install');
-			if (res.ok) {
-				const status = await res.json();
-				isInstalled = !!status.installed;
+		if (data?.isInstalled === undefined) {
+			try {
+				const res = await fetch('/api/install');
+				if (res.ok) {
+					const status = await res.json();
+					isInstalled = !!status.installed;
+				}
+			} catch (err) {
+				console.error('[Layout] Failed to check installation status:', err);
 			}
-		} catch (err) {
-			console.error('[Layout] Failed to check installation status:', err);
 		}
 
 		if (!isInstalled && page.url.pathname !== '/install') {
@@ -106,7 +157,6 @@
 		let scrollTarget = 0;
 		let scrollCurrent = 0;
 		let isScrolling = false;
-		let currentSlider = null;
 		let activeWheelListenerTarget = null;
 
 		const applyMomentum = () => {
@@ -128,9 +178,10 @@
 		const wheelHandler = (e) => {
 			if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
 			e.preventDefault(); // Bloquear scroll vertical solo dentro del slider
-			
-			scrollTarget += e.deltaY * 1.2; 
-			const maxScroll = activeWheelListenerTarget.scrollWidth - activeWheelListenerTarget.clientWidth;
+
+			scrollTarget += e.deltaY * 1.2;
+			const maxScroll =
+				activeWheelListenerTarget.scrollWidth - activeWheelListenerTarget.clientWidth;
 			scrollTarget = Math.max(0, Math.min(scrollTarget, maxScroll));
 
 			if (!isScrolling) {
@@ -171,7 +222,7 @@
 		};
 
 		window.addEventListener('mouseover', pointerOverHandler);
-		
+
 		return () => {
 			window.removeEventListener('mouseover', pointerOverHandler);
 			if (activeWheelListenerTarget) {
@@ -184,24 +235,27 @@
 		let heartbeatTimer;
 		if (authStore.isAuthenticated) {
 			// Gamification: Heartbeat (Time online)
-			heartbeatTimer = setInterval(async () => {
-				if (document.visibilityState === 'visible') {
-					try {
-						const res = await fetch('/api/gamification/heartbeat', { 
-							method: 'POST',
-							headers: authStore.token ? { 'Authorization': `Bearer ${authStore.token}` } : {}
-						});
-						if (res.ok) {
-							const data = await res.json();
-							if (data.awarded && data.amount > 0 && authStore.user) {
-								authStore.user.xp_points = (authStore.user.xp_points || 0) + data.amount;
+			heartbeatTimer = setInterval(
+				async () => {
+					if (document.visibilityState === 'visible') {
+						try {
+							const res = await fetch('/api/gamification/heartbeat', {
+								method: 'POST',
+								headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+							});
+							if (res.ok) {
+								const data = await res.json();
+								if (data.awarded && data.amount > 0 && authStore.user) {
+									authStore.user.xp_points = (authStore.user.xp_points || 0) + data.amount;
+								}
 							}
+						} catch (_e) {
+							// Ignorar errores de red en el ping de fondo para evitar cerrar sesión accidentalmente
 						}
-					} catch (e) {
-						// Ignorar errores de red en el ping de fondo para evitar cerrar sesión accidentalmente
 					}
-				}
-			}, 2 * 60 * 1000); // 2 minutes
+				},
+				2 * 60 * 1000
+			); // 2 minutes
 		} else {
 			notificationsStore.disconnect();
 		}
@@ -210,7 +264,6 @@
 			if (heartbeatTimer) clearInterval(heartbeatTimer);
 		};
 	});
-
 </script>
 
 <svelte:head>
@@ -221,7 +274,7 @@
 
 <LiquidBackground />
 
-{#if !installChecked || authStore.loading}
+{#if !installChecked}
 	<div class="vs-boot" data-vs-boot out:fade={{ duration: 400, easing: cubicOut }}>
 		<div class="vs-boot__core">
 			<div class="vs-boot__prism"></div>
@@ -239,7 +292,11 @@
 {:else if isAdminRoute}
 	{@render children()}
 {:else if authStore.isAuthenticated}
-	<div class="vs-shell" class:vs-shell--collapsed={!uiStore.sidebarExpanded} class:vs-shell--reels={isReelsRoute}>
+	<div
+		class="vs-shell"
+		class:vs-shell--collapsed={!uiStore.sidebarExpanded}
+		class:vs-shell--reels={isReelsRoute}
+	>
 		<aside class="vs-shell__rail">
 			<SideNav />
 		</aside>
@@ -260,9 +317,11 @@
 {/if}
 
 <PwaPrompt />
+<CookieBanner />
 
 <style>
-	:global(body.is-reels), :global(html.is-reels) {
+	:global(body.is-reels),
+	:global(html.is-reels) {
 		background-color: #05131a !important;
 	}
 
@@ -295,10 +354,10 @@
 		background:
 			radial-gradient(circle at 30% 40%, rgba(0, 229, 255, 0.18) 0%, transparent 55%),
 			radial-gradient(circle at 70% 60%, rgba(232, 74, 114, 0.14) 0%, transparent 50%),
-			radial-gradient(circle at 50% 85%, rgba(255, 215, 0, 0.10) 0%, transparent 60%);
-		filter: blur(90px);
+			radial-gradient(circle at 50% 85%, rgba(255, 215, 0, 0.1) 0%, transparent 60%);
 		z-index: -1;
 		animation: vsAurora 18s ease-in-out infinite alternate;
+		will-change: transform;
 	}
 
 	.vs-boot__core {
@@ -325,7 +384,6 @@
 		inset: 0;
 		background: var(--noise-texture);
 		opacity: 0.03;
-		mix-blend-mode: overlay;
 		pointer-events: none;
 	}
 
@@ -336,13 +394,12 @@
 		width: 220%;
 		height: 60%;
 		transform: translateX(-50%);
-		background: linear-gradient(
-			180deg,
+		background: radial-gradient(
+			ellipse at 50% 50%,
 			rgba(0, 229, 255, 0.12) 0%,
 			rgba(232, 74, 114, 0.06) 50%,
-			transparent 100%
+			transparent 75%
 		);
-		filter: blur(40px);
 		pointer-events: none;
 	}
 
@@ -443,29 +500,56 @@
 	}
 
 	@keyframes vsBootEnter {
-		from { opacity: 0; }
-		to   { opacity: 1; }
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
 	}
 
 	@keyframes vsCoreFloat {
-		from { opacity: 0; transform: translateY(14px) scale(0.96); }
-		to   { opacity: 1; transform: translateY(0) scale(1); }
+		from {
+			opacity: 0;
+			transform: translateY(14px) scale(0.96);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
 	}
 
 	@keyframes vsAurora {
-		0%   { transform: translate(0, 0) scale(1); }
-		50%  { transform: translate(-3%, 4%) scale(1.06); }
-		100% { transform: translate(3%, -4%) scale(1); }
+		0% {
+			transform: translate(0, 0) scale(1);
+		}
+		50% {
+			transform: translate(-3%, 4%) scale(1.06);
+		}
+		100% {
+			transform: translate(3%, -4%) scale(1);
+		}
 	}
 
 	@keyframes vsPulseSweep {
-		0%   { background-position: 0% 50%; opacity: 0.6; }
-		50%  { background-position: 100% 50%; opacity: 1; }
-		100% { background-position: 0% 50%; opacity: 0.6; }
+		0% {
+			background-position: 0% 50%;
+			opacity: 0.6;
+		}
+		50% {
+			background-position: 100% 50%;
+			opacity: 1;
+		}
+		100% {
+			background-position: 0% 50%;
+			opacity: 0.6;
+		}
 	}
 
 	@keyframes vsSpin {
-		to { transform: rotate(360deg); }
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	@media (min-width: 768px) {
@@ -477,4 +561,3 @@
 		}
 	}
 </style>
-

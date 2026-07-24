@@ -13,10 +13,12 @@ export async function logActivity(userId, actionType, entityType, entityId, meta
 		const db = getDb();
 		const metaStr = metadata ? JSON.stringify(metadata) : null;
 		// better-sqlite3 es síncrono — no usar await
-		db.prepare(`
+		db.prepare(
+			`
 			INSERT OR IGNORE INTO activity_logs (user_id, action_type, entity_type, entity_id, metadata)
 			VALUES (?, ?, ?, ?, ?)
-		`).run(userId, actionType, entityType, entityId, metaStr);
+		`
+		).run(userId, actionType, entityType, entityId, metaStr);
 	} catch (e) {
 		console.error('[activity.js] Error logging activity:', e);
 	}
@@ -44,10 +46,14 @@ export async function getActivityHistory(userId, options = {}) {
 		whereClause += " AND action_type IN ('create', 'update', 'delete')";
 	}
 
-	return db.prepare(`
+	return db
+		.prepare(
+			`
 		SELECT * FROM activity_logs
 		${whereClause}
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`).all(...params, limit, offset);
+	`
+		)
+		.all(...params, limit, offset);
 }

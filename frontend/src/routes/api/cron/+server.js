@@ -15,8 +15,12 @@ export async function GET({ request, url }) {
 	const db = getDb();
 
 	try {
-		const storiesResult = await db.prepare(`DELETE FROM stories WHERE created_at < datetime('now', '-24 hours')`).run();
-		const sessionsResult = await db.prepare(`DELETE FROM user_sessions WHERE expires_at < datetime('now')`).run();
+		const storiesResult = await db
+			.prepare(`DELETE FROM stories WHERE created_at < datetime('now', '-24 hours')`)
+			.run();
+		const sessionsResult = await db
+			.prepare(`DELETE FROM user_sessions WHERE expires_at < datetime('now')`)
+			.run();
 
 		return json({
 			success: true,

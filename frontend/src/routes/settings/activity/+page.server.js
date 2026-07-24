@@ -5,20 +5,20 @@ import { getDb } from '$lib/server/db.js';
 export async function load({ request, url }) {
 	const userId = await requireAuth(request);
 	const filter = url.searchParams.get('filter') || 'all';
-	
+
 	const logs = await getActivityHistory(userId, { limit: 50, filter });
-	
+
 	const db = getDb();
-	
+
 	// Enriquecer los logs con información de la entidad para mostrarla en la UI
-	const enrichedLogs = logs.map(log => {
+	const enrichedLogs = logs.map((log) => {
 		let entityPreview = null;
 		let metadataObj = null;
-		
+
 		try {
 			if (log.metadata) metadataObj = JSON.parse(log.metadata);
-		} catch(e) {}
-		
+		} catch (_e) {}
+
 		if (log.entity_type === 'post') {
 			if (['delete', 'update'].includes(log.action_type) && metadataObj?.previous_body) {
 				entityPreview = metadataObj.previous_body.substring(0, 100) + '...';
@@ -36,7 +36,7 @@ export async function load({ request, url }) {
 				else entityPreview = '[Comentario eliminado]';
 			}
 		}
-		
+
 		return {
 			...log,
 			entityPreview,

@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { requireAuth } from '$lib/server/auth.js';
 import { logActivity } from '$lib/server/activity.js';
-import { getDb } from '$lib/server/db.js';
 
 /**
  * POST /api/activity/view
@@ -19,7 +18,10 @@ export async function POST({ request }) {
 		const { entity_type, entity_id } = body;
 
 		if (!['reel', 'video'].includes(entity_type) || !entity_id) {
-			return json({ error: 'Solo se registran visualizaciones de multimedia (reel/video)' }, { status: 400 });
+			return json(
+				{ error: 'Solo se registran visualizaciones de multimedia (reel/video)' },
+				{ status: 400 }
+			);
 		}
 
 		// El índice único condicional (unique_multimedia_views_idx) en SQLite se encarga del anti-spam.

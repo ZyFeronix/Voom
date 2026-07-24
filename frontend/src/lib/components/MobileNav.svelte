@@ -1,45 +1,70 @@
 <script>
 	import { page } from '$app/state';
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
+	import { slide } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import { cubicOut } from 'svelte/easing';
 
-	const items = [
-		{ href: '/feed',         icon: 'home',         label: 'Inicio' },
-		{ href: '/explore',      icon: 'explore',      label: 'Explorar' },
-		{ href: '/posts/create', icon: 'post_add',     label: 'Crear',   accent: true },
-		{ href: '/reels',        icon: 'play_circle',  label: 'Reels' },
-		{ href: '/messages',     icon: 'chat_bubble',  label: 'Mensajes' },
-	];
+	const parseBool = (val) => val !== '0' && val !== false && val !== 'false';
+	const settings = $derived(page.data.globalSettings || {});
+
+	const items = $derived(
+		[
+			{ href: '/feed', icon: 'home', label: 'Inicio', show: true },
+			{ href: '/explore', icon: 'explore', label: 'Explorar', show: true },
+			{ href: '/posts/create', icon: 'post_add', label: 'Crear', accent: true, show: true },
+			{
+				href: '/reels',
+				icon: 'play_circle',
+				label: 'Reels',
+				show: parseBool(settings.reels_enabled)
+			},
+			{ href: '/messages', icon: 'chat_bubble', label: 'Mensajes', show: true }
+		].filter((i) => i.show)
+	);
 </script>
 
 <nav class="vs-mobile-nav md:hidden">
 	<div class="vs-mobile-container">
-		{#each items as item}
-			<a
-				href={item.href}
-				class="vs-mobile-item {page.url.pathname.startsWith(item.href) && !item.accent ? 'active' : ''} {item.accent ? 'accent-item' : ''}"
-				aria-label={item.label}
+		{#each items as item (item.href)}
+			<div
+				transition:slide={{ duration: 300, easing: cubicOut, axis: 'x' }}
+				animate:flip={{ duration: 300, easing: cubicOut }}
+				style="display: flex; flex: 1;"
 			>
-				{#if item.accent}
-					<div class="vs-accent-pill">
-						<span class="material-icons-round" style="font-size:26px; color:#fff">{item.icon}</span>
-					</div>
-				{:else}
-					<div class="vs-icon-wrap">
-						<span class="material-icons-round vs-mob-icon">{item.icon}</span>
-						{#if item.href === '/messages' && notificationsStore.unreadMessageCount > 0}
-							<span class="vs-mob-badge">
-								{notificationsStore.unreadMessageCount > 9 ? '9+' : notificationsStore.unreadMessageCount}
-							</span>
-						{/if}
-						{#if item.href === '/notifications' && notificationsStore.unreadCount > 0}
-							<span class="vs-mob-badge">
-								{notificationsStore.unreadCount > 9 ? '9+' : notificationsStore.unreadCount}
-							</span>
-						{/if}
-					</div>
-					<span class="vs-mob-label">{item.label}</span>
-				{/if}
-			</a>
+				<a
+					href={item.href}
+					class="vs-mobile-item {page.url.pathname.startsWith(item.href) && !item.accent
+						? 'active'
+						: ''} {item.accent ? 'accent-item' : ''}"
+					aria-label={item.label}
+				>
+					{#if item.accent}
+						<div class="vs-accent-pill">
+							<span class="material-icons-round" style="font-size:26px; color:#fff"
+								>{item.icon}</span
+							>
+						</div>
+					{:else}
+						<div class="vs-icon-wrap">
+							<span class="material-icons-round vs-mob-icon">{item.icon}</span>
+							{#if item.href === '/messages' && notificationsStore.unreadMessageCount > 0}
+								<span class="vs-mob-badge">
+									{notificationsStore.unreadMessageCount > 9
+										? '9+'
+										: notificationsStore.unreadMessageCount}
+								</span>
+							{/if}
+							{#if item.href === '/notifications' && notificationsStore.unreadCount > 0}
+								<span class="vs-mob-badge">
+									{notificationsStore.unreadCount > 9 ? '9+' : notificationsStore.unreadCount}
+								</span>
+							{/if}
+						</div>
+						<span class="vs-mob-label">{item.label}</span>
+					{/if}
+				</a>
+			</div>
 		{/each}
 	</div>
 </nav>
@@ -48,7 +73,9 @@
 	/* ─── Container ─────────────────────────────── */
 	.vs-mobile-nav {
 		position: fixed;
-		bottom: 0; left: 0; right: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
 		z-index: var(--z-sticky, 200);
 		padding: 8px 12px 20px;
 	}
@@ -81,7 +108,10 @@
 		border-radius: 16px;
 		color: var(--text-muted);
 		text-decoration: none;
-		transition: color var(--t-base), background var(--t-base), transform var(--t-spring);
+		transition:
+			color var(--t-base),
+			background var(--t-base),
+			transform var(--t-spring);
 		flex: 1;
 		min-width: 0;
 		position: relative;
@@ -110,7 +140,7 @@
 
 	.vs-mobile-item:hover .vs-mob-icon,
 	.vs-mobile-item.active .vs-mob-icon {
-		transform: translateY(-2px) scale(1.10);
+		transform: translateY(-2px) scale(1.1);
 	}
 
 	/* Active indicator dot */
@@ -118,10 +148,11 @@
 		content: '';
 		position: absolute;
 		bottom: -2px;
-		width: 4px; height: 4px;
+		width: 4px;
+		height: 4px;
 		border-radius: 50%;
 		background: var(--aero-blue);
-		box-shadow: 0 0 6px rgba(46,134,232,0.50);
+		box-shadow: 0 0 6px rgba(46, 134, 232, 0.5);
 	}
 
 	.vs-mob-label {
@@ -134,19 +165,21 @@
 	/* ─── Notification badge ─────────────────────── */
 	.vs-mob-badge {
 		position: absolute;
-		top: -5px; right: -7px;
+		top: -5px;
+		right: -7px;
 		background: var(--aero-rose);
 		color: #fff;
 		font-size: 8px;
 		font-weight: 700;
-		min-width: 14px; height: 14px;
+		min-width: 14px;
+		height: 14px;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 0 2px;
 		border: 2px solid var(--bg-canvas);
-		box-shadow: 0 2px 6px rgba(232,74,114,0.40);
+		box-shadow: 0 2px 6px rgba(232, 74, 114, 0.4);
 	}
 
 	/* ─── Accent (Create) button ─────────────────── */
@@ -157,7 +190,8 @@
 	}
 
 	.vs-accent-pill {
-		width: 52px; height: 52px;
+		width: 52px;
+		height: 52px;
 		border-radius: 50%;
 		background: var(--grad-primary);
 		display: flex;
@@ -165,28 +199,39 @@
 		justify-content: center;
 		margin-top: -24px;
 		border: none;
-		box-shadow: 0 4px 16px rgba(46,134,232,0.4), inset 0 1px 2px rgba(255,255,255,0.4);
-		transition: transform var(--t-spring), box-shadow var(--t-base);
+		box-shadow:
+			0 4px 16px rgba(46, 134, 232, 0.4),
+			inset 0 1px 2px rgba(255, 255, 255, 0.4);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-base);
 		position: relative;
 		z-index: 10;
 	}
 	.vs-accent-pill::before {
 		content: '';
 		position: absolute;
-		top: 0; left: 0; right: 0;
+		top: 0;
+		left: 0;
+		right: 0;
 		height: 45%;
-		background: linear-gradient(180deg, rgba(255,255,255,0.20) 0%, transparent 100%);
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
 		border-radius: 50% 50% 0 0;
 		pointer-events: none;
 	}
 
 	.accent-item:hover .vs-accent-pill {
 		transform: translateY(-5px) scale(1.06);
-		box-shadow: 0 12px 28px rgba(46,134,232,0.46), inset 0 1px 0 rgba(255,255,255,0.40);
+		box-shadow:
+			0 12px 28px rgba(46, 134, 232, 0.46),
+			inset 0 1px 0 rgba(255, 255, 255, 0.4);
 	}
 
 	/* ─── Dark mode refinements ──────────────────── */
-	:global([data-theme="dark"]) .vs-mobile-container {
-		box-shadow: 0 -2px 20px rgba(0,0,0,0.30), var(--shadow-lg), var(--glass-inset);
+	:global([data-theme='dark']) .vs-mobile-container {
+		box-shadow:
+			0 -2px 20px rgba(0, 0, 0, 0.3),
+			var(--shadow-lg),
+			var(--glass-inset);
 	}
 </style>

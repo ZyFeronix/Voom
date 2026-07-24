@@ -4,26 +4,73 @@
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
+	import { slide } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+	import { cubicOut } from 'svelte/easing';
 
-	const navItems = [
-		{ href: '/feed',          icon: 'home',           label: 'Inicio' },
-		{ href: '/explore',       icon: 'explore',        label: 'Explorar' },
-		{ href: '/reels',         icon: 'play_circle',    label: 'Reels' },
-		{ href: '/marketplace',   icon: 'storefront',     label: 'Marketplace' },
-		{ href: '/leaderboard',   icon: 'emoji_events',   label: 'Ranking' },
-		{ href: '/messages',      icon: 'chat_bubble',    label: 'Mensajes', badge: () => notificationsStore.unreadMessageCount },
-		{ href: '/notifications', icon: 'notifications',  label: 'Notificaciones', badge: () => notificationsStore.unreadCount },
-	];
+	const parseBool = (val) => val !== '0' && val !== false && val !== 'false';
+	const settings = $derived(page.data.globalSettings || {});
 
-	const creatorItems = [
-		{ href: '/stories/create', icon: 'auto_stories', label: 'Nueva Historia' },
-		{ href: '/posts/create',   icon: 'post_add',  label: 'Nuevo Post' },
-		{ href: '/reels/create',   icon: 'video_call',   label: 'Nuevo Reel' },
-	];
+	const navItems = $derived(
+		[
+			{ href: '/feed', icon: 'home', label: 'Inicio', show: true },
+			{ href: '/explore', icon: 'explore', label: 'Explorar', show: true },
+			{
+				href: '/reels',
+				icon: 'play_circle',
+				label: 'Reels',
+				show: parseBool(settings.reels_enabled)
+			},
+			{
+				href: '/marketplace',
+				icon: 'storefront',
+				label: 'Marketplace',
+				show: parseBool(settings.marketplace_enabled)
+			},
+			{
+				href: '/leaderboard',
+				icon: 'emoji_events',
+				label: 'Ranking',
+				show: parseBool(settings.gamification_enabled)
+			},
+			{
+				href: '/messages',
+				icon: 'chat_bubble',
+				label: 'Mensajes',
+				show: true,
+				badge: () => notificationsStore.unreadMessageCount
+			},
+			{
+				href: '/notifications',
+				icon: 'notifications',
+				label: 'Notificaciones',
+				show: true,
+				badge: () => notificationsStore.unreadCount
+			}
+		].filter((i) => i.show)
+	);
+
+	const creatorItems = $derived(
+		[
+			{
+				href: '/stories/create',
+				icon: 'auto_stories',
+				label: 'Nueva Historia',
+				show: parseBool(settings.stories_enabled)
+			},
+			{ href: '/posts/create', icon: 'post_add', label: 'Nuevo Post', show: true },
+			{
+				href: '/reels/create',
+				icon: 'video_call',
+				label: 'Nuevo Reel',
+				show: parseBool(settings.reels_enabled)
+			}
+		].filter((i) => i.show)
+	);
 
 	const bottomItems = [
-		{ href: `/u/${authStore.user?.username}`, icon: 'person',   label: 'Mi Perfil' },
-		{ href: '/settings',                      icon: 'settings', label: 'Ajustes' },
+		{ href: `/u/${authStore.user?.username}`, icon: 'person', label: 'Mi Perfil' },
+		{ href: '/settings', icon: 'settings', label: 'Ajustes' }
 	];
 
 	async function handleLogout() {
@@ -47,28 +94,32 @@
 			<span class="vs-logo-text">VSocial</span>
 		</a>
 		<button onclick={() => uiStore.toggleSidebar()} class="vs-collapse-btn" title="Alternar menú">
-			<span class="material-icons-round" style="font-size: 20px;">{uiStore.sidebarExpanded ? 'menu_open' : 'menu'}</span>
+			<span class="material-icons-round" style="font-size: 20px;"
+				>{uiStore.sidebarExpanded ? 'menu_open' : 'menu'}</span
+			>
 		</button>
 	</div>
 
 	<!-- Main navigation -->
 	<div class="vs-nav-section">
-		{#each navItems as item}
-			<a
-				href={item.href}
-				class="vs-nav-link {isActiveNav(item.href) ? 'active' : ''}"
+		{#each navItems as item (item.href)}
+			<div
+				transition:slide={{ duration: 300, easing: cubicOut }}
+				animate:flip={{ duration: 300, easing: cubicOut }}
 			>
-				<span class="vs-nav-icon-wrapper">
-					<span class="material-icons-round vs-nav-icon">{item.icon}</span>
-					{#if item.badge && item.badge() > 0}
-						<span class="vs-badge">{item.badge() > 99 ? '+99' : item.badge()}</span>
+				<a href={item.href} class="vs-nav-link {isActiveNav(item.href) ? 'active' : ''}">
+					<span class="vs-nav-icon-wrapper">
+						<span class="material-icons-round vs-nav-icon">{item.icon}</span>
+						{#if item.badge && item.badge() > 0}
+							<span class="vs-badge">{item.badge() > 99 ? '+99' : item.badge()}</span>
+						{/if}
+					</span>
+					<span class="vs-nav-label">{item.label}</span>
+					{#if isActiveNav(item.href)}
+						<span class="vs-active-pip"></span>
 					{/if}
-				</span>
-				<span class="vs-nav-label">{item.label}</span>
-				{#if isActiveNav(item.href)}
-					<span class="vs-active-pip"></span>
-				{/if}
-			</a>
+				</a>
+			</div>
 		{/each}
 	</div>
 
@@ -76,14 +127,19 @@
 	<div class="vs-nav-group">
 		<p class="vs-section-title">Crear</p>
 		<div class="vs-nav-section">
-			{#each creatorItems as item}
-				<a
-					href={item.href}
-					class="vs-nav-link creator {page.url.pathname === item.href ? 'active' : ''}"
+			{#each creatorItems as item (item.href)}
+				<div
+					transition:slide={{ duration: 300, easing: cubicOut }}
+					animate:flip={{ duration: 300, easing: cubicOut }}
 				>
-					<span class="material-icons-round vs-nav-icon">{item.icon}</span>
-					<span class="vs-nav-label">{item.label}</span>
-				</a>
+					<a
+						href={item.href}
+						class="vs-nav-link creator {page.url.pathname === item.href ? 'active' : ''}"
+					>
+						<span class="material-icons-round vs-nav-icon">{item.icon}</span>
+						<span class="vs-nav-label">{item.label}</span>
+					</a>
+				</div>
 			{/each}
 		</div>
 	</div>
@@ -92,7 +148,10 @@
 	{#if authStore.isAdmin}
 		<div class="vs-nav-group">
 			<p class="vs-section-title">Admin</p>
-			<a href="/admin" class="vs-nav-link admin {page.url.pathname.startsWith('/admin') ? 'active' : ''}">
+			<a
+				href="/admin"
+				class="vs-nav-link admin {page.url.pathname.startsWith('/admin') ? 'active' : ''}"
+			>
 				<span class="material-icons-round vs-nav-icon">admin_panel_settings</span>
 				<span class="vs-nav-label">Panel Admin</span>
 			</a>
@@ -105,10 +164,7 @@
 	<!-- Bottom section -->
 	<div class="vs-bottom-section">
 		{#each bottomItems as item}
-			<a
-				href={item.href}
-				class="vs-nav-link {page.url.pathname === item.href ? 'active' : ''}"
-			>
+			<a href={item.href} class="vs-nav-link {page.url.pathname === item.href ? 'active' : ''}">
 				<span class="material-icons-round vs-nav-icon">{item.icon}</span>
 				<span class="vs-nav-label">{item.label}</span>
 			</a>
@@ -119,7 +175,14 @@
 			<div class="vs-user-card">
 				<div class="vs-user-avatar">
 					{#if authStore.user.avatar_url}
-						<img src={authStore.user.avatar_url} alt={authStore.user.username} />
+						<img
+							src={authStore.user.avatar_url}
+							alt={authStore.user.username}
+							width="32"
+							height="32"
+							loading="lazy"
+							decoding="async"
+						/>
 					{:else}
 						<span class="vs-avatar-letter">
 							{(authStore.user.display_name || authStore.user.username || '?')[0].toUpperCase()}
@@ -155,7 +218,7 @@
 		will-change: transform;
 		transform: translateZ(0);
 		border-right: 1px solid var(--glass-border-t);
-		box-shadow: 2px 0 20px rgba(46,134,232,0.06);
+		box-shadow: 2px 0 20px rgba(46, 134, 232, 0.06);
 
 		overflow-y: auto;
 		scrollbar-width: none; /* Firefox */
@@ -192,7 +255,9 @@
 		transition: opacity var(--t-base);
 		overflow: hidden;
 	}
-	.vs-logo-link:hover { opacity: 0.85; }
+	.vs-logo-link:hover {
+		opacity: 0.85;
+	}
 
 	.vs-collapse-btn {
 		background: transparent;
@@ -205,7 +270,9 @@
 		width: 32px;
 		height: 32px;
 		border-radius: 8px;
-		transition: background var(--t-base), color var(--t-base);
+		transition:
+			background var(--t-base),
+			color var(--t-base);
 	}
 	.vs-collapse-btn:hover {
 		background: var(--bg-surface-hover);
@@ -213,19 +280,26 @@
 	}
 
 	.vs-logo-box {
-		width: 34px; height: 34px;
+		width: 34px;
+		height: 34px;
 		border-radius: 10px;
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 4px 12px rgba(46,134,232,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
-		transition: transform var(--t-spring), box-shadow var(--t-base);
+		box-shadow:
+			0 4px 12px rgba(46, 134, 232, 0.35),
+			inset 0 1px 0 rgba(255, 255, 255, 0.35);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-base);
 		flex-shrink: 0;
 	}
 	.vs-logo-link:hover .vs-logo-box {
 		transform: scale(1.08) rotate(4deg);
-		box-shadow: 0 6px 18px rgba(46,134,232,0.45), inset 0 1px 0 rgba(255,255,255,0.40);
+		box-shadow:
+			0 6px 18px rgba(46, 134, 232, 0.45),
+			inset 0 1px 0 rgba(255, 255, 255, 0.4);
 	}
 
 	.vs-logo-text {
@@ -256,7 +330,13 @@
 		text-decoration: none;
 		font-weight: 500;
 		font-size: 0.9rem;
-		transition: background var(--t-base), color var(--t-base), transform var(--t-spring), box-shadow var(--t-base), gap var(--t-spring), padding var(--t-spring);
+		transition:
+			background var(--t-base),
+			color var(--t-base),
+			transform var(--t-spring),
+			box-shadow var(--t-base),
+			gap var(--t-spring),
+			padding var(--t-spring);
 		border: 1px solid transparent;
 		position: relative;
 	}
@@ -273,21 +353,23 @@
 		font-size: 20px;
 		transition: transform var(--t-spring);
 	}
-	
+
 	.vs-badge {
 		position: absolute;
 		top: -5px;
 		right: -10px;
 		background: #ef4444; /* aero-rose or red */
 		color: #fff;
-		font-size: 0.60rem;
+		font-size: 0.6rem;
 		font-weight: 800;
 		font-family: var(--font-sans);
 		padding: 2px 4px;
 		min-width: 16px;
 		text-align: center;
 		border-radius: 9px;
-		box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4), 0 0 0 2px var(--bg-sidebar);
+		box-shadow:
+			0 2px 4px rgba(239, 68, 68, 0.4),
+			0 0 0 2px var(--bg-sidebar);
 		z-index: 2;
 		pointer-events: none;
 		line-height: 1;
@@ -295,13 +377,15 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.vs-nav-label { 
-		flex: 1; 
-		white-space: nowrap; 
-		overflow: hidden; 
+	.vs-nav-label {
+		flex: 1;
+		white-space: nowrap;
+		overflow: hidden;
 		max-width: 200px;
 		opacity: 1;
-		transition: max-width var(--t-spring), opacity var(--t-fast);
+		transition:
+			max-width var(--t-spring),
+			opacity var(--t-fast);
 	}
 
 	.vs-nav-link:hover {
@@ -317,8 +401,10 @@
 	.vs-nav-link.active {
 		background: var(--grad-primary);
 		color: #fff;
-		border-color: rgba(255,255,255,0.20);
-		box-shadow: 0 4px 14px rgba(46,134,232,0.28), var(--glass-inset);
+		border-color: rgba(255, 255, 255, 0.2);
+		box-shadow:
+			0 4px 14px rgba(46, 134, 232, 0.28),
+			var(--glass-inset);
 		font-weight: 600;
 	}
 	.vs-nav-link.active .vs-nav-icon {
@@ -328,9 +414,11 @@
 	.vs-nav-link.active::before {
 		content: '';
 		position: absolute;
-		top: 0; left: 0; right: 0;
+		top: 0;
+		left: 0;
+		right: 0;
 		height: 45%;
-		background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 100%);
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 100%);
 		border-radius: var(--radius-md) var(--radius-md) 0 0;
 		pointer-events: none;
 	}
@@ -338,25 +426,31 @@
 	/* Creator links get a mint tint on hover */
 	.vs-nav-link.creator:hover {
 		color: var(--aero-mint);
-		background: rgba(61,199,154,0.08);
-		border-color: rgba(61,199,154,0.18);
+		background: rgba(61, 199, 154, 0.08);
+		border-color: rgba(61, 199, 154, 0.18);
 	}
-	.vs-nav-link.admin:hover, .vs-nav-link.admin.active {
-		background: linear-gradient(145deg, var(--aero-amber), hsl(38,80%,48%));
+	.vs-nav-link.admin:hover,
+	.vs-nav-link.admin.active {
+		background: linear-gradient(145deg, var(--aero-amber), hsl(38, 80%, 48%));
 		color: #fff;
 		border-color: rgba(255, 193, 7, 0.4);
-		box-shadow: 0 4px 14px rgba(255, 193, 7, 0.25), var(--glass-inset);
+		box-shadow:
+			0 4px 14px rgba(255, 193, 7, 0.25),
+			var(--glass-inset);
 	}
 
 	.vs-active-pip {
-		width: 6px; height: 6px;
+		width: 6px;
+		height: 6px;
 		border-radius: 50%;
-		background: rgba(255,255,255,0.75);
+		background: rgba(255, 255, 255, 0.75);
 		flex-shrink: 0;
 	}
 
 	/* ─── Groups ────────────────────────────────── */
-	.vs-nav-group { margin-top: 14px; }
+	.vs-nav-group {
+		margin-top: 14px;
+	}
 
 	.vs-section-title {
 		font-size: 0.75rem;
@@ -369,7 +463,10 @@
 		white-space: nowrap;
 		overflow: hidden;
 		max-height: 20px;
-		transition: max-height var(--t-spring), opacity var(--t-fast), margin var(--t-spring);
+		transition:
+			max-height var(--t-spring),
+			opacity var(--t-fast),
+			margin var(--t-spring);
 	}
 
 	/* ─── Bottom ────────────────────────────────── */
@@ -401,13 +498,15 @@
 		flex-shrink: 0;
 	}
 	.vs-user-avatar img {
-		width: 32px; height: 32px;
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		object-fit: cover;
-		border: 2px solid rgba(255,255,255,0.7);
+		border: 2px solid rgba(255, 255, 255, 0.7);
 	}
 	.vs-avatar-letter {
-		width: 32px; height: 32px;
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		background: var(--grad-primary);
 		display: flex;
@@ -416,19 +515,24 @@
 		color: #fff;
 		font-weight: 700;
 		font-size: 0.82rem;
-		border: 2px solid rgba(255,255,255,0.5);
+		border: 2px solid rgba(255, 255, 255, 0.5);
 	}
 	.vs-online-dot {
 		position: absolute;
-		bottom: 0; right: -1px;
-		width: 9px; height: 9px;
+		bottom: 0;
+		right: -1px;
+		width: 9px;
+		height: 9px;
 		border-radius: 50%;
 		background: var(--aero-mint);
 		border: 2px solid var(--bg-surface);
-		box-shadow: 0 0 6px rgba(61,199,154,0.5);
+		box-shadow: 0 0 6px rgba(61, 199, 154, 0.5);
 	}
 
-	.vs-user-info { flex: 1; min-width: 0; }
+	.vs-user-info {
+		flex: 1;
+		min-width: 0;
+	}
 	.vs-user-name {
 		font-size: 0.82rem;
 		font-weight: 600;
@@ -438,7 +542,7 @@
 		text-overflow: ellipsis;
 	}
 	.vs-user-handle {
-		font-size: 0.70rem;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -449,20 +553,24 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 30px; height: 30px;
+		width: 30px;
+		height: 30px;
 		border-radius: var(--radius-sm);
-		background: rgba(232,74,114,0.10);
-		border: 1px solid rgba(232,74,114,0.18);
+		background: rgba(232, 74, 114, 0.1);
+		border: 1px solid rgba(232, 74, 114, 0.18);
 		color: var(--aero-rose);
 		cursor: pointer;
 		flex-shrink: 0;
-		transition: background var(--t-base), box-shadow var(--t-base), transform var(--t-spring);
+		transition:
+			background var(--t-base),
+			box-shadow var(--t-base),
+			transform var(--t-spring);
 	}
 	.vs-logout-btn:hover {
 		background: var(--aero-rose);
 		color: #fff;
 		transform: scale(1.06);
-		box-shadow: 0 4px 12px rgba(232,74,114,0.30);
+		box-shadow: 0 4px 12px rgba(232, 74, 114, 0.3);
 	}
 	/* ─── Collapsed State ───────────────────────── */
 	:global(.vs-shell--collapsed) .vs-nav-label,
@@ -476,7 +584,7 @@
 		pointer-events: none;
 		display: none;
 	}
-	
+
 	:global(.vs-shell--collapsed) .vs-section-title {
 		max-height: 0;
 		opacity: 0;
@@ -507,5 +615,14 @@
 		justify-content: center;
 		padding: 12px 0;
 		gap: 0;
+	}
+
+	/* Móvil: el sidenav es chrome sticky con blur(24px) saturate(1.5) que repinta en cada
+	   scroll. Se reduce a blur(8px) solo en ≤768px; desktop idéntico. */
+	@media (max-width: 768px) {
+		.vs-sidenav {
+			backdrop-filter: blur(8px);
+			-webkit-backdrop-filter: blur(8px);
+		}
 	}
 </style>

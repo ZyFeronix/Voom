@@ -1,5 +1,5 @@
 /**
- * Auth Store  Emanages authentication state
+ * Auth Store — Manages authentication state
  * Uses Svelte 5 runes for reactivity
  */
 
@@ -20,111 +20,127 @@ const isModerator = $derived(_user?.role === 'moderator' || isAdmin);
  * Initialize auth from localStorage (called on app boot).
  */
 async function initialize() {
-  if (_initialized) return;
-  _initialized = true;
-  _loading = true;
+	if (_initialized) return;
+	_initialized = true;
+	_loading = true;
 
-  try {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('vsocial_token');
-      if (stored) {
-        _token = stored;
-        document.cookie = `vsocial_token=${stored}; path=/; max-age=31536000; SameSite=Strict`;
-        const { user } = await authApi.me();
-        _user = user;
-      }
-    }
-  } catch (err) {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('vsocial_token');
-      document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict';
-    }
-    _token = null;
-    _user = null;
-  } finally {
-    _loading = false;
-  }
+	try {
+		if (typeof localStorage !== 'undefined') {
+			const stored = localStorage.getItem('vsocial_token');
+			if (stored) {
+				_token = stored;
+				document.cookie = `vsocial_token=${stored}; path=/; max-age=31536000; SameSite=Strict; Secure`;
+				const { user } = await authApi.me();
+				_user = user;
+			}
+		}
+	} catch (_err) {
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem('vsocial_token');
+			document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict; Secure';
+		}
+		_token = null;
+		_user = null;
+	} finally {
+		_loading = false;
+	}
 }
 
 /**
  * Login with username/email + password.
  */
 async function login(loginId, password) {
-  const { token, user } = await authApi.login({ login: loginId, password });
-  _token = token;
-  _user = user;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('vsocial_token', token);
-    document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict`;
-  }
-  return user;
+	const { token, user } = await authApi.login({ login: loginId, password });
+	_token = token;
+	_user = user;
+	if (typeof localStorage !== 'undefined') {
+		localStorage.setItem('vsocial_token', token);
+		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
+	}
+	return user;
 }
 
 /**
  * Register new account.
  */
 async function register(data) {
-  const { token, user } = await authApi.register(data);
-  _token = token;
-  _user = user;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('vsocial_token', token);
-    document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict`;
-  }
-  return user;
+	const { token, user } = await authApi.register(data);
+	_token = token;
+	_user = user;
+	if (typeof localStorage !== 'undefined') {
+		localStorage.setItem('vsocial_token', token);
+		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
+	}
+	return user;
 }
 
 /**
  * Logout current user.
  */
 async function logout() {
-  try { await authApi.logout(); } catch (_) {}
-  _token = null;
-  _user = null;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem('vsocial_token');
-    document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict';
-  }
+	try {
+		await authApi.logout();
+	} catch (_) {}
+	_token = null;
+	_user = null;
+	if (typeof localStorage !== 'undefined') {
+		localStorage.removeItem('vsocial_token');
+		document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict; Secure';
+	}
 }
 
 /**
  * Update user data in store (e.g. after profile edit).
  */
 function updateUser(data) {
-  if (_user) {
-    _user = { ..._user, ...data };
-  }
+	if (_user) {
+		_user = { ..._user, ...data };
+	}
 }
 
 /**
  * Refresh user data from API.
  */
 async function refresh() {
-  try {
-    const { user } = await authApi.me();
-    _user = user;
-    return user;
-  } catch (err) {
-    if (err.status === 401) {
-      logout();
-    }
-    throw err;
-  }
+	try {
+		const { user } = await authApi.me();
+		_user = user;
+		return user;
+	} catch (err) {
+		if (err.status === 401) {
+			logout();
+		}
+		throw err;
+	}
 }
 
 // Export reactive getters and actions
 export const authStore = {
-  get user() { return _user; },
-  get token() { return _token; },
-  get loading() { return _loading; },
-  get initialized() { return _initialized; },
-  get isAuthenticated() { return isAuthenticated; },
-  get isAdmin() { return isAdmin; },
-  get isModerator() { return isModerator; },
-  initialize,
-  login,
-  register,
-  logout,
-  updateUser,
-  refresh
+	get user() {
+		return _user;
+	},
+	get token() {
+		return _token;
+	},
+	get loading() {
+		return _loading;
+	},
+	get initialized() {
+		return _initialized;
+	},
+	get isAuthenticated() {
+		return isAuthenticated;
+	},
+	get isAdmin() {
+		return isAdmin;
+	},
+	get isModerator() {
+		return isModerator;
+	},
+	initialize,
+	login,
+	register,
+	logout,
+	updateUser,
+	refresh
 };

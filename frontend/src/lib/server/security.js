@@ -7,7 +7,7 @@ import { error } from '@sveltejs/kit';
 // Simple in-memory rate limiter
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 100; // per window
+const MAX_REQUESTS = 1000; // per window
 
 export function checkRateLimit(ident) {
 	const now = Date.now();

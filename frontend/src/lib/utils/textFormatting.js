@@ -16,7 +16,7 @@ export function escapeHtml(unsafe) {
  * Formats text for display in posts, comments, bios, etc.
  * - Escapes HTML (XSS protection)
  * - Wraps #hashtags in styled anchor links pointing to /explore
- * 
+ *
  * Safe to use with {@html} after this function.
  */
 export function formatHashtags(text) {

@@ -1,11 +1,11 @@
 import { createClient } from '@libsql/client';
 
 const client = createClient({
-  url: 'file:d:/Vsocial/database.sqlite'
+	url: 'file:d:/Vsocial/database.sqlite'
 });
 
 async function run() {
-  await client.execute(`
+	await client.execute(`
     CREATE TABLE IF NOT EXISTS profile_customizations (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         primary_color VARCHAR(20),
@@ -20,7 +20,7 @@ async function run() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  console.log("Table profile_customizations created.");
+	console.log('Table profile_customizations created.');
 }
 
 run();

@@ -75,18 +75,18 @@ const normTarget1 = norm(target1);
 const normTarget2 = norm(target2);
 
 if (content.includes(normTarget1)) {
-    content = content.replace(normTarget1, replacement1);
-    console.log("Replaced startStoryTimer");
+	content = content.replace(normTarget1, replacement1);
+	console.log('Replaced startStoryTimer');
 } else {
-    console.log("Could not find target1");
+	console.log('Could not find target1');
 }
 
 if (content.includes(normTarget2)) {
-    content = content.replace(normTarget2, replacement2);
-    console.log("Replaced media-player");
+	content = content.replace(normTarget2, replacement2);
+	console.log('Replaced media-player');
 } else {
-    console.log("Could not find target2");
+	console.log('Could not find target2');
 }
 
 fs.writeFileSync(path, content, 'utf8');
-console.log("Done");
+console.log('Done');

@@ -13,12 +13,15 @@ export async function initTransporter() {
 	if (!host) return null;
 
 	const nodemailer = await import('nodemailer');
-	const port = parseInt(db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_port'").get()?.value || '587');
+	const port = parseInt(
+		db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_port'").get()?.value || '587'
+	);
 	const user = db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_user'").get()?.value;
 	const pass = db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_pass'").get()?.value;
 
 	transporter = nodemailer.default.createTransport({
-		host, port,
+		host,
+		port,
 		secure: port === 465,
 		auth: user && pass ? { user, pass } : undefined
 	});
@@ -33,8 +36,12 @@ export function createEmailToken(userId, type = 'verify') {
 	const db = getDb();
 	const token = generateToken();
 	const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-	db.prepare('INSERT INTO email_tokens (user_id, token, type, expires_at) VALUES (?, ?, ?, ?)')
-		.run(userId, token, type, expiresAt);
+	db.prepare('INSERT INTO email_tokens (user_id, token, type, expires_at) VALUES (?, ?, ?, ?)').run(
+		userId,
+		token,
+		type,
+		expiresAt
+	);
 	return token;
 }
 
@@ -87,9 +94,14 @@ ${endStyle}`;
 
 export async function sendEmail(to, subject, html) {
 	const t = await initTransporter();
-	if (!t) { console.warn('[email] No SMTP configured, skipping send to', to); return false; }
+	if (!t) {
+		console.warn('[email] No SMTP configured, skipping send to', to);
+		return false;
+	}
 	const db = getDb();
-	const from = db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_from'").get()?.value || 'noreply@vsocial.app';
+	const from =
+		db.prepare("SELECT value FROM system_settings WHERE key = 'smtp_from'").get()?.value ||
+		'noreply@vsocial.app';
 	try {
 		await t.sendMail({ from, to, subject, html });
 		return true;

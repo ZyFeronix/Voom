@@ -1,8 +1,7 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
-	import { themeStore, toggleTheme } from '$lib/stores/theme.svelte.js';
+	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 
@@ -22,11 +21,13 @@
 			clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(async () => {
 				try {
-					const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery.trim())}&limit=4`);
+					const res = await fetch(
+						`/api/search?q=${encodeURIComponent(searchQuery.trim())}&limit=4`
+					);
 					if (res.ok) {
 						searchResults = await res.json();
 					}
-				} catch (e) {
+				} catch (_e) {
 				} finally {
 					isSearching = false;
 				}
@@ -34,19 +35,19 @@
 		} else {
 			searchResults = { users: [], posts: [] };
 		}
-		
+
 		return () => clearTimeout(debounceTimer);
 	});
 
 	function saveToRecent(item) {
 		const isString = typeof item === 'string';
-		const itemId = isString ? item : (item.type === 'user' ? item.username : item.id);
-		
-		recentSearches = recentSearches.filter(s => {
-			const sId = typeof s === 'string' ? s : (s.type === 'user' ? s.username : s.id);
+		const itemId = isString ? item : item.type === 'user' ? item.username : item.id;
+
+		recentSearches = recentSearches.filter((s) => {
+			const sId = typeof s === 'string' ? s : s.type === 'user' ? s.username : s.id;
 			return sId !== itemId;
 		});
-		
+
 		recentSearches = [item, ...recentSearches].slice(0, 10);
 		localStorage.setItem('vs_recent_searches', JSON.stringify(recentSearches));
 	}
@@ -55,7 +56,7 @@
 		if (e.key === 'Enter' && searchQuery.trim()) {
 			const term = searchQuery.trim();
 			saveToRecent(term);
-			
+
 			goto(`/explore?q=${encodeURIComponent(term)}`);
 			searchFocused = false;
 			e.target.blur();
@@ -80,13 +81,13 @@
 	function triggerSearch(term) {
 		saveToRecent(term);
 		searchQuery = typeof term === 'string' ? term : '';
-		
+
 		if (typeof term === 'string') {
 			goto(`/explore?q=${encodeURIComponent(term)}`);
 		} else if (term.type === 'user') {
 			goto(`/u/${term.username}`);
 		}
-		
+
 		searchFocused = false;
 	}
 
@@ -94,15 +95,11 @@
 		dropdownOpen = !dropdownOpen;
 	}
 
-	function closeDropdown() {
-		dropdownOpen = false;
-	}
-
 	onMount(() => {
 		try {
 			const saved = localStorage.getItem('vs_recent_searches');
 			if (saved) recentSearches = JSON.parse(saved);
-		} catch(e) {}
+		} catch (_e) {}
 
 		function handleClickOutside(e) {
 			if (dropdownRef && !dropdownRef.contains(e.target)) {
@@ -127,16 +124,16 @@
 				id="global_search_input"
 				name="global_search_input"
 				bind:value={searchQuery}
-				onfocus={() => searchFocused = true}
+				onfocus={() => (searchFocused = true)}
 				onkeydown={handleSearch}
-				placeholder={searchFocused ? "Buscar" : "Buscar creadores, posts…"}
+				placeholder={searchFocused ? 'Buscar' : 'Buscar creadores, posts…'}
 				class="vs-search-input"
 				autocomplete="off"
 			/>
 		</div>
 
 		{#if searchFocused}
-			<div class="vs-search-dropdown glass-panel" transition:fly={{y: -10, duration: 250}}>
+			<div class="vs-search-dropdown glass-panel" transition:fly={{ y: -10, duration: 250 }}>
 				{#if searchQuery.trim().length > 1}
 					{#if isSearching}
 						<div class="vs-search-empty">Buscando...</div>
@@ -147,11 +144,28 @@
 							<div class="vs-search-recent-header"><span>Personas</span></div>
 							<div class="vs-search-recent-list">
 								{#each searchResults.users as user}
-									<a href={`/u/${user.username}`} class="vs-search-recent-item" onclick={() => { saveToRecent({ type: 'user', ...user }); searchFocused = false; }}>
+									<a
+										href={`/u/${user.username}`}
+										class="vs-search-recent-item"
+										onclick={() => {
+											saveToRecent({ type: 'user', ...user });
+											searchFocused = false;
+										}}
+									>
 										{#if user.avatar_url}
-											<img src={user.avatar_url} alt={user.username} style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);" />
+											<img
+												src={user.avatar_url}
+												alt={user.username}
+												style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
+												width="36"
+												height="36"
+												loading="lazy"
+												decoding="async"
+											/>
 										{:else}
-											<div style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);">
+											<div
+												style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
+											>
 												{(user.display_name || user.username)[0].toUpperCase()}
 											</div>
 										{/if}
@@ -164,12 +178,27 @@
 							</div>
 						{/if}
 						{#if searchResults?.posts && searchResults.posts.length > 0}
-							<div class="vs-search-recent-header" style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 12px;"><span>Publicaciones</span></div>
+							<div
+								class="vs-search-recent-header"
+								style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 12px;"
+							>
+								<span>Publicaciones</span>
+							</div>
 							<div class="vs-search-recent-list">
 								{#each searchResults.posts as post}
-									<a href={`/post/${post.id}`} class="vs-search-recent-item" onclick={() => searchFocused = false}>
-										<span class="material-icons-round text-muted" style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: 50%;">article</span>
-										<span class="vs-search-item-text">{post.body.substring(0, 50)}{post.body.length > 50 ? '...' : ''}</span>
+									<a
+										href={`/post/${post.id}`}
+										class="vs-search-recent-item"
+										onclick={() => (searchFocused = false)}
+									>
+										<span
+											class="material-icons-round text-muted"
+											style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: 50%;"
+											>article</span
+										>
+										<span class="vs-search-item-text"
+											>{post.body.substring(0, 50)}{post.body.length > 50 ? '...' : ''}</span
+										>
 									</a>
 								{/each}
 							</div>
@@ -181,9 +210,7 @@
 						</div>
 					{/if}
 				{:else if recentSearches.length === 0}
-					<div class="vs-search-empty">
-						Prueba a buscar personas, listas o palabras clave
-					</div>
+					<div class="vs-search-empty">Prueba a buscar personas, listas o palabras clave</div>
 				{:else}
 					<div class="vs-search-recent-header">
 						<span>Recientes</span>
@@ -192,19 +219,49 @@
 					<div class="vs-search-recent-list">
 						{#each recentSearches as item, idx}
 							{#if typeof item === 'string'}
-								<div class="vs-search-recent-item" role="button" tabindex="0" onclick={() => triggerSearch(item)} onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}>
-									<span class="material-icons-round text-muted" style="font-size: 18px; margin-right: 12px;">search</span>
+								<div
+									class="vs-search-recent-item"
+									role="button"
+									tabindex="0"
+									onclick={() => triggerSearch(item)}
+									onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
+								>
+									<span
+										class="material-icons-round text-muted"
+										style="font-size: 18px; margin-right: 12px;">search</span
+									>
 									<span class="vs-search-item-text">{item}</span>
-									<button class="vs-search-item-remove" onclick={(e) => removeRecent(idx, e)} title="Eliminar de recientes">
+									<button
+										class="vs-search-item-remove"
+										onclick={(e) => removeRecent(idx, e)}
+										title="Eliminar de recientes"
+									>
 										<span class="material-icons-round" style="font-size: 16px;">close</span>
 									</button>
 								</div>
 							{:else if item.type === 'user'}
-								<div class="vs-search-recent-item" style="position:relative;" role="button" tabindex="0" onclick={() => triggerSearch(item)} onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}>
+								<div
+									class="vs-search-recent-item"
+									style="position:relative;"
+									role="button"
+									tabindex="0"
+									onclick={() => triggerSearch(item)}
+									onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
+								>
 									{#if item.avatar_url}
-										<img src={item.avatar_url} alt={item.username} style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);" />
+										<img
+											src={item.avatar_url}
+											alt={item.username}
+											style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
+											width="36"
+											height="36"
+											loading="lazy"
+											decoding="async"
+										/>
 									{:else}
-										<div style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);">
+										<div
+											style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
+										>
 											{(item.display_name || item.username)[0].toUpperCase()}
 										</div>
 									{/if}
@@ -212,7 +269,12 @@
 										<span class="vs-search-user-name">{item.display_name || item.username}</span>
 										<span class="vs-search-user-handle">@{item.username}</span>
 									</div>
-									<button class="vs-search-item-remove" style="position:absolute; right:16px;" onclick={(e) => removeRecent(idx, e)} title="Eliminar de recientes">
+									<button
+										class="vs-search-item-remove"
+										style="position:absolute; right:16px;"
+										onclick={(e) => removeRecent(idx, e)}
+										title="Eliminar de recientes"
+									>
 										<span class="material-icons-round" style="font-size: 16px;">close</span>
 									</button>
 								</div>
@@ -226,26 +288,23 @@
 
 	<!-- Right actions -->
 	<div class="vs-actions">
-
-
-
-
-
 		<!-- Theme toggle -->
-		<button onclick={toggleTheme} class="aero-icon-btn vs-action-btn" title="Cambiar tema">
-			<span class="material-icons-round" style="font-size:20px">
-				{themeStore.value === 'dark' ? 'light_mode' : 'dark_mode'}
-			</span>
-		</button>
-
-
+		<ThemeSelector compact={true} align="right" />
 
 		<!-- Avatar + Dropdown -->
 		{#if authStore.user}
 			<div class="vs-avatar-wrap" bind:this={dropdownRef}>
 				<button class="vs-avatar-btn" onclick={toggleDropdown} aria-expanded={dropdownOpen}>
 					{#if authStore.user.avatar_url}
-						<img src={authStore.user.avatar_url} alt={authStore.user.username} class="vs-avatar-img" />
+						<img
+							src={authStore.user.avatar_url}
+							alt={authStore.user.username}
+							class="vs-avatar-img"
+							width="34"
+							height="34"
+							loading="lazy"
+							decoding="async"
+						/>
 					{:else}
 						<span class="vs-avatar-initial">
 							{(authStore.user.display_name || authStore.user.username || '?')[0].toUpperCase()}
@@ -256,36 +315,41 @@
 
 				{#if dropdownOpen}
 					<div class="vs-dropdown">
-					<div class="vs-dropdown-inner">
-						<div class="vs-dropdown-header">
-							<p class="vs-dd-name">{authStore.user.display_name || authStore.user.username}</p>
-							<p class="vs-dd-handle">@{authStore.user.username}</p>
-						</div>
-						<div class="vs-dropdown-divider"></div>
-						<a href={`/u/${authStore.user.username}`} class="vs-dd-item">
-							<span class="material-icons-round" style="font-size:20px">person</span>
-							Mi Perfil
-						</a>
-						<a href="/settings" class="vs-dd-item">
-							<span class="material-icons-round" style="font-size:20px">settings</span>
-							Ajustes
-						</a>
-						{#if authStore.isAdmin}
-							<a href="/admin" class="vs-dd-item vs-dd-admin">
-								<span class="material-icons-round" style="font-size:20px">admin_panel_settings</span>
-								Admin Panel
+						<div class="vs-dropdown-inner">
+							<div class="vs-dropdown-header">
+								<p class="vs-dd-name">{authStore.user.display_name || authStore.user.username}</p>
+								<p class="vs-dd-handle">@{authStore.user.username}</p>
+							</div>
+							<div class="vs-dropdown-divider"></div>
+							<a href={`/u/${authStore.user.username}`} class="vs-dd-item">
+								<span class="material-icons-round" style="font-size:20px">person</span>
+								Mi Perfil
 							</a>
-						{/if}
-						<div class="vs-dropdown-divider"></div>
-						<button
-							onclick={() => { dropdownOpen = false; authStore.logout().then(() => goto('/')); }}
-							class="vs-dd-item vs-dd-logout"
-						>
-							<span class="material-icons-round" style="font-size:20px">logout</span>
-							Cerrar sesión
-						</button>
+							<a href="/settings" class="vs-dd-item">
+								<span class="material-icons-round" style="font-size:20px">settings</span>
+								Ajustes
+							</a>
+							{#if authStore.isAdmin}
+								<a href="/admin" class="vs-dd-item vs-dd-admin">
+									<span class="material-icons-round" style="font-size:20px"
+										>admin_panel_settings</span
+									>
+									Admin Panel
+								</a>
+							{/if}
+							<div class="vs-dropdown-divider"></div>
+							<button
+								onclick={() => {
+									dropdownOpen = false;
+									authStore.logout().then(() => goto('/'));
+								}}
+								class="vs-dd-item vs-dd-logout"
+							>
+								<span class="material-icons-round" style="font-size:20px">logout</span>
+								Cerrar sesión
+							</button>
+						</div>
 					</div>
-				</div>
 				{/if}
 			</div>
 		{/if}
@@ -315,14 +379,16 @@
 		will-change: transform;
 		transform: translateZ(0);
 		border-bottom: 1px solid var(--glass-border-t);
-		box-shadow: 0 4px 16px rgba(46,134,232,0.06);
+		box-shadow: 0 4px 16px rgba(46, 134, 232, 0.06);
 		z-index: -1;
 	}
 
-	:global([data-theme="light"]) .vs-topbar::before {
+	:global([data-theme='light']) .vs-topbar::before {
 		/* Cristal skyblue saturado con esmeralda predominante, manteniendo translucidez */
 		background: linear-gradient(90deg, rgba(16, 185, 129, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%);
-		box-shadow: 0 4px 16px rgba(16, 185, 129, 0.12), 0 1px 0 rgba(255,255,255,0.6) inset;
+		box-shadow:
+			0 4px 16px rgba(16, 185, 129, 0.12),
+			0 1px 0 rgba(255, 255, 255, 0.6) inset;
 	}
 
 	/* ─── Search ────────────────────────────────── */
@@ -339,7 +405,7 @@
 		background: var(--bg-input);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-full);
-		box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+		box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
 		transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 		overflow: hidden;
 		height: 40px;
@@ -347,7 +413,9 @@
 	.vs-search-inner.focused {
 		border-color: var(--aero-sky);
 		background: var(--bg-surface);
-		box-shadow: 0 0 0 3px rgba(74,171,223,0.16), inset 0 1px 3px rgba(0,0,0,0.03);
+		box-shadow:
+			0 0 0 3px rgba(74, 171, 223, 0.16),
+			inset 0 1px 3px rgba(0, 0, 0, 0.03);
 	}
 	.vs-search-icon {
 		position: absolute;
@@ -372,7 +440,9 @@
 		font-size: 0.88rem;
 		transition: opacity 0.3s;
 	}
-	.vs-search-input::placeholder { color: var(--text-muted); }
+	.vs-search-input::placeholder {
+		color: var(--text-muted);
+	}
 
 	/* Search Dropdown */
 	.vs-search-dropdown {
@@ -543,10 +613,6 @@
 		gap: 8px;
 		margin-left: auto;
 	}
-
-	.vs-action-btn {
-		position: relative;
-	}
 	/* ─── Avatar ────────────────────────────────── */
 	.vs-avatar-wrap {
 		position: relative;
@@ -560,19 +626,23 @@
 		display: flex;
 	}
 	.vs-avatar-img {
-		width: 34px; height: 34px;
+		width: 34px;
+		height: 34px;
 		border-radius: 50%;
 		object-fit: cover;
 		border: 2px solid var(--glass-border-t);
 		box-shadow: var(--shadow-xs);
-		transition: transform var(--t-spring), box-shadow var(--t-base);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-base);
 	}
 	.vs-avatar-btn:hover .vs-avatar-img {
 		transform: scale(1.06);
-		box-shadow: 0 4px 12px rgba(46,134,232,0.22);
+		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.22);
 	}
 	.vs-avatar-initial {
-		width: 34px; height: 34px;
+		width: 34px;
+		height: 34px;
 		border-radius: 50%;
 		background: var(--grad-primary);
 		display: flex;
@@ -581,7 +651,7 @@
 		color: #fff;
 		font-weight: 700;
 		font-size: 0.84rem;
-		border: 2px solid rgba(255,255,255,0.5);
+		border: 2px solid rgba(255, 255, 255, 0.5);
 		transition: transform var(--t-spring);
 	}
 	.vs-avatar-btn:hover .vs-avatar-initial {
@@ -589,8 +659,10 @@
 	}
 	.vs-avatar-online {
 		position: absolute;
-		bottom: 1px; right: 1px;
-		width: 9px; height: 9px;
+		bottom: 1px;
+		right: 1px;
+		width: 9px;
+		height: 9px;
 		border-radius: 50%;
 		background: var(--aero-mint);
 		border: 2px solid var(--bg-canvas);
@@ -604,7 +676,7 @@
 		z-index: var(--z-dropdown, 100);
 		min-width: 200px;
 		animation: slideInUp 0.22s var(--ease-out) both;
-		
+
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
@@ -645,7 +717,9 @@
 		line-height: 1;
 		color: var(--text-secondary);
 		text-decoration: none;
-		transition: background var(--t-fast), color var(--t-fast);
+		transition:
+			background var(--t-fast),
+			color var(--t-fast);
 		cursor: pointer;
 		width: 100%;
 		border: none;
@@ -654,21 +728,42 @@
 		font-family: var(--font-sans);
 	}
 	.vs-dd-item:hover {
-		background: rgba(46,134,232,0.08);
+		background: rgba(46, 134, 232, 0.08);
 		color: var(--aero-blue);
 	}
-	.vs-dd-admin { color: var(--aero-amber); }
-	.vs-dd-admin:hover { background: rgba(232,160,35,0.08); color: var(--aero-amber); }
-	.vs-dd-logout { color: var(--aero-rose); }
-	.vs-dd-logout:hover { background: rgba(232,74,114,0.08); color: var(--aero-rose); }
+	.vs-dd-admin {
+		color: var(--aero-amber);
+	}
+	.vs-dd-admin:hover {
+		background: rgba(232, 160, 35, 0.08);
+		color: var(--aero-amber);
+	}
+	.vs-dd-logout {
+		color: var(--aero-rose);
+	}
+	.vs-dd-logout:hover {
+		background: rgba(232, 74, 114, 0.08);
+		color: var(--aero-rose);
+	}
 
 	@keyframes glowPulse {
-		0%,100% { box-shadow: 0 2px 6px rgba(232,74,114,0.35); }
-		50%      { box-shadow: 0 2px 10px rgba(232,74,114,0.55); }
+		0%,
+		100% {
+			box-shadow: 0 2px 6px rgba(232, 74, 114, 0.35);
+		}
+		50% {
+			box-shadow: 0 2px 10px rgba(232, 74, 114, 0.55);
+		}
 	}
 
 	@keyframes slideInUp {
-		from { opacity: 0; transform: translateY(-8px); }
-		to { opacity: 1; transform: translateY(0); }
+		from {
+			opacity: 0;
+			transform: translateY(-8px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 </style>

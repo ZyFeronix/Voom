@@ -7,3 +7,9 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Ad-hoc debug/dump files in the frontend root (not part of the app source)
+style_dump.css
+test_admin.mjs
+test_db.mjs
+test_klipy.mjs

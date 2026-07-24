@@ -5,21 +5,33 @@ const CACHE = `vsocial-cache-${version}`;
 
 // Solo cachear assets estáticos (imágenes, fuentes, JS/CSS del build)
 // NUNCA páginas de navegación SSR — esas las maneja SvelteKit
-const ASSETS = [
-	...build,
-	...files
-];
+const ASSETS = [...build, ...files];
 
 // Extensiones que son assets estáticos cacheables
 const CACHEABLE_EXTENSIONS = [
-	'.js', '.css', '.woff', '.woff2', '.ttf', '.otf',
-	'.png', '.jpg', '.jpeg', '.webp', '.avif', '.svg',
-	'.gif', '.ico', '.mp4', '.webm', '.mp3', '.ogg'
+	'.js',
+	'.css',
+	'.woff',
+	'.woff2',
+	'.ttf',
+	'.otf',
+	'.png',
+	'.jpg',
+	'.jpeg',
+	'.webp',
+	'.avif',
+	'.svg',
+	'.gif',
+	'.ico',
+	'.mp4',
+	'.webm',
+	'.mp3',
+	'.ogg'
 ];
 
 function isStaticAsset(url) {
 	const pathname = new URL(url).pathname;
-	return CACHEABLE_EXTENSIONS.some(ext => pathname.endsWith(ext));
+	return CACHEABLE_EXTENSIONS.some((ext) => pathname.endsWith(ext));
 }
 
 function shouldIntercept(request) {
@@ -49,16 +61,22 @@ function shouldIntercept(request) {
 // ── Install: pre-cachear assets del build ──
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+		caches
+			.open(CACHE)
+			.then((cache) => cache.addAll(ASSETS))
+			.then(() => self.skipWaiting())
 	);
 });
 
 // ── Activate: limpiar caches viejos ──
 self.addEventListener('activate', (event) => {
 	event.waitUntil(
-		caches.keys().then((keys) =>
-			Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
-		).then(() => self.clients.claim())
+		caches
+			.keys()
+			.then((keys) =>
+				Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
+			)
+			.then(() => self.clients.claim())
 	);
 });
 

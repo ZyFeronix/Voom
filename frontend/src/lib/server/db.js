@@ -10,7 +10,13 @@ import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { config } from 'dotenv';
 
-const rootDir = resolve(dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Z]:)/, '$1'), '..', '..', '..', '..');
+const rootDir = resolve(
+	dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Z]:)/, '$1'),
+	'..',
+	'..',
+	'..',
+	'..'
+);
 config({ path: resolve(rootDir, '.env') });
 
 const DB_PATH = process.env.DB_PATH || resolve(rootDir, 'database.sqlite');
@@ -36,26 +42,38 @@ function createWrapper(driver, raw) {
 					async run(...args) {
 						try {
 							const r = await raw.execute({ sql, args });
-							return { changes: r.rowsAffected, lastInsertRowid: r.lastInsertRowid ? Number(r.lastInsertRowid) : 0 };
-						} catch (e) { throw new Error(`DB run error: ${e.message}\nSQL: ${sql}`); }
+							return {
+								changes: r.rowsAffected,
+								lastInsertRowid: r.lastInsertRowid ? Number(r.lastInsertRowid) : 0
+							};
+						} catch (e) {
+							throw new Error(`DB run error: ${e.message}\nSQL: ${sql}`);
+						}
 					},
 					async get(...args) {
 						try {
 							const r = await raw.execute({ sql, args });
 							return r.rows.length > 0 ? { ...r.rows[0] } : undefined;
-						} catch (e) { throw new Error(`DB get error: ${e.message}\nSQL: ${sql}`); }
+						} catch (e) {
+							throw new Error(`DB get error: ${e.message}\nSQL: ${sql}`);
+						}
 					},
 					async all(...args) {
 						try {
 							const r = await raw.execute({ sql, args });
-							return r.rows.map(row => ({ ...row }));
-						} catch (e) { throw new Error(`DB all error: ${e.message}\nSQL: ${sql}`); }
+							return r.rows.map((row) => ({ ...row }));
+						} catch (e) {
+							throw new Error(`DB all error: ${e.message}\nSQL: ${sql}`);
+						}
 					}
 				};
 			},
 			async exec(sql) {
-				try { await raw.executeMultiple(sql); }
-				catch (e) { throw new Error(`DB exec error: ${e.message}`); }
+				try {
+					await raw.executeMultiple(sql);
+				} catch (e) {
+					throw new Error(`DB exec error: ${e.message}`);
+				}
 			},
 			transaction(fn) {
 				return async () => {
@@ -64,12 +82,16 @@ function createWrapper(driver, raw) {
 						await fn();
 						await raw.execute('COMMIT');
 					} catch (e) {
-						await raw.execute('ROLLBACK').catch(err => console.error('[db] ROLLBACK failed:', err.message));
+						await raw
+							.execute('ROLLBACK')
+							.catch((err) => console.error('[db] ROLLBACK failed:', err.message));
 						throw e;
 					}
 				};
 			},
-			close() { raw.close(); }
+			close() {
+				raw.close();
+			}
 		};
 	}
 
@@ -82,33 +104,41 @@ function createWrapper(driver, raw) {
 					try {
 						const r = stmt.run(...args);
 						return { changes: r.changes, lastInsertRowid: Number(r.lastInsertRowid) };
-					} catch (e) { throw new Error(`DB run error: ${e.message}\nSQL: ${sql}`); }
+					} catch (e) {
+						throw new Error(`DB run error: ${e.message}\nSQL: ${sql}`);
+					}
 				},
 				async get(...args) {
 					try {
 						const r = stmt.get(...args);
 						return r !== undefined ? { ...r } : undefined;
-					} catch (e) { throw new Error(`DB get error: ${e.message}\nSQL: ${sql}`); }
+					} catch (e) {
+						throw new Error(`DB get error: ${e.message}\nSQL: ${sql}`);
+					}
 				},
 				async all(...args) {
 					try {
-						return stmt.all(...args).map(r => ({ ...r }));
-					} catch (e) { throw new Error(`DB all error: ${e.message}\nSQL: ${sql}`); }
+						return stmt.all(...args).map((r) => ({ ...r }));
+					} catch (e) {
+						throw new Error(`DB all error: ${e.message}\nSQL: ${sql}`);
+					}
 				}
 			};
 		},
 		async exec(sql) {
-			try { raw.exec(sql); }
-			catch (e) { throw new Error(`DB exec error: ${e.message}`); }
+			try {
+				raw.exec(sql);
+			} catch (e) {
+				throw new Error(`DB exec error: ${e.message}`);
+			}
 		},
 		transaction(fn) {
 			const txn = raw.transaction(fn);
-			return async () => {
-				try { txn(); }
-				catch (e) { throw e; }
-			};
+			return async () => txn();
 		},
-		close() { raw.close(); }
+		close() {
+			raw.close();
+		}
 	};
 }
 
@@ -134,7 +164,9 @@ export async function initDb() {
 		driverName = '@libsql/client';
 		dbWrapper = createWrapper(driverName, rawClient);
 		initialized = true;
-		console.log(`[db] @libsql/client ready | mode: ${isLocal ? 'local+WAL' : 'remote'} | ${DB_URL}`);
+		console.log(
+			`[db] @libsql/client ready | mode: ${isLocal ? 'local+WAL' : 'remote'} | ${DB_URL}`
+		);
 		return dbWrapper;
 	} catch (e) {
 		console.log(`[db] @libsql/client not available: ${e.message}`);
@@ -162,18 +194,21 @@ export async function initDb() {
 
 	throw new Error(
 		'No database driver available.\n' +
-		'Install one: npm install @libsql/client  OR  npm install better-sqlite3'
+			'Install one: npm install @libsql/client  OR  npm install better-sqlite3'
 	);
 }
 
 export function getDb() {
-	if (!dbWrapper) throw new Error('Database not initialized. Ensure initDb() was called in hooks.server.js');
+	if (!dbWrapper)
+		throw new Error('Database not initialized. Ensure initDb() was called in hooks.server.js');
 	return dbWrapper;
 }
 
 export function closeDb() {
 	if (dbWrapper) {
-		try { dbWrapper.close(); } catch {}
+		try {
+			dbWrapper.close();
+		} catch {}
 		rawClient = null;
 		dbWrapper = null;
 		initialized = false;
@@ -197,7 +232,9 @@ export async function runSchema() {
 	await db.exec(schema);
 }
 
-export function getRootDir() { return rootDir; }
+export function getRootDir() {
+	return rootDir;
+}
 
 export function getUploadsDir(subfolder = '') {
 	const uploadsDir = resolve(rootDir, 'uploads', subfolder);

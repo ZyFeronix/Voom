@@ -1,261 +1,412 @@
 <script>
-  import { fly, fade } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
-  import PodiumCard from '$lib/components/gamification/PodiumCard.svelte';
-  import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
-  import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
+	import { fly, fade } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
+	import AuroraPillar from '$lib/components/gamification/AuroraPillar.svelte';
+	import LeaderboardTabs from '$lib/components/gamification/LeaderboardTabs.svelte';
+	import PodiumCard from '$lib/components/gamification/PodiumCard.svelte';
+	import LeaderboardRow from '$lib/components/gamification/LeaderboardRow.svelte';
+	import CurrentUserCard from '$lib/components/gamification/CurrentUserCard.svelte';
 
-  let type = $state('level');
-  let users = $state([]);
-  let currentUserRank = $state(null);
-  let currentUserData = $state(null);
-  let loading = $state(true);
+	let type = $state('level'); // Controls the {#key} content
+	let activeTab = $state('level'); // Controls the UI tabs instantly
+	let users = $state([]);
+	let currentUserRank = $state(null);
+	let currentUserData = $state(null);
+	let loading = $state(true);
+	let error = $state(null);
 
-  async function fetchLeaderboard() {
-    loading = true;
-    try {
-      const res = await fetch(`/api/gamification/leaderboard?type=${type}`);
-      if (res.ok) {
-        const data = await res.json();
-        users = data.users || [];
-        currentUserRank = data.currentUserRank;
-        currentUserData = data.currentUserData;
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      loading = false;
-    }
-  }
+	let isInitialLoad = $state(true);
 
-  $effect(() => {
-    fetchLeaderboard();
-  });
+	// Cache for instant transitions
+	let cache = $state({});
 
-  let top3 = $derived(users.slice(0, 3));
-  let rest = $derived(users.slice(3));
+	async function fetchLeaderboard(targetType) {
+		if (cache[targetType]) {
+			users = cache[targetType].users;
+			currentUserRank = cache[targetType].currentUserRank;
+			currentUserData = cache[targetType].currentUserData;
+			type = targetType;
+			loading = false;
+			return;
+		}
 
-  let podiumOrder = $derived([top3[1], top3[0], top3[2]].filter(Boolean));
-  let getRank = (user) => top3.indexOf(user) + 1;
+		// Only show full-page spinner on the very first load
+		if (Object.keys(cache).length === 0) {
+			loading = true;
+		}
+
+		error = null;
+		try {
+			const res = await fetch(`/api/gamification/leaderboard?type=${targetType}`);
+			if (res.ok) {
+				const data = await res.json();
+				cache[targetType] = data;
+
+				if (activeTab === targetType) {
+					users = data.users || [];
+					currentUserRank = data.currentUserRank;
+					currentUserData = data.currentUserData;
+					type = targetType; // Triggers the slide transition!
+				}
+			} else {
+				if (activeTab === targetType && !cache[targetType]) {
+					error = 'No pudimos cargar la clasificación. Inténtalo de nuevo.';
+				}
+			}
+		} catch (e) {
+			console.error(e);
+			if (activeTab === targetType && !cache[targetType]) {
+				error = 'No pudimos cargar la clasificación. Inténtalo de nuevo.';
+			}
+		} finally {
+			if (activeTab === targetType) {
+				loading = false;
+			}
+		}
+	}
+
+	import { onMount } from 'svelte';
+	onMount(() => {
+		fetchLeaderboard(activeTab);
+	});
+
+	let top3 = $derived(users.slice(0, 3));
+	let rest = $derived(users.slice(3));
+
+	// Visual podium order: silver (2) — gold (1) — bronze (3)
+	let podiumOrder = $derived([top3[1], top3[0], top3[2]].filter(Boolean));
+	let getRank = (user) => users.indexOf(user) + 1;
+
+	let showBeacon = $derived(!loading && currentUserData && currentUserRank);
+
+	let direction = $state(1);
+
+	function changeType(next) {
+		if (activeTab === next) return;
+		isInitialLoad = false;
+		direction = next === 'streak' ? 1 : -1;
+		activeTab = next;
+		fetchLeaderboard(next);
+	}
 </script>
 
-<div class="vs-container pb-32 min-h-[90vh] pt-8">
+<svelte:head>
+	<title>Salón de la Fama · VSocial</title>
+</svelte:head>
 
-  <!-- Header -->
-  <div class="text-center mb-10" in:fade={{ duration: 400 }}>
-    <h1 class="text-4xl font-black text-[var(--text-main)] mb-2" style="text-shadow: 0 4px 20px rgba(27,133,243,0.3);">Salón de la Fama</h1>
-    <p class="text-[var(--text-muted)]">Descubre a los usuarios más destacados de la plataforma</p>
-  </div>
+<main class="lb-page" class:has-beacon={showBeacon}>
+	<AuroraPillar {type} />
 
-  <!-- Tabs (Aero Style) -->
-  <div class="flex justify-center mb-8 relative z-20" in:fly={{ y: -20, duration: 400, delay: 100, easing: cubicOut }}>
-    <div class="glass-panel p-1.5 rounded-full flex gap-1 shadow-md border border-[var(--glass-border)]">
-      <button 
-        class="tab-btn {type === 'level' ? 'active level' : ''}"
-        onclick={() => type = 'level'}
-      >
-        <span class="material-icons-round text-[18px]">star</span>
-        Niveles
-      </button>
-      <button 
-        class="tab-btn {type === 'streak' ? 'active streak' : ''}"
-        onclick={() => type = 'streak'}
-      >
-        <span class="material-icons-round text-[18px]">local_fire_department</span>
-        Rachas
-      </button>
-    </div>
-  </div>
+	<!-- Header -->
+	<header class="lb-header" in:fade={{ duration: 400 }}>
+		<p class="lb-eyebrow">Comunidad VSocial</p>
+		<h1 class="lb-title">Salón de la Fama</h1>
+		<p class="lb-subtitle">
+			{activeTab === 'level'
+				? 'Los creadores que más han crecido en la plataforma.'
+				: 'Las rachas más constantes, día tras día.'}
+		</p>
+	</header>
 
-  <style>
-    .tab-btn {
-      padding: 10px 32px;
-      border-radius: 9999px;
-      font-weight: 800;
-      font-size: 0.875rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.3s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
-      color: var(--text-muted);
-      background: transparent;
-      border: 1px solid transparent;
-    }
+	<!-- Tabs -->
+	<div class="lb-tabs-row" in:fly={{ y: -18, duration: 400, delay: 100, easing: cubicOut }}>
+		<LeaderboardTabs type={activeTab} onChange={changeType} />
+	</div>
 
-    .tab-btn:hover:not(.active) {
-      color: var(--text-main);
-      background: rgba(255,255,255,0.05);
-    }
+	<div id="lb-panel" role="tabpanel" aria-labelledby="lb-tab-{type}" class="lb-panel">
+		{#if loading && users.length === 0}
+			<div
+				class="lb-loading"
+				in:fade={{ duration: 250, delay: 150 }}
+				out:fade={{ duration: 200 }}
+				aria-live="polite"
+				aria-busy="true"
+			>
+				<div class="lb-spinner"></div>
+				<p>Cargando clasificación…</p>
+			</div>
+		{:else if error && users.length === 0}
+			<div class="lb-empty" in:fade={{ duration: 300 }} out:fade={{ duration: 200 }} role="alert">
+				<span class="material-icons-round lb-empty__icon">error_outline</span>
+				<h2 class="lb-empty__title">Algo salió mal</h2>
+				<p class="lb-empty__text">{error}</p>
+				<button type="button" class="lb-retry" onclick={fetchLeaderboard}>Reintentar</button>
+			</div>
+		{:else if users.length === 0}
+			<div class="lb-empty" in:fade={{ duration: 300 }} out:fade={{ duration: 200 }}>
+				<span class="material-icons-round lb-empty__icon">emoji_events</span>
+				<h2 class="lb-empty__title">Aún no hay registros</h2>
+				<p class="lb-empty__text">Sé el primero en aparecer en esta clasificación.</p>
+			</div>
+		{:else}
+			{#key type}
+				<div
+					class="lb-content"
+					in:fly={{
+						x: isInitialLoad ? 0 : 40 * direction,
+						y: isInitialLoad ? 20 : 0,
+						duration: 450,
+						easing: cubicOut
+					}}
+					out:fly={{ x: isInitialLoad ? 0 : -40 * direction, duration: 300, easing: cubicOut }}
+				>
+					<!-- Podium -->
+					{#if top3.length > 0}
+						<div class="lb-podium" role="list" aria-label="Top 3">
+							{#each podiumOrder as user, idx (user.id)}
+								<div
+									class="lb-podium__slot lb-podium__slot--{getRank(user)}"
+									role="listitem"
+									in:fly={{
+										y: isInitialLoad ? 60 : 0,
+										duration: isInitialLoad ? 600 : 0,
+										delay: isInitialLoad ? 200 + idx * 140 : 0,
+										easing: cubicOut
+									}}
+								>
+									<PodiumCard {user} rank={getRank(user)} {type} />
+								</div>
+							{/each}
+						</div>
+					{/if}
 
-    .tab-btn.active.level {
-      background: var(--aero-blue, #1b85f3);
-      color: #fff;
-      box-shadow: 0 4px 15px rgba(27,133,243,0.4);
-      border-color: rgba(255,255,255,0.2);
-    }
-    .tab-btn.active.level .material-icons-round { color: #fde047; }
+					<!-- List -->
+					{#if rest.length > 0}
+						<ol class="lb-list" aria-label="Resto de la clasificación">
+							{#each rest as user, i (user.id)}
+								<li
+									in:fly={{
+										y: isInitialLoad ? 18 : 0,
+										duration: isInitialLoad ? 380 : 0,
+										delay: isInitialLoad ? 360 + Math.min(i, 18) * 45 : 0,
+										easing: cubicOut
+									}}
+								>
+									<LeaderboardRow
+										{user}
+										{type}
+										rank={i + 4}
+										isCurrentUser={currentUserData && currentUserData.id === user.id}
+									/>
+								</li>
+							{/each}
+						</ol>
+					{/if}
+				</div>
+			{/key}
+		{/if}
+	</div>
+</main>
 
-    .tab-btn.active.streak {
-      background: #f97316;
-      color: #fff;
-      box-shadow: 0 4px 15px rgba(249,115,22,0.4);
-      border-color: rgba(255,255,255,0.2);
-    }
-    .tab-btn.active.streak .material-icons-round { color: #fef08a; }
-  </style>
-
-  {#if loading}
-    <div class="flex justify-center py-20 mt-20 relative z-10" in:fade>
-      <div class="vs-spinner"></div>
-    </div>
-  {:else if users.length === 0}
-    <div class="glass-panel text-center py-20 max-w-lg mx-auto rounded-3xl mt-20 mb-24 relative z-10 shadow-lg border border-[var(--glass-border)]" in:fade>
-      <span class="material-icons-round text-5xl text-[var(--text-muted)] mb-3 opacity-50 block">emoji_events</span>
-      <h3 class="text-xl font-bold text-[var(--text-main)]">Aún no hay registros</h3>
-      <p class="text-sm text-[var(--text-muted)] mt-2">Sé el primero en aparecer en esta clasificación.</p>
-    </div>
-  {:else}
-    
-    <!-- Podium Section -->
-    {#if top3.length > 0}
-      <div class="podium-wrapper flex flex-row justify-center items-end relative z-10 mx-auto">
-        {#each podiumOrder as user, idx}
-          <div in:fly={{ y: 50, duration: 600, delay: 200 + (idx * 150), easing: cubicOut }} class="podium-item podium-{getRank(user)}">
-            <PodiumCard {user} rank={getRank(user)} {type} />
-          </div>
-        {/each}
-      </div>
-    {/if}
-
-    <!-- Leaderboard List -->
-    {#if rest.length > 0}
-      <div class="max-w-2xl mx-auto flex flex-col gap-2 mt-8">
-        {#each rest as user, i}
-          <a href="/u/{user.username}" 
-             in:fly={{ y: 20, duration: 400, delay: 400 + (Math.min(i, 20) * 50), easing: cubicOut }}
-             class="glass-panel p-4 rounded-xl flex items-center justify-between hover:-translate-y-1 transition-all group border border-transparent hover:border-[var(--glass-border)]"
-             style={currentUserData && currentUserData.id === user.id ? 'border-color: var(--primary-color, #1b85f3); background: rgba(27, 133, 243, 0.1);' : ''}>
-            
-            <div class="flex items-center gap-4">
-              <span class="text-xl font-black text-[var(--text-muted)] opacity-50 w-8 text-center group-hover:text-[var(--primary-color,#1b85f3)] group-hover:opacity-100 transition-colors"
-                    style={currentUserData && currentUserData.id === user.id ? 'color: var(--primary-color, #1b85f3); opacity: 1;' : ''}>{i + 4}</span>
-              
-              {#if user.avatar_url}
-                <img src={user.avatar_url} alt={user.display_name} class="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-2 border-[var(--glass-border)] group-hover:border-[var(--primary-color,#1b85f3)] transition-colors" 
-                     style={currentUserData && currentUserData.id === user.id ? 'border-color: var(--primary-color, #1b85f3);' : ''} />
-              {:else}
-                <div class="vs-avatar-letter avatar-md w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 border-[var(--glass-border)] group-hover:border-[var(--primary-color,#1b85f3)] transition-colors" 
-                     style="line-height: 1 !important; padding: 0 !important; margin: 0 !important; {currentUserData && currentUserData.id === user.id ? 'border-color: var(--primary-color, #1b85f3);' : ''}">
-                  {(user.display_name || user.username || '?').charAt(0).toUpperCase()}
-                </div>
-              {/if}
-              
-              <div class="flex flex-col">
-                <span class="font-bold text-[var(--text-main)] text-sm">{user.display_name}</span>
-                {#if user.title_text}
-                  <div class="mt-1"><UserTitleBadge title={user.title_text} color={user.title_color} size="sm" /></div>
-                {:else}
-                  <span class="text-xs text-[var(--text-muted)]">@{user.username}</span>
-                {/if}
-              </div>
-            </div>
-            
-            <div class="flex flex-col items-end">
-              {#if type === 'level'}
-                <LevelBadge level={user.level || 1} size="sm" />
-                <span class="text-[10px] text-[var(--text-muted)] font-mono font-bold mt-1">{user.xp_points || 0} XP</span>
-              {:else}
-                <div class="flex items-center gap-1 bg-[var(--glass-surface)] px-2 py-1 rounded-lg border border-[var(--glass-border)]">
-                  <span class="material-icons-round text-[14px] text-orange-500">local_fire_department</span>
-                  <span class="text-sm font-bold text-[var(--text-main)]">{user.checkin_streak || 0}</span>
-                </div>
-              {/if}
-            </div>
-            
-          </a>
-        {/each}
-      </div>
-    {/if}
-  {/if}
-</div>
-
-<!-- Sticky Bottom Bar for Current User (if they are outside the top 50, or simply always visible if they are logged in and rank is known) -->
-{#if !loading && currentUserData && currentUserRank}
-  <div class="fixed bottom-0 left-0 right-0 z-50 p-4 pb-6 md:pb-8 pointer-events-none" in:fly={{ y: 100, duration: 600, delay: 800, easing: cubicOut }}>
-    <div class="max-w-3xl mx-auto pointer-events-auto">
-      <a href="/u/{currentUserData.username}" class="glass-panel p-4 rounded-2xl flex items-center justify-between transition-all group border-2 border-[var(--primary-color,#1b85f3)] shadow-[0_10px_30px_rgba(27,133,243,0.3)] bg-[var(--bg-panel)]" style="backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);">
-        
-        <div class="flex items-center gap-4">
-          <div class="flex flex-col items-center justify-center w-10">
-            <span class="text-xs uppercase font-bold text-[var(--primary-color,#1b85f3)] tracking-widest mb-0.5">Rango</span>
-            <span class="text-2xl font-black text-[var(--text-main)]">#{currentUserRank}</span>
-          </div>
-          
-          {#if currentUserData.avatar_url}
-            <img src={currentUserData.avatar_url} alt={currentUserData.display_name} class="w-12 h-12 rounded-full object-cover border-2 border-[var(--glass-border)]" />
-          {:else}
-            <div class="vs-avatar-letter avatar-md w-12 h-12 rounded-full flex items-center justify-center border-2 border-[var(--glass-border)]" style="line-height: 1 !important; padding: 0 !important; margin: 0 !important;">
-              {(currentUserData.display_name || currentUserData.username || '?').charAt(0).toUpperCase()}
-            </div>
-          {/if}
-          
-          <div class="flex flex-col">
-            <span class="font-bold text-[var(--text-main)] text-sm">Tú ({currentUserData.display_name})</span>
-            {#if currentUserData.title_text}
-              <div class="mt-1"><UserTitleBadge title={currentUserData.title_text} color={currentUserData.title_color} size="sm" /></div>
-            {:else}
-              <span class="text-xs text-[var(--text-muted)]">@{currentUserData.username}</span>
-            {/if}
-          </div>
-        </div>
-        
-        <div class="flex flex-col items-end">
-          {#if type === 'level'}
-            <LevelBadge level={currentUserData.level || 1} size="md" />
-            <span class="text-[12px] text-[var(--primary-color,#1b85f3)] font-mono font-bold mt-1">{currentUserData.xp_points || 0} XP</span>
-          {:else}
-            <div class="flex items-center gap-1.5 bg-[var(--glass-surface)] px-3 py-1.5 rounded-lg border border-orange-500/30 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-              <span class="material-icons-round text-[18px] text-orange-500">local_fire_department</span>
-              <span class="text-base font-bold text-orange-400">{currentUserData.checkin_streak || 0}</span>
-            </div>
-          {/if}
-        </div>
-      </a>
-    </div>
-  </div>
+{#if showBeacon}
+	<div in:fly={{ y: 100, duration: 500, delay: 700, easing: cubicOut }}>
+		<CurrentUserCard user={currentUserData} rank={currentUserRank} {type} />
+	</div>
 {/if}
 
 <style>
-  .vs-spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid var(--glass-border);
-    border-top-color: var(--primary-color, #1b85f3);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
+	.lb-page {
+		position: relative;
+		max-width: 720px;
+		margin: 0 auto;
+		padding: 2rem 1rem 4rem;
+		min-height: 90vh;
+	}
+	/* Room for the fixed beacon so the last row stays reachable */
+	.lb-page.has-beacon {
+		padding-bottom: 8.5rem;
+	}
 
-  .podium-wrapper {
-    gap: 12px;
-    margin-top: 60px;
-    padding-bottom: 40px;
-  }
+	/* ── Header ── */
+	.lb-header {
+		position: relative;
+		z-index: 10;
+		text-align: center;
+		margin-bottom: 1.75rem;
+	}
+	.lb-eyebrow {
+		font-family: var(--font-display);
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.18em;
+		color: var(--aero-sky);
+		margin: 0 0 0.5rem;
+	}
+	.lb-title {
+		font-family: var(--font-display);
+		font-size: clamp(2.1rem, 6vw, 3.4rem);
+		font-weight: 900;
+		letter-spacing: -0.03em;
+		line-height: 1.02;
+		color: var(--text-primary);
+		margin: 0;
+		text-shadow: 0 4px 24px rgba(27, 133, 243, 0.25);
+	}
+	.lb-subtitle {
+		max-width: 34ch;
+		margin: 0.6rem auto 0;
+		font-size: 0.95rem;
+		color: var(--text-muted);
+	}
 
-  @media (min-width: 768px) {
-    .podium-wrapper {
-      gap: 40px;
-      margin-top: 80px;
-      padding-bottom: 60px;
-    }
-  }
+	.lb-tabs-row {
+		position: relative;
+		z-index: 20;
+		display: flex;
+		justify-content: center;
+		margin-bottom: 2rem;
+	}
 
-  @media (max-width: 500px) {
-    .podium-wrapper {
-      transform: scale(0.75);
-      transform-origin: bottom center;
-    }
-  }
+	.lb-panel {
+		position: relative;
+		z-index: 10;
+		display: grid;
+		align-items: start;
+	}
+	.lb-panel > * {
+		grid-area: 1 / 1;
+	}
+	.lb-content {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+	}
+
+	/* ── Podium ── */
+	.lb-podium {
+		display: flex;
+		justify-content: center;
+		align-items: flex-end;
+		gap: 12px;
+		margin-top: 4.5rem;
+		padding-bottom: 1rem;
+	}
+	.lb-podium__slot {
+		flex: 0 0 auto;
+	}
+	.lb-podium__slot--1 {
+		order: 2;
+	}
+	.lb-podium__slot--2 {
+		order: 1;
+	}
+	.lb-podium__slot--3 {
+		order: 3;
+	}
+
+	/* ── List ── */
+	.lb-list {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		margin: 2.5rem 0 0;
+		padding: 0;
+	}
+
+	/* ── Loading ── */
+	.lb-loading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		padding: 5rem 1rem;
+		color: var(--text-muted);
+	}
+	.lb-spinner {
+		width: 42px;
+		height: 42px;
+		border: 3px solid var(--glass-border);
+		border-top-color: var(--aero-sky);
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* ── Empty / Error ── */
+	.lb-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 0.35rem;
+		max-width: 32rem;
+		margin: 3.5rem auto 0;
+		padding: 3.5rem 1.5rem;
+		border-radius: var(--radius-xl, 24px);
+		border: 1px solid transparent;
+		background:
+			linear-gradient(var(--glass-bg), var(--glass-bg)) padding-box,
+			linear-gradient(
+					135deg,
+					rgba(255, 255, 255, 0.28),
+					rgba(255, 255, 255, 0.06) 50%,
+					rgba(27, 133, 243, 0.2)
+				)
+				border-box;
+		box-shadow: var(--shadow-md);
+		backdrop-filter: var(--lb-glass-blur);
+		-webkit-backdrop-filter: var(--lb-glass-blur);
+	}
+	.lb-empty__icon {
+		font-size: 3rem;
+		color: var(--text-muted);
+		opacity: 0.5;
+		margin-bottom: 0.5rem;
+	}
+	.lb-empty__title {
+		font-family: var(--font-display);
+		font-size: 1.25rem;
+		font-weight: 800;
+		color: var(--text-primary);
+		margin: 0;
+	}
+	.lb-empty__text {
+		font-size: 0.9rem;
+		color: var(--text-muted);
+		margin: 0;
+	}
+	.lb-retry {
+		margin-top: 1rem;
+		padding: 10px 24px;
+		border: none;
+		border-radius: 999px;
+		font-family: var(--font-display);
+		font-weight: 800;
+		font-size: 0.85rem;
+		color: #fff;
+		background: linear-gradient(120deg, var(--aero-sky), var(--aero-mint));
+		box-shadow: 0 4px 16px rgba(46, 180, 255, 0.4);
+		cursor: pointer;
+		transition: transform 0.2s var(--ease-spring);
+	}
+	.lb-retry:hover {
+		transform: translateY(-2px);
+	}
+	.lb-retry:focus-visible {
+		outline: 2px solid var(--accent-cyan);
+		outline-offset: 3px;
+	}
+
+	@media (min-width: 640px) {
+		.lb-podium {
+			gap: 32px;
+			margin-top: 5.5rem;
+		}
+	}
+
+	@media (max-width: 380px) {
+		.lb-podium {
+			gap: 6px;
+			transform: scale(0.9);
+			transform-origin: bottom center;
+		}
+	}
+
+	/* [VSocial: reduced-motion removido — spinner siempre a velocidad original] */
 </style>
