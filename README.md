@@ -118,4 +118,4 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 
 ## Licencia
 
-GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE) o la página renderizada en [`/docs/license`](./license.html).
+GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE)
