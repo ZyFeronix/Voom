@@ -9,17 +9,12 @@ lerna-debug.log*
 
 # Diagnostic reports
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-frontend/report*.json
 
-# Runtime data & DB state
+# Runtime data
 pids
 *.pid
 *.seed
 *.pid.lock
-install.lock
-database.sqlite*
-*.sqlite*
-uploads/
 
 # Coverage directory
 coverage/
@@ -31,57 +26,17 @@ node_modules/
 # Build outputs
 frontend/build/
 frontend/.svelte-kit/
-*.zip
 
 # Local environment files
 .env
 .env.local
 .env.*.local
 
-# AI tools & agent internal docs
-.agents/
-.ai-codex/
-.claude/
-.codegraph/
-.opencode/
-.qoder/
-opencode.jsonc
-CLAUDE.md
-PACKAGING.md
-Personality & SOUL.md
-frontend/static/docs/Personality-and-SOUL.md
-_auth_migration_backup/
-temp_svelte_video_player/
-
-# Dead root scaffold
-/tsconfig.json
-/vite.config.js
-/package.json
-/package-lock.json
-
-# Maintenance scripts & single-use tools
-*.py
-*.sh
-check_db.*
-update_db.*
-debug_db.*
-alter_db.*
-setup_customizations.*
-test_*.mjs
-test_*.js
-test_*.cjs
-fix*.js
-fix*.cjs
-frontend/*.mjs
-frontend/*.cjs
-frontend/*.js
-frontend/style_dump.css
-refactor_css.mjs
-restore_css.mjs
-evolve_css.mjs
-fix_css.mjs
-force_dark.mjs
-tests/
+# Sensitive data
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+uploads/
 
 # IDEs
 .vscode/
