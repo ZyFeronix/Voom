@@ -158,6 +158,32 @@ export async function initDb() {
 			await rawClient.execute('PRAGMA busy_timeout = 5000');
 			await rawClient.execute('PRAGMA cache_size = -64000');
 			await rawClient.execute('PRAGMA temp_store = MEMORY');
+
+			// Ensure activity_logs table exists if database came from an older version
+			await rawClient
+				.execute(
+					`CREATE TABLE IF NOT EXISTS activity_logs (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				action_type VARCHAR(50) NOT NULL,
+				entity_type VARCHAR(50) NOT NULL,
+				entity_id INTEGER NOT NULL,
+				metadata TEXT,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			)`
+				)
+				.catch(() => {});
+			await rawClient
+				.execute(
+					`CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs(user_id, created_at DESC)`
+				)
+				.catch(() => {});
+			await rawClient
+				.execute(
+					`CREATE UNIQUE INDEX IF NOT EXISTS unique_activity_idx ON activity_logs (user_id, action_type, entity_id, entity_type)`
+				)
+				.catch(() => {});
+
 		} else {
 			await rawClient.execute('PRAGMA foreign_keys = ON').catch(() => {});
 		}
