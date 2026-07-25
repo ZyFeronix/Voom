@@ -13,11 +13,8 @@ const config = {
 			envPrefix: ''
 		}),
 		prerender: {
-			// Páginas estáticas sin datos (legales + about). El +layout.js raíz tiene prerender=false,
-			// así que el crawler no fuerza rutas dinámicas (p.ej. /feed); estas entradas explícitas
-			// garantizan el prerender aunque alguna no esté enlazada en el crawl desde '/'.
 			entries: ['/', '/privacy', '/terms', '/cookies', '/about', '/about/verified'],
-			// Assets faltantes referenciados en metas globales (p.ej. og-image.png) no deben abortar el prerender.
+			handleUnseenRoutes: 'ignore',
 			handleHttpError: ({ path, message }) => {
 				if (
 					path.endsWith('.png') ||
