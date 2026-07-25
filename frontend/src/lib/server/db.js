@@ -183,7 +183,6 @@ export async function initDb() {
 					`CREATE UNIQUE INDEX IF NOT EXISTS unique_activity_idx ON activity_logs (user_id, action_type, entity_id, entity_type)`
 				)
 				.catch(() => {});
-
 		} else {
 			await rawClient.execute('PRAGMA foreign_keys = ON').catch(() => {});
 		}

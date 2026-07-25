@@ -20,7 +20,6 @@ export async function logActivity(userId, actionType, entityType, entityId, meta
 		`
 			)
 			.run(userId, actionType, entityType, entityId, metaStr);
-
 	} catch (e) {
 		console.error('[activity.js] Error logging activity:', e);
 	}
@@ -58,5 +57,4 @@ export async function getActivityHistory(userId, options = {}) {
 	`
 		)
 		.all(...params, limit, offset);
-
 }
