@@ -1,7 +1,7 @@
 # VSocial — Red Social Full-Stack
 
 [![Version](https://img.shields.io/badge/version-0.5--alpha-blue)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-AGPLv3-blue)](#licencia)
+[![License](https://img.shields.io/badge/license-AGPLv3-blue)](#[licencia](https://www.gnu.org/licenses/agpl-3.0))
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
 
 **VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
