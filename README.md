@@ -119,3 +119,9 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 ## Licencia
 
 GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE)
+
+<p align="center">
+  <a target="_blank" rel="noopener noreferrer" href="https://raw.githubusercontent.com/haveachin/infrared/main/docs/public/img/agplv3_logo.svg">
+    <img height="60" src="https://raw.githubusercontent.com/haveachin/infrared/main/docs/public/img/agplv3_logo.svg" alt="AGPLv3 Logo" style="max-width: 100%; height: auto; max-height: 60px;">
+  </a>
+</p>
