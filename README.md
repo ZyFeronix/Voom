@@ -6,7 +6,7 @@
 
 **VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL,
 WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
-**VSOCIAL** nace semanas después del retiro de WoWonder de CodeCanyon. No es un clon. 
+**VSOCIAL** nace semanas después del retiro de WoWonder de CodeCanyon,no es un clon. 
 Es una respuesta arquitectónica a una década de código procedural, vulnerabilidades y mala UX. 
 Construido en casi 3 meses orquestando IA, con SQLite optimizado, Glassmorphism 2.0 y un sistema de verificación único. 
 Para quienes buscan el futuro, no el pasado.
