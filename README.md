@@ -10,7 +10,7 @@
 
 Es una respuesta arquitectónica a una década de código procedural, vulnerabilidades y mala UX.
 
-Construido en casi 3 meses orquestando IA, con SQLite optimizado, Glassmorphism 2.0 y un sistema de verificación único.
+Desarrollado en casi tres meses mediante la orquestación e iteración continua de herramientas de IA, con SQLite optimizado, Glassmorphism 2.0 y un sistema de verificación único.
 
 Para quienes buscan el futuro, no el pasado.
 
