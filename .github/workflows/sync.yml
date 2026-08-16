@@ -3,7 +3,12 @@ name: Sync to GitLab
 on:
   push:
     branches:
-      - '**'
+      - main
+    # El mirror replica el repo completo (clone --mirror + push --mirror);
+    # este filtro solo evita re-mirrorar cuando el único cambio es
+    # configuración de GitHub Actions (.github/), que no es contenido del proyecto.
+    paths-ignore:
+      - '.github/**'
   workflow_dispatch:
 
 jobs:
