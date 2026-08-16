@@ -5,10 +5,11 @@ import { json } from '@sveltejs/kit';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
 import { requireAuth, optionalAuth } from '$lib/server/auth.js';
 import { awardXP } from '$lib/server/gamification.js';
-import { writeFileSync } from 'fs';
+import { existsSync, unlinkSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { logActivity } from '$lib/server/activity.js';
 import { queueReelProgress } from '$lib/server/batch-writer.js';
+import { extractVideoFrame } from '$lib/server/media.js';
 
 export async function GET({ request, url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
@@ -126,6 +127,27 @@ export async function POST({ request, _url, params }) {
 					}
 				} catch (thumbErr) {
 					console.error('[Reel Thumbnail Save Error]:', thumbErr);
+				}
+			}
+
+			// Thumbnail automático: si el usuario no adjuntó uno, se extrae el primer
+			// frame del video con ffmpeg (degradación elegante si falla o no hay binario).
+			if (!thumbnailUrl) {
+				try {
+					const autoThumbName = `thumb_${Date.now()}.jpg`;
+					const autoThumbPath = resolve(uploadDir, autoThumbName);
+					const ok = await extractVideoFrame(resolve(uploadDir, newName), autoThumbPath);
+					if (ok && existsSync(autoThumbPath)) {
+						thumbnailUrl = `/uploads/reels/${autoThumbName}`;
+					} else {
+						try {
+							unlinkSync(autoThumbPath);
+						} catch {
+							// archivo parcial inexistente: nada que limpiar
+						}
+					}
+				} catch (thumbErr) {
+					console.error('[Reel Auto Thumbnail Error]:', thumbErr);
 				}
 			}
 

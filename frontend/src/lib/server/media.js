@@ -3,6 +3,9 @@
  * Validates binary magic numbers (file signatures) to prevent malicious upload masquerading.
  */
 
+import { spawn } from 'node:child_process';
+import ffmpegStatic from 'ffmpeg-static';
+
 /**
  * Detect file MIME type based on binary magic numbers
  * @param {Uint8Array|Buffer} buffer
@@ -162,4 +165,51 @@ export function sanitizeMediaFilename(filename) {
 		.replace(/[^a-zA-Z0-9._-]/g, '_')
 		.replace(/\.{2,}/g, '_')
 		.toLowerCase();
+}
+
+/**
+ * Extrae el primer frame de un video como JPEG (thumbnail automático).
+ * Usa el binario ffmpeg estático de `ffmpeg-static`; si no está disponible
+ * o falla, resuelve `false` para que el llamador degrade con elegancia.
+ * @param {string} inputPath ruta absoluta del video
+ * @param {string} outputPath ruta absoluta del JPEG de salida
+ * @param {{ offset?: number, width?: number, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export function extractVideoFrame(inputPath, outputPath, opts = {}) {
+	return new Promise((resolve) => {
+		const ffmpegPath = ffmpegStatic;
+		if (!ffmpegPath) return resolve(false);
+
+		// `-ss` antes de `-i` busca rápido; offset 0.2s evita frames iniciales
+		// negros/vacíos típicos en exportaciones de editores de video.
+		const offset = opts.offset ?? 0.2;
+		const width = opts.width ?? 540; // suficiente para grids; mantiene proporción
+		const args = [
+			'-y',
+			'-ss',
+			String(offset),
+			'-i',
+			inputPath,
+			'-frames:v',
+			'1',
+			'-vf',
+			`scale=${width}:-2`,
+			'-q:v',
+			'3',
+			outputPath
+		];
+
+		const proc = spawn(ffmpegPath, args, { stdio: 'ignore' });
+		const timer = setTimeout(() => proc.kill('SIGKILL'), opts.timeoutMs ?? 15000);
+
+		proc.once('close', (code) => {
+			clearTimeout(timer);
+			resolve(code === 0);
+		});
+		proc.once('error', () => {
+			clearTimeout(timer);
+			resolve(false);
+		});
+	});
 }

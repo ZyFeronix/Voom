@@ -148,7 +148,11 @@
 											<div class="media-thumb">
 												{#if currentType === 'reels' || item.media.includes('video')}
 													<span class="material-icons-round play-icon">play_circle</span>
-													<video src={item.media} muted playsinline preload="metadata"></video>
+													{#if item.thumbnail_url}
+														<img src={item.thumbnail_url} alt="Media" />
+													{:else}
+														<video src={item.media} muted playsinline preload="metadata"></video>
+													{/if}
 												{:else}
 													<img src={item.media} alt="Media" />
 												{/if}
