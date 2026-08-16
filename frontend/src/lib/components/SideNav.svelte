@@ -534,7 +534,7 @@
 		list-style: none;
 		display: flex;
 		flex-direction: column;
-		gap: 1px;
+		gap: 10px;
 	}
 
 	/* ─── ITEM DE NAVEGACIÓN ─────────────────────────────── */
@@ -946,6 +946,8 @@
 	:global(.vs-shell--collapsed) .vs-nav-list {
 		width: 100%;
 		align-items: center;
+		/* Los tiles de 44px se perciben más juntos: más aire entre items */
+		gap: 14px;
 	}
 	:global(.vs-shell--collapsed) .vs-nav-item {
 		width: 44px;

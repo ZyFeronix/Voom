@@ -423,7 +423,7 @@
 		display: flex;
 		flex-direction: column;
 		padding: 4px;
-		gap: 2px;
+		gap: 6px;
 	}
 
 	/* Scrollbar styling */

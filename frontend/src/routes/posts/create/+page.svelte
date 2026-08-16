@@ -2318,7 +2318,7 @@
 		max-height: 190px;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 6px;
 	}
 	.autocomplete-item {
 		display: flex;

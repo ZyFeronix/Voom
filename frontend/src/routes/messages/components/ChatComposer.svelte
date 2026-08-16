@@ -471,7 +471,7 @@
 	}
 	.emoji-panel-tabs {
 		display: flex;
-		gap: 2px;
+		gap: 6px;
 		padding: 4px 6px;
 		border-bottom: 1px solid var(--border-subtle);
 		background: rgba(var(--accent-blue-rgb), 0.04);

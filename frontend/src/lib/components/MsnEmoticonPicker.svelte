@@ -85,7 +85,7 @@
 	.msn-picker-tabs {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 2px;
+		gap: 6px;
 		padding: 6px;
 		border-bottom: 1px solid var(--border-subtle);
 		background: transparent;
@@ -117,7 +117,7 @@
 	.msn-picker-grid {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
-		gap: 2px;
+		gap: 6px;
 		padding: 8px;
 		max-height: 220px;
 		overflow-y: auto;
