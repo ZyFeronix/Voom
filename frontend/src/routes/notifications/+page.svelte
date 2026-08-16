@@ -103,6 +103,9 @@
 				return { icon: 'favorite', colorClass: 'notif-like' };
 			case 'comment':
 				return { icon: 'chat_bubble', colorClass: 'notif-comment' };
+			case 'share':
+			case 'repost':
+				return { icon: 'repeat', colorClass: 'notif-repost' };
 			case 'follow':
 				return { icon: 'person_add', colorClass: 'notif-follow' };
 			case 'mention':
@@ -349,14 +352,16 @@
 	.notif-avatar-img {
 		width: 44px;
 		height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		object-fit: cover;
 		border: 2px solid var(--border-glass);
 	}
 	.notif-avatar-fallback {
 		width: 44px;
 		height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -372,7 +377,8 @@
 		right: -3px;
 		width: 20px;
 		height: 20px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -401,6 +407,9 @@
 	.notif-comment {
 		background: var(--aero-sky);
 	}
+	.notif-repost {
+		background: var(--aero-mint);
+	}
 	.notif-follow {
 		background: var(--aero-indigo);
 	}
@@ -426,6 +435,13 @@
 	}
 	.notif-icon-wrap.notif-comment .material-icons-round {
 		color: var(--aero-sky);
+	}
+	.notif-icon-wrap.notif-repost {
+		background: rgba(0, 212, 170, 0.1);
+		border-color: rgba(0, 212, 170, 0.2);
+	}
+	.notif-icon-wrap.notif-repost .material-icons-round {
+		color: var(--aero-mint);
 	}
 	.notif-icon-wrap.notif-follow {
 		background: rgba(91, 114, 204, 0.1);
@@ -483,7 +499,8 @@
 	.notif-unread-dot {
 		width: 10px;
 		height: 10px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-blue);
 		box-shadow: 0 0 8px rgba(46, 134, 232, 0.5);
 	}
@@ -518,7 +535,8 @@
 	.skeleton-avatar {
 		width: 44px;
 		height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-overlay);
 	}
 	.skeleton-text {
@@ -529,7 +547,7 @@
 	}
 	.skeleton-line {
 		height: 10px;
-		border-radius: 5px;
+		border-radius: var(--radius-xs);
 		background: var(--bg-overlay);
 	}
 	.skeleton-w60 {
@@ -550,12 +568,15 @@
 	.notif-empty {
 		padding: 4rem 2rem;
 		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
 	}
 	.notif-empty-icon {
 		font-size: 3.5rem;
 		color: var(--text-muted);
 		opacity: 0.3;
-		display: block;
 		margin-bottom: 1rem;
 	}
 	.notif-empty-title {
@@ -563,7 +584,7 @@
 		font-size: 1.25rem;
 		font-weight: 800;
 		color: var(--text-primary);
-		margin-bottom: 0.5rem;
+		margin: 0 0 0.5rem 0;
 	}
 	.notif-empty-desc {
 		font-size: 0.82rem;

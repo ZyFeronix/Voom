@@ -163,19 +163,15 @@
 				class="smooth-transition-content"
 			>
 				{#if loading}
-					<div class="text-center py-12">
-						<span class="material-icons-round animate-spin text-4xl text-primary mb-4 block"
-							>autorenew</span
-						>
-						<h3 class="text-xl text-muted font-medium">Cargando historial...</h3>
+					<div class="history-empty">
+						<span class="material-icons-round animate-spin history-loading-icon">autorenew</span>
+						<h3 class="history-empty-title">Cargando historial...</h3>
 					</div>
 				{:else if logs.length === 0}
-					<div class="text-center py-12">
-						<span class="material-icons-round text-6xl text-muted opacity-50 mb-4 block"
-							>hourglass_empty</span
-						>
-						<h3 class="text-xl text-main font-medium">No hay actividad reciente</h3>
-						<p class="text-muted text-sm mt-2">
+					<div class="history-empty">
+						<span class="material-icons-round history-empty-icon">hourglass_empty</span>
+						<h3 class="history-empty-title">No hay actividad reciente</h3>
+						<p class="history-empty-desc">
 							Interactúa con la plataforma para empezar a registrar tu historial.
 						</p>
 					</div>
@@ -197,7 +193,7 @@
 
 								<!-- Icono de acción -->
 								<div
-									class="relative z-10 rounded-full glass-panel flex items-center justify-center shrink-0"
+									class="relative z-10 squircle glass-panel flex items-center justify-center shrink-0"
 									style="flex: 0 0 44px; width: 44px; height: 44px; min-width: 44px; min-height: 44px;"
 								>
 									<span
@@ -254,11 +250,44 @@
 		width: 100%;
 	}
 
+	.history-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: 3.5rem 1.5rem;
+	}
+	.history-loading-icon {
+		font-size: 2.5rem;
+		color: var(--accent-blue-base);
+		margin-bottom: 1rem;
+	}
+	.history-empty-icon {
+		font-size: 3.5rem;
+		color: var(--text-muted);
+		opacity: 0.4;
+		margin-bottom: 1rem;
+	}
+	.history-empty-title {
+		font-family: var(--font-display);
+		font-size: 1.2rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0 0 0.5rem 0;
+	}
+	.history-empty-desc {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		max-width: 320px;
+		margin: 0 auto;
+	}
+
 	.filter-btn {
 		padding: 8px 18px;
 		font-size: 0.85rem;
 		font-weight: 600;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 		display: inline-flex;
 		align-items: center;

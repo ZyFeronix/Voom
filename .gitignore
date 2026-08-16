@@ -46,3 +46,73 @@ uploads/
 .DS_Store
 Thumbs.db
 nul
+
+# ─── Estado de instalación / datos locales ───
+install.lock
+tmp_*.sqlite
+tmp_*.sqlite-shm
+tmp_*.sqlite-wal
+
+# ─── Releases (el .zip va a GitHub Releases, no al repo) ───
+vsocial-*.zip
+
+# ─── Docs y notas internas de agentes (no van al repo oficial) ───
+/AGENTS.md
+/CLAUDE.md
+/opencode.jsonc
+/PACKAGING.md
+/docs/
+/tests/
+/.agents/
+/.ai-codex/
+/.claude/
+/.freebuff/
+/.zcode/
+Personality & SOUL.md
+DOCS_BRAND_ZYFERONYX.md
+council_verdict_plan_xai_vsocial.md
+implementaciones_clave_xai.md
+vsocial_plan_opti.md
+
+# ─── Capturas y assets de trabajo ───
+*_dark.png
+*_light.png
+_test_*.png
+test_image_*.jpg
+el_topbar_avatar.png
+Zyferonyx_full.png
+
+# ─── Scripts one-off, backups y basura ad-hoc ───
+# Scaffold muerto de la raíz (la app vive en frontend/)
+/vite.config.js
+/tsconfig.json
+/package.json
+/package-lock.json
+*.bak
+*.bak.*
+*_top.png
+_auth_migration_backup/
+/media/
+ClassicMojis/
+apply_prismatic.py
+build_emoticons.py
+clone_exact.mjs
+evolve_css.mjs
+fix_css.mjs
+force_dark.mjs
+refactor.py
+refactor_css.mjs
+refactor_radii.mjs
+restore_css.mjs
+setup_customizations.js
+debug_db.js
+update_db.js
+migrate_status.js
+test_imports.mjs
+test_install.mjs
+scripts/fix_shadows.mjs
+scripts/start.ps1
+frontend/data.db
+frontend/migrate_status.js
+frontend/old_page.svelte
+frontend/src/routes/fix_radii.py

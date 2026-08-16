@@ -52,9 +52,6 @@ export async function POST({ request }) {
 			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')")
 			.run(userId);
 		await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(userId);
-		await db
-			.prepare('INSERT OR IGNORE INTO wallets (user_id, balance) VALUES (?, 1000)')
-			.run(userId);
 
 		const upsert = await db.prepare(
 			'INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'

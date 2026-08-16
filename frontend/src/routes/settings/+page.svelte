@@ -7,12 +7,116 @@
 	let sectionKey = $state(0);
 	import { users as usersApi, feed as feedApi, auth as authApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { perfStore } from '$lib/stores/perf.svelte.js';
+	import { validatePaymentLink } from '$lib/validators.js';
+	import ImageCropperModal from '$lib/components/ImageCropperModal.svelte';
 
 	// ── Runes State ──────────────────────────────────────────────────────────
-	let activeSection = $state('profile'); // 'profile', 'privacy', 'notifications', 'algorithm', 'data'
+	let activeSection = $state('profile'); // 'profile', 'privacy', 'notifications', 'algorithm', 'data', 'payments', 'performance'
 	let loading = $state(true);
 	let saving = $state(false);
 	let message = $state({ type: '', text: '' });
+
+	// ── Pagos y Enlaces (P2P) ───────────────────────────────────────────────
+	let paymentLink = $state('');
+	let savedPaymentLink = $state('');
+	let paymentLinkHint = $state({ ok: true, host: null, error: '' });
+	let savingPaymentLink = $state(false);
+
+	let selectedPlatform = $state('');
+	let paymentUsername = $state('');
+
+	const PAYMENT_PLATFORMS = [
+		{ id: 'paypal', host: 'paypal.me', name: 'PayPal', prefix: 'paypal.me/' },
+		{ id: 'patreon', host: 'patreon.com', name: 'Patreon', prefix: 'patreon.com/' },
+		{ id: 'kofi', host: 'ko-fi.com', name: 'Ko-fi', prefix: 'ko-fi.com/' }
+	];
+
+	function selectPaymentPlatform(id) {
+		selectedPlatform = id;
+		buildPaymentLink();
+	}
+
+	function buildPaymentLink() {
+		if (!selectedPlatform || !paymentUsername) {
+			paymentLink = '';
+		} else {
+			const p = PAYMENT_PLATFORMS.find((x) => x.id === selectedPlatform);
+			paymentLink = `https://${p.prefix}${paymentUsername.trim()}`;
+		}
+		paymentLinkHint = validatePaymentLink(paymentLink);
+	}
+
+	function parsePaymentLinkToBuilder(urlStr) {
+		if (!urlStr) {
+			selectedPlatform = '';
+			paymentUsername = '';
+			return;
+		}
+		let url;
+		try {
+			url = new URL(urlStr);
+		} catch {
+			return;
+		}
+
+		let host = url.hostname.toLowerCase();
+		if (host.startsWith('www.')) host = host.slice(4);
+
+		const p = PAYMENT_PLATFORMS.find((x) => host === x.host || host.endsWith('.' + x.host));
+		if (p) {
+			selectedPlatform = p.id;
+			paymentUsername = url.pathname.replace(/^\/+/, '');
+		}
+	}
+
+	function onPaymentLinkInput() {
+		buildPaymentLink();
+	}
+
+	async function savePaymentLink() {
+		if (savingPaymentLink) return;
+		const v = validatePaymentLink(paymentLink);
+		if (!v.ok) {
+			paymentLinkHint = v;
+			return;
+		}
+		savingPaymentLink = true;
+		try {
+			await usersApi.updateProfile({ payment_link: v.value });
+			authStore.updateUser({ payment_link: v.value });
+			savedPaymentLink = v.value;
+			paymentLinkHint = { ok: true, host: v.host };
+			message = {
+				type: 'success',
+				text: v.value
+					? 'Enlace de pago guardado y visible en tu perfil.'
+					: 'Enlace de pago eliminado.'
+			};
+		} catch (err) {
+			message = { type: 'error', text: err?.message ?? 'Error al guardar el enlace.' };
+		} finally {
+			savingPaymentLink = false;
+		}
+	}
+
+	async function clearPaymentLink() {
+		if (savingPaymentLink) return;
+		savingPaymentLink = true;
+		try {
+			await usersApi.updateProfile({ payment_link: null });
+			authStore.updateUser({ payment_link: null });
+			paymentLink = '';
+			savedPaymentLink = '';
+			selectedPlatform = '';
+			paymentUsername = '';
+			paymentLinkHint = { ok: true, host: null, error: '' };
+		} catch (err) {
+			console.error('Error clearing payment link', err);
+		} finally {
+			savingPaymentLink = false;
+		}
+	}
 
 	// ── Mis Datos (RGPD) ─────────────────────────────────────────────────────
 	let deletePassword = $state('');
@@ -72,6 +176,11 @@
 	// Media upload inputs
 	let avatarInput = $state(null);
 	let coverInput = $state(null);
+
+	// Cropper State
+	let cropFile = $state(null);
+	let cropType = $state(null); // 'avatar' or 'cover'
+	let cropRatio = $state(1);
 
 	// Change Password fields
 	let oldPassword = $state('');
@@ -255,6 +364,7 @@
 
 	// ── Lifecycle ────────────────────────────────────────────────────────────
 	onMount(async () => {
+		perfStore.init();
 		loading = true;
 		try {
 			// Load user profile defaults
@@ -265,6 +375,13 @@
 				website = authStore.user.website || '';
 				avatarPreview = authStore.user.avatar_url || '';
 				coverPreview = authStore.user.cover_url || '';
+				paymentLink =
+					authStore.user.payment_link && authStore.user.payment_link !== 'null'
+						? authStore.user.payment_link
+						: '';
+				savedPaymentLink = paymentLink;
+				parsePaymentLinkToBuilder(paymentLink);
+				paymentLinkHint = validatePaymentLink(paymentLink);
 			}
 
 			// Load algorithm preferences
@@ -331,48 +448,63 @@
 		}
 	}
 
-	async function handleAvatarChange(e) {
+	function handleAvatarChange(e) {
 		const file = e.target.files[0];
 		if (!file || saving) return;
+		cropFile = file;
+		cropType = 'avatar';
+		cropRatio = 1;
+		e.target.value = ''; // Reset input so it can be selected again
+	}
+
+	function handleCoverChange(e) {
+		const file = e.target.files[0];
+		if (!file || saving) return;
+		cropFile = file;
+		cropType = 'cover';
+		cropRatio = 16 / 5; // 3.2:1 ideal banner ratio
+		e.target.value = '';
+	}
+
+	async function handleCrop(croppedFile) {
+		const type = cropType;
+		cropFile = null;
+		cropType = null;
 
 		saving = true;
 		message = { type: '', text: '' };
 		try {
 			const fd = new FormData();
-			fd.append('avatar', file);
-			const res = await usersApi.uploadAvatar(fd);
-			if (res.success) {
-				avatarPreview = res.avatar_url;
-				authStore.updateUser({ avatar_url: res.avatar_url });
-				message = { type: 'success', text: '¡Foto de perfil actualizada con éxito!' };
+			if (type === 'avatar') {
+				fd.append('avatar', croppedFile);
+				const res = await usersApi.uploadAvatar(fd);
+				if (res.success) {
+					avatarPreview = res.avatar_url;
+					authStore.updateUser({ avatar_url: res.avatar_url });
+					message = { type: 'success', text: '¡Foto de perfil actualizada con éxito!' };
+				}
+			} else if (type === 'cover') {
+				fd.append('cover', croppedFile);
+				const res = await usersApi.uploadCover(fd);
+				if (res.success) {
+					coverPreview = res.cover_url;
+					authStore.updateUser({ cover_url: res.cover_url });
+					message = { type: 'success', text: '¡Portada del perfil actualizada con éxito!' };
+				}
 			}
 		} catch (err) {
-			message = { type: 'error', text: err?.message ?? 'Error al subir foto de perfil.' };
+			message = {
+				type: 'error',
+				text: err?.message ?? `Error al subir ${type === 'avatar' ? 'foto de perfil' : 'portada'}.`
+			};
 		} finally {
 			saving = false;
 		}
 	}
 
-	async function handleCoverChange(e) {
-		const file = e.target.files[0];
-		if (!file || saving) return;
-
-		saving = true;
-		message = { type: '', text: '' };
-		try {
-			const fd = new FormData();
-			fd.append('cover', file);
-			const res = await usersApi.uploadCover(fd);
-			if (res.success) {
-				coverPreview = res.cover_url;
-				authStore.updateUser({ cover_url: res.cover_url });
-				message = { type: 'success', text: '¡Portada del perfil actualizada con éxito!' };
-			}
-		} catch (err) {
-			message = { type: 'error', text: err?.message ?? 'Error al subir portada.' };
-		} finally {
-			saving = false;
-		}
+	function cancelCrop() {
+		cropFile = null;
+		cropType = null;
 	}
 
 	async function handleChangePassword(e) {
@@ -509,6 +641,35 @@
 				<span class="material-icons-round">folder_special</span>
 				<span>Mis Datos</span>
 			</button>
+
+			<button
+				onclick={() => selectSection('payments')}
+				class="sidebar-btn"
+				class:active={activeSection === 'payments'}
+			>
+				<span class="material-icons-round">payments</span>
+				<span>Pagos y Enlaces</span>
+			</button>
+
+			<button
+				onclick={() => selectSection('performance')}
+				class="sidebar-btn"
+				class:active={activeSection === 'performance'}
+			>
+				<span class="material-icons-round">speed</span>
+				<span>Rendimiento</span>
+			</button>
+
+			{#if authStore.isTeamOrHigher}
+				<a
+					href="/studio/emotes"
+					class="sidebar-btn sidebar-btn-team"
+					style="text-decoration: none;"
+				>
+					<span class="material-icons-round" style="color: var(--aero-mint);">military_tech</span>
+					<span>Estudio Emotes (EXP)</span>
+				</a>
+			{/if}
 		</div>
 
 		<!-- Right Sidebar Content Box -->
@@ -551,61 +712,92 @@
 										</p>
 									</div>
 
-									<!-- Media Uploads Section -->
-									<div class="media-uploads-row">
-										<!-- Avatar Upload -->
-										<div class="avatar-upload-box">
-											<div class="profile-avatar-circle">
-												{#if avatarPreview}
-													<img src={avatarPreview} alt="Avatar preview" />
-												{:else}
-													<span>{displayName[0]?.toUpperCase() || '?'}</span>
-												{/if}
-											</div>
-											<input
-												id="avatar-upload"
-												name="avatar-upload"
-												type="file"
-												accept="image/*"
-												bind:this={avatarInput}
-												onchange={handleAvatarChange}
-												style="display: none;"
-											/>
+									<!-- Visual Identity Studio (Avatar & Cover) -->
+									<div class="profile-visual-card glass-panel">
+										<!-- Cover Preview Banner -->
+										<div class="profile-visual-cover">
+											{#if coverPreview}
+												<img src={coverPreview} alt="Vista previa de portada" />
+											{:else}
+												<div class="no-cover-art">
+													<span class="material-icons-round no-cover-icon">panorama</span>
+													<span>Sin imagen de portada configurada</span>
+												</div>
+											{/if}
+											<div class="cover-gradient-shade"></div>
+
+											<!-- Cover Action Floating Button -->
 											<button
 												type="button"
-												class="btn-aero-secondary btn-xs"
-												onclick={() => avatarInput.click()}
+												class="btn-cover-action"
+												onclick={() => coverInput.click()}
+												title="Cambiar imagen de portada (16:5)"
 											>
-												Cambiar avatar
+												<span class="material-icons-round">photo_camera</span>
+												<span class="btn-text">Cambiar portada</span>
 											</button>
 										</div>
 
-										<!-- Cover Upload -->
-										<div class="cover-upload-box">
-											<div class="profile-cover-preview">
-												{#if coverPreview}
-													<img src={coverPreview} alt="Cover preview" />
-												{:else}
-													<div class="no-cover-placeholder">Sin portada de perfil</div>
-												{/if}
+										<!-- Avatar & Studio Info Row -->
+										<div class="profile-visual-bottom">
+											<div class="avatar-interactive-slot">
+												<div class="avatar-visual-circle">
+													{#if avatarPreview}
+														<img src={avatarPreview} alt="Avatar preview" />
+													{:else}
+														<span class="avatar-initials-text"
+															>{displayName[0]?.toUpperCase() || '?'}</span
+														>
+													{/if}
+													<!-- Camera Overlay Badge Button -->
+													<button
+														type="button"
+														class="avatar-camera-overlay"
+														onclick={() => avatarInput.click()}
+														aria-label="Cambiar foto de perfil"
+														title="Cambiar foto de perfil (1:1)"
+													>
+														<span class="material-icons-round">photo_camera</span>
+													</button>
+													<div class="avatar-corner-badge" aria-hidden="true">
+														<span class="material-icons-round">photo_camera</span>
+													</div>
+												</div>
 											</div>
-											<input
-												id="cover-upload"
-												name="cover-upload"
-												type="file"
-												accept="image/*"
-												bind:this={coverInput}
-												onchange={handleCoverChange}
-												style="display: none;"
-											/>
-											<button
-												type="button"
-												class="btn-aero-secondary btn-xs"
-												onclick={() => coverInput.click()}
-											>
-												Cambiar portada
-											</button>
+
+											<div class="visual-actions-meta">
+												<div class="visual-hints-row">
+													<span class="visual-hint">
+														<span class="material-icons-round hint-dot">check_circle</span>
+														Avatar: 1:1 circular
+													</span>
+													<span class="visual-hint">
+														<span class="material-icons-round hint-dot">check_circle</span>
+														Portada: 16:5 panorámica (1920×600px)
+													</span>
+												</div>
+											</div>
 										</div>
+
+										<!-- Hidden file inputs -->
+										<input
+											id="avatar-upload"
+											name="avatar-upload"
+											type="file"
+											accept="image/*"
+											bind:this={avatarInput}
+											onchange={handleAvatarChange}
+											style="display: none;"
+										/>
+										<input
+											id="cover-upload"
+											name="cover-upload"
+											type="file"
+											accept="image/*"
+											bind:this={coverInput}
+											onchange={handleCoverChange}
+											style="display: none;"
+										/>
 									</div>
 
 									<!-- General Form -->
@@ -639,7 +831,7 @@
 													id="location"
 													type="text"
 													bind:value={location}
-													placeholder="Metaverso, Twitch, Japón..."
+													placeholder="Internet, Twitch, Japón..."
 													class="aero-input"
 												/>
 											</div>
@@ -733,7 +925,7 @@
 										<div class="chart-container" class:dimmed={feedMode !== 'intelligent'}>
 											<h4 class="chart-title">Distribución de Pesos</h4>
 											<div class="chart-bars">
-												{#each [{ label: 'Intereses', val: wInterests, color: 'linear-gradient(to top, #00E5FF, #0077FF)' }, { label: 'Interacciones', val: wInteractions, color: 'linear-gradient(to top, #7000ff, #f000ff)' }, { label: 'Social', val: wSocial, color: 'linear-gradient(to top, #ec4899, #f43f5e)' }, { label: 'Popularidad', val: wPopularity, color: 'linear-gradient(to top, #ef4444, #f97316)' }, { label: 'Recencia', val: wRecency, color: 'linear-gradient(to top, #10b981, #059669)' }, { label: 'Diversidad', val: wDiversity, color: 'linear-gradient(to top, #f59e0b, #d97706)' }] as bar}
+												{#each [{ label: 'Intereses', val: wInterests, color: 'linear-gradient(to top, var(--aero-sky), var(--aero-blue))' }, { label: 'Interacciones', val: wInteractions, color: 'linear-gradient(to top, #a855f7, #d946ef)' }, { label: 'Social', val: wSocial, color: 'linear-gradient(to top, var(--aero-coral), var(--aero-rose))' }, { label: 'Popularidad', val: wPopularity, color: 'linear-gradient(to top, #ef4444, #f97316)' }, { label: 'Recencia', val: wRecency, color: 'linear-gradient(to top, var(--aero-mint), #059669)' }, { label: 'Diversidad', val: wDiversity, color: 'linear-gradient(to top, #fcd34d, var(--aero-amber))' }] as bar}
 													{@const pct = (bar.val / totalWeight) * 100}
 													<div class="bar-col">
 														<span class="bar-pct-text">{pct.toFixed(0)}%</span>
@@ -1131,14 +1323,14 @@
 									<!-- Zona de peligro: eliminación de cuenta (art. 17 supresión) -->
 									<div
 										class="danger-zone"
-										style="border: 1px solid rgba(255,0,110,0.3); border-radius: 14px; padding: 1.25rem; margin-top: 1rem;"
+										style="border: 1px solid color-mix(in srgb, var(--aero-rose) 30%, transparent); border-radius: var(--radius-md); padding: 1.25rem; margin-top: 1rem;"
 									>
-										<h4
-											class="section-title"
-											style="color: #FF006E; font-size: 1.05rem; margin-bottom: 0.5rem;"
+										<div
+											class="danger-title"
+											style="color: var(--aero-rose); font-size: 1.05rem; margin-bottom: 0.5rem;"
 										>
 											Eliminar cuenta
-										</h4>
+										</div>
 										<p class="toggle-desc" style="margin-bottom: 0.85rem;">
 											Tu cuenta se desactivará de inmediato y se eliminará permanentemente, junto
 											con todo su contenido, transcurridos 30 días. Puedes reactivarla iniciando
@@ -1155,15 +1347,18 @@
 										>
 											<input
 												type="password"
+												id="deletePassword"
 												bind:value={deletePassword}
 												placeholder="Confirma tu contraseña"
-												class="aero-input w-full"
+												class="aero-input"
+												style="width: 100%; max-width: 360px;"
 												autocomplete="current-password"
+												required
 											/>
 											<button
 												type="submit"
 												class="btn-aero-primary"
-												style="padding: 10px 20px; background: #FF006E; align-self: flex-start;"
+												style="padding: 10px 20px; background: var(--aero-rose); align-self: flex-start;"
 												disabled={deleting || !deletePassword}
 											>
 												<span class="btn-spinner" class:show={deleting}>
@@ -1174,6 +1369,302 @@
 										</form>
 									</div>
 								</div>
+							{:else if activeSection === 'payments'}
+								<div class="section-content">
+									<div>
+										<h3 class="section-title">Pagos y Enlaces</h3>
+										<p class="section-subtitle">
+											Conecta tu método de cobro externo para recibir pagos directamente, sin
+											intermediarios de la plataforma.
+										</p>
+									</div>
+
+									<div class="payment-card">
+										<div class="payment-card-head">
+											<div class="payment-icon-wrapper">
+												<div class="payment-glow"></div>
+												<div class="payment-icon">
+													<span class="material-icons-round">payments</span>
+												</div>
+											</div>
+											<div class="payment-card-title">
+												<span class="toggle-title">Enlace de cobro (P2P)</span>
+												<span class="toggle-desc"
+													>Recibe apoyos directos en tu perfil. Compatible con <strong
+														>PayPal</strong
+													>, <strong>Ko-fi</strong> o <strong>Patreon</strong>.</span
+												>
+											</div>
+										</div>
+
+										<div
+											class="payment-platform-selector"
+											style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;"
+										>
+											{#each PAYMENT_PLATFORMS as p}
+												<button
+													class="platform-pill {selectedPlatform === p.id ? 'active' : ''}"
+													onclick={() => selectPaymentPlatform(p.id)}
+													style="padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border-subtle); background: {selectedPlatform ===
+													p.id
+														? 'var(--aero-blue)'
+														: 'var(--bg-surface-elevated)'}; color: {selectedPlatform === p.id
+														? '#fff'
+														: 'var(--text-primary)'}; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s ease;"
+												>
+													<span class="material-icons-round" style="font-size: 1.1rem;"
+														>{selectedPlatform === p.id
+															? 'check_circle'
+															: 'radio_button_unchecked'}</span
+													>
+													{p.name}
+												</button>
+											{/each}
+										</div>
+
+										{#if selectedPlatform}
+											<div class="payment-input-row" transition:slide={{ duration: 300 }}>
+												<div class="payment-input-wrap" class:has-value={!!paymentUsername}>
+													<div
+														class="payment-input-field"
+														style="display: flex; align-items: center;"
+													>
+														<span
+															class="payment-prefix"
+															style="color: var(--text-muted); font-weight: 500; margin-left: 14px; margin-right: 2px;"
+															>{PAYMENT_PLATFORMS.find((p) => p.id === selectedPlatform)
+																?.prefix}</span
+														>
+														<input
+															type="text"
+															bind:value={paymentUsername}
+															oninput={onPaymentLinkInput}
+															placeholder="tu_usuario"
+															class="payment-input"
+															style="padding-left: 2px;"
+															aria-label="Nombre de usuario"
+														/>
+													</div>
+													<button
+														class="btn-aero-primary payment-save"
+														onclick={savePaymentLink}
+														disabled={savingPaymentLink ||
+															!paymentUsername.trim() ||
+															paymentLink === savedPaymentLink}
+													>
+														<span class="btn-spinner" class:show={savingPaymentLink}>
+															<span class="loading loading-spinner loading-xs"></span>
+														</span>
+														{savingPaymentLink ? 'Guardando...' : 'Guardar'}
+													</button>
+												</div>
+											</div>
+										{/if}
+
+										{#if paymentLink}
+											<div class="payment-validation" transition:slide={{ duration: 300 }}>
+												{#if paymentLinkHint.error}
+													<p class="payment-hint error">
+														<span class="material-icons-round">error_outline</span>
+														{paymentLinkHint.error}
+													</p>
+												{:else if paymentLinkHint.host}
+													<p class="payment-hint ok">
+														<span class="material-icons-round">verified</span>
+														Enlace válido detectado →
+														<span class="platform-name">{paymentLinkHint.host}</span>
+													</p>
+												{/if}
+											</div>
+										{/if}
+
+										{#if savedPaymentLink}
+											<div class="payment-preview-card" transition:slide={{ duration: 400 }}>
+												<span class="payment-preview-label">Así se verá en tu perfil público</span>
+												<div class="payment-preview-mockup">
+													<div class="mockup-banner"></div>
+													<div class="mockup-avatar">
+														<span class="material-icons-round">person</span>
+													</div>
+													<div class="mockup-info">
+														<div class="mockup-name">
+															@{authStore.user?.username || 'tu_usuario'}
+														</div>
+														<div class="mockup-bio">Creador verificado</div>
+													</div>
+													<a
+														href={savedPaymentLink}
+														target="_blank"
+														rel="noopener noreferrer nofollow"
+														class="btn-aero-primary mockup-btn"
+													>
+														<span class="material-icons-round">favorite</span>
+														Apoyar
+													</a>
+												</div>
+												<div class="payment-actions-footer">
+													<button
+														class="btn-aero-ghost text-danger action-btn"
+														onclick={clearPaymentLink}
+													>
+														<span class="material-icons-round">delete</span>
+														Eliminar enlace actual
+													</button>
+												</div>
+											</div>
+										{:else}
+											<div class="payment-empty-state">
+												<span class="material-icons-round">visibility_off</span>
+												<p>Sin enlace configurado: el botón "Apoyar" permanecerá oculto.</p>
+												{#if paymentLink}
+													<button
+														class="btn-aero-ghost text-muted mt-2 action-btn"
+														onclick={clearPaymentLink}>Descartar cambios</button
+													>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								</div>
+							{:else if activeSection === 'performance'}
+								<div class="section-content">
+									<div>
+										<h3 class="section-title">Rendimiento & Accesibilidad</h3>
+										<p class="section-subtitle">
+											Optimiza la experiencia visual y fluidez de la interfaz para tu equipo y
+											preferencias de navegación.
+										</p>
+									</div>
+
+									<div
+										class="glass-card p-5 mt-4"
+										style="display: flex; flex-direction: column; gap: 16px;"
+									>
+										<div
+											class="flex items-center justify-between gap-4 py-3"
+											style="border-bottom: 1px solid var(--border-subtle);"
+										>
+											<div>
+												<h4 class="font-bold text-main" style="font-size: 0.95rem;">
+													Modo Rendimiento (Lite)
+												</h4>
+												<p class="text-xs text-muted" style="margin-top: 2px;">
+													Desactiva el desenfoque de cristal (backdrop-filter) y sombras complejas
+													para máxima fluidez en gráficos integrados.
+												</p>
+											</div>
+											<label class="toggle-switch">
+												<input
+													type="checkbox"
+													checked={perfStore.perfMode}
+													onchange={(e) => perfStore.setPerfMode(e.currentTarget.checked)}
+												/>
+												<span class="toggle-slider"></span>
+											</label>
+										</div>
+
+										<div
+											class="flex items-center justify-between gap-4 py-3"
+											style="border-bottom: 1px solid var(--border-subtle);"
+										>
+											<div>
+												<h4 class="font-bold text-main" style="font-size: 0.95rem;">
+													Reducir Movimiento
+												</h4>
+												<p class="text-xs text-muted" style="margin-top: 2px;">
+													Desactiva transiciones y animaciones continuas (accesibilidad vestibular y
+													ahorro de CPU).
+												</p>
+											</div>
+											<label class="toggle-switch">
+												<input
+													type="checkbox"
+													checked={perfStore.reduceMotion}
+													onchange={(e) => perfStore.setReduceMotion(e.currentTarget.checked)}
+												/>
+												<span class="toggle-slider"></span>
+											</label>
+										</div>
+
+										<div
+											class="flex items-center justify-between gap-4 py-3"
+											style="border-bottom: 1px solid var(--border-subtle);"
+										>
+											<div>
+												<h4 class="font-bold text-main" style="font-size: 0.95rem;">
+													Fondo Fluido Dinámico (Aurora Blobs)
+												</h4>
+												<p class="text-xs text-muted" style="margin-top: 2px;">
+													Gradientes animados con desenfoque de 120px en el fondo. Desactivarlo
+													reduce drásticamente el uso de VRAM/GPU.
+												</p>
+											</div>
+											<label class="toggle-switch">
+												<input
+													type="checkbox"
+													checked={!perfStore.disableLiquidBg}
+													onchange={(e) => perfStore.setDisableLiquidBg(!e.currentTarget.checked)}
+												/>
+												<span class="toggle-slider"></span>
+											</label>
+										</div>
+
+										<div
+											class="mt-2 p-4 rounded-xl"
+											style="background: rgba(27, 133, 243, 0.08); border: 1px solid rgba(27, 133, 243, 0.25); border-radius: var(--radius-md);"
+										>
+											<div
+												class="flex items-center gap-3"
+												style="display: flex; align-items: center; gap: 12px;"
+											>
+												<span
+													class="material-icons-round"
+													style="color: var(--aero-blue); font-size: 28px;">memory</span
+												>
+												<div>
+													<div class="text-xs font-bold text-main" style="font-size: 0.85rem;">
+														Diagnóstico de Hardware
+													</div>
+													<div
+														class="text-xs text-muted"
+														style="font-size: 0.78rem; margin-top: 2px;"
+													>
+														Núcleos CPU: <strong>{perfStore.hardwareInfo.cores}</strong>
+														{#if perfStore.hardwareInfo.memoryGB}
+															&bull; RAM: <strong>~{perfStore.hardwareInfo.memoryGB} GB</strong>
+														{/if}
+														&bull; Recomendación:
+														<strong
+															style="color: {perfStore.hardwareInfo.isLowEnd
+																? 'var(--aero-amber)'
+																: 'var(--aero-mint)'};"
+															>{perfStore.hardwareInfo.isLowEnd
+																? 'Modo Rendimiento'
+																: 'Modo Alta Calidad'}</strong
+														>
+													</div>
+												</div>
+											</div>
+											<button
+												type="button"
+												class="btn-aero-secondary mt-3 w-full text-xs"
+												style="margin-top: 12px; width: 100%; font-size: 0.8rem; padding: 8px 12px; display: flex; align-items: center; justify-content: center; gap: 6px;"
+												onclick={() => {
+													perfStore.applyRecommendedSettings();
+													message = {
+														type: 'success',
+														text: 'Ajustes de rendimiento optimizados aplicados con éxito.'
+													};
+												}}
+											>
+												<span class="material-icons-round" style="font-size: 18px;"
+													>auto_fix_high</span
+												>
+												Aplicar configuración recomendada para mi equipo
+											</button>
+										</div>
+									</div>
+								</div>
 							{/if}
 						</div>
 					{/key}
@@ -1182,6 +1673,21 @@
 		</div>
 	</div>
 </div>
+
+{#if cropFile}
+	<ImageCropperModal
+		imageFile={cropFile}
+		aspectRatio={cropRatio}
+		shape={cropType === 'avatar' ? 'circle' : 'rect'}
+		{cropType}
+		title={cropType === 'avatar' ? 'Ajustar Foto de Perfil' : 'Ajustar Portada de Perfil'}
+		subtitle={cropType === 'avatar'
+			? 'Centra y escala tu avatar • Proporción 1:1'
+			: 'Encuadra tu banner panorámico • Proporción 16:5'}
+		onCrop={handleCrop}
+		onCancel={cancelCrop}
+	/>
+{/if}
 
 <style>
 	.settings-container {
@@ -1222,7 +1728,7 @@
 	.sidebar-btn {
 		width: 100%;
 		padding: 12px 16px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		font-size: 0.85rem;
 		font-weight: 600;
 		text-align: left;
@@ -1254,7 +1760,7 @@
 		top: 20%;
 		bottom: 20%;
 		width: 3px;
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		background: var(--aero-blue);
 		opacity: 0;
 		transform: scaleY(0.3);
@@ -1269,10 +1775,10 @@
 	}
 
 	.sidebar-btn.active {
-		background: rgba(27, 133, 243, 0.08);
-		border-color: rgba(27, 133, 243, 0.18);
+		background: color-mix(in srgb, var(--aero-blue) 8%, transparent);
+		border-color: color-mix(in srgb, var(--aero-blue) 18%, transparent);
 		color: var(--aero-blue);
-		box-shadow: 0 0 12px rgba(27, 133, 243, 0.08);
+		box-shadow: 0 0 12px color-mix(in srgb, var(--aero-blue) 8%, transparent);
 	}
 
 	.sidebar-btn.active::before {
@@ -1286,7 +1792,7 @@
 
 	.panel-card {
 		padding: 32px;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 		min-height: 750px;
 	}
 
@@ -1332,7 +1838,7 @@
 
 	.alert-box {
 		padding: 12px 16px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		font-size: 0.8rem;
 		display: flex;
 		align-items: center;
@@ -1341,14 +1847,14 @@
 	}
 
 	.alert-box.success {
-		background: rgba(61, 199, 154, 0.08);
-		border: 1px solid rgba(61, 199, 154, 0.25);
+		background: color-mix(in srgb, var(--aero-mint) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--aero-mint) 25%, transparent);
 		color: var(--aero-mint);
 	}
 
 	.alert-box.error {
-		background: rgba(232, 74, 114, 0.08);
-		border: 1px solid rgba(232, 74, 114, 0.25);
+		background: color-mix(in srgb, var(--aero-rose) 8%, transparent);
+		border: 1px solid color-mix(in srgb, var(--aero-rose) 25%, transparent);
 		color: var(--aero-rose);
 	}
 
@@ -1392,75 +1898,224 @@
 		margin: 4px 0 0 0;
 	}
 
-	.media-uploads-row {
-		display: flex;
-		gap: 24px;
-		align-items: flex-start;
-		flex-wrap: wrap;
-		padding: 20px;
-		background: rgba(0, 229, 255, 0.04);
-		border-radius: 16px;
-		border: 1px solid rgba(0, 119, 255, 0.08);
+	/* Visual Identity Studio (Avatar & Cover) */
+	.profile-visual-card {
+		border-radius: var(--radius-xl);
+		border: 1px solid var(--border-subtle);
+		overflow: hidden;
+		background: var(--bg-surface);
+		box-shadow:
+			0 8px 30px rgba(0, 0, 0, 0.08),
+			var(--glass-inset-highlight);
+		margin-bottom: 8px;
 	}
 
-	.avatar-upload-box {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 10px;
-	}
-
-	.profile-avatar-circle {
-		width: 80px;
-		height: 80px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #00e5ff 0%, #0077ff 100%);
+	.profile-visual-cover {
+		position: relative;
+		width: 100%;
+		height: 140px;
+		background: color-mix(in srgb, var(--aero-blue) 12%, var(--bg-surface2));
+		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #000;
-		font-weight: 700;
-		font-size: 1.8rem;
-		overflow: hidden;
-		box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2);
 	}
 
-	.profile-avatar-circle img {
+	.profile-visual-cover img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		object-position: center center;
+		display: block;
 	}
 
-	.cover-upload-box {
+	.no-cover-art {
 		display: flex;
-		flex-direction: column;
 		align-items: center;
-		gap: 10px;
+		justify-content: center;
+		gap: 8px;
+		color: var(--text-muted);
+		font-size: 0.85rem;
+		font-weight: 500;
+	}
+
+	.no-cover-icon {
+		font-size: 22px;
+		color: var(--text-muted);
+	}
+
+	.cover-gradient-shade {
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, transparent 60%);
+		pointer-events: none;
+	}
+
+	.btn-cover-action {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		z-index: 5;
+		background: rgba(0, 0, 0, 0.55);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		color: #ffffff;
+		border-radius: var(--radius-full);
+		padding: 6px 14px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+		transition:
+			background var(--t-fast),
+			border-color var(--t-fast),
+			transform var(--t-fast);
+	}
+
+	.btn-cover-action:hover {
+		background: var(--aero-blue);
+		border-color: #ffffff;
+		transform: translateY(-1px);
+	}
+
+	.btn-cover-action:active {
+		transform: translateY(1px);
+	}
+
+	.profile-visual-bottom {
+		display: flex;
+		align-items: flex-start;
+		gap: 20px;
+		padding: 0 20px 20px 20px;
+		margin-top: -44px;
+		position: relative;
+		z-index: 6;
+		flex-wrap: wrap;
+	}
+
+	.avatar-interactive-slot {
+		flex: 0 0 94px;
+	}
+
+	.avatar-visual-circle {
+		width: 94px;
+		height: 94px;
+		border-radius: var(--radius-xl);
+		position: relative;
+		border: 4px solid var(--bg-surface-solid, var(--bg-surface));
+		background: var(--accent-gradient);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow:
+			0 8px 24px rgba(0, 0, 0, 0.3),
+			0 0 0 1px var(--border-subtle);
+		overflow: hidden;
+		transition: transform var(--t-spring);
+	}
+
+	.avatar-visual-circle:hover {
+		transform: scale(1.02);
+	}
+
+	.avatar-visual-circle img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		object-position: center center;
+		display: block;
+	}
+
+	.avatar-initials-text {
+		color: #ffffff;
+		font-weight: 800;
+		font-size: 2.2rem;
+		font-family: var(--font-display);
+	}
+
+	.avatar-camera-overlay {
+		position: absolute;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		backdrop-filter: blur(2px);
+		-webkit-backdrop-filter: blur(2px);
+		border: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #ffffff;
+		font-size: 24px;
+		opacity: 0;
+		cursor: pointer;
+		transition: opacity var(--t-fast);
+		z-index: 2;
+	}
+
+	.avatar-visual-circle:hover .avatar-camera-overlay,
+	.avatar-camera-overlay:focus-visible {
+		opacity: 1;
+	}
+
+	.avatar-corner-badge {
+		position: absolute;
+		bottom: 4px;
+		right: 4px;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(4px);
+		-webkit-backdrop-filter: blur(4px);
+		border: 1.5px solid rgba(255, 255, 255, 0.65);
+		color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+		pointer-events: none;
+		z-index: 1;
+		transition: opacity var(--t-fast);
+	}
+
+	.avatar-corner-badge .material-icons-round {
+		font-size: 15px;
+	}
+
+	.avatar-visual-circle:hover .avatar-corner-badge {
+		opacity: 0;
+	}
+
+	.visual-actions-meta {
 		flex: 1;
 		min-width: 240px;
-	}
-
-	.profile-cover-preview {
-		width: 100%;
-		height: 80px;
-		border-radius: 12px;
-		overflow: hidden;
-		border: 1px solid rgba(0, 119, 255, 0.1);
-		background: rgba(0, 119, 255, 0.06);
+		padding-top: 52px;
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		justify-content: center;
 	}
 
-	.profile-cover-preview img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
+	.visual-hints-row {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		flex-wrap: wrap;
 	}
 
-	.no-cover-placeholder {
+	.visual-hint {
 		font-size: 0.75rem;
 		color: var(--text-muted);
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.hint-dot {
+		font-size: 14px;
+		color: var(--aero-mint, #00d4aa);
 	}
 
 	.form-container {
@@ -1495,14 +2150,15 @@
 			grid-template-columns: 1fr;
 		}
 
-		.media-uploads-row {
+		.profile-visual-bottom {
 			flex-direction: column;
 			align-items: center;
 			text-align: center;
 		}
 
-		.cover-upload-box {
-			width: 100%;
+		.visual-actions-meta {
+			padding-top: 10px;
+			align-items: center;
 		}
 	}
 
@@ -1525,7 +2181,7 @@
 		gap: 6px;
 		text-align: left;
 		padding: 16px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		background: var(--bg-overlay);
 		border: 1px solid var(--border-subtle);
 		cursor: pointer;
@@ -1538,7 +2194,7 @@
 
 	.mode-card:hover {
 		transform: translateY(-2px);
-		border-color: rgba(0, 119, 255, 0.3);
+		border-color: color-mix(in srgb, var(--aero-blue) 30%, transparent);
 	}
 
 	.mode-card:active {
@@ -1546,9 +2202,9 @@
 	}
 
 	.mode-card.active {
-		background: rgba(0, 229, 255, 0.06);
-		border-color: rgba(0, 119, 255, 0.4);
-		box-shadow: 0 0 18px rgba(0, 119, 255, 0.12);
+		background: color-mix(in srgb, var(--aero-blue) 6%, transparent);
+		border-color: color-mix(in srgb, var(--aero-blue) 40%, transparent);
+		box-shadow: 0 0 18px color-mix(in srgb, var(--aero-blue) 12%, transparent);
 	}
 
 	.mode-card-head {
@@ -1576,7 +2232,7 @@
 
 	.mode-card.active .mode-card-tag {
 		color: var(--aero-sky);
-		border-color: rgba(0, 119, 255, 0.3);
+		border-color: color-mix(in srgb, var(--aero-blue) 30%, transparent);
 	}
 
 	.mode-card-title {
@@ -1596,9 +2252,9 @@
 		align-items: center;
 		gap: 10px;
 		padding: 12px 16px;
-		border-radius: 14px;
-		background: rgba(0, 229, 255, 0.05);
-		border: 1px solid rgba(0, 119, 255, 0.12);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--aero-blue) 5%, transparent);
+		border: 1px solid color-mix(in srgb, var(--aero-blue) 12%, transparent);
 		font-size: 0.78rem;
 		color: var(--text-main);
 		line-height: 1.4;
@@ -1633,7 +2289,7 @@
 		font-weight: 700;
 		cursor: pointer;
 		padding: 4px 8px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		transition:
 			color 0.2s ease,
 			background 0.2s ease;
@@ -1641,7 +2297,7 @@
 
 	.reset-btn:hover {
 		color: var(--aero-rose);
-		background: rgba(232, 74, 114, 0.08);
+		background: color-mix(in srgb, var(--aero-rose) 8%, transparent);
 	}
 
 	.reset-btn .material-icons-round {
@@ -1675,7 +2331,7 @@
 
 	.preset-chip:hover {
 		color: var(--text-primary);
-		border-color: rgba(0, 119, 255, 0.3);
+		border-color: color-mix(in srgb, var(--aero-blue) 30%, transparent);
 	}
 
 	.preset-chip:active {
@@ -1683,9 +2339,10 @@
 	}
 
 	.preset-chip.active {
-		color: var(--aero-sky);
-		background: rgba(0, 229, 255, 0.08);
-		border-color: rgba(0, 119, 255, 0.4);
+		background: color-mix(in srgb, var(--aero-sky) 8%, transparent);
+		border-color: color-mix(in srgb, var(--aero-blue) 40%, transparent);
+		color: var(--aero-blue);
+		box-shadow: 0 0 12px color-mix(in srgb, var(--aero-blue) 12%, transparent);
 	}
 
 	.preset-chip .material-icons-round {
@@ -1712,10 +2369,10 @@
 	}
 
 	.chart-container {
-		background: rgba(0, 229, 255, 0.04);
-		border: 1px solid rgba(0, 119, 255, 0.08);
+		background: color-mix(in srgb, var(--aero-sky) 4%, transparent);
+		border: 1px solid color-mix(in srgb, var(--aero-blue) 8%, transparent);
 		padding: 16px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
@@ -1736,7 +2393,7 @@
 		gap: 8px;
 		justify-content: space-around;
 		padding-top: 16px;
-		border-bottom: 1px solid rgba(0, 119, 255, 0.1);
+		border-bottom: 1px solid color-mix(in srgb, var(--aero-blue) 10%, transparent);
 	}
 
 	.bar-col {
@@ -1821,7 +2478,7 @@
 		appearance: none;
 		width: 100%;
 		height: 4px;
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		background: var(--border-subtle);
 		outline: none;
 		margin-top: 6px;
@@ -1832,10 +2489,11 @@
 		appearance: none;
 		width: 14px;
 		height: 14px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-sky);
 		cursor: pointer;
-		box-shadow: 0 0 8px rgba(74, 171, 223, 0.4);
+		box-shadow: 0 0 8px color-mix(in srgb, var(--aero-sky) 40%, transparent);
 		transition: transform var(--t-fast);
 	}
 
@@ -1881,7 +2539,8 @@
 		-webkit-appearance: none;
 		width: 16px;
 		height: 16px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		border: 2px solid var(--border-subtle);
 		outline: none;
 		display: flex;
@@ -1930,5 +2589,317 @@
 	.border-bottom {
 		border-bottom: 1px solid var(--border-subtle);
 		padding-bottom: 12px;
+	}
+
+	/* Hint de validación del enlace P2P */
+	.payment-validation {
+		margin-top: 2px;
+	}
+	.payment-hint {
+		font-size: 0.72rem;
+		margin: 0;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.payment-hint .material-icons-round {
+		font-size: 1rem;
+	}
+	.payment-hint.ok {
+		color: var(--aero-mint);
+	}
+	.payment-hint.error {
+		color: var(--aero-rose);
+	}
+	.platform-name {
+		font-weight: 800;
+		text-transform: capitalize;
+		color: var(--text-primary);
+	}
+
+	/* Tarjeta de Pagos y Enlaces */
+	.payment-card {
+		background: var(--glass-bg);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		border: 1px solid var(--glass-border);
+		box-shadow: var(--glass-inset-highlight), var(--shadow-glow, 0 4px 20px rgba(0, 0, 0, 0.08));
+		border-radius: var(--radius-lg);
+		padding: 24px;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		position: relative;
+		overflow: hidden;
+		transform: translateZ(0);
+	}
+	.payment-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 1px;
+		background: var(--glass-border-t);
+		z-index: 1;
+	}
+
+	.payment-card-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+		position: relative;
+		z-index: 2;
+	}
+	.payment-icon-wrapper {
+		position: relative;
+		width: 48px;
+		height: 48px;
+		flex: 0 0 48px;
+	}
+	.payment-icon {
+		position: absolute;
+		inset: 0;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
+		background: var(--accent-gradient);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 2;
+		color: #fff;
+		font-size: 1.5rem;
+		box-shadow:
+			inset 0 2px 4px rgba(255, 255, 255, 0.4),
+			0 4px 12px rgba(14, 165, 233, 0.3);
+	}
+	.payment-glow {
+		position: absolute;
+		inset: -4px;
+		background: var(--accent-gradient);
+		filter: blur(12px);
+		opacity: 0.6;
+		z-index: 1;
+		border-radius: var(--radius-squircle);
+		animation: pulse-glow 3s infinite alternate ease-in-out;
+	}
+	@keyframes pulse-glow {
+		0% {
+			opacity: 0.4;
+			transform: scale(0.95);
+		}
+		100% {
+			opacity: 0.7;
+			transform: scale(1.05);
+		}
+	}
+
+	.payment-card-title {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.payment-card-title .toggle-title {
+		font-size: 1.1rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+	.payment-card-title .toggle-desc {
+		font-size: 0.85rem;
+		line-height: 1.4;
+	}
+
+	.payment-input-row {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		position: relative;
+		z-index: 2;
+	}
+	.payment-input-wrap {
+		display: flex;
+		gap: 8px;
+		background: var(--bg-input);
+		border: 1px solid var(--border-subtle);
+		padding: 6px;
+		border-radius: var(--radius-full);
+		transition: all var(--t-fast);
+		box-shadow: var(--input-shadow-inner, inset 0 2px 4px rgba(0, 0, 0, 0.02));
+		position: relative;
+	}
+	.payment-input-field {
+		display: flex;
+		flex: 1;
+		align-items: center;
+		gap: 8px;
+		padding-left: 12px;
+	}
+	.payment-input {
+		flex: 1;
+		min-width: 0;
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		padding: 8px 12px 8px 0;
+		outline: none;
+	}
+	.payment-input-wrap:focus-within {
+		border-color: var(--accent-blue-light);
+		box-shadow:
+			0 0 0 3px rgba(46, 180, 255, 0.2),
+			var(--input-shadow-inner);
+		background: var(--bg-input-tint);
+	}
+	.payment-save {
+		border-radius: var(--radius-full);
+		padding: 10px 24px;
+		flex-shrink: 0;
+		font-weight: 700;
+		letter-spacing: 0.5px;
+	}
+	.payment-save:not(:disabled) {
+		box-shadow: var(--shadow-btn-primary);
+	}
+
+	.payment-preview-card {
+		margin-top: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 20px;
+		background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+		border-radius: var(--radius-md);
+		border: 1px dashed var(--border-subtle);
+		position: relative;
+		z-index: 2;
+	}
+	.payment-preview-label {
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 1px;
+		color: var(--accent-blue-base);
+		align-self: flex-start;
+	}
+
+	.payment-preview-mockup {
+		background: var(--bg-surface-solid);
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+		box-shadow: var(--shadow-md);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding-bottom: 20px;
+		position: relative;
+	}
+	.mockup-banner {
+		width: 100%;
+		height: 60px;
+		flex-shrink: 0;
+		background: linear-gradient(135deg, var(--aero-sky), var(--aero-mint));
+		opacity: 0.6;
+	}
+	.mockup-avatar {
+		width: 64px;
+		height: 64px;
+		flex: 0 0 64px;
+		border-radius: 50%;
+		background: var(--aero-blue);
+		border: 3px solid var(--bg-surface-solid);
+		margin-top: -32px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+		font-size: 2rem;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+		position: relative;
+		z-index: 2;
+	}
+	.mockup-info {
+		text-align: center;
+		margin-top: 8px;
+		margin-bottom: 16px;
+	}
+	.mockup-name {
+		font-weight: 800;
+		font-size: 1rem;
+		color: var(--text-primary);
+	}
+	.mockup-bio {
+		font-size: 0.75rem;
+		color: var(--text-secondary);
+	}
+	.mockup-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 24px;
+		border-radius: var(--radius-full);
+		font-weight: 700;
+		font-size: 0.9rem;
+		text-decoration: none;
+	}
+	.mockup-btn .material-icons-round {
+		font-size: 1.1rem;
+	}
+
+	.payment-actions-footer {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 4px;
+	}
+	.action-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.8rem;
+		padding: 8px 16px;
+		border-radius: var(--radius-full);
+	}
+	.action-btn .material-icons-round {
+		font-size: 1rem;
+	}
+
+	.payment-empty-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 24px;
+		text-align: center;
+		color: var(--text-muted);
+		background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+		border-radius: var(--radius-md);
+		border: 1px dashed var(--border-subtle);
+		position: relative;
+		z-index: 2;
+	}
+	.payment-empty-state .material-icons-round {
+		font-size: 2rem;
+		opacity: 0.5;
+	}
+	.payment-empty-state p {
+		margin: 0;
+		font-size: 0.85rem;
+	}
+
+	@media (max-width: 520px) {
+		.payment-input-wrap {
+			flex-direction: column;
+			align-items: stretch;
+			border-radius: var(--radius-md);
+			padding: 8px;
+			gap: 12px;
+		}
+		.payment-input-field {
+			padding-left: 8px;
+		}
+		.payment-input {
+			padding: 8px 12px 8px 0;
+		}
 	}
 </style>

@@ -4,6 +4,9 @@ import { socketPlugin } from './src/lib/server/socket-plugin.js';
 
 export default defineConfig({
 	plugins: [sveltekit(), socketPlugin],
+	optimizeDeps: {
+		include: ['socket.io-client', 'dompurify', 'bcryptjs', 'validator']
+	},
 	build: {
 		// Objetivo moderno: evita transpilar sintaxis que los navegadores actuales ya soportan nativamente.
 		target: 'es2020',
@@ -23,7 +26,6 @@ export default defineConfig({
 				manualChunks: (id) => {
 					if (id.includes('node_modules')) {
 						if (id.includes('socket.io')) return 'vendor-socket';
-						if (id.includes('vidstack')) return 'vendor-vidstack';
 						if (id.includes('dompurify')) return 'vendor-purify';
 						return 'vendor';
 					}

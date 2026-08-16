@@ -17,9 +17,9 @@
 			'1': 'bg-slate-500/15 border-slate-400/30 shadow-[0_2px_8px_rgba(255,255,255,0.05)] text-current', // Niveles 1-4 (Cristal)
 			'2': 'bg-emerald-500/20 border-emerald-400/40 shadow-[0_0_15px_rgba(16,185,129,0.25)] text-emerald-50', // Niveles 5-9 (Esmeralda)
 			'3': 'bg-blue-500/20 border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.35)] text-blue-50', // Niveles 10-14 (Zafiro)
-			'4': 'bg-fuchsia-500/20 border-fuchsia-400/60 shadow-[0_0_25px_rgba(217,70,239,0.45)] text-fuchsia-50', // Niveles 15-19 (Amatista)
+			'4': 'bg-teal-500/20 border-teal-400/60 shadow-[0_0_25px_rgba(13,148,136,0.45)] text-teal-100', // Niveles 15-19 (Topacio Aqua)
 			'5': 'bg-amber-500/30 border-amber-300/70 shadow-[0_0_30px_rgba(245,158,11,0.55)] text-amber-50', // Niveles 20-29 (Oro Mítico)
-			'6': 'bg-gradient-to-tr from-cyan-400/40 via-primary/50 to-fuchsia-500/40 border-white/80 shadow-[0_0_40px_rgba(34,211,238,0.7)] text-white animate-pulse-slow' // Nivel 30+ (Diamante Líquido)
+			'6': 'bg-gradient-to-tr from-cyan-400/40 via-sky-500/50 to-emerald-400/40 border-white/80 shadow-[0_0_40px_rgba(34,211,238,0.7)] text-white animate-pulse-slow' // Nivel 30+ (Diamante Líquido)
 		}[tier.toString()]
 	);
 
@@ -34,7 +34,7 @@
 </script>
 
 <div
-	class="relative inline-flex flex-shrink-0 items-center justify-center {sizeClasses} rounded-full border backdrop-blur-md font-bold {tierStyles} overflow-hidden group"
+	class="relative inline-flex flex-shrink-0 items-center justify-center {sizeClasses} squircle border backdrop-blur-md font-bold {tierStyles} overflow-hidden group"
 >
 	<!-- Internal reflection for glass effect -->
 	<div
@@ -70,11 +70,11 @@
 	@keyframes pulse-glow {
 		0%,
 		100% {
-			box-shadow: 0 0 20px rgba(27, 133, 243, 0.4);
+			box-shadow: 0 0 20px rgba(var(--accent-blue-rgb), 0.4);
 		}
 		50% {
 			box-shadow:
-				0 0 35px rgba(27, 133, 243, 0.8),
+				0 0 35px rgba(var(--accent-blue-rgb), 0.8),
 				inset 0 0 10px rgba(255, 255, 255, 0.2);
 		}
 	}

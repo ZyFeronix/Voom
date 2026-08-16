@@ -15,16 +15,11 @@
 	let sortOption = $state('recent'); // 'recent', 'price_asc', 'price_desc'
 	let loading = $state(true);
 
-	// Sidebar filters (desktop)
-	let maxPrice = $state(500);
+	// Sidebar filters (desktop) — 5000 por defecto para no ocultar listados reales
+	let maxPrice = $state(5000);
 
 	// Listing detail modal
 	let selectedItem = $state(null);
-	let offerAmount = $state('');
-	let offerMessage = $state('');
-	let offering = $state(false);
-	let offerError = $state('');
-	let offerSuccess = $state(false);
 
 	// Review state inside modal
 	let reviewRating = $state(5);
@@ -80,7 +75,7 @@
 	async function loadCategories() {
 		try {
 			const res = await marketplaceApi.categories();
-			dbCategories = res.categories || [];
+			dbCategories = res.categories || res || [];
 		} catch (err) {
 			console.error('Failed to load categories:', err);
 			dbCategories = [
@@ -153,59 +148,13 @@
 		loading = true;
 		try {
 			const data = await marketplaceApi.get(item.id);
-			selectedItem = data.listing || item;
-			offerAmount = selectedItem.price.toString();
-
-			// Load mock reviews for visual premium feel
-			localReviews = [
-				{
-					id: 1,
-					username: 'sakura_art',
-					display_name: 'Sakura VT',
-					rating: 5,
-					comment: 'Excelente modelo, muy limpio el rig y las texturas.'
-				},
-				{
-					id: 2,
-					username: 'neon_fan',
-					display_name: 'Neon Fan',
-					rating: 4,
-					comment: 'Buen overlay, fácil de configurar en OBS. Recomiendo.'
-				}
-			];
+			selectedItem = data.listing || data || item;
+			loadReviews(selectedItem.id);
 		} catch (_err) {
 			selectedItem = item;
-			offerAmount = item.price.toString();
 			localReviews = [];
 		} finally {
 			loading = false;
-			offerSuccess = false;
-			offerError = '';
-		}
-	}
-
-	async function handleSendOffer(e) {
-		e.preventDefault();
-		if (!authStore.isAuthenticated) {
-			goto('/login');
-			return;
-		}
-
-		offering = true;
-		offerError = '';
-		offerSuccess = false;
-
-		try {
-			await marketplaceApi.offer(selectedItem.id, {
-				amount: Number(offerAmount),
-				message: offerMessage.trim()
-			});
-			offerSuccess = true;
-			offerMessage = '';
-		} catch (err) {
-			offerError = err?.message ?? 'Error al enviar la oferta.';
-		} finally {
-			offering = false;
 		}
 	}
 
@@ -218,14 +167,14 @@
 
 		creating = true;
 		createError = '';
-
 		try {
 			const payload = {
 				title: newTitle.trim(),
 				description: newDescription.trim(),
 				price: Number(newPrice),
 				category_id: Number(newCategoryId),
-				image_url: newMediaUrl.trim() || null
+				image_url: newMediaUrl.trim() || null,
+				media_urls: newMediaUrl.trim() ? [newMediaUrl.trim()] : []
 			};
 
 			await marketplaceApi.create(payload);
@@ -244,6 +193,21 @@
 		}
 	}
 
+	async function loadReviews(listingId) {
+		try {
+			const rev = await fetch(`/api/marketplace/${listingId}/reviews`);
+			if (rev.ok) {
+				const data = await rev.json();
+				localReviews = data.reviews || [];
+			} else {
+				localReviews = [];
+			}
+		} catch (err) {
+			console.error('Failed to load reviews:', err);
+			localReviews = [];
+		}
+	}
+
 	async function handlePostReview(e) {
 		e.preventDefault();
 		if (!authStore.isAuthenticated) return;
@@ -254,19 +218,8 @@
 				rating: reviewRating,
 				comment: reviewText.trim()
 			});
-
-			// Append locally
-			localReviews = [
-				{
-					id: Date.now(),
-					username: authStore.user?.username || 'yo',
-					display_name: authStore.user?.display_name || 'Yo',
-					rating: reviewRating,
-					comment: reviewText.trim()
-				},
-				...localReviews
-			];
 			reviewText = '';
+			await loadReviews(selectedItem.id);
 		} catch (err) {
 			console.error('Failed to post review:', err);
 		} finally {
@@ -364,7 +317,7 @@
 					<input
 						type="range"
 						min="10"
-						max="1000"
+						max="5000"
 						step="10"
 						bind:value={maxPrice}
 						class="aero-range"
@@ -643,61 +596,40 @@
 					<p class="detail-desc-text">{selectedItem.description}</p>
 				</div>
 
-				<!-- Buy / Offer Form -->
+				<!-- Buy / Contact Form -->
 				<div class="detail-section">
-					<h4 class="section-subtitle-mini">Hacer oferta al vendedor</h4>
+					<h4 class="section-subtitle-mini">Comprar o consultar</h4>
 
-					{#if offerSuccess}
-						<div class="alert-box success">
-							¡Oferta enviada con éxito! El vendedor se contactará contigo por DM.
-						</div>
-					{:else}
-						{#if offerError}
-							<div class="alert-box error">
-								<span class="material-icons-round">error_outline</span>
-								<span>{offerError}</span>
-							</div>
-						{/if}
+					<p
+						class="contact-seller-desc"
+						style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
+					>
+						Economía 100% P2P: todos los pagos se envían directamente al creador (0% comisiones).
+					</p>
 
-						<form onsubmit={handleSendOffer} class="offer-form">
-							<div class="offer-input-row">
-								<div class="price-input-wrapper">
-									<span class="currency-symbol">$</span>
-									<input
-										id="offer-amount"
-										name="offer-amount"
-										type="number"
-										required
-										bind:value={offerAmount}
-										class="aero-input"
-									/>
-								</div>
-								<button
-									type="submit"
-									disabled={offering || !offerAmount}
-									class="btn-aero-secondary"
-									style="padding: 8px 16px;"
-								>
-									{#if offering}
-										<span
-											class="loading loading-spinner text-primary loading-xs"
-											style="margin-right: 4px;"
-										></span>
-									{/if}
-									Enviar
-								</button>
-							</div>
-							<input
-								id="offer-message"
-								name="offer-message"
-								type="text"
-								placeholder="Mensaje opcional para el vendedor..."
-								bind:value={offerMessage}
-								class="aero-input"
-								style="font-size: 0.75rem; padding-top: 6px; padding-bottom: 6px;"
-							/>
-						</form>
+					{#if selectedItem.payment_link}
+						<a
+							href={selectedItem.payment_link}
+							target="_blank"
+							rel="noopener noreferrer nofollow"
+							class="btn-aero-primary"
+							style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-bottom: 10px;"
+						>
+							<span class="material-icons-round">payments</span>
+							Pagar / Apoyar al Vendedor
+						</a>
 					{/if}
+
+					<a
+						href={`/messages?user=${selectedItem.seller_username || selectedItem.username}`}
+						class={selectedItem.payment_link
+							? 'btn-aero-secondary contact-btn'
+							: 'btn-aero-primary contact-btn'}
+						style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;"
+					>
+						<span class="material-icons-round">chat</span>
+						Mensaje al Vendedor
+					</a>
 				</div>
 
 				<!-- Reviews List (Simulated) -->
@@ -797,7 +729,7 @@
 		position: relative;
 		overflow: hidden;
 		padding: 32px 24px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -810,8 +742,9 @@
 		right: -48px;
 		width: 180px;
 		height: 180px;
-		border-radius: 50%;
-		background: rgba(240, 0, 255, 0.12);
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
+		background: rgba(0, 229, 255, 0.14);
 		filter: blur(50px);
 		pointer-events: none;
 	}
@@ -869,7 +802,7 @@
 
 	.chip {
 		padding: 8px 18px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		font-size: 0.8rem;
 		font-weight: 600;
 		white-space: nowrap;
@@ -912,7 +845,7 @@
 
 	.filter-card {
 		padding: 20px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 20px;
@@ -950,7 +883,7 @@
 		-webkit-appearance: none;
 		width: 100%;
 		height: 4px;
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		background: var(--border-subtle);
 		outline: none;
 	}
@@ -960,7 +893,8 @@
 		appearance: none;
 		width: 14px;
 		height: 14px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-rose);
 		cursor: pointer;
 		box-shadow: 0 0 8px rgba(232, 74, 114, 0.4);
@@ -987,7 +921,7 @@
 
 	.loading-skeleton {
 		padding: 16px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
@@ -996,14 +930,14 @@
 	.skeleton-media {
 		aspect-ratio: 16/9;
 		background: rgba(0, 229, 255, 0.06);
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		animation: pulse 1.5s infinite ease-in-out;
 	}
 
 	.skeleton-line {
 		height: 12px;
 		background: rgba(0, 229, 255, 0.06);
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		animation: pulse 1.5s infinite ease-in-out;
 	}
 
@@ -1034,7 +968,7 @@
 		justify-content: center;
 		padding: 64px 24px;
 		text-align: center;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 	}
 
 	.empty-state .material-icons-round {
@@ -1059,15 +993,15 @@
 	.market-item-card {
 		display: flex;
 		flex-direction: column;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		overflow: hidden;
 		transition: all 0.3s ease;
 		height: 100%;
 	}
 
 	.market-item-card:hover {
-		border-color: rgba(240, 0, 255, 0.3);
-		box-shadow: 0 0 20px rgba(240, 0, 255, 0.2);
+		border-color: var(--aero-primary);
+		box-shadow: 0 0 20px var(--aero-primary-glow, rgba(46, 180, 255, 0.2));
 		transform: translateY(-3px);
 	}
 
@@ -1096,7 +1030,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(240, 0, 255, 0.08) 100%);
+		background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
 		color: var(--text-muted);
 	}
 
@@ -1105,12 +1039,12 @@
 		top: 12px;
 		right: 12px;
 		padding: 6px 12px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		background: rgba(0, 0, 0, 0.75);
 		font-weight: 700;
 		font-size: 0.8rem;
-		color: hsl(300, 85%, 65%);
-		border: 1px solid rgba(240, 0, 255, 0.2);
+		color: #7de3ff;
+		border: 1px solid rgba(46, 180, 255, 0.25);
 		backdrop-filter: blur(4px);
 		z-index: 10;
 	}
@@ -1187,12 +1121,13 @@
 		right: 24px;
 		width: 56px;
 		height: 56px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		z-index: 40;
-		box-shadow: 0 4px 20px rgba(240, 0, 255, 0.4);
+		box-shadow: 0 4px 20px rgba(46, 180, 255, 0.4);
 	}
 
 	.modal-backdrop {
@@ -1236,7 +1171,7 @@
 
 	.alert-box {
 		padding: 8px 12px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		font-size: 0.75rem;
 		display: flex;
 		align-items: center;
@@ -1247,12 +1182,6 @@
 		background: rgba(239, 68, 68, 0.15);
 		border: 1px solid rgba(239, 68, 68, 0.25);
 		color: #f87171;
-	}
-
-	.alert-box.success {
-		background: rgba(16, 185, 129, 0.15);
-		border: 1px solid rgba(16, 185, 129, 0.25);
-		color: #34d399;
 	}
 
 	.modal-form {
@@ -1292,7 +1221,7 @@
 		position: relative;
 		width: 80px;
 		height: 80px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		overflow: hidden;
 		margin-top: 8px;
 		border: 1px solid rgba(0, 119, 255, 0.15);
@@ -1310,7 +1239,8 @@
 		right: 4px;
 		background: rgba(0, 0, 0, 0.7);
 		border: none;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		width: 16px;
 		height: 16px;
 		display: flex;
@@ -1336,7 +1266,7 @@
 		max-width: 760px;
 		width: 100%;
 		display: flex;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 		border: 1px solid rgba(0, 119, 255, 0.12);
 		overflow: hidden;
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -1445,40 +1375,6 @@
 		margin: 0;
 	}
 
-	.offer-form {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	.offer-input-row {
-		display: flex;
-		gap: 8px;
-	}
-
-	.price-input-wrapper {
-		position: relative;
-		flex: 1;
-	}
-
-	.currency-symbol {
-		position: absolute;
-		left: 12px;
-		top: 50%;
-		transform: translateY(-50%);
-		color: var(--text-muted);
-		font-size: 0.85rem;
-		font-weight: 700;
-	}
-
-	.price-input-wrapper input {
-		padding-left: 24px;
-		width: 100%;
-		font-size: 0.85rem;
-		padding-top: 8px;
-		padding-bottom: 8px;
-	}
-
 	.reviews-list-container {
 		flex: 1;
 		overflow-y: auto;
@@ -1497,7 +1393,7 @@
 
 	.review-item {
 		padding: 8px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		background: rgba(0, 229, 255, 0.03);
 		border: 1px solid rgba(0, 119, 255, 0.06);
 	}
@@ -1557,7 +1453,8 @@
 	.seller-avatar {
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: linear-gradient(135deg, #f000ff 0%, #7000ff 100%);
 		display: flex;
 		align-items: center;

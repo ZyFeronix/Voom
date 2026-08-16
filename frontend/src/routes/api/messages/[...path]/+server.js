@@ -1,12 +1,31 @@
 /**
  * VSocial — Messages API
+ *
+ * Sub-rutas (dispatch interno por segmentos de params.path):
+ *   GET    /unread-count
+ *   GET    /conversations
+ *   GET    /conversations/user/:peerId          → obtener/crear DM
+ *   GET    /conversations/:convId/messages       → paginado por cursor (before/after)
+ *   POST   /conversations/:convId/messages       → enviar (soporta reply_to_id)
+ *   POST   /conversations/:convId/typing
+ *   POST   /conversations/:convId/read[/:msgId]
+ *   POST   /conversations/:convId/pin            → toggle fijar
+ *   POST   /conversations/:convId/mute           → toggle silenciar
+ *   POST   /:msgId/reactions                     → toggle reacción
+ *   PUT    /:msgId                               → editar texto (solo autor)
+ *   DELETE /:msgId                               → borrado lógico (solo autor)
  */
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
-import { requireAuth } from '$lib/server/auth.js';
+import { requireAuth, checkUserNotMuted } from '$lib/server/auth.js';
 import { getSocketIO, isUserOnline } from '$lib/server/socket.js';
 
 async function getOrCreateDm(db, user1, user2) {
+	// Validar peer: debe existir y no ser uno mismo (evita colisión de PK y filas huérfanas)
+	if (!Number.isInteger(user2) || user2 <= 0 || user1 === user2) return null;
+	const peerExists = await db.prepare('SELECT 1 FROM users WHERE id = ?').get(user2);
+	if (!peerExists) return null;
+
 	const conv = await db
 		.prepare(
 			`
@@ -65,6 +84,7 @@ export async function GET({ request, url, params }) {
 			.prepare(
 				`
 			SELECT c.id, c.type, c.group_name, c.group_avatar_url, c.last_message_at,
+				cp.is_pinned, cp.is_muted,
 				m.body as last_message_body, m.created_at as last_message_time, m.sender_id as last_message_sender_id,
 				(SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) as participant_count,
 				(SELECT COUNT(*) FROM messages_new mn 
@@ -83,7 +103,7 @@ export async function GET({ request, url, params }) {
 			        AND c.type = 'dm' 
 			        AND (u.is_active = 0 OR u.is_banned = 1)
 			  )
-			ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
+			ORDER BY cp.is_pinned DESC, COALESCE(c.last_message_at, c.created_at) DESC
 		`
 			)
 			.all(userId, userId, userId);
@@ -128,6 +148,7 @@ export async function GET({ request, url, params }) {
 	if (parts[0] === 'conversations' && parts[1] === 'user' && parts[2]) {
 		const peerId = parseInt(parts[2]);
 		const convId = await getOrCreateDm(db, userId, peerId);
+		if (!convId) return json({ error: 'Usuario no válido' }, { status: 400 });
 		return json({ conversation_id: convId });
 	}
 
@@ -147,9 +168,22 @@ export async function GET({ request, url, params }) {
 		let query = `
 			SELECT m.*, u.username as sender_username, u.display_name as sender_display_name, u.avatar_url as sender_avatar_url,
 			(
+				SELECT JSON_OBJECT(
+					'id', rm.id,
+					'body', rm.body,
+					'media_type', rm.media_type,
+					'is_deleted', rm.is_deleted,
+					'sender_id', rm.sender_id,
+					'sender_name', ru.display_name,
+					'sender_username', ru.username
+				)
+				FROM messages_new rm JOIN users ru ON rm.sender_id = ru.id
+				WHERE rm.id = m.reply_to_id
+			) as reply_json,
+			(
 				SELECT JSON_GROUP_ARRAY(JSON_OBJECT('emoji', r.emoji, 'count', r.cnt, 'user_reacted', r.user_reacted))
 				FROM (
-					SELECT emoji, COUNT(*) as cnt, MAX(CASE WHEN user_id = ${userId} THEN 1 ELSE 0 END) as user_reacted
+					SELECT emoji, COUNT(*) as cnt, MAX(CASE WHEN user_id = ? THEN 1 ELSE 0 END) as user_reacted
 					FROM message_reactions 
 					WHERE message_id = m.id 
 					GROUP BY emoji
@@ -158,7 +192,7 @@ export async function GET({ request, url, params }) {
 			FROM messages_new m JOIN users u ON m.sender_id = u.id 
 			WHERE m.conversation_id = ?
 		`;
-		const params = [convId];
+		const params = [userId, convId];
 
 		if (before) {
 			query += ` AND m.id < ?`;
@@ -188,7 +222,16 @@ export async function GET({ request, url, params }) {
 				} catch (_e) {}
 			}
 			delete msg.reactions_json;
-			return { ...msg, reactions };
+
+			let reply_to = null;
+			if (msg.reply_json) {
+				try {
+					reply_to = JSON.parse(msg.reply_json);
+				} catch (_e) {}
+			}
+			delete msg.reply_json;
+
+			return { ...msg, reactions, reply_to };
 		});
 
 		// Reverse if fetching older messages (DESC order) to maintain chronological order
@@ -253,23 +296,41 @@ export async function POST({ request, _url, params }) {
 		if (!participant) return json({ error: 'No autorizado' }, { status: 403 });
 
 		const body = await request.json();
-		const text = (body.body || '').trim();
+		let text = (body.body || body.content || '').trim();
 		const mediaUrl = (body.media_url || '').trim();
 		const mediaType = (body.media_type || '').trim();
 		const voiceUrl = (body.voice_url || '').trim();
+		let replyToId = body.reply_to_id ? parseInt(body.reply_to_id) : null;
+		await checkUserNotMuted(userId);
 		if (!text && !mediaUrl && !voiceUrl)
 			return json({ error: 'Message body or attachment required' }, { status: 400 });
 
+		const isZumbido =
+			text === '⚡ ¡ZUMBIDO!' ||
+			text.toLowerCase() === '/zumbido' ||
+			text.toLowerCase() === '/nudge';
+		if (isZumbido) {
+			text = '⚡ ¡ZUMBIDO!';
+		}
+
+		// Validar que el mensaje citado pertenezca a esta conversación
+		if (replyToId) {
+			const parent = await db
+				.prepare('SELECT id FROM messages_new WHERE id = ? AND conversation_id = ?')
+				.get(replyToId, convId);
+			if (!parent) replyToId = null;
+		}
+
 		const result = await db
 			.prepare(
-				'INSERT INTO messages_new (conversation_id, sender_id, body, media_url, media_type, voice_url) VALUES (?, ?, ?, ?, ?, ?)'
+				'INSERT INTO messages_new (conversation_id, sender_id, body, media_url, media_type, voice_url, reply_to_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
 			)
-			.run(convId, userId, text, mediaUrl || null, mediaType || null, voiceUrl || null);
+			.run(convId, userId, text, mediaUrl || null, mediaType || null, voiceUrl || null, replyToId);
 		const msgId = Number(result.lastInsertRowid);
 
-		db.prepare("UPDATE conversations SET last_message_at = datetime('now') WHERE id = ?").run(
-			convId
-		);
+		await db
+			.prepare("UPDATE conversations SET last_message_at = datetime('now') WHERE id = ?")
+			.run(convId);
 
 		const user = await db
 			.prepare('SELECT display_name, username FROM users WHERE id = ?')
@@ -277,7 +338,7 @@ export async function POST({ request, _url, params }) {
 		const userName = user?.display_name || user?.username || 'Alguien';
 		const peers = await db
 			.prepare(
-				'SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND user_id != ?'
+				'SELECT user_id, is_muted FROM conversation_participants WHERE conversation_id = ? AND user_id != ?'
 			)
 			.all(convId, userId);
 		const insertNotif = db.prepare(
@@ -287,27 +348,61 @@ export async function POST({ request, _url, params }) {
 		const io = getSocketIO();
 		const fullMsg = await db
 			.prepare(
-				`SELECT m.*, u.username as sender_username, u.display_name as sender_name, u.avatar_url as sender_avatar FROM messages_new m JOIN users u ON m.sender_id = u.id WHERE m.id = ?`
+				`SELECT m.*, u.username as sender_username, u.display_name as sender_name, u.avatar_url as sender_avatar,
+				(
+					SELECT JSON_OBJECT(
+						'id', rm.id, 'body', rm.body, 'media_type', rm.media_type, 'is_deleted', rm.is_deleted,
+						'sender_id', rm.sender_id, 'sender_name', ru.display_name, 'sender_username', ru.username
+					)
+					FROM messages_new rm JOIN users ru ON rm.sender_id = ru.id WHERE rm.id = m.reply_to_id
+				) as reply_json
+				FROM messages_new m JOIN users u ON m.sender_id = u.id WHERE m.id = ?`
 			)
 			.get(msgId);
 
+		if (fullMsg) {
+			try {
+				fullMsg.reply_to = fullMsg.reply_json ? JSON.parse(fullMsg.reply_json) : null;
+			} catch (_e) {
+				fullMsg.reply_to = null;
+			}
+			delete fullMsg.reply_json;
+		}
+
 		for (const peer of peers) {
-			const notifRes = await insertNotif.run(
-				peer.user_id,
-				userId,
-				msgId,
-				`${userName} te ha enviado un mensaje.`
-			);
+			// Respetar silencio de conversación: no generar notificación persistente
+			if (!peer.is_muted) {
+				const notifRes = await insertNotif.run(
+					peer.user_id,
+					userId,
+					msgId,
+					isZumbido
+						? `${userName} te ha enviado un ZUMBIDO.`
+						: `${userName} te ha enviado un mensaje.`
+				);
+
+				if (io) {
+					const latestNotif = await db
+						.prepare('SELECT * FROM notifications WHERE id = ?')
+						.get(notifRes.lastInsertRowid);
+					if (latestNotif) {
+						io.to(`user_${peer.user_id}`).emit('new_notification', {
+							notifications: [latestNotif]
+						});
+					}
+				}
+			}
 
 			if (io) {
-				io.to(`user_${peer.user_id}`).emit('new_message', { messages: [fullMsg] });
-
-				const latestNotif = await db
-					.prepare('SELECT * FROM notifications WHERE id = ?')
-					.get(notifRes.lastInsertRowid);
-				if (latestNotif) {
-					io.to(`user_${peer.user_id}`).emit('new_notification', { notifications: [latestNotif] });
+				if (isZumbido) {
+					io.to(`user_${peer.user_id}`).emit('zumbido', {
+						convId,
+						senderId: userId,
+						messageId: msgId,
+						timestamp: Date.now()
+					});
 				}
+				io.to(`user_${peer.user_id}`).emit('new_message', { messages: [fullMsg] });
 			}
 		}
 
@@ -328,6 +423,8 @@ export async function POST({ request, _url, params }) {
 				media_url: mediaUrl || null,
 				media_type: mediaType || null,
 				voice_url: voiceUrl || null,
+				reply_to_id: replyToId,
+				reply_to: fullMsg?.reply_to || null,
 				created_at: new Date().toISOString(),
 				sender_username: user?.username
 			}
@@ -335,8 +432,10 @@ export async function POST({ request, _url, params }) {
 	}
 
 	// POST /api/messages/conversations/:convId/typing
+	// Reservado: el indicador de "escribiendo…" viaja en tiempo real por Socket.IO
+	// (evento `typing`, ver lib/server/socket.js). Este endpoint HTTP existe solo
+	// como fallback no-op para clientes sin websocket y no persiste estado.
 	if (parts[0] === 'conversations' && parts[2] === 'typing') {
-		// Validar si el usuario pertenece al chat (opcional)
 		return json({ success: true });
 	}
 
@@ -354,10 +453,17 @@ export async function POST({ request, _url, params }) {
 			messageId = parseInt(parts[3]);
 		} else {
 			const body = await request.json().catch(() => ({}));
-			messageId = body.message_id;
+			messageId = parseInt(body.message_id);
 		}
 
-		if (!messageId) return json({ error: 'message_id required' }, { status: 400 });
+		if (!messageId || isNaN(messageId))
+			return json({ error: 'message_id required' }, { status: 400 });
+
+		// El mensaje debe pertenecer a esta conversación (no aceptar punteros arbitrarios)
+		const target = await db
+			.prepare('SELECT id FROM messages_new WHERE id = ? AND conversation_id = ?')
+			.get(messageId, convId);
+		if (!target) return json({ error: 'Mensaje no válido' }, { status: 400 });
 
 		await db
 			.prepare(
@@ -369,7 +475,62 @@ export async function POST({ request, _url, params }) {
 			)
 			.run(convId, userId, messageId, messageId);
 
+		// Notificar a los demás participantes para actualizar sus confirmaciones de lectura en vivo
+		const io = getSocketIO();
+		if (io) {
+			const peers = await db
+				.prepare(
+					'SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND user_id != ?'
+				)
+				.all(convId, userId);
+			for (const peer of peers) {
+				io.to(`user_${peer.user_id}`).emit('messages_read', {
+					conversation_id: convId,
+					reader_id: userId,
+					last_read_id: messageId
+				});
+			}
+		}
+
 		return json({ success: true });
+	}
+
+	// POST /api/messages/conversations/:convId/pin  (toggle fijar)
+	if (parts[0] === 'conversations' && parts[2] === 'pin') {
+		const convId = parseInt(parts[1]);
+		const participant = await db
+			.prepare(
+				'SELECT is_pinned FROM conversation_participants WHERE conversation_id = ? AND user_id = ?'
+			)
+			.get(convId, userId);
+		if (!participant) return json({ error: 'No autorizado' }, { status: 403 });
+
+		const next = participant.is_pinned ? 0 : 1;
+		await db
+			.prepare(
+				'UPDATE conversation_participants SET is_pinned = ? WHERE conversation_id = ? AND user_id = ?'
+			)
+			.run(next, convId, userId);
+		return json({ success: true, is_pinned: next });
+	}
+
+	// POST /api/messages/conversations/:convId/mute  (toggle silenciar)
+	if (parts[0] === 'conversations' && parts[2] === 'mute') {
+		const convId = parseInt(parts[1]);
+		const participant = await db
+			.prepare(
+				'SELECT is_muted FROM conversation_participants WHERE conversation_id = ? AND user_id = ?'
+			)
+			.get(convId, userId);
+		if (!participant) return json({ error: 'No autorizado' }, { status: 403 });
+
+		const next = participant.is_muted ? 0 : 1;
+		await db
+			.prepare(
+				'UPDATE conversation_participants SET is_muted = ? WHERE conversation_id = ? AND user_id = ?'
+			)
+			.run(next, convId, userId);
+		return json({ success: true, is_muted: next });
 	}
 
 	// POST /api/messages/:msgId/reactions
@@ -378,28 +539,43 @@ export async function POST({ request, _url, params }) {
 		try {
 			const body = await request.json();
 			if (body.emoji) {
+				const msg = await db
+					.prepare('SELECT sender_id, conversation_id FROM messages_new WHERE id = ?')
+					.get(msgId);
+				if (!msg) return json({ success: false, error: 'Message not found' }, { status: 404 });
+
+				// El usuario debe ser participante de la conversación del mensaje
+				const isParticipant = await db
+					.prepare(
+						'SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?'
+					)
+					.get(msg.conversation_id, userId);
+				if (!isParticipant)
+					return json({ success: false, error: 'No autorizado' }, { status: 403 });
+
+				const io = getSocketIO();
 				const existing = await db
 					.prepare(
 						'SELECT 1 FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?'
 					)
 					.get(msgId, userId, body.emoji);
+
+				let action;
 				if (existing) {
 					await db
 						.prepare(
 							'DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?'
 						)
 						.run(msgId, userId, body.emoji);
-					return json({ success: true, action: 'removed' });
+					action = 'removed';
 				} else {
 					await db
 						.prepare('INSERT INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)')
 						.run(msgId, userId, body.emoji);
+					action = 'added';
 
-					// Fetch message details to notify the sender
-					const msg = await db
-						.prepare('SELECT sender_id, conversation_id FROM messages_new WHERE id = ?')
-						.get(msgId);
-					if (msg && msg.sender_id !== userId) {
+					// Notificar al autor del mensaje (solo al añadir)
+					if (msg.sender_id !== userId) {
 						const user = await db
 							.prepare('SELECT display_name, username FROM users WHERE id = ?')
 							.get(userId);
@@ -415,7 +591,6 @@ export async function POST({ request, _url, params }) {
 								`${userName} reaccionó a tu mensaje con ${body.emoji}`
 							);
 
-						const io = getSocketIO();
 						if (io) {
 							const latestNotif = await db
 								.prepare('SELECT * FROM notifications WHERE id = ?')
@@ -427,13 +602,76 @@ export async function POST({ request, _url, params }) {
 							}
 						}
 					}
-					return json({ success: true, action: 'added' });
 				}
+
+				// Difundir el cambio de reacción a todos los participantes para
+				// actualizar la UI del chat en vivo (añadir y quitar).
+				if (io) {
+					const convPeers = await db
+						.prepare('SELECT user_id FROM conversation_participants WHERE conversation_id = ?')
+						.all(msg.conversation_id);
+					for (const p of convPeers) {
+						io.to(`user_${p.user_id}`).emit('message_reaction', {
+							conversation_id: msg.conversation_id,
+							message_id: msgId,
+							emoji: body.emoji,
+							action,
+							actor_id: userId
+						});
+					}
+				}
+
+				return json({ success: true, action });
 			}
 		} catch (e) {
 			console.error('Error toggling reaction:', e);
 		}
 		return json({ success: false });
+	}
+
+	return json({ error: 'Endpoint not found' }, { status: 404 });
+}
+
+export async function PUT({ request, params }) {
+	const parts = params.path ? params.path.split('/') : [];
+	const userId = await requireAuth(request);
+	const db = getDb();
+
+	// PUT /api/messages/:id  (editar texto de un mensaje propio)
+	if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
+		const msgId = parseInt(parts[0]);
+		const body = await request.json().catch(() => ({}));
+		const text = (body.body || '').trim();
+		if (!text) return json({ error: 'Message body required' }, { status: 400 });
+
+		const msg = await db
+			.prepare('SELECT sender_id, conversation_id, is_deleted FROM messages_new WHERE id = ?')
+			.get(msgId);
+		if (!msg) return json({ error: 'Message not found' }, { status: 404 });
+		if (msg.sender_id !== userId) return json({ error: 'Unauthorized' }, { status: 403 });
+		if (msg.is_deleted) return json({ error: 'Cannot edit a deleted message' }, { status: 400 });
+
+		await db
+			.prepare("UPDATE messages_new SET body = ?, edited_at = datetime('now') WHERE id = ?")
+			.run(text, msgId);
+
+		const io = getSocketIO();
+		if (io) {
+			const peers = await db
+				.prepare('SELECT user_id FROM conversation_participants WHERE conversation_id = ?')
+				.all(msg.conversation_id);
+			const payload = {
+				id: msgId,
+				conversation_id: msg.conversation_id,
+				body: text,
+				edited_at: new Date().toISOString()
+			};
+			for (const peer of peers) {
+				io.to(`user_${peer.user_id}`).emit('message_edited', payload);
+			}
+		}
+
+		return json({ success: true, id: msgId, body: text, edited_at: new Date().toISOString() });
 	}
 
 	return json({ error: 'Endpoint not found' }, { status: 404 });
@@ -448,7 +686,9 @@ export async function DELETE({ request, params }) {
 	if (parts.length === 1 && !isNaN(parseInt(parts[0]))) {
 		const msgId = parseInt(parts[0]);
 
-		const msg = await db.prepare('SELECT sender_id FROM messages_new WHERE id = ?').get(msgId);
+		const msg = await db
+			.prepare('SELECT sender_id, conversation_id FROM messages_new WHERE id = ?')
+			.get(msgId);
 		if (!msg) return json({ error: 'Message not found' }, { status: 404 });
 		if (msg.sender_id !== userId) return json({ error: 'Unauthorized' }, { status: 403 });
 
@@ -457,6 +697,20 @@ export async function DELETE({ request, params }) {
 				"UPDATE messages_new SET is_deleted = 1, body = 'Este mensaje fue eliminado', voice_url = NULL, media_url = NULL, media_type = NULL WHERE id = ?"
 			)
 			.run(msgId);
+
+		const io = getSocketIO();
+		if (io) {
+			const peers = await db
+				.prepare('SELECT user_id FROM conversation_participants WHERE conversation_id = ?')
+				.all(msg.conversation_id);
+			for (const peer of peers) {
+				io.to(`user_${peer.user_id}`).emit('message_deleted', {
+					id: msgId,
+					conversation_id: msg.conversation_id
+				});
+			}
+		}
+
 		return json({ success: true, id: msgId });
 	}
 

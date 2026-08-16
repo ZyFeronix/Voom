@@ -114,7 +114,7 @@ export async function handleGoogleOAuth(code, origin) {
 		.prepare(
 			`
 		SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url,
-			u.bio, u.category, u.is_verified, u.wallet_balance, u.follower_count, u.following_count,
+			u.bio, u.category, u.is_verified, u.follower_count, u.following_count,
 			COALESCE(ur.role, u.role, 'user') AS role
 		FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE u.id = ? LIMIT 1
 	`

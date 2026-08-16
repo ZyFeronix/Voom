@@ -4,6 +4,13 @@
 	import { goto } from '$app/navigation';
 	import { posts as postsApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import CustomSelect from '$lib/components/CustomSelect.svelte';
+
+	const privacyOptions = [
+		{ value: 'public', label: 'Público', icon: 'public' },
+		{ value: 'followers', label: 'Solo seguidores', icon: 'group' },
+		{ value: 'private', label: 'Privado', icon: 'lock' }
+	];
 
 	let post = $state(null);
 	let bodyText = $state('');
@@ -25,7 +32,11 @@
 		try {
 			const data = await postsApi.get(postId);
 			post = data.post;
-			if (post.user_id !== authStore.user?.id && !authStore.isAdmin) {
+			if (
+				!post.is_author &&
+				Number(post.user_id) !== Number(authStore.user?.id) &&
+				!authStore.isAdmin
+			) {
 				goto('/feed');
 				return;
 			}
@@ -44,7 +55,10 @@
 		error = '';
 		success = '';
 		try {
-			await postsApi.update(postId, { body: bodyText.trim(), privacy });
+			await postsApi.update(postId, {
+				body: bodyText.trim(),
+				privacy: post?.is_anonymous ? 'public' : privacy
+			});
 			success = 'Publicacion actualizada con exito.';
 			setTimeout(() => goto(`/feed`), 1200);
 		} catch (err) {
@@ -144,11 +158,16 @@
 			<div class="edit-options">
 				<div class="option-group">
 					<label class="option-label" for="privacy-select">Privacidad</label>
-					<select id="privacy-select" bind:value={privacy} class="privacy-select">
-						<option value="public">Publico</option>
-						<option value="followers">Solo seguidores</option>
-						<option value="private">Privado</option>
-					</select>
+					{#if post.is_anonymous}
+						<div
+							class="anon-privacy-info flex items-center gap-2 p-2.5 rounded-xl text-xs font-semibold select-none"
+						>
+							<span class="material-icons-round text-sm">visibility_off</span>
+							<span>Público (Publicación Anónima)</span>
+						</div>
+					{:else}
+						<CustomSelect id="privacy-select" bind:value={privacy} options={privacyOptions} />
+					{/if}
 				</div>
 			</div>
 
@@ -196,7 +215,7 @@
 	}
 	.edit-card {
 		padding: 24px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
@@ -212,7 +231,8 @@
 		justify-content: center;
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
 		color: var(--text-secondary);
@@ -240,7 +260,7 @@
 		align-items: center;
 		gap: 8px;
 		padding: 10px 14px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		font-size: 0.8rem;
 		font-weight: 600;
 	}
@@ -284,7 +304,7 @@
 		min-height: 120px;
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		padding: 14px;
 		font-family: var(--font-sans);
 		font-size: 1rem;
@@ -320,7 +340,7 @@
 	.media-thumb {
 		width: 64px;
 		height: 64px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		overflow: hidden;
 		border: 1px solid var(--glass-border);
 		display: flex;
@@ -347,16 +367,6 @@
 		flex-direction: column;
 		gap: 4px;
 	}
-	.privacy-select {
-		background: var(--glass-bg);
-		border: 1px solid var(--glass-border);
-		border-radius: 8px;
-		padding: 6px 10px;
-		font-size: 0.8rem;
-		color: var(--text-primary);
-		outline: none;
-		cursor: pointer;
-	}
 	.danger-zone {
 		padding-top: 16px;
 		border-top: 1px solid rgba(232, 74, 114, 0.15);
@@ -380,8 +390,14 @@
 		display: inline-block;
 		border: 3px solid rgba(255, 255, 255, 0.3);
 		border-top-color: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		animation: spin 0.75s linear infinite;
+	}
+	.anon-privacy-info {
+		background: var(--anon-bg, rgba(99, 102, 241, 0.12));
+		border: 1px solid var(--anon-border, rgba(99, 102, 241, 0.35));
+		color: var(--anon-text, #4338ca);
 	}
 	@keyframes spin {
 		to {

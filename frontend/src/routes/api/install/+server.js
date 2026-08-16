@@ -133,6 +133,27 @@ export async function POST({ request, url }) {
 				sql: 'INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)',
 				args: [userId]
 			});
+
+			// Save platform system_settings
+			if (data.site_name) {
+				await client.execute({
+					sql: "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('site_name', ?)",
+					args: [data.site_name]
+				});
+			}
+			if (data.allow_registration !== undefined) {
+				await client.execute({
+					sql: "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('allow_registration', ?)",
+					args: [data.allow_registration ? 'true' : 'false']
+				});
+			}
+			if (data.theme) {
+				await client.execute({
+					sql: "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('theme', ?)",
+					args: [data.theme]
+				});
+			}
+
 			client.close();
 			driverUsed = '@libsql/client';
 		} catch (libsqlErr) {
@@ -155,6 +176,23 @@ export async function POST({ request, url }) {
 				await db
 					.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)')
 					.run(result.lastInsertRowid);
+
+				if (data.site_name) {
+					db.prepare(
+						"INSERT OR REPLACE INTO system_settings (key, value) VALUES ('site_name', ?)"
+					).run(data.site_name);
+				}
+				if (data.allow_registration !== undefined) {
+					db.prepare(
+						"INSERT OR REPLACE INTO system_settings (key, value) VALUES ('allow_registration', ?)"
+					).run(data.allow_registration ? 'true' : 'false');
+				}
+				if (data.theme) {
+					db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('theme', ?)").run(
+						data.theme
+					);
+				}
+
 				db.close();
 				driverUsed = 'better-sqlite3';
 			} catch (bs3Err) {

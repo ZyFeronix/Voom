@@ -16,12 +16,14 @@
  */
 import { json } from '@sveltejs/kit';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
-import { requireAuth, optionalAuth } from '$lib/server/auth.js';
+import { requireAuth, optionalAuth, checkUserNotMuted } from '$lib/server/auth.js';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { randomBytes } from 'crypto';
 import { awardXP } from '$lib/server/gamification.js';
 import { logActivity } from '$lib/server/activity.js';
+import { anonymizePost, anonymizeComment, getAnonIdentity } from '$lib/server/security.js';
+import { validateMediaUpload } from '$lib/server/media.js';
 
 function parsePostMetadata(post) {
 	if (!post) return;
@@ -52,16 +54,24 @@ export async function GET({ request, _url, params }) {
 	// GET /api/posts/:id
 	if (parts.length === 1) {
 		const postId = parseInt(parts[0]);
+		const userId = await optionalAuth(request);
 		const post = await db
 			.prepare(
 				`
-			SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, COALESCE(ur.role, u.role, 'user') AS role
-			FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE p.id = ? AND p.deleted_at IS NULL
+			SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
+				(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
+				(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+				(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared,
+				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_text,
+				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_color
+			FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id WHERE p.id = ? AND p.deleted_at IS NULL
 		`
 			)
-			.get(postId);
+			.get(userId || 0, userId || 0, userId || 0, postId);
 		if (!post) return json({ error: 'Post not found' }, { status: 404 });
 		parsePostMetadata(post);
+		anonymizePost(post, userId);
 		post.media = await db
 			.prepare('SELECT id, media_type, media_url FROM post_media WHERE post_id = ?')
 			.all(postId);
@@ -80,6 +90,33 @@ export async function GET({ request, _url, params }) {
 		`
 			)
 			.all(postId);
+
+		// En posts anónimos TODOS los comentarios son anónimos: se muestra la identidad
+		// anónima permanente del comentarista, nunca su perfil real.
+		const post = await db.prepare('SELECT is_anonymous FROM posts WHERE id = ?').get(postId);
+		const postIsAnon = post && (post.is_anonymous == 1 || post.is_anonymous === true);
+		if (postIsAnon && comments.length > 0) {
+			const commenterIds = [...new Set(comments.map((c) => Number(c.user_id)))];
+			const identRows = await db
+				.prepare(
+					`SELECT user_id, anon_username FROM anon_identities WHERE user_id IN (${commenterIds
+						.map(() => '?')
+						.join(',')})`
+				)
+				.all(...commenterIds);
+			const identMap = new Map(identRows.map((r) => [Number(r.user_id), r.anon_username]));
+			for (const c of comments) {
+				const realUserId = Number(c.user_id);
+				// Solo el propio autor del comentario conserva su user_id (para editar/borrar)
+				if (userId && realUserId === Number(userId)) {
+					c.is_owner = 1;
+				} else {
+					c.user_id = null;
+					c.is_owner = 0;
+				}
+				anonymizeComment(c, identMap.get(realUserId) || null);
+			}
+		}
 
 		if (userId) {
 			const likes = await db
@@ -104,31 +141,46 @@ export async function POST({ request, _url, params }) {
 
 	// POST /api/posts/media — upload media file
 	if (parts.length === 1 && parts[0] === 'media') {
+		await checkUserNotMuted(userId);
 		const formData = await request.formData();
 		const file = formData.get('media');
 		if (!file) return json({ error: 'No media file provided' }, { status: 400 });
+
+		const buffer = Buffer.from(await file.arrayBuffer());
+		const validation = validateMediaUpload({
+			buffer,
+			filename: file.name,
+			declaredMime: file.type,
+			allowedCategories: ['image', 'video', 'audio'],
+			maxSizeMB: 50
+		});
+
+		if (!validation.valid) {
+			return json({ error: validation.error || 'Archivo inválido o corrupto' }, { status: 400 });
+		}
 
 		const uploadDir = getUploadsDir('posts');
 		const ext = file.name.split('.').pop() || 'bin';
 		const newName = `${Date.now()}_${randomBytes(4).toString('hex')}.${ext}`;
 		const destPath = resolve(uploadDir, newName);
-		const buffer = Buffer.from(await file.arrayBuffer());
 		writeFileSync(destPath, buffer);
 
-		const mediaType = file.type.includes('video') ? 'video' : 'image';
+		const mediaType = validation.mimeType?.startsWith('video/') ? 'video' : 'image';
 		const mediaUrl = `/uploads/posts/${newName}`;
 		return json({ success: true, media: [{ url: mediaUrl, type: mediaType }] });
 	}
 
 	// POST /api/posts — create post
 	if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
+		await checkUserNotMuted(userId);
 		let bodyText = '',
 			mediaUrls = [],
 			privacy = 'public',
 			mood = null,
 			scheduledAt = null,
 			locationName = null,
-			pollObj = null;
+			pollObj = null,
+			isAnonymous = 0;
 		const contentType = request.headers.get('content-type') || '';
 
 		if (contentType.includes('multipart/form-data')) {
@@ -138,6 +190,8 @@ export async function POST({ request, _url, params }) {
 			mood = formData.get('mood') || null;
 			scheduledAt = formData.get('scheduled_at') || null;
 			locationName = formData.get('location_name') || null;
+			const anonVal = formData.get('is_anonymous');
+			isAnonymous = anonVal === '1' || anonVal === 'true' || anonVal === true ? 1 : 0;
 			const pollStr = formData.get('poll');
 			if (pollStr) {
 				try {
@@ -153,10 +207,33 @@ export async function POST({ request, _url, params }) {
 			scheduledAt = body.scheduled_at || null;
 			locationName = body.location_name || null;
 			pollObj = body.poll || null;
+			isAnonymous =
+				body.is_anonymous === true ||
+				body.is_anonymous === 1 ||
+				body.is_anonymous === '1' ||
+				body.is_anonymous === 'true'
+					? 1
+					: 0;
 		}
 
 		if (!bodyText && mediaUrls.length === 0)
 			return json({ error: 'Post cannot be empty' }, { status: 400 });
+
+		// Publicar de forma anónima requiere la identidad anónima permanente (username exclusivo)
+		if (isAnonymous) {
+			const ident = await db
+				.prepare('SELECT anon_username FROM anon_identities WHERE user_id = ?')
+				.get(userId);
+			if (!ident) {
+				return json(
+					{
+						error: 'Para publicar de forma anónima necesitas crear tu identidad anónima.',
+						code: 'ANON_IDENTITY_REQUIRED'
+					},
+					{ status: 403 }
+				);
+			}
+		}
 
 		try {
 			let statusVal = 'published';
@@ -194,17 +271,30 @@ export async function POST({ request, _url, params }) {
 				finalBody = bodyText + '\n[METADATA]' + JSON.stringify(meta);
 			}
 
+			const effectivePrivacy = isAnonymous ? 'public' : privacy;
 			const insertPost = await db.prepare(
-				'INSERT INTO posts (user_id, body, privacy, mood, scheduled_at, status) VALUES (?, ?, ?, ?, ?, ?)'
+				'INSERT INTO posts (user_id, body, privacy, mood, scheduled_at, status, is_anonymous) VALUES (?, ?, ?, ?, ?, ?, ?)'
 			);
-			const result = await insertPost.run(userId, finalBody, privacy, mood, scheduledAt, statusVal);
+			const result = await insertPost.run(
+				userId,
+				finalBody,
+				effectivePrivacy,
+				mood,
+				scheduledAt,
+				statusVal,
+				isAnonymous
+			);
 			const postId = Number(result.lastInsertRowid);
 
 			await db.prepare('UPDATE users SET post_count = post_count + 1 WHERE id = ?').run(userId);
 
 			// Gamification: Award 5 XP for creating a post
 			await awardXP(db, userId, 5).catch((e) => console.error('[Gamification Error]', e));
-			await logActivity(userId, 'create', 'post', postId);
+
+			// Privacy: Only log public activity and notify followers if NOT anonymous
+			if (!isAnonymous) {
+				await logActivity(userId, 'create', 'post', postId);
+			}
 
 			for (const med of mediaUrls) {
 				await db
@@ -234,8 +324,8 @@ export async function POST({ request, _url, params }) {
 				}
 			}
 
-			// Notify followers (only if published immediately)
-			if (statusVal === 'published') {
+			// Notify followers (only if published immediately AND not anonymous)
+			if (statusVal === 'published' && !isAnonymous) {
 				const followers = await db
 					.prepare('SELECT follower_id FROM follows WHERE following_id = ?')
 					.all(userId);
@@ -257,7 +347,12 @@ export async function POST({ request, _url, params }) {
 			}
 
 			return json(
-				{ success: true, post_id: postId, message: 'Post creado con éxito' },
+				{
+					success: true,
+					post_id: postId,
+					is_anonymous: isAnonymous,
+					message: isAnonymous ? 'Publicación anónima creada con éxito' : 'Post creado con éxito'
+				},
 				{ status: 201 }
 			);
 		} catch (e) {
@@ -328,17 +423,31 @@ export async function POST({ request, _url, params }) {
 			.run(postId, userId, reactionType);
 		await db.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').run(postId);
 
+		// Track first_engagement_at if external interaction
+		await db
+			.prepare(
+				"UPDATE posts SET first_engagement_at = datetime('now') WHERE id = ? AND first_engagement_at IS NULL AND user_id != ?"
+			)
+			.run(postId, userId);
+
 		// Non-blocking Side Effects (Notifications & Gamification)
 		// This acts as an event queue in memory to prevent blocking the response
 		setTimeout(async () => {
 			try {
-				const ownerId = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(postId)
-					?.user_id;
+				const likePost = await db
+					.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?')
+					.get(postId);
+				const ownerId = likePost?.user_id;
 				if (ownerId && ownerId !== userId) {
 					const liker = await db
 						.prepare('SELECT display_name, username FROM users WHERE id = ?')
 						.get(userId);
-					const likerName = liker?.display_name || liker?.username || 'Alguien';
+					// En posts anónimos el like llega con la identidad anónima del autor del like
+					const anonLikerName =
+						likePost?.is_anonymous == 1 ? await getAnonIdentity(db, userId) : null;
+					const likerName = anonLikerName
+						? '@' + anonLikerName
+						: liker?.display_name || liker?.username || 'Alguien';
 					await db
 						.prepare(
 							"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'like', 'post', ?, ?)"
@@ -359,10 +468,70 @@ export async function POST({ request, _url, params }) {
 		return json({ success: true, message: 'Post liked' });
 	}
 
-	// POST /api/posts/:id/share
-	if (subaction === 'share') {
-		await db.prepare('UPDATE posts SET share_count = share_count + 1 WHERE id = ?').run(postId);
-		return json({ success: true, message: 'Post shared successfully' });
+	// POST /api/posts/:id/share or POST /api/posts/:id/repost
+	if (subaction === 'share' || subaction === 'repost') {
+		const existing = await db
+			.prepare('SELECT 1 FROM post_shares WHERE user_id = ? AND post_id = ?')
+			.get(userId, postId);
+
+		if (!existing) {
+			await db
+				.prepare(
+					"INSERT INTO post_shares (user_id, post_id, created_at) VALUES (?, ?, datetime('now'))"
+				)
+				.run(userId, postId);
+
+			await db
+				.prepare(
+					"UPDATE posts SET first_engagement_at = datetime('now') WHERE id = ? AND first_engagement_at IS NULL AND user_id != ?"
+				)
+				.run(postId, userId);
+
+			await logActivity(userId, 'share', 'post', postId).catch(() => {});
+
+			// Non-blocking Side Effects (Notifications & Gamification)
+			setTimeout(async () => {
+				try {
+					const sharePost = await db
+						.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?')
+						.get(postId);
+					const ownerId = sharePost?.user_id;
+					if (ownerId && ownerId !== userId) {
+						const reposter = await db
+							.prepare('SELECT display_name, username FROM users WHERE id = ?')
+							.get(userId);
+						// En posts anónimos el repost llega con la identidad anónima
+						const anonReposter =
+							sharePost?.is_anonymous == 1 ? await getAnonIdentity(db, userId) : null;
+						const reposterName = anonReposter
+							? '@' + anonReposter
+							: reposter?.display_name || reposter?.username || 'Alguien';
+						await db
+							.prepare(
+								"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'share', 'post', ?, ?)"
+							)
+							.run(ownerId, userId, postId, `${reposterName} reposteó tu publicación.`);
+
+						// Gamification: Award 2 XP to post owner for receiving a repost
+						await awardXP(db, ownerId, 2).catch(() => {});
+					}
+
+					// Gamification: Award 1 XP to user for reposting
+					await awardXP(db, userId, 1).catch(() => {});
+				} catch (e) {
+					console.error('[Async Share Tasks Error]', e);
+				}
+			}, 0);
+		}
+
+		const currentCount = await db.prepare('SELECT share_count FROM posts WHERE id = ?').get(postId);
+
+		return json({
+			success: true,
+			shared: true,
+			share_count: currentCount?.share_count || 0,
+			message: 'Post reposteado con éxito'
+		});
 	}
 
 	// POST /api/posts/:id/save
@@ -373,12 +542,58 @@ export async function POST({ request, _url, params }) {
 		return json({ success: true, message: 'Post saved successfully' });
 	}
 
+	// POST /api/posts/:id/signal or POST /api/posts/:id/not-interested
+	if (subaction === 'signal' || subaction === 'not-interested') {
+		const body = await request.json().catch(() => ({}));
+		const signalType = (
+			body.signal_type || (subaction === 'not-interested' ? 'not_interested' : '')
+		).trim();
+		if (!['not_interested', 'spam', 'offensive'].includes(signalType)) {
+			return json({ error: 'Tipo de señal inválido' }, { status: 400 });
+		}
+
+		await db
+			.prepare(
+				`INSERT INTO content_signals (user_id, post_id, signal_type, created_at)
+				VALUES (?, ?, ?, datetime('now'))
+				ON CONFLICT(user_id, post_id, signal_type) DO UPDATE SET created_at = datetime('now')`
+			)
+			.run(userId, postId, signalType);
+
+		return json({ success: true, message: 'Señal registrada con éxito' });
+	}
+
 	// POST /api/posts/:id/comments
 	if (subaction === 'comments' && parts.length === 2) {
+		await checkUserNotMuted(userId);
 		const body = await request.json();
 		const content = (body.body || body.content || '').trim();
 		const parentId = body.parent_id || null;
 		if (!content) return json({ error: 'Comment cannot be empty' }, { status: 400 });
+
+		// En posts anónimos los comentarios son SIEMPRE anónimos: el comentarista necesita
+		// su identidad anónima permanente (username exclusivo elegido una sola vez).
+		const targetPost = await db
+			.prepare('SELECT user_id, is_anonymous FROM posts WHERE id = ?')
+			.get(postId);
+		if (!targetPost) return json({ error: 'Post not found' }, { status: 404 });
+		const postIsAnon = targetPost.is_anonymous == 1 || targetPost.is_anonymous === true;
+		let anonName = null;
+		if (postIsAnon) {
+			const ident = await db
+				.prepare('SELECT anon_username FROM anon_identities WHERE user_id = ?')
+				.get(userId);
+			if (!ident) {
+				return json(
+					{
+						error: 'Para comentar en publicaciones anónimas necesitas crear tu identidad anónima.',
+						code: 'ANON_IDENTITY_REQUIRED'
+					},
+					{ status: 403 }
+				);
+			}
+			anonName = ident.anon_username;
+		}
 
 		const insertResult = await db
 			.prepare('INSERT INTO comments (post_id, user_id, body, parent_id) VALUES (?, ?, ?, ?)')
@@ -387,17 +602,37 @@ export async function POST({ request, _url, params }) {
 		await db.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').run(postId);
 		await logActivity(userId, 'create', 'comment', commentId, { post_id: postId });
 
-		const ownerId = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(postId)?.user_id;
+		const ownerId = targetPost.user_id;
 		if (ownerId && ownerId !== userId) {
+			// External interaction: track first_engagement_at
+			await db
+				.prepare(
+					"UPDATE posts SET first_engagement_at = datetime('now') WHERE id = ? AND first_engagement_at IS NULL"
+				)
+				.run(postId);
+
 			const commenter = await db
 				.prepare('SELECT display_name, username FROM users WHERE id = ?')
 				.get(userId);
-			const commenterName = commenter?.display_name || commenter?.username || 'Alguien';
+			// En posts anónimos la notificación muestra la identidad anónima, nunca el perfil real
+			const commenterName = anonName
+				? `@${anonName}`
+				: commenter?.display_name || commenter?.username || 'Alguien';
 			await db
 				.prepare(
 					"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'comment', 'post', ?, ?)"
 				)
 				.run(ownerId, userId, postId, `${commenterName} ha comentado en tu publicación.`);
+		} else if (ownerId && ownerId === userId && parentId) {
+			// Author response in their own post comments: only count if replying to another user's comment (anti-gaming)
+			const parentComment = await db
+				.prepare('SELECT user_id FROM comments WHERE id = ? AND post_id = ?')
+				.get(parentId, postId);
+			if (parentComment && parentComment.user_id !== userId) {
+				await db
+					.prepare('UPDATE posts SET author_replies_count = author_replies_count + 1 WHERE id = ?')
+					.run(postId);
+			}
 		}
 
 		// Gamification: Comments
@@ -552,6 +787,58 @@ export async function DELETE({ request, _url, params }) {
 		return json({ success: true, message: 'Post unreacted' });
 	}
 
+	// DELETE /api/posts/:id/signal
+	if (subaction === 'signal') {
+		const body = await request.json().catch(() => ({}));
+		const signalType = (body.signal_type || '').trim();
+		if (signalType) {
+			await db
+				.prepare(
+					'DELETE FROM content_signals WHERE user_id = ? AND post_id = ? AND signal_type = ?'
+				)
+				.run(userId, postId, signalType);
+		} else {
+			await db
+				.prepare('DELETE FROM content_signals WHERE user_id = ? AND post_id = ?')
+				.run(userId, postId);
+		}
+		return json({ success: true, message: 'Señal eliminada' });
+	}
+
+	// DELETE /api/posts/:id/share or DELETE /api/posts/:id/repost — un-repost
+	if (subaction === 'share' || subaction === 'repost') {
+		const result = await db
+			.prepare('DELETE FROM post_shares WHERE user_id = ? AND post_id = ?')
+			.run(userId, postId);
+
+		if (result.changes > 0) {
+			await logActivity(userId, 'unshare', 'post', postId).catch(() => {});
+
+			// Non-blocking Gamification penalty rollback
+			setTimeout(async () => {
+				try {
+					const post = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(postId);
+					const ownerId = post?.user_id;
+					if (ownerId && ownerId !== userId) {
+						await awardXP(db, ownerId, -2).catch(() => {});
+					}
+					await awardXP(db, userId, -1).catch(() => {});
+				} catch (e) {
+					console.error('[Async Unshare Gamification Error]', e);
+				}
+			}, 0);
+		}
+
+		const currentCount = await db.prepare('SELECT share_count FROM posts WHERE id = ?').get(postId);
+
+		return json({
+			success: true,
+			shared: false,
+			share_count: currentCount?.share_count || 0,
+			message: 'Repost eliminado con éxito'
+		});
+	}
+
 	// DELETE /api/posts/:id/save — unsave
 	if (subaction === 'save') {
 		await db
@@ -578,7 +865,9 @@ export async function DELETE({ request, _url, params }) {
 	// DELETE /api/posts/:id/comments/:commentId
 	if (subaction === 'comments' && subid && parts.length === 3) {
 		const commentId = parseInt(subid);
-		const oldComment = db.prepare('SELECT body FROM comments WHERE id = ?').get(commentId);
+		const oldComment = await db
+			.prepare('SELECT user_id, parent_id, body FROM comments WHERE id = ?')
+			.get(commentId);
 		const result = await db
 			.prepare(
 				"UPDATE comments SET deleted_at = datetime('now') WHERE id = ? AND (user_id = ? OR post_id IN (SELECT id FROM posts WHERE user_id = ?))"
@@ -588,9 +877,26 @@ export async function DELETE({ request, _url, params }) {
 			await logActivity(userId, 'delete', 'comment', commentId, {
 				previous_body: oldComment?.body
 			});
-			db.prepare('UPDATE posts SET comment_count = MAX(comment_count - 1, 0) WHERE id = ?').run(
-				postId
-			);
+			await db
+				.prepare('UPDATE posts SET comment_count = MAX(comment_count - 1, 0) WHERE id = ?')
+				.run(postId);
+
+			// Decrement author_replies_count if deleted comment was an author reply
+			if (oldComment && oldComment.parent_id) {
+				const owner = await db.prepare('SELECT user_id FROM posts WHERE id = ?').get(postId);
+				if (owner && owner.user_id === oldComment.user_id) {
+					const parent = await db
+						.prepare('SELECT user_id FROM comments WHERE id = ?')
+						.get(oldComment.parent_id);
+					if (parent && parent.user_id !== oldComment.user_id) {
+						await db
+							.prepare(
+								'UPDATE posts SET author_replies_count = MAX(author_replies_count - 1, 0) WHERE id = ?'
+							)
+							.run(postId);
+					}
+				}
+			}
 
 			// Gamification: Comment deletion penalty
 			setTimeout(async () => {

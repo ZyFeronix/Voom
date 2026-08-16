@@ -17,7 +17,7 @@ async function run() {
             applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `;
-    db.exec(createMigrationsTable);
+    await db.exec(createMigrationsTable);
 
     const migrationsDir = resolve(getRootDir(), 'migrations');
     
@@ -27,11 +27,11 @@ async function run() {
     }
 
     const files = fs.readdirSync(migrationsDir)
-        .filter(f => f.endsWith('.sql'))
+        .filter(f => f.endsWith('.sql') && !f.endsWith('.down.sql'))
         .sort();
 
     for (const file of files) {
-        const alreadyApplied = db.prepare('SELECT id FROM _migrations WHERE name = ?').get(file);
+        const alreadyApplied = await db.prepare('SELECT id FROM _migrations WHERE name = ?').get(file);
         if (alreadyApplied) {
             console.log(`[migrations] Skipping ${file} (already applied)`);
             continue;
@@ -41,8 +41,8 @@ async function run() {
         const sql = fs.readFileSync(filePath, 'utf8');
 
         try {
-            db.exec(sql);
-            db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file);
+            await db.exec(sql);
+            await db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file);
             console.log(`[migrations] Applied: ${file}`);
         } catch (err) {
             console.error(`[migrations] Failed on ${file}: ${err.message}`);

@@ -64,7 +64,7 @@
 					<img
 						src="/logo.svg"
 						alt="V-SOCIAL Logo"
-						class="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(27,133,243,0.5)]"
+						class="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(var(--accent-blue-rgb),0.5)]"
 					/>
 				</div>
 				<div class="flex flex-col min-w-0">
@@ -83,7 +83,7 @@
 					<span class="material-icons-round text-[20px]">close</span>
 				</button>
 				<button
-					class="btn-aero-primary px-4 py-2 text-sm font-bold shadow-[0_0_15px_rgba(27,133,243,0.3)]"
+					class="btn-aero-primary px-4 py-2 text-sm font-bold shadow-[0_0_15px_rgba(var(--accent-blue-rgb),0.3)]"
 					onclick={handleInstall}
 				>
 					Instalar
@@ -110,7 +110,7 @@
 		width: 100%;
 		max-width: 600px;
 		padding: 12px 16px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -127,7 +127,7 @@
 	.pwa-icon {
 		width: 44px;
 		height: 44px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		background: var(--bg-canvas);
 		display: flex;
 		align-items: center;
@@ -142,7 +142,8 @@
 		justify-content: center;
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		color: var(--text-muted);
 		transition: all 0.2s;
 	}

@@ -7,6 +7,7 @@
 	import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
 	import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
 	import { formatHashtags } from '$lib/utils/textFormatting.js';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
 	import { onDestroy } from 'svelte';
 
 	let { username, basicUser = null, children } = $props();
@@ -141,7 +142,7 @@
 			onkeydown={(_e) => {}}
 		>
 			{#if fullUser}
-				<div class="hc-header" style="position: relative; z-index: 1;">
+				<div class="hc-header" style="position: relative; z-index: 0;">
 					{#if fullUser.cover_url}
 						<img
 							src={fullUser.cover_url}
@@ -157,23 +158,18 @@
 					{/if}
 					<div class="hc-overlay"></div>
 				</div>
-				<div class="hc-body" style="position: relative; z-index: 1;">
+				<div class="hc-body" style="position: relative; z-index: 2;">
 					<div class="hc-top-row">
-						{#if fullUser.avatar_url}
-							<img
-								src={fullUser.avatar_url}
-								alt={username}
-								class="hc-avatar"
-								width="68"
-								height="68"
-								loading="lazy"
-								decoding="async"
-							/>
-						{:else}
-							<div class="hc-avatar hc-avatar-fallback">
-								{(fullUser.display_name || fullUser.username || '?')[0].toUpperCase()}
-							</div>
-						{/if}
+						<AeroAvatar
+							src={fullUser.avatar_url}
+							alt={username}
+							size="lg"
+							className="hc-avatar-override"
+							online={fullUser.custom_status === 'online' || !fullUser.custom_status}
+							away={fullUser.custom_status === 'away'}
+							busy={fullUser.custom_status === 'busy'}
+							isVtuber={fullUser.is_virtual}
+						/>
 
 						{#if fullUser.id !== authStore.user?.id && authStore.isAuthenticated}
 							<button
@@ -249,7 +245,7 @@
 		position: absolute;
 		left: 0;
 		width: 290px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		overflow: hidden;
 		z-index: 100;
 		box-shadow:
@@ -274,14 +270,17 @@
 	}
 
 	.hc-header {
-		height: 85px;
+		height: 90px;
 		position: relative;
-		background: var(--bg-overlay);
+		background: var(--grad-primary);
+		overflow: hidden;
 	}
 	.hc-cover-img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		object-position: center center;
+		display: block;
 	}
 	.hc-cover-fallback {
 		width: 100%;
@@ -306,35 +305,26 @@
 		align-items: flex-end;
 		margin-top: -48px;
 		margin-bottom: 12px;
+		position: relative;
+		z-index: 10;
 	}
 
-	.hc-avatar {
-		width: 68px;
-		height: 68px;
-		border-radius: 50%;
-		border: 3px solid var(--bg-surface);
-		object-fit: cover;
-		background: var(--bg-canvas);
+	:global(.hc-avatar-override) {
+		width: 68px !important;
+		height: 68px !important;
+		border: 3px solid var(--bg-surface) !important;
+		background: var(--bg-canvas) !important;
 		z-index: 2;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-	}
-	.hc-avatar-fallback {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 24px;
-		font-weight: 800;
-		color: #fff;
-		background: var(--grad-primary);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 	}
 
 	.hc-follow-btn {
 		padding: 6px 16px;
 		font-size: 0.85rem;
 		font-weight: 700;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		z-index: 2;
-		box-shadow: 0 4px 12px rgba(27, 133, 243, 0.2);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.2);
 	}
 	.hc-follow-btn.following {
 		background: rgba(255, 255, 255, 0.1);
@@ -426,7 +416,8 @@
 		height: 28px;
 		border: 3px solid var(--border-subtle);
 		border-top-color: var(--aero-sky);
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		animation: spin 0.8s linear infinite;
 	}
 	@keyframes spin {

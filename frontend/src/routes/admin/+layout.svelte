@@ -7,11 +7,12 @@
 
 	let { children } = $props();
 
-	let ready = $state(authStore.isAuthenticated && authStore.isAdmin);
+	let ready = $state(false);
 
 	// Sub-routes for admin navigation
 	const adminNav = [
 		{ href: '/admin', icon: 'dashboard', label: 'Dashboard', exact: true },
+		{ href: '/admin/verifications', icon: 'verified', label: 'Verificaciones' },
 		{ href: '/admin/users', icon: 'people', label: 'Usuarios' },
 		{ href: '/admin/content', icon: 'grid_view', label: 'Contenido' },
 		{ href: '/admin/reports', icon: 'flag', label: 'Reportes' },
@@ -25,14 +26,12 @@
 	}
 
 	onMount(async () => {
-		if (!ready) {
-			await authStore.initialize();
-			if (!authStore.isAuthenticated || !authStore.isAdmin) {
-				goto('/feed');
-				return;
-			}
-			ready = true;
+		await authStore.initialize();
+		if (!authStore.isAuthenticated || !authStore.isAdmin) {
+			goto('/feed');
+			return;
 		}
+		ready = true;
 	});
 </script>
 
@@ -141,7 +140,7 @@
 	.admin-boot-logo {
 		width: 52px;
 		height: 52px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
@@ -232,7 +231,7 @@
 	.aside-logo-icon {
 		width: 32px;
 		height: 32px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
@@ -339,14 +338,15 @@
 		right: 0;
 		height: 45%;
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 100%);
-		border-radius: var(--radius-md) var(--radius-md) 0 0;
+		border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-xs);
 		pointer-events: none;
 	}
 
 	.aside-nav-pip {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(255, 255, 255, 0.75);
 		flex-shrink: 0;
 	}
@@ -370,7 +370,8 @@
 	.aside-user-avatar {
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		overflow: hidden;
 		flex-shrink: 0;
 		background: var(--grad-primary);

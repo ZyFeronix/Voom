@@ -62,7 +62,7 @@
 		width: 100%;
 		max-width: 720px;
 		padding: 14px 18px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -91,12 +91,12 @@
 
 	.cookie-text {
 		font-size: 0.82rem;
-		color: var(--text-muted, #94a3b8);
+		color: var(--text-muted, #8fb4bc);
 		line-height: 1.4;
 	}
 
 	.cookie-link {
-		color: var(--text-main, #e2e8f0);
+		color: var(--text-main, #d8edef);
 		text-decoration: underline;
 	}
 
@@ -110,9 +110,9 @@
 	.btn-essential {
 		background: transparent;
 		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
-		color: var(--text-muted, #94a3b8);
+		color: var(--text-muted, #8fb4bc);
 		padding: 0.5rem 1rem;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -121,7 +121,7 @@
 
 	.btn-essential:hover {
 		background: rgba(255, 255, 255, 0.08);
-		color: var(--text-main, #e2e8f0);
+		color: var(--text-main, #d8edef);
 	}
 
 	@media (max-width: 640px) {

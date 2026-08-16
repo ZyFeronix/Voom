@@ -14,8 +14,7 @@ export async function GET({ request, url }) {
 		if (type === 'level') {
 			users = await db
 				.prepare(
-					`
-				SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.xp_points, u.is_verified, COALESCE(ur.role, u.role, 'user') AS role,
+					`					SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.xp_points, u.is_verified, u.custom_status, COALESCE(ur.role, u.role, 'user') AS role,
 					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
 				FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -28,7 +27,7 @@ export async function GET({ request, url }) {
 			users = await db
 				.prepare(
 					`
-				SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.checkin_streak, u.last_checkin_at, u.is_verified, COALESCE(ur.role, u.role, 'user') AS role,
+				SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.checkin_streak, u.last_checkin_at, u.is_verified, u.custom_status, COALESCE(ur.role, u.role, 'user') AS role,
 					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
 				FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -54,7 +53,7 @@ export async function GET({ request, url }) {
 				const u = await db
 					.prepare(
 						`
-					SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.xp_points, u.checkin_streak, u.last_checkin_at, u.is_verified, COALESCE(ur.role, u.role, 'user') AS role,
+					SELECT u.id, u.username, u.display_name, u.avatar_url, u.level, u.xp_points, u.checkin_streak, u.last_checkin_at, u.is_verified, u.custom_status, COALESCE(ur.role, u.role, 'user') AS role,
 						(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 						(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
 					FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id

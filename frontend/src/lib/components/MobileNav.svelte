@@ -24,7 +24,7 @@
 	);
 </script>
 
-<nav class="vs-mobile-nav md:hidden">
+<nav class="vs-mobile-nav">
 	<div class="vs-mobile-container">
 		{#each items as item (item.href)}
 			<div
@@ -93,7 +93,7 @@
 		transform: translateZ(0);
 		border: 1px solid var(--glass-border);
 		border-top-color: var(--glass-border-t);
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 		box-shadow: var(--shadow-lg), var(--glass-inset);
 	}
 
@@ -105,7 +105,7 @@
 		justify-content: center;
 		gap: 3px;
 		padding: 6px 10px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		color: var(--text-muted);
 		text-decoration: none;
 		transition:
@@ -150,7 +150,8 @@
 		bottom: -2px;
 		width: 4px;
 		height: 4px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-blue);
 		box-shadow: 0 0 6px rgba(46, 134, 232, 0.5);
 	}
@@ -173,7 +174,8 @@
 		font-weight: 700;
 		min-width: 14px;
 		height: 14px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -192,7 +194,8 @@
 	.vs-accent-pill {
 		width: 52px;
 		height: 52px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
@@ -225,6 +228,13 @@
 		box-shadow:
 			0 12px 28px rgba(46, 134, 232, 0.46),
 			inset 0 1px 0 rgba(255, 255, 255, 0.4);
+	}
+
+	/* ─── Ocultar en desktop (≥768px) ───────────── */
+	@media (min-width: 768px) {
+		.vs-mobile-nav {
+			display: none;
+		}
 	}
 
 	/* ─── Dark mode refinements ──────────────────── */

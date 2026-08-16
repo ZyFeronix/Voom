@@ -11,14 +11,86 @@
 	import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
 	import { formatHashtags } from '$lib/utils/textFormatting.js';
 	import ActivityHistory from '$lib/components/ActivityHistory.svelte';
+	import ImageCropperModal from '$lib/components/ImageCropperModal.svelte';
+	import { mediaViewer } from '$lib/stores/mediaViewer.svelte.js';
 
 	// ── Runes State ──────────────────────────────────────────────────────────
 	let username = $derived(page.params.username);
 	let user = $state(null);
 	let posts = $state([]);
-	let activeTab = $state('posts'); // 'posts', 'about', 'trash'
+	let postsPage = $state(1);
+	let hasMorePosts = $state(true);
+	let loadingMorePosts = $state(false);
+
+	let reposts = $state([]);
+	let repostsPage = $state(1);
+	let hasMoreReposts = $state(true);
+	let loadingMoreReposts = $state(false);
+	let loadingReposts = $state(false);
+	let activeTab = $state('posts'); // 'posts', 'reposts', 'about', 'history', 'trash'
 	let loading = $state(true);
 	let deletedPosts = $state([]);
+
+	// ── Cropper State for Profile Direct Upload ──
+	let cropFile = $state(null);
+	let cropType = $state(null);
+	let cropRatio = $state(1);
+	let avatarInput = $state(null);
+	let coverInput = $state(null);
+	let savingMedia = $state(false);
+
+	function handleAvatarChange(e) {
+		const file = e.target.files[0];
+		if (!file || savingMedia) return;
+		cropFile = file;
+		cropType = 'avatar';
+		cropRatio = 1;
+		e.target.value = '';
+	}
+
+	function handleCoverChange(e) {
+		const file = e.target.files[0];
+		if (!file || savingMedia) return;
+		cropFile = file;
+		cropType = 'cover';
+		cropRatio = 16 / 5;
+		e.target.value = '';
+	}
+
+	async function handleCrop(croppedFile) {
+		const type = cropType;
+		cropFile = null;
+		cropType = null;
+		savingMedia = true;
+
+		try {
+			const fd = new FormData();
+			if (type === 'avatar') {
+				fd.append('avatar', croppedFile);
+				const res = await usersApi.uploadAvatar(fd);
+				if (res.success) {
+					if (user) user.avatar_url = res.avatar_url;
+					authStore.updateUser({ avatar_url: res.avatar_url });
+				}
+			} else if (type === 'cover') {
+				fd.append('cover', croppedFile);
+				const res = await usersApi.uploadCover(fd);
+				if (res.success) {
+					if (user) user.cover_url = res.cover_url;
+					authStore.updateUser({ cover_url: res.cover_url });
+				}
+			}
+		} catch (err) {
+			console.error('Error al subir imagen:', err);
+		} finally {
+			savingMedia = false;
+		}
+	}
+
+	function cancelCrop() {
+		cropFile = null;
+		cropType = null;
+	}
 
 	// ── Gamification XP Logic ──
 	const XP_PER_LEVEL_FACTOR = 100;
@@ -36,6 +108,7 @@
 	function selectTab(tabId) {
 		activeTab = tabId;
 		tabKey++;
+		if (activeTab === 'reposts') loadReposts();
 		if (activeTab === 'trash' && deletedPosts.length === 0) loadTrash();
 	}
 	let loadingTrash = $state(false);
@@ -60,18 +133,21 @@
 	// ── Actions ──────────────────────────────────────────────────────────────
 	async function loadUserProfile() {
 		loading = true;
+		postsPage = 1;
+		hasMorePosts = true;
 		try {
 			// Fetch user profile y posts en paralelo: ambos dependen solo del username (ya conocido),
 			// no hay dependencia entre las llamadas, así que se lanzan a la vez en lugar de secuencial.
 			const [data, postsData] = await Promise.all([
 				usersApi.get(username),
-				usersApi.posts(username)
+				usersApi.posts(username, { page: 1, limit: 10 })
 			]);
 			user = data.user;
 			followingState = user.is_following || false;
 			followersCount = user.follower_count || 0;
 
 			posts = postsData.posts || [];
+			if (posts.length < 10) hasMorePosts = false;
 		} catch (err) {
 			console.error('Failed to load user profile:', err);
 			// Fallback mockup profile
@@ -80,7 +156,7 @@
 				username,
 				display_name: username.charAt(0).toUpperCase() + username.slice(1),
 				bio: 'Creador de contenido virtual oficial en VSocial. ¡Bienvenidos a mi perfil!',
-				location: 'Metaverso',
+				location: 'Internet',
 				website: 'https://vsocial.app',
 				joined_at: new Date().toISOString(),
 				avatar_url: null,
@@ -141,6 +217,99 @@
 		} catch (err) {
 			console.error('DM initiation error:', err);
 		}
+	}
+
+	async function loadMorePosts() {
+		if (loadingMorePosts || !hasMorePosts || loading) return;
+		loadingMorePosts = true;
+		try {
+			const nextPage = postsPage + 1;
+			const data = await usersApi.posts(username, { page: nextPage, limit: 10 });
+			const newPosts = data.posts || [];
+			if (newPosts.length === 0) {
+				hasMorePosts = false;
+			} else {
+				posts = [...posts, ...newPosts];
+				postsPage = nextPage;
+				if (newPosts.length < 10) hasMorePosts = false;
+			}
+		} catch (e) {
+			console.error('Failed to load more posts:', e);
+		} finally {
+			loadingMorePosts = false;
+		}
+	}
+
+	async function loadReposts() {
+		loadingReposts = true;
+		repostsPage = 1;
+		hasMoreReposts = true;
+		try {
+			const data = await usersApi.reposts(username, { page: 1, limit: 10 });
+			const list = data.reposts || data.posts || [];
+			reposts = list;
+			if (list.length < 10) hasMoreReposts = false;
+		} catch (e) {
+			console.error('Failed to load reposts:', e);
+			reposts = [];
+		} finally {
+			loadingReposts = false;
+		}
+	}
+
+	async function loadMoreReposts() {
+		if (loadingMoreReposts || !hasMoreReposts || loadingReposts) return;
+		loadingMoreReposts = true;
+		try {
+			const nextPage = repostsPage + 1;
+			const data = await usersApi.reposts(username, { page: nextPage, limit: 10 });
+			const list = data.reposts || data.posts || [];
+			if (list.length === 0) {
+				hasMoreReposts = false;
+			} else {
+				reposts = [...reposts, ...list];
+				repostsPage = nextPage;
+				if (list.length < 10) hasMoreReposts = false;
+			}
+		} catch (e) {
+			console.error('Failed to load more reposts:', e);
+		} finally {
+			loadingMoreReposts = false;
+		}
+	}
+
+	function infiniteScrollPosts(node) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && !loadingMorePosts && hasMorePosts && !loading) {
+					loadMorePosts();
+				}
+			},
+			{ rootMargin: '300px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
+
+	function infiniteScrollReposts(node) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && !loadingMoreReposts && hasMoreReposts && !loadingReposts) {
+					loadMoreReposts();
+				}
+			},
+			{ rootMargin: '300px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
 	}
 
 	async function loadTrash() {
@@ -246,7 +415,15 @@
 			<!-- Profile Banner & Info -->
 			<div class="profile-header-card glass-panel">
 				<!-- Banner/Cover Image -->
-				<div class="profile-cover">
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="profile-cover {user.cover_url ? 'is-expandable' : ''}"
+					onclick={() => {
+						if (user.cover_url) mediaViewer.openProfileCover(user);
+					}}
+					title={user.cover_url ? 'Ver foto de portada completa' : ''}
+				>
 					{#if user.cover_url}
 						<img
 							src={user.cover_url}
@@ -259,12 +436,36 @@
 						/>
 					{/if}
 					<div class="cover-glow-bubble"></div>
+
+					{#if isOwnProfile}
+						<button
+							type="button"
+							class="profile-cover-camera-btn"
+							onclick={(e) => {
+								e.stopPropagation();
+								coverInput?.click();
+							}}
+							title="Cambiar portada (16:5)"
+							aria-label="Cambiar foto de portada"
+						>
+							<span class="material-icons-round">photo_camera</span>
+							<span class="btn-text">Cambiar portada</span>
+						</button>
+					{/if}
 				</div>
 
 				<!-- Avatar & Basic Info -->
 				<div class="profile-header">
 					<div class="avatar-and-names">
-						<div class="profile-avatar">
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							class="profile-avatar {user.avatar_url ? 'is-expandable' : ''}"
+							onclick={() => {
+								if (user.avatar_url) mediaViewer.openProfileAvatar(user);
+							}}
+							title={user.avatar_url ? 'Ver foto de perfil completa' : ''}
+						>
 							{#if user.avatar_url}
 								<img
 									src={user.avatar_url}
@@ -279,6 +480,21 @@
 								<div class="avatar-initials-fallback">
 									{user.display_name.charAt(0).toUpperCase()}
 								</div>
+							{/if}
+
+							{#if isOwnProfile}
+								<button
+									type="button"
+									class="profile-avatar-camera-btn"
+									onclick={(e) => {
+										e.stopPropagation();
+										avatarInput?.click();
+									}}
+									title="Cambiar foto de perfil (1:1)"
+									aria-label="Cambiar foto de perfil"
+								>
+									<span class="material-icons-round">photo_camera</span>
+								</button>
 							{/if}
 						</div>
 						<div class="profile-credentials">
@@ -309,17 +525,17 @@
 							<a
 								href="/settings"
 								class="btn-aero-secondary"
-								style="padding: 0 16px; font-size: 0.9rem; flex: 0 0 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;"
+								style="white-space: nowrap; flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 20px; font-size: 0.9rem;"
 							>
-								<span class="material-icons-round text-[18px] mr-1">settings</span> Editar perfil
+								<span class="material-icons-round text-[18px]">settings</span> Editar perfil
 							</a>
 						{:else}
 							<button
 								onclick={startDirectMessage}
 								class="btn-aero-secondary"
-								style="padding: 0 16px; font-size: 0.9rem; flex: 0 0 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;"
+								style="white-space: nowrap; flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 20px; font-size: 0.9rem;"
 							>
-								<span class="material-icons-round text-[18px] mr-1">message</span> Mensaje
+								<span class="material-icons-round text-[18px]">message</span> Mensaje
 							</button>
 							<button
 								class="profile-follow-btn"
@@ -328,6 +544,18 @@
 							>
 								{followingState ? 'Siguiendo' : 'Seguir'}
 							</button>
+						{/if}
+
+						{#if user && user.payment_link}
+							<a
+								href={user.payment_link}
+								target="_blank"
+								rel="noopener noreferrer nofollow"
+								class="btn-aero-primary profile-pay-btn"
+								title="Apoyar a {user.display_name || user.username}"
+							>
+								<span class="material-icons-round text-[18px]">payments</span> Apoyar
+							</a>
 						{/if}
 					</div>
 				</div>
@@ -391,7 +619,7 @@
 
 				<!-- Tab selectors -->
 				<div class="tabs-container">
-					{#each [{ id: 'posts', label: 'Posts' }, { id: 'about', label: 'Sobre mí' }, ...(isOwnProfile ? [{ id: 'history', label: 'Historial' }, { id: 'trash', label: 'Papelera' }] : [])] as tab}
+					{#each [{ id: 'posts', label: 'Posts' }, { id: 'reposts', label: 'Reposts' }, { id: 'about', label: 'Sobre mí' }, ...(isOwnProfile ? [{ id: 'history', label: 'Historial' }, { id: 'trash', label: 'Papelera' }] : [])] as tab}
 						<button
 							onclick={() => selectTab(tab.id)}
 							class="tab-button"
@@ -424,6 +652,60 @@
 												onDelete={() => (posts = posts.filter((p) => p.id !== post.id))}
 											/>
 										{/each}
+										{#if hasMorePosts}
+											<div
+												class="text-center py-4"
+												use:infiniteScrollPosts
+												style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
+											>
+												{#if loadingMorePosts}
+													<span
+														class="material-icons-round notif-pulse"
+														style="color: var(--aero-blue); font-size: 24px;">sync</span
+													>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								{/if}
+							{:else if activeTab === 'reposts'}
+								{#if loadingReposts}
+									<div class="glass-card empty-posts-box">
+										<span
+											class="material-icons-round notif-pulse"
+											style="color: var(--aero-mint, #00d4aa);">repeat</span
+										>
+										<p>Cargando reposteos...</p>
+									</div>
+								{:else if reposts.length === 0}
+									<div class="glass-card empty-posts-box">
+										<span class="material-icons-round" style="color: var(--aero-mint, #00d4aa);"
+											>repeat</span
+										>
+										<p>Este usuario no ha reposteado ninguna publicación todavía.</p>
+									</div>
+								{:else}
+									<div class="profile-posts-list">
+										{#each reposts as post (post.id + '-' + (post.reposted_by?.id || 'r'))}
+											<PostCard
+												{post}
+												onDelete={() => (reposts = reposts.filter((p) => p.id !== post.id))}
+											/>
+										{/each}
+										{#if hasMoreReposts}
+											<div
+												class="text-center py-4"
+												use:infiniteScrollReposts
+												style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
+											>
+												{#if loadingMoreReposts}
+													<span
+														class="material-icons-round notif-pulse"
+														style="color: var(--aero-mint); font-size: 24px;">sync</span
+													>
+												{/if}
+											</div>
+										{/if}
 									</div>
 								{/if}
 							{:else if activeTab === 'about'}
@@ -564,6 +846,42 @@
 	</div>
 </div>
 
+{#if isOwnProfile}
+	<input
+		id="profile-avatar-upload"
+		name="profile-avatar-upload"
+		type="file"
+		accept="image/*"
+		bind:this={avatarInput}
+		onchange={handleAvatarChange}
+		style="display: none;"
+	/>
+	<input
+		id="profile-cover-upload"
+		name="profile-cover-upload"
+		type="file"
+		accept="image/*"
+		bind:this={coverInput}
+		onchange={handleCoverChange}
+		style="display: none;"
+	/>
+
+	{#if cropFile}
+		<ImageCropperModal
+			imageFile={cropFile}
+			aspectRatio={cropRatio}
+			shape={cropType === 'avatar' ? 'circle' : 'rect'}
+			{cropType}
+			title={cropType === 'avatar' ? 'Ajustar Foto de Perfil' : 'Ajustar Portada de Perfil'}
+			subtitle={cropType === 'avatar'
+				? 'Centra y escala tu avatar • Proporción 1:1'
+				: 'Encuadra tu banner panorámico • Proporción 16:5'}
+			onCrop={handleCrop}
+			onCancel={cancelCrop}
+		/>
+	{/if}
+{/if}
+
 <style>
 	/* ── Silky smooth crossfader ── */
 	.smooth-transition-wrapper {
@@ -621,7 +939,7 @@
 	.error-profile-box {
 		padding: 48px;
 		text-align: center;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 		margin: 24px 16px;
 	}
 
@@ -653,7 +971,7 @@
 
 	.profile-cover {
 		width: 100%;
-		height: 180px;
+		height: 200px;
 		background: var(--grad-primary);
 		border-top-left-radius: var(--radius-lg);
 		border-top-right-radius: var(--radius-lg);
@@ -664,11 +982,57 @@
 		box-shadow: inset 0 -20px 50px rgba(0, 0, 0, 0.15);
 	}
 
+	.profile-cover.is-expandable {
+		cursor: pointer;
+	}
+
+	.profile-cover.is-expandable:hover img {
+		filter: brightness(1.04);
+		transition: filter 0.25s ease;
+	}
+
+	.profile-cover-camera-btn {
+		position: absolute;
+		top: 14px;
+		right: 14px;
+		z-index: 8;
+		background: rgba(0, 0, 0, 0.55);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		color: #ffffff;
+		border-radius: var(--radius-full);
+		padding: 6px 14px;
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+		transition:
+			background var(--t-fast),
+			border-color var(--t-fast),
+			transform var(--t-fast);
+	}
+
+	.profile-cover-camera-btn:hover {
+		background: var(--aero-blue);
+		border-color: #ffffff;
+		transform: translateY(-1px);
+	}
+
+	.profile-cover-camera-btn:active {
+		transform: translateY(1px);
+	}
+
 	.profile-cover img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		object-position: center center;
 		opacity: 1; /* override the container opacity for images */
+		display: block;
 	}
 
 	.cover-glow-bubble {
@@ -677,7 +1041,8 @@
 		right: 40px;
 		width: 140px;
 		height: 140px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(255, 255, 255, 0.25);
 		filter: blur(40px);
 		pointer-events: none;
@@ -722,12 +1087,50 @@
 	.profile-avatar {
 		width: 84px;
 		height: 84px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		padding: 3px;
 		background: var(--bg-surface);
 		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 		overflow: hidden;
 		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		transition: box-shadow 0.25s ease;
+	}
+
+	.profile-avatar.is-expandable {
+		cursor: pointer;
+	}
+
+	.profile-avatar.is-expandable:hover {
+		box-shadow: 0 0 16px rgba(27, 133, 243, 0.35);
+	}
+
+	.profile-avatar-camera-btn {
+		position: absolute;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.45);
+		backdrop-filter: blur(2px);
+		-webkit-backdrop-filter: blur(2px);
+		border: none;
+		border-radius: inherit;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #ffffff;
+		font-size: 24px;
+		opacity: 0;
+		cursor: pointer;
+		transition: opacity var(--t-fast);
+		z-index: 5;
+	}
+
+	.profile-avatar:hover .profile-avatar-camera-btn,
+	.profile-avatar-camera-btn:focus-visible {
+		opacity: 1;
 	}
 
 	@media (max-width: 576px) {
@@ -740,7 +1143,10 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		border-radius: 50%;
+		object-position: center center;
+		border-radius: calc(var(--radius-squircle) - 2px);
+		corner-shape: squircle;
+		display: block;
 	}
 
 	.avatar-initials-fallback {
@@ -750,7 +1156,8 @@
 		align-items: center;
 		justify-content: center;
 		background: var(--grad-primary);
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		color: #fff;
 		font-size: 2rem;
 		font-weight: 900;
@@ -795,6 +1202,19 @@
 		display: flex;
 		gap: 10px;
 		margin-top: 10px;
+		flex-wrap: wrap;
+	}
+
+	.profile-pay-btn {
+		white-space: nowrap;
+		flex: 0 0 auto;
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 0 20px;
+		font-size: 0.9rem;
 	}
 
 	@media (max-width: 576px) {
@@ -829,7 +1249,7 @@
 		align-items: center;
 		gap: 6px;
 		text-decoration: none;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		padding: 4px 8px;
 		transition: background var(--t-fast);
 	}
@@ -899,7 +1319,7 @@
 		width: 100%;
 		height: 8px;
 		background: rgba(0, 0, 0, 0.08);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		overflow: hidden;
 		position: relative;
 		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -912,8 +1332,8 @@
 	.xp-bar-fill {
 		height: 100%;
 		background: linear-gradient(90deg, var(--aero-sky), var(--aero-blue));
-		border-radius: 10px;
-		box-shadow: 0 0 12px rgba(27, 133, 243, 0.35);
+		border-radius: var(--radius-sm);
+		box-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.35);
 		transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
@@ -1053,7 +1473,7 @@
 
 	.about-card {
 		padding: 20px;
-		border-radius: 18px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
@@ -1108,7 +1528,7 @@
 
 	.interest-tag {
 		padding: 4px 10px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
 		color: var(--aero-sky);
@@ -1124,7 +1544,7 @@
 		font-size: 0.9rem;
 		font-weight: 700;
 		padding: 0 16px;
-		border-radius: 100px;
+		border-radius: var(--radius-xl);
 		border: 1px solid transparent;
 		box-shadow:
 			0 4px 12px rgba(14, 165, 233, 0.3),

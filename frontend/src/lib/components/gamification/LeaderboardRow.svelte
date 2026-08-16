@@ -7,6 +7,12 @@
 
 	let initial = $derived((user.display_name || user.username || '?').charAt(0).toUpperCase());
 
+	// Presencia: mapeo custom_status → variante de dot
+	let presenceClass = $derived.by(() => {
+		const s = user.custom_status || 'online';
+		return s === 'invisible' || s === 'offline' ? 'is-offline' : `is-${s}`;
+	});
+
 	// Tier accent by rank band — mirrors the aurora pillar segments.
 	let tier = $derived.by(() => {
 		if (rank <= 10) return 'rising'; // mint
@@ -37,7 +43,7 @@
 >
 	<span class="lb-row__rank" aria-hidden="true">{rank}</span>
 
-	<div class="lb-row__avatar">
+	<div class="lb-row__avatar {presenceClass}">
 		{#if user.avatar_url}
 			<img
 				src={user.avatar_url}
@@ -51,6 +57,7 @@
 		{:else}
 			<div class="avatar-letter">{initial}</div>
 		{/if}
+		<span class="presence-dot" title="Estado: {user.custom_status || 'online'}"></span>
 	</div>
 
 	<div class="lb-row__id">
@@ -85,7 +92,7 @@
 		grid-template-columns: 34px auto 1fr auto;
 		align-items: center;
 		gap: 14px;
-		padding: 12px 16px 12px 12px;
+		padding: 12px 16px;
 		border-radius: var(--radius-lg, 18px);
 		border: 1px solid transparent;
 		background:
@@ -98,8 +105,6 @@
 				)
 				border-box;
 		box-shadow: var(--shadow-sm);
-		backdrop-filter: var(--lb-glass-blur);
-		-webkit-backdrop-filter: var(--lb-glass-blur);
 		text-decoration: none;
 		overflow: hidden;
 		transition:
@@ -108,46 +113,16 @@
 			box-shadow 0.22s ease;
 	}
 
-	/* Left accent bar tinted by tier with smooth gradient */
-	.lb-row::before {
-		content: '';
-		position: absolute;
-		left: 0;
-		top: 12px;
-		bottom: 12px;
-		width: 3px;
-		border-radius: 3px;
-		background: linear-gradient(
-			180deg,
-			var(--row-accent) 0%,
-			color-mix(in srgb, var(--row-accent) 40%, transparent) 100%
-		);
-		opacity: 0.75;
-		transition:
-			opacity 0.22s ease,
-			top 0.22s ease,
-			bottom 0.22s ease;
-	}
-
 	.lb-row:hover {
 		transform: translateY(-3px);
-		background:
-			linear-gradient(var(--lb-card-bg), var(--lb-card-bg)) padding-box,
-			linear-gradient(
-					135deg,
-					color-mix(in srgb, var(--row-accent) 80%, #fff),
-					rgba(255, 255, 255, 0.2) 50%,
-					color-mix(in srgb, var(--row-accent) 50%, transparent)
-				)
-				border-box;
 		box-shadow:
 			var(--shadow-md),
 			0 0 18px color-mix(in srgb, var(--row-accent) 25%, transparent);
 	}
-	.lb-row:hover::before {
-		opacity: 1;
-		top: 6px;
-		bottom: 6px;
+	.lb-row.is-self:hover {
+		box-shadow:
+			var(--shadow-md),
+			0 0 26px color-mix(in srgb, var(--lb-self) 40%, transparent);
 	}
 
 	.lb-row:focus-visible {
@@ -174,16 +149,6 @@
 			var(--shadow-md),
 			0 0 22px color-mix(in srgb, var(--lb-self) 30%, transparent);
 	}
-	.lb-row.is-self::before {
-		background: linear-gradient(
-			180deg,
-			#fff 0%,
-			var(--lb-self) 50%,
-			color-mix(in srgb, var(--lb-self) 30%, transparent) 100%
-		);
-		opacity: 1;
-	}
-
 	.lb-row__rank {
 		font-family: var(--font-display);
 		font-size: 1.15rem;
@@ -197,16 +162,46 @@
 	.lb-row__avatar {
 		width: 46px;
 		height: 46px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		padding: 2px;
 		background: linear-gradient(135deg, var(--row-accent), transparent);
 		flex-shrink: 0;
+		position: relative;
+	}
+	.presence-dot {
+		position: absolute;
+		bottom: 0;
+		right: 0;
+		width: 13px;
+		height: 13px;
+		border-radius: 50%;
+		border: 2px solid var(--lb-card-bg, var(--bg-surface));
+		z-index: 3;
+		pointer-events: none;
+	}
+	.lb-row__avatar.is-online .presence-dot {
+		background: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 6px rgba(0, 212, 170, 0.6);
+	}
+	.lb-row__avatar.is-away .presence-dot {
+		background: var(--aero-gold, #f5b301);
+		box-shadow: 0 0 6px rgba(245, 179, 1, 0.6);
+	}
+	.lb-row__avatar.is-busy .presence-dot {
+		background: var(--aero-coral, #ec4899);
+		box-shadow: 0 0 6px rgba(236, 72, 153, 0.6);
+	}
+	.lb-row__avatar.is-offline .presence-dot {
+		background: var(--text-muted);
+		box-shadow: none;
 	}
 	.avatar-img,
 	.avatar-letter {
 		width: 100%;
 		height: 100%;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		object-fit: cover;
 	}
 	.avatar-letter {
@@ -260,7 +255,7 @@
 		font-variant-numeric: tabular-nums;
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: var(--text-muted);
+		color: var(--text-secondary);
 	}
 	.streak-chip {
 		display: inline-flex;
@@ -275,15 +270,23 @@
 					color-mix(in srgb, var(--lb-streak) 12%, transparent)
 				)
 				padding-box,
-			linear-gradient(135deg, #fb923c, color-mix(in srgb, var(--lb-streak) 40%, transparent))
+			linear-gradient(
+					135deg,
+					color-mix(in srgb, var(--lb-streak) 70%, #fff),
+					color-mix(in srgb, var(--lb-streak) 40%, transparent)
+				)
 				border-box;
+		transition: transform 0.22s var(--ease-spring);
+	}
+	.lb-row:hover .streak-chip {
+		transform: scale(1.08);
 	}
 	.streak-icon {
-		color: var(--lb-streak);
+		color: var(--text-primary);
 		font-size: 16px;
 	}
 	.streak-count {
-		color: var(--lb-streak);
+		color: var(--text-primary);
 		font-weight: 800;
 		font-size: 0.92rem;
 	}

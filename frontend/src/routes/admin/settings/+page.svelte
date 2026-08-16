@@ -208,7 +208,7 @@
 				<div class="panel-header">
 					<div
 						class="panel-icon"
-						style="background: var(--grad-purple); box-shadow: 0 0 20px rgba(138,43,226,0.3);"
+						style="background: var(--accent-gradient); box-shadow: 0 0 20px rgba(14,165,233,0.3);"
 					>
 						<span class="material-icons-round">dashboard_customize</span>
 					</div>
@@ -411,7 +411,7 @@
 		width: 48px;
 		height: 48px;
 		min-width: 48px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -520,7 +520,7 @@
 		bottom: 0;
 		background-color: rgba(255, 255, 255, 0.1);
 		transition: 0.3s var(--ease-spring);
-		border-radius: 34px;
+		border-radius: var(--radius-xl);
 		border: 1px solid var(--border-glass);
 		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 	}
@@ -533,7 +533,8 @@
 		bottom: 3px;
 		background-color: white;
 		transition: 0.3s var(--ease-spring);
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 	}
 	input:checked + .toggle-slider {
@@ -596,7 +597,7 @@
 		align-items: center;
 		gap: 8px;
 		padding: 10px 16px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid var(--border-glass);
 		color: var(--text-secondary);
@@ -620,7 +621,7 @@
 		gap: 16px;
 		background: rgba(0, 0, 0, 0.15);
 		padding: 24px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		border: 1px solid rgba(255, 255, 255, 0.05);
 		box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.2);
 	}

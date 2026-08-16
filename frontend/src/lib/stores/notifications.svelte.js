@@ -14,23 +14,36 @@ let _connected = $state(false);
 let _socket = null;
 let _heartbeatTimer = null;
 
-// Presencia en tiempo real: set reactivo de IDs de usuarios en línea AHORA.
-// Los componentes derivan de aquí si un peer está conectado.
-let _onlineUsers = $state(new Set());
+// Presencia en tiempo real: Map<userId, { online: boolean, status: string, statusText: string }>
+let _onlineUsers = $state(new Map());
 
-// Track processed event IDs to prevent duplicates
+// Track processed event IDs to prevent duplicates (Bounded FIFO)
 let _processedMessageIds = new Set();
 let _processedNotificationIds = new Set();
 let _processedSignalIds = new Set();
 
+function addBoundedSet(set, id, max = 500) {
+	if (set.size >= max) {
+		const iter = set.values();
+		for (let i = 0; i < 50; i++) {
+			const next = iter.next();
+			if (next.done) break;
+			set.delete(next.value);
+		}
+	}
+	set.add(id);
+}
+
 const HEARTBEAT_INTERVAL_MS = 30000;
 
-function setUserOnline(userId, online) {
-	const id = Number(userId);
-	const next = new Set(_onlineUsers);
-	if (online) next.add(id);
-	else next.delete(id);
-	_onlineUsers = next; // reasignación para disparar reactividad de runes
+function setUserOnline(userId, isOnline, status = 'online', statusText = null) {
+	const newMap = new Map(_onlineUsers);
+	if (isOnline) {
+		newMap.set(Number(userId), { online: true, status, statusText });
+	} else {
+		newMap.delete(Number(userId));
+	}
+	_onlineUsers = newMap;
 }
 
 /**
@@ -67,8 +80,16 @@ function connect(token) {
 		// Sincronización inicial de presencia: qué pares ya están en línea.
 		_socket.on('presence:sync', (data) => {
 			try {
-				const ids = (data?.onlineUserIds || []).map(Number);
-				_onlineUsers = new Set(ids);
+				const users = data?.users || [];
+				const newMap = new Map();
+				for (const u of users) {
+					newMap.set(Number(u.userId), {
+						online: u.online,
+						status: u.status || 'online',
+						statusText: u.statusText || null
+					});
+				}
+				_onlineUsers = newMap;
 			} catch (err) {
 				console.error('[Socket] Error parsing presence:sync:', err);
 			}
@@ -78,7 +99,7 @@ function connect(token) {
 		_socket.on('presence:update', (data) => {
 			try {
 				if (data && data.userId != null) {
-					setUserOnline(data.userId, !!data.online);
+					setUserOnline(data.userId, !!data.online, data.status, data.statusText);
 				}
 			} catch (err) {
 				console.error('[Socket] Error parsing presence:update:', err);
@@ -91,7 +112,7 @@ function connect(token) {
 					// Deduplicate by message ID before adding
 					const uniqueMessages = data.messages.filter((msg) => {
 						if (_processedMessageIds.has(msg.id)) return false;
-						_processedMessageIds.add(msg.id);
+						addBoundedSet(_processedMessageIds, msg.id);
 						return true;
 					});
 					if (uniqueMessages.length > 0) {
@@ -115,11 +136,11 @@ function connect(token) {
 					const uniqueNotifs = data.notifications.filter((notif) => {
 						if (_processedNotificationIds.has(notif.id)) return false;
 						if (notif.type === 'message') return false; // Ignorar notificaciones de tipo mensaje
-						_processedNotificationIds.add(notif.id);
+						addBoundedSet(_processedNotificationIds, notif.id);
 						return true;
 					});
 					if (uniqueNotifs.length > 0) {
-						_notifications = [...uniqueNotifs, ..._notifications];
+						_notifications = [...uniqueNotifs, ..._notifications].slice(0, 100);
 						_unreadCount += uniqueNotifs.filter((n) => !n.is_read).length;
 
 						// Dispatch global event for message reactions so chat UI can update
@@ -152,7 +173,7 @@ function connect(token) {
 					// Deduplicate by signal ID before adding
 					const uniqueSignals = data.signals.filter((sig) => {
 						if (_processedSignalIds.has(sig.id)) return false;
-						_processedSignalIds.add(sig.id);
+						addBoundedSet(_processedSignalIds, sig.id);
 						return true;
 					});
 					if (uniqueSignals.length > 0) {
@@ -164,9 +185,9 @@ function connect(token) {
 			}
 		});
 
-		_socket.on('global_settings_update', () => {
+		_socket.on('global_settings_update', (data) => {
 			if (typeof window !== 'undefined') {
-				window.dispatchEvent(new CustomEvent('global_settings_update'));
+				window.dispatchEvent(new CustomEvent('global_settings_update', { detail: data }));
 			}
 		});
 
@@ -176,7 +197,7 @@ function connect(token) {
 			stopHeartbeat();
 			// Al perder conexión no sabemos el estado de los pares; se
 			// re-sincroniza vía presence:sync en la próxima reconexión.
-			_onlineUsers = new Set();
+			_onlineUsers = new Map();
 		});
 
 		_socket.on('connect_error', (err) => {
@@ -240,7 +261,7 @@ function disconnect() {
 	}
 	_connected = false;
 	_newMessages = [];
-	_onlineUsers = new Set();
+	_onlineUsers = new Map();
 }
 
 /**
@@ -249,7 +270,12 @@ function disconnect() {
  * @returns {boolean}
  */
 function isUserOnline(userId) {
-	return _onlineUsers.has(Number(userId));
+	const u = _onlineUsers.get(Number(userId));
+	return u && u.online && u.status !== 'invisible';
+}
+
+function getUserPresence(userId) {
+	return _onlineUsers.get(Number(userId)) || { online: false, status: 'offline', statusText: null };
 }
 
 export function getSocket() {
@@ -324,12 +350,13 @@ export const notificationsStore = {
 		return _onlineUsers;
 	},
 	isUserOnline,
+	getUserPresence,
 	getSocket,
 	connect,
 	disconnect,
 	clearNewMessages,
-	markRead,
-	markAllRead,
+	markRead: markRead,
+	markAllRead: markAllRead,
 	addLocal,
 	setNotifications,
 	decreaseUnreadMessageCount,

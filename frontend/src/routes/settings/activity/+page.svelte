@@ -58,21 +58,21 @@
 	function getActionIcon(action) {
 		switch (action) {
 			case 'view':
-				return 'bx-show';
+				return 'visibility';
 			case 'like':
-				return 'bx-heart';
+				return 'favorite';
 			case 'unlike':
-				return 'bx-heart-circle';
+				return 'heart_broken';
 			case 'comment':
-				return 'bx-comment-detail';
+				return 'chat_bubble';
 			case 'create':
-				return 'bx-plus-circle';
+				return 'add_circle';
 			case 'update':
-				return 'bx-edit';
+				return 'edit';
 			case 'delete':
-				return 'bx-trash';
+				return 'delete';
 			default:
-				return 'bx-history';
+				return 'history';
 		}
 	}
 
@@ -147,7 +147,7 @@
 <div class="max-w-4xl mx-auto w-full space-y-6 pt-4 pb-20">
 	<div class="glass-panel p-6 sm:p-8 relative overflow-hidden">
 		<div
-			class="absolute -top-32 -right-32 w-64 h-64 bg-primary/20 rounded-full blur-[80px] pointer-events-none"
+			class="absolute -top-32 -right-32 w-64 h-64 bg-primary/20 squircle blur-[80px] pointer-events-none"
 		></div>
 
 		<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -169,7 +169,7 @@
 					data-sveltekit-replacestate
 					class="px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 backdrop-blur-md border {currentFilter ===
 					filter.id
-						? 'bg-primary/20 text-primary-300 border-primary/30 shadow-[0_0_15px_rgba(27,133,243,0.15)]'
+						? 'bg-primary/20 text-primary-300 border-primary/30 shadow-[0_0_15px_rgba(var(--accent-blue-rgb),0.15)]'
 						: 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white/90'}"
 				>
 					{filter.label}
@@ -180,17 +180,15 @@
 		<!-- Timeline de Actividad -->
 		<div class="space-y-4">
 			{#if loading}
-				<div class="text-center py-12" in:fade>
-					<span class="material-icons-round animate-spin text-4xl text-primary mb-4 block"
-						>autorenew</span
-					>
-					<h3 class="text-xl text-white/50 font-medium">Cargando historial...</h3>
+				<div class="history-empty" in:fade>
+					<span class="material-icons-round animate-spin history-loading-icon">autorenew</span>
+					<h3 class="history-empty-title">Cargando historial...</h3>
 				</div>
 			{:else if logs.length === 0}
-				<div class="text-center py-12" in:fade>
-					<i class="bx bx-ghost text-6xl text-white/20 mb-4 block"></i>
-					<h3 class="text-xl text-white/50 font-medium">No hay actividad reciente</h3>
-					<p class="text-white/30 text-sm mt-2">
+				<div class="history-empty" in:fade>
+					<span class="material-icons-round history-empty-icon">hourglass_empty</span>
+					<h3 class="history-empty-title">No hay actividad reciente</h3>
+					<p class="history-empty-desc">
 						Interactúa con la plataforma para empezar a registrar tu historial.
 					</p>
 				</div>
@@ -210,11 +208,11 @@
 							class="relative z-10 h-[44px] rounded-full bg-white/5 border border-white/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] backdrop-blur-md shrink-0"
 							style="flex: 0 0 44px; min-width: 44px;"
 						>
-							<i
-								class="bx {getActionIcon(log.action_type)} text-xl {getActionColor(
+							<span
+								class="material-icons-round text-xl {getActionColor(
 									log.action_type
-								)} drop-shadow-[0_0_8px_currentColor]"
-							></i>
+								)} drop-shadow-[0_0_8px_currentColor]">{getActionIcon(log.action_type)}</span
+							>
 						</div>
 
 						<!-- Contenido -->
@@ -247,3 +245,38 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.history-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		padding: 3.5rem 1.5rem;
+	}
+	.history-loading-icon {
+		font-size: 2.5rem;
+		color: var(--accent-blue-base);
+		margin-bottom: 1rem;
+	}
+	.history-empty-icon {
+		font-size: 3.5rem;
+		color: var(--text-muted);
+		opacity: 0.4;
+		margin-bottom: 1rem;
+	}
+	.history-empty-title {
+		font-family: var(--font-display);
+		font-size: 1.2rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		margin: 0 0 0.5rem 0;
+	}
+	.history-empty-desc {
+		font-size: 0.85rem;
+		color: var(--text-muted);
+		max-width: 320px;
+		margin: 0 auto;
+	}
+</style>

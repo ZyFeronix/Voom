@@ -16,6 +16,7 @@
 	import LiquidBackground from '$lib/components/LiquidBackground.svelte';
 	import PwaPrompt from '$lib/components/PwaPrompt.svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
+	import MediaLightbox from '$lib/components/MediaLightbox.svelte';
 
 	onNavigate((navigation) => {
 		if (!document.startViewTransition) return;
@@ -61,43 +62,69 @@
 	});
 
 	$effect(() => {
-		const handleSettingsUpdate = () => {
-			import('$app/navigation').then(({ invalidateAll }) => {
-				invalidateAll();
-			});
+		const handleSettingsUpdate = (e) => {
+			const detail = e?.detail;
+			if (detail && typeof detail === 'object' && Object.keys(detail).length > 0) {
+				featureStore.initFeatures(detail);
+				if (typeof document !== 'undefined') {
+					document.documentElement.setAttribute(
+						'data-platform-mode',
+						detail.platform_mode || 'custom'
+					);
+				}
+			} else {
+				fetch('/api/settings')
+					.then((res) => (res.ok ? res.json() : null))
+					.then((json) => {
+						if (json?.settings) {
+							featureStore.initFeatures(json.settings);
+							if (typeof document !== 'undefined') {
+								document.documentElement.setAttribute(
+									'data-platform-mode',
+									json.settings.platform_mode || 'custom'
+								);
+							}
+						}
+					})
+					.catch(() => {});
+			}
 		};
 		window.addEventListener('global_settings_update', handleSettingsUpdate);
 		return () => window.removeEventListener('global_settings_update', handleSettingsUpdate);
 	});
 
-	let installChecked = $derived(data?.isInstalled !== undefined);
-	let isInstalled = $derived(data?.isInstalled ?? false);
+	let installChecked = $state(false);
+	let isInstalled = $state(false);
 
-	const publicRoutes = [
-		'/',
-		'/login',
-		'/register',
-		'/install',
-		'/setup',
-		'/privacy',
-		'/terms',
-		'/cookies'
-	];
+	$effect(() => {
+		if (data?.isInstalled !== undefined) {
+			installChecked = true;
+			isInstalled = data.isInstalled;
+		}
+	});
+
+	// Rutas públicas — no requieren auth. Se evalúa de forma explícita
+	// para evitar ambigüedades durante el hydration de SSR en Svelte 5.
+	const publicPrefixes = ['/about', '/install', '/setup'];
+	const publicExact = ['/', '/login', '/register', '/privacy', '/terms', '/cookies'];
 	const isPublicRoute = $derived(
-		publicRoutes.some(
-			(r) =>
-				page.url.pathname === r ||
-				page.url.pathname.startsWith('/install') ||
-				page.url.pathname.startsWith('/setup')
-		)
+		publicExact.includes(page.url.pathname) ||
+			publicPrefixes.some((prefix) => page.url.pathname.startsWith(prefix))
 	);
 	const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
-	const isReelsRoute = $derived(page.url.pathname.startsWith('/reels'));
+	const isReelsRoute = $derived(
+		page.url.pathname.startsWith('/reels') && !page.url.pathname.startsWith('/reels/create')
+	);
+	// En rutas públicas no bloqueamos el render aunque installChecked sea false
+	const showBootScreen = $derived(!installChecked && !isPublicRoute && !isAdminRoute);
 
 	onMount(async () => {
-		authStore.initialize();
+		await authStore.initialize();
 
-		if (data?.isInstalled === undefined) {
+		// Respetar estado proveniente de SSR
+		if (data?.isInstalled !== undefined) {
+			isInstalled = !!data.isInstalled;
+		} else {
 			try {
 				const res = await fetch('/api/install');
 				if (res.ok) {
@@ -121,23 +148,16 @@
 			return;
 		}
 
-		if (isInstalled) {
-			try {
-				const setupRes = await fetch('/api/setup');
-				if (setupRes.ok) {
-					const setupData = await setupRes.json();
-					if (setupData.needsSetup && page.url.pathname !== '/setup') {
-						installChecked = true;
-						goto('/setup');
-						return;
-					}
-					if (!setupData.needsSetup && page.url.pathname === '/setup') {
-						installChecked = true;
-						goto('/login');
-						return;
-					}
-				}
-			} catch {}
+		const needsSetup = data?.needsSetup;
+		if (isInstalled && needsSetup && page.url.pathname !== '/setup') {
+			installChecked = true;
+			goto('/setup');
+			return;
+		}
+		if (isInstalled && needsSetup === false && page.url.pathname === '/setup') {
+			installChecked = true;
+			goto('/login');
+			return;
 		}
 
 		installChecked = true;
@@ -192,38 +212,47 @@
 
 		// Delegación dinámica: Solo aplicamos "passive: false" al elemento bajo el cursor
 		// Esto libera el hilo principal (compositor thread) para el scroll del resto de la página.
+		let pointerRaf = null;
+		let lastTarget = null;
 		const pointerOverHandler = (e) => {
-			const path = window.location.pathname;
-			if (path === '/' || path === '/about/verified') {
-				if (activeWheelListenerTarget) {
+			if (e.target === lastTarget) return;
+			lastTarget = e.target;
+			if (pointerRaf) return;
+			pointerRaf = requestAnimationFrame(() => {
+				pointerRaf = null;
+				const path = window.location.pathname;
+				if (path === '/' || path === '/about/verified') {
+					if (activeWheelListenerTarget) {
+						activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
+						activeWheelListenerTarget = null;
+						isScrolling = false;
+					}
+					return;
+				}
+
+				const slider = lastTarget?.closest?.('.overflow-x-auto, .hide-scrollbar');
+				if (slider && slider.scrollWidth > slider.clientWidth) {
+					if (activeWheelListenerTarget !== slider) {
+						if (activeWheelListenerTarget) {
+							activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
+						}
+						activeWheelListenerTarget = slider;
+						activeWheelListenerTarget.addEventListener('wheel', wheelHandler, { passive: false });
+						scrollTarget = activeWheelListenerTarget.scrollLeft;
+						scrollCurrent = activeWheelListenerTarget.scrollLeft;
+					}
+				} else if (activeWheelListenerTarget) {
 					activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
 					activeWheelListenerTarget = null;
 					isScrolling = false;
 				}
-				return;
-			}
-
-			const slider = e.target.closest('.overflow-x-auto, .hide-scrollbar');
-			if (slider && slider.scrollWidth > slider.clientWidth) {
-				if (activeWheelListenerTarget !== slider) {
-					if (activeWheelListenerTarget) {
-						activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
-					}
-					activeWheelListenerTarget = slider;
-					activeWheelListenerTarget.addEventListener('wheel', wheelHandler, { passive: false });
-					scrollTarget = activeWheelListenerTarget.scrollLeft;
-					scrollCurrent = activeWheelListenerTarget.scrollLeft;
-				}
-			} else if (activeWheelListenerTarget) {
-				activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
-				activeWheelListenerTarget = null;
-				isScrolling = false;
-			}
+			});
 		};
 
 		window.addEventListener('mouseover', pointerOverHandler);
 
 		return () => {
+			if (pointerRaf) cancelAnimationFrame(pointerRaf);
 			window.removeEventListener('mouseover', pointerOverHandler);
 			if (activeWheelListenerTarget) {
 				activeWheelListenerTarget.removeEventListener('wheel', wheelHandler);
@@ -274,7 +303,7 @@
 
 <LiquidBackground />
 
-{#if !installChecked}
+{#if showBootScreen}
 	<div class="vs-boot" data-vs-boot out:fade={{ duration: 400, easing: cubicOut }}>
 		<div class="vs-boot__core">
 			<div class="vs-boot__prism"></div>
@@ -318,6 +347,7 @@
 
 <PwaPrompt />
 <CookieBanner />
+<MediaLightbox />
 
 <style>
 	:global(body.is-reels),
@@ -342,7 +372,6 @@
 		display: grid;
 		place-items: center;
 		background: var(--bg-canvas);
-		background-attachment: fixed;
 		isolation: isolate;
 		animation: vsBootEnter 0.6s var(--ease-out) both;
 	}
@@ -356,8 +385,6 @@
 			radial-gradient(circle at 70% 60%, rgba(232, 74, 114, 0.14) 0%, transparent 50%),
 			radial-gradient(circle at 50% 85%, rgba(255, 215, 0, 0.1) 0%, transparent 60%);
 		z-index: -1;
-		animation: vsAurora 18s ease-in-out infinite alternate;
-		will-change: transform;
 	}
 
 	.vs-boot__core {
@@ -419,7 +446,7 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		filter: drop-shadow(0 0 18px rgba(0, 229, 255, 0.35));
+		text-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
 	}
 
 	.vs-boot__meter {
@@ -457,12 +484,21 @@
 	.vs-boot--fallback .vs-boot__spinner {
 		width: 48px;
 		height: 48px;
-		border-radius: 50%;
-		border: 3px solid transparent;
-		border-top-color: var(--accent-cyan);
-		border-right-color: var(--accent-magenta);
-		animation: vsSpin 0.9s linear infinite;
-		box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+		position: relative;
+		background: var(--bg-surface);
+		border-radius: var(--radius-squircle);
+		box-shadow: var(--shadow-glow);
+		animation: squircle-pulse 1.2s var(--ease-spring) infinite alternate;
+	}
+	.vs-boot--fallback .vs-boot__spinner::after {
+		content: '';
+		position: absolute;
+		inset: 2px;
+		border-radius: inherit;
+		background: var(--accent-gradient);
+		opacity: 0.5;
+		filter: blur(2px);
+		animation: squircle-glow 1.2s var(--ease-spring) infinite alternate;
 	}
 
 	.vs-shell {
@@ -479,7 +515,9 @@
 		height: 100vh;
 		display: none;
 		flex-direction: column;
-		z-index: 40;
+		/* z-index elevado para que el sidenav siempre quede sobre el contenido
+		   (PostCard hover llega a z-index:40, esta a 100 evita la colisión) */
+		z-index: 100;
 		transition: width var(--t-spring);
 	}
 
@@ -492,6 +530,9 @@
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
+		/* Crea un stacking context aislado: los z-index del contenido
+		   (PostCard, modales, etc.) no escapan al stacking context del shell */
+		isolation: isolate;
 	}
 
 	.vs-shell__canvas {
@@ -516,18 +557,6 @@
 		to {
 			opacity: 1;
 			transform: translateY(0) scale(1);
-		}
-	}
-
-	@keyframes vsAurora {
-		0% {
-			transform: translate(0, 0) scale(1);
-		}
-		50% {
-			transform: translate(-3%, 4%) scale(1.06);
-		}
-		100% {
-			transform: translate(3%, -4%) scale(1);
 		}
 	}
 

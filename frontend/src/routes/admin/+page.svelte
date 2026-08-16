@@ -1,5 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { admin as adminApi } from '$lib/api.js';
 
 	let loading = $state(true);
@@ -9,6 +11,11 @@
 
 	onMount(async () => {
 		try {
+			await authStore.initialize();
+			if (!authStore.isAuthenticated || !authStore.isAdmin) {
+				goto('/feed');
+				return;
+			}
 			const res = await adminApi.dashboard();
 			stats = res.stats;
 			activity = res.recent_activity || [];
@@ -203,7 +210,7 @@
 	.metric-icon {
 		width: 56px;
 		height: 56px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		background: var(--bg-surface);
 		display: flex;
 		align-items: center;
@@ -300,7 +307,8 @@
 	.act-avatar {
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-surface);
 		overflow: hidden;
 		display: flex;
@@ -354,7 +362,7 @@
 	.rep-icon {
 		width: 36px;
 		height: 36px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		background: rgba(232, 74, 114, 0.1);
 		color: var(--aero-rose);
 		display: flex;

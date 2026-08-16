@@ -23,6 +23,13 @@
 	let userToDelete = $state(null);
 	let deletingUser = $state(false);
 
+	// Strike / Discipline Modal
+	let userToStrike = $state(null);
+	let strikeLevel = $state(2);
+	let strikeReason = $state('');
+	let issuingStrike = $state(false);
+	let strikeSuccess = $state('');
+
 	onMount(async () => {
 		await loadUsers();
 	});
@@ -186,6 +193,39 @@
 		}
 	}
 
+	function openStrikeModal(user) {
+		activeMenuId = null;
+		userToStrike = user;
+		strikeLevel = 2;
+		strikeReason = '';
+	}
+
+	async function executeStrike() {
+		if (!userToStrike) return;
+		if (!strikeReason.trim()) {
+			actionError = 'Debe especificar un motivo para la sanción';
+			setTimeout(() => (actionError = ''), 4000);
+			return;
+		}
+		issuingStrike = true;
+		try {
+			const res = await adminApi.strikes.issue({
+				user_id: userToStrike.id,
+				strike_level: strikeLevel,
+				reason: strikeReason.trim()
+			});
+			strikeSuccess = res.message || 'Sanción disciplinaria aplicada';
+			setTimeout(() => (strikeSuccess = ''), 4000);
+			userToStrike = null;
+			await loadUsers();
+		} catch (e) {
+			actionError = e.message || 'Error al aplicar sanción';
+			setTimeout(() => (actionError = ''), 4000);
+		} finally {
+			issuingStrike = false;
+		}
+	}
+
 	async function toggleDisable(user) {
 		activeMenuId = null;
 		const isActivating = user.is_active == 0;
@@ -286,6 +326,7 @@
 								{ value: 'user', label: 'User' },
 								{ value: 'team', label: 'Team' },
 								{ value: 'moderator', label: 'Moderator' },
+								{ value: 'government', label: 'Government' },
 								{ value: 'admin', label: 'Admin' }
 							]}
 						/>
@@ -349,6 +390,75 @@
 	</div>
 {/if}
 
+<!-- Disciplinary Strike Modal -->
+{#if userToStrike}
+	<div class="modal-backdrop">
+		<div class="modal-content glass-card neo-shadow" style="max-width: 500px;">
+			<div class="modal-header">
+				<h2 class="text-warning flex items-center gap-2 font-bold">
+					<span class="material-icons-round text-amber-400">gavel</span>
+					Sanción Disciplinaria a @{userToStrike.username}
+				</h2>
+				<button class="btn-icon shield-btn" onclick={() => (userToStrike = null)}>
+					<span class="material-icons-round">close</span>
+				</button>
+			</div>
+			<div class="modal-body flex flex-col gap-4 text-xs">
+				<div class="form-control">
+					<label
+						for="strike-level-select"
+						class="font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block"
+					>
+						Grado de Sanción / Penalización:
+					</label>
+					<select
+						id="strike-level-select"
+						bind:value={strikeLevel}
+						class="modal-input text-xs w-full p-2.5 bg-black/40 rounded-xl border border-white/10 text-white"
+					>
+						<option value={1}>Nivel 1 — Advertencia Oficial (Notificación)</option>
+						<option value={2}>Nivel 2 — Silencio Temporal / Mute (24 Horas)</option>
+						<option value={3}>Nivel 3 — Suspensión Temporal de Cuenta (7 Días)</option>
+						<option value={4}>Nivel 4 — Baneo Permanente de la Plataforma</option>
+					</select>
+				</div>
+
+				<div class="form-control">
+					<label
+						for="strike-reason-textarea"
+						class="font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block"
+					>
+						Motivo y Justificación de la Sanción *:
+					</label>
+					<textarea
+						id="strike-reason-textarea"
+						rows="3"
+						bind:value={strikeReason}
+						placeholder="Especifica el motivo de la infracción comunitaria..."
+						class="modal-input text-xs w-full p-3 resize-none bg-black/30 rounded-xl border border-white/10"
+					></textarea>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button
+					class="btn-aero-ghost"
+					onclick={() => (userToStrike = null)}
+					disabled={issuingStrike}
+				>
+					Cancelar
+				</button>
+				<button class="btn-aero-primary font-bold" onclick={executeStrike} disabled={issuingStrike}>
+					{#if issuingStrike}
+						<span class="loading loading-spinner loading-sm"></span>
+					{:else}
+						Aplicar Sanción
+					{/if}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <div class="page-header">
 	<div class="header-left">
 		<h1 class="page-title">Usuarios</h1>
@@ -370,6 +480,16 @@
 		<div class="glass-panel p-4 mb-6 flex items-center gap-2 text-sm rounded-lg error-toast">
 			<span class="material-icons-round text-[18px]">error_outline</span>
 			{actionError}
+		</div>
+	{/if}
+
+	{#if strikeSuccess}
+		<div
+			class="glass-panel p-4 mb-6 flex items-center gap-2 text-sm rounded-lg"
+			style="background: rgba(0, 212, 170, 0.15); border: 1px solid rgba(0, 212, 170, 0.3); color: var(--aero-mint);"
+		>
+			<span class="material-icons-round text-[18px]">check_circle</span>
+			{strikeSuccess}
 		</div>
 	{/if}
 
@@ -398,6 +518,7 @@
 						{ value: 'user', label: 'User' },
 						{ value: 'team', label: 'Team' },
 						{ value: 'moderator', label: 'Moderator' },
+						{ value: 'government', label: 'Government' },
 						{ value: 'admin', label: 'Admin' }
 					]}
 					onchange={handleFilterChange}
@@ -477,6 +598,7 @@
 													{ value: 'user', label: 'User' },
 													{ value: 'team', label: 'Team' },
 													{ value: 'moderator', label: 'Moderator' },
+													{ value: 'government', label: 'Government' },
 													{ value: 'admin', label: 'Admin' }
 												]}
 												onchange={(val) => changeUserRole(user, val)}
@@ -521,11 +643,18 @@
 															{user.is_active == 0 ? 'Habilitar Perfil' : 'Deshabilitar Perfil'}
 														</button>
 													{/if}
-													<button class="menu-item" onclick={() => verifyUser(user)}>
-														<span class="material-icons-round text-[18px] text-blue-500"
+													<button class="menu-item text-blue-400" onclick={() => verifyUser(user)}>
+														<span class="material-icons-round text-[18px]"
 															>{user.is_verified == 1 ? 'remove_circle_outline' : 'verified'}</span
 														>
 														{user.is_verified == 1 ? 'Quitar Verificación' : 'Verificar'}
+													</button>
+													<button
+														class="menu-item text-amber-400"
+														onclick={() => openStrikeModal(user)}
+													>
+														<span class="material-icons-round text-[18px]">gavel</span>
+														Sancionar / Strike
 													</button>
 													<div class="menu-divider"></div>
 													<button
@@ -692,7 +821,8 @@
 		flex: 0 0 44px;
 		min-width: 44px;
 		min-height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
@@ -729,7 +859,7 @@
 	.badge-outline {
 		border: 1px solid var(--border-glass);
 		padding: 4px 8px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		font-size: 0.7rem;
 		text-transform: uppercase;
 		font-weight: 700;
@@ -737,7 +867,7 @@
 
 	.status-badge {
 		padding: 4px 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		font-size: 0.75rem;
 		font-weight: 600;
 		background: rgba(232, 74, 114, 0.1);
@@ -762,7 +892,8 @@
 		border: none;
 		color: var(--text-muted);
 		cursor: pointer;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -814,7 +945,7 @@
 		color: var(--text-primary);
 		font-size: 0.9rem;
 		font-weight: 500;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 		text-align: left;

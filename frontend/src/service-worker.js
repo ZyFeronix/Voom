@@ -3,8 +3,20 @@ import { build, files, version } from '$service-worker';
 
 const CACHE = `vsocial-cache-${version}`;
 
-// Solo cachear assets estáticos (imágenes, fuentes, JS/CSS del build)
-// NUNCA páginas de navegación SSR — esas las maneja SvelteKit
+// Solo cachear assets estáticos críticos en install (JS/CSS del build, iconos principales)
+// Emojis masivos y docs se cachean on-demand en el fetch handler
+const PRECACHE_ASSETS = [
+	...build,
+	...files.filter(
+		(f) =>
+			!f.includes('/emojis/') &&
+			!f.includes('/docs/') &&
+			!f.includes('/samples/') &&
+			!f.endsWith('.mp4') &&
+			!f.endsWith('.webm')
+	)
+];
+
 const ASSETS = [...build, ...files];
 
 // Extensiones que son assets estáticos cacheables
@@ -58,12 +70,12 @@ function shouldIntercept(request) {
 	return true;
 }
 
-// ── Install: pre-cachear assets del build ──
+// ── Install: pre-cachear assets críticos del build ──
 self.addEventListener('install', (event) => {
 	event.waitUntil(
 		caches
 			.open(CACHE)
-			.then((cache) => cache.addAll(ASSETS))
+			.then((cache) => cache.addAll(PRECACHE_ASSETS))
 			.then(() => self.skipWaiting())
 	);
 });

@@ -1,9 +1,13 @@
 <script>
 	import { onMount } from 'svelte';
+	import { perfStore } from '$lib/stores/perf.svelte.js';
 
 	let wrapper = $state();
+	let isBackgroundDisabled = $derived(perfStore.perfMode || perfStore.disableLiquidBg);
 
 	onMount(() => {
+		perfStore.init();
+
 		// Pausa las animaciones infinitas del fondo cuando la pestaña está oculta (ahorro de
 		// GPU/batería en segundo plano). Al volver a foco se reanudan solas (clase quitada).
 		const onVisibility = () => {
@@ -17,14 +21,16 @@
 	});
 </script>
 
-<div class="aero-bg-wrapper" bind:this={wrapper}>
-	<!-- Base de gradientes líquidos (GPU Accelerated) -->
-	<div class="aurora-blobs">
-		<div class="blob blob-1"></div>
-		<div class="blob blob-2"></div>
-		<div class="blob blob-3"></div>
+{#if !isBackgroundDisabled}
+	<div class="aero-bg-wrapper" bind:this={wrapper} aria-hidden="true">
+		<!-- Base de gradientes líquidos (GPU Accelerated) -->
+		<div class="aurora-blobs">
+			<div class="blob blob-1"></div>
+			<div class="blob blob-2"></div>
+			<div class="blob blob-3"></div>
+		</div>
 	</div>
-</div>
+{/if}
 
 <style>
 	.aero-bg-wrapper {
@@ -34,7 +40,7 @@
 		overflow: hidden;
 		pointer-events: none;
 		contain: strict;
-		/* El fondo base ahora es heredado del body (--bg-canvas) para respetar Light/Dark mode */
+		/* El fondo base se hereda de html (--bg-canvas) respetando el tema activo */
 		background: transparent;
 	}
 
@@ -47,13 +53,15 @@
 		background: conic-gradient(
 			from 140deg at 50% -10%,
 			transparent 0deg,
-			rgba(0, 229, 255, 0.08) 20deg,
+			rgba(0, 229, 255, 0.05) 20deg,
 			transparent 35deg,
-			rgba(0, 180, 255, 0.05) 45deg,
+			rgba(0, 180, 255, 0.03) 45deg,
 			transparent 55deg,
-			rgba(0, 229, 255, 0.1) 65deg,
+			rgba(0, 229, 255, 0.06) 65deg,
 			transparent 80deg
 		);
+		filter: blur(20px);
+		mix-blend-mode: screen;
 		transform-origin: 50% 0%;
 		/* Animación de oscilación suave como el agua */
 		animation: swayRays 18s ease-in-out infinite alternate;
@@ -69,11 +77,12 @@
 		}
 	}
 
-	/* --- Bioluminiscencia Submarina --- */
+	/* --- Bioluminiscencia Submarina & Aero Fluid --- */
 	.aurora-blobs {
 		position: absolute;
 		inset: -15%;
 		z-index: 1;
+		filter: blur(120px);
 		opacity: 0.75;
 		overflow: hidden;
 		transform: translateZ(0);
@@ -82,52 +91,51 @@
 
 	.blob {
 		position: absolute;
-		border-radius: 50%;
-		/* Removido mix-blend-mode: screen para que sean visibles en Light Mode */
+		border-radius: 45% 55% 40% 60% / 55% 45% 60% 40%;
 		will-change: transform;
 	}
 
 	/* Colores adaptados a la estética Frutiger Aero Submarino (Cianes, Azules Eléctricos, Teals) */
 	.blob-1 {
-		width: 80vw;
-		height: 80vw;
-		top: -10%;
+		width: 75vw;
+		height: 75vw;
+		top: -8%;
 		left: -10%;
 		background: radial-gradient(
-			closest-side at 40% 40%,
-			rgba(0, 242, 254, 0.5) 0%,
-			rgba(79, 172, 254, 0.2) 60%,
-			transparent 100%
+			circle at 25% 25%,
+			rgba(0, 242, 254, 0.55) 0%,
+			rgba(79, 172, 254, 0.22) 60%,
+			transparent 90%
 		);
 		animation: flowBlob1 38s linear infinite;
 		opacity: 0.6;
 	}
 
 	.blob-2 {
-		width: 70vw;
-		height: 70vw;
-		bottom: -15%;
-		right: -10%;
+		width: 65vw;
+		height: 65vw;
+		bottom: -12%;
+		right: -8%;
 		background: radial-gradient(
-			closest-side at 60% 40%,
-			rgba(0, 198, 255, 0.5) 0%,
-			rgba(0, 114, 255, 0.15) 60%,
-			transparent 100%
+			circle at 25% 25%,
+			rgba(0, 198, 255, 0.45) 0%,
+			rgba(0, 114, 255, 0.18) 65%,
+			transparent 90%
 		);
 		animation: flowBlob2 48s linear infinite;
 		opacity: 0.5;
 	}
 
 	.blob-3 {
-		width: 65vw;
-		height: 65vw;
-		top: 25%;
-		left: 15%;
+		width: 60vw;
+		height: 60vw;
+		top: 28%;
+		left: 18%;
 		background: radial-gradient(
-			closest-side at 30% 60%,
-			rgba(28, 216, 210, 0.45) 0%,
-			rgba(31, 107, 184, 0.15) 60%,
-			transparent 100%
+			circle at 25% 25%,
+			rgba(28, 216, 210, 0.4) 0%,
+			rgba(31, 107, 184, 0.14) 60%,
+			transparent 90%
 		);
 		animation: flowBlob3 42s linear infinite;
 		opacity: 0.45;

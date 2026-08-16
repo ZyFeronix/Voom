@@ -114,7 +114,7 @@
 	}
 	.legal-card {
 		padding: 3rem;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 	}
 	:global([data-theme='dark']) .legal-card {
 		background: rgba(15, 20, 25, 0.5);
@@ -159,7 +159,7 @@
 		font-family: 'Courier New', monospace;
 		background: rgba(128, 128, 128, 0.15);
 		padding: 0.1rem 0.35rem;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		font-size: 0.85rem;
 		color: var(--text-primary);
 	}

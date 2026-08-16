@@ -91,7 +91,20 @@
 		</section>
 
 		<section>
-			<h2>9. Ley aplicable</h2>
+			<h2>9. Transacciones y economía entre usuarios (P2P)</h2>
+			<p>
+				V-SOCIAL no actúa como pasarela de pago, procesador financiero, custodio ni intermediario
+				mercantil. Cualquier transacción comercial, compra de servicios digitales, encargos
+				artísticos o apoyos económicos se realiza de forma directa y entre pares (P2P) a través de
+				los enlaces externos configurados voluntariamente por los propios creadores (como PayPal,
+				Ko-fi o Patreon). V-SOCIAL <strong>no cobra comisiones</strong> por dichas transacciones,
+				<strong>no retiene fondos</strong> ni interviene en la custodia del dinero, y no asume responsabilidad
+				respecto al cumplimiento o disputas comerciales entre usuarios.
+			</p>
+		</section>
+
+		<section>
+			<h2>10. Ley aplicable</h2>
 			<p>
 				Estos términos se rigen por la legislación aplicable en la jurisdicción del operador de la
 				instancia. Cualquier disputa se someterá a los tribunales competentes de dicha jurisdicción,
@@ -113,7 +126,7 @@
 	}
 	.legal-card {
 		padding: 3rem;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 	}
 	:global([data-theme='dark']) .legal-card {
 		background: rgba(15, 20, 25, 0.5);

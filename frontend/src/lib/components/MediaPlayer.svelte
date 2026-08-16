@@ -823,7 +823,7 @@
 				</div>
 				<div class="v-about-title">Reproductor de VSocial</div>
 				<div class="v-about-info" class:closing={aboutClosing}>
-					<div class="v-about-version">Versión v0.5 Alpha</div>
+					<div class="v-about-version">Versión v0.6.0-beta.1</div>
 					<div class="v-about-copy">© 2026 VSocial · AGPLv3</div>
 				</div>
 			</div>
@@ -873,7 +873,7 @@
 
 	.media-player-wrapper.audio {
 		background: transparent;
-		border-radius: 40px;
+		border-radius: var(--radius-xl);
 		overflow: visible;
 		border: none;
 		box-shadow: none;
@@ -888,7 +888,8 @@
 		transform: translate(-50%, -50%);
 		width: 72px;
 		height: 72px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(0, 0, 0, 0.5);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
@@ -931,22 +932,30 @@
 	.v-spinner {
 		width: 48px;
 		height: 48px;
-		border: 4px solid rgba(255, 255, 255, 0.2);
-		border-top-color: var(--aero-blue);
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
+		position: relative;
+		background: rgba(255, 255, 255, 0.1);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: var(--radius-squircle);
+		box-shadow: var(--shadow-glow);
+		backdrop-filter: blur(8px);
+		animation: squircle-pulse 1.2s var(--ease-spring) infinite alternate;
 	}
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
+	.v-spinner::after {
+		content: '';
+		position: absolute;
+		inset: 4px;
+		border-radius: inherit;
+		background: var(--accent-gradient);
+		opacity: 0.5;
+		filter: blur(2px);
+		animation: squircle-glow 1.2s var(--ease-spring) infinite alternate;
 	}
 
 	.v-context-menu {
 		position: absolute;
 		background: rgba(20, 20, 20, 0.85);
-		backdrop-filter: blur(20px) saturate(1.5);
-		-webkit-backdrop-filter: blur(20px) saturate(1.5);
+		backdrop-filter: blur(14px) saturate(1.15);
+		-webkit-backdrop-filter: blur(14px) saturate(1.15);
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		border-radius: var(--radius-md);
 		padding: 6px;
@@ -978,7 +987,7 @@
 		border: none;
 		color: #fff;
 		font-size: 0.85rem;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		cursor: pointer;
 		text-align: left;
 		transition: background 0.2s;
@@ -1012,8 +1021,8 @@
 		bottom: 72px;
 		right: 16px;
 		background: rgba(20, 20, 20, 0.85);
-		backdrop-filter: blur(20px);
-		-webkit-backdrop-filter: blur(20px);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		border-radius: var(--radius-md);
 		padding: 12px;
@@ -1054,7 +1063,7 @@
 		border: none;
 		color: #fff;
 		padding: 4px 8px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		font-size: 0.8rem;
 		font-family: var(--font-mono, monospace);
 		cursor: pointer;
@@ -1119,13 +1128,13 @@
 		width: 100%;
 		height: 5px;
 		background: rgba(255, 255, 255, 0.22);
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		position: relative;
 		transition: height 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 	.v-timeline-container:hover .v-timeline-track {
 		height: 8px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 	}
 	.v-timeline-buffer {
 		position: absolute;
@@ -1151,7 +1160,8 @@
 		width: 15px;
 		height: 15px;
 		background: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		transform: translate(-50%, -50%) scale(0);
 		transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 		box-shadow:
@@ -1171,7 +1181,7 @@
 		background: rgba(0, 0, 0, 0.85);
 		color: #fff;
 		padding: 4px 8px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		font-size: 0.75rem;
 		font-family: var(--font-mono, monospace);
 		font-weight: 500;
@@ -1191,7 +1201,8 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		flex-shrink: 0;
 		transition:
 			background 0.2s,
@@ -1239,7 +1250,7 @@
 		display: flex;
 		align-items: center;
 		width: auto;
-		border-radius: 18px;
+		border-radius: var(--radius-md);
 		padding: 0 6px;
 	}
 	.v-vol-hover:hover {
@@ -1267,7 +1278,7 @@
 		width: 50px;
 		height: 4px;
 		background: rgba(255, 255, 255, 0.3);
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		position: relative;
 		cursor: pointer;
 		display: flex;
@@ -1287,7 +1298,8 @@
 		width: 12px;
 		height: 12px;
 		background: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		transform: translate(-50%, 0);
 		box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
 		top: -4px;
@@ -1303,7 +1315,7 @@
 		border: 1px solid var(--glass-border);
 		box-shadow: var(--shadow-sm);
 		padding: 8px 14px 8px 8px;
-		border-radius: 40px;
+		border-radius: var(--radius-xl);
 		width: 100%;
 		max-width: 320px;
 	}
@@ -1315,7 +1327,8 @@
 		width: 36px;
 		height: 36px;
 		flex-shrink: 0;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--grad-primary);
 		color: #fff;
 		border: none;
@@ -1342,7 +1355,7 @@
 		width: 100%;
 		height: 6px;
 		background: rgba(120, 120, 120, 0.3);
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		position: relative;
 		transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 	}
@@ -1356,7 +1369,7 @@
 		left: 0;
 		bottom: 0;
 		background: var(--grad-primary, linear-gradient(90deg, #0ea5e9, #10b981));
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 	}
 	.v-audio-thumb {
 		position: absolute;
@@ -1364,7 +1377,8 @@
 		width: 15px;
 		height: 15px;
 		background: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		transform: translate(-50%, -50%);
 		box-shadow:
 			0 0 0 3px rgba(14, 165, 233, 0.35),
@@ -1399,7 +1413,7 @@
 		padding: 7px 8px;
 		background: transparent;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		color: rgba(255, 255, 255, 0.85);
 		font-size: 0.8rem;
 		font-weight: 500;
@@ -1456,14 +1470,14 @@
 		width: min(300px, 82%);
 		padding: 30px 26px 22px;
 		text-align: center;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		background: linear-gradient(160deg, rgba(46, 46, 52, 0.92) 0%, rgba(24, 24, 28, 0.94) 100%);
 		border: 1px solid rgba(255, 255, 255, 0.14);
 		box-shadow:
 			0 24px 60px rgba(0, 0, 0, 0.55),
 			inset 0 1px 0 rgba(255, 255, 255, 0.14);
-		backdrop-filter: blur(30px) saturate(1.4);
-		-webkit-backdrop-filter: blur(30px) saturate(1.4);
+		backdrop-filter: blur(16px) saturate(1.1);
+		-webkit-backdrop-filter: blur(16px) saturate(1.1);
 		color: #fff;
 		animation: aboutPanelIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 	}
@@ -1496,7 +1510,8 @@
 		left: 12px;
 		width: 13px;
 		height: 13px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		border: none;
 		background: #ff5f57;
 		box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);
@@ -1511,7 +1526,7 @@
 		width: 68px;
 		height: 68px;
 		margin: 0 auto 16px;
-		border-radius: 18px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;

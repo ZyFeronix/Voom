@@ -30,6 +30,12 @@
 	let initial = $derived((user.display_name || user.username || '?').charAt(0).toUpperCase());
 	let isFirst = $derived(rank === 1);
 
+	// Presencia: mapeo custom_status → variante de dot (mismo mapeo que el resto de la app)
+	let presenceClass = $derived.by(() => {
+		const s = user.custom_status || 'online';
+		return s === 'invisible' || s === 'offline' ? 'is-offline' : `is-${s}`;
+	});
+
 	// Deterministic spark positions so the burst doesn't reshuffle on re-render.
 	const sparks = Array.from({ length: 6 }, (_, i) => {
 		const angle = (i / 6) * Math.PI * 2;
@@ -70,7 +76,7 @@
 				</div>
 			</div>
 
-			<div class="avatar-ring lb-motion">
+			<div class="avatar-ring lb-motion {presenceClass}">
 				<a href="/u/{user.username}" class="avatar-link" aria-hidden="true" tabindex="-1">
 					{#if user.avatar_url}
 						<img
@@ -86,6 +92,7 @@
 						<div class="avatar-letter">{initial}</div>
 					{/if}
 				</a>
+				<span class="presence-dot" title="Estado: {user.custom_status || 'online'}"></span>
 			</div>
 		</div>
 
@@ -107,7 +114,7 @@
 			{/if}
 		</div>
 
-		<div class="stats-box">
+		<div class="stats-box {type === 'streak' ? 'is-streak' : ''}">
 			{#if type === 'level'}
 				<div class="stats-row">
 					<LevelBadge level={user.level || 1} />
@@ -129,13 +136,12 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		width: 145px;
+		width: 100%;
 		height: 240px;
 		transition: transform 0.4s var(--ease-spring);
 		z-index: 10;
 	}
 	.podium-card.is-first {
-		width: 168px;
 		height: 288px;
 	}
 	.podium-card:hover,
@@ -151,7 +157,8 @@
 		background: var(--rank-color);
 		filter: blur(28px);
 		opacity: 0.16;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		z-index: 0;
 		animation: lb-pulse-ring 5s ease-in-out infinite;
 	}
@@ -174,7 +181,8 @@
 		left: 0;
 		width: 5px;
 		height: 5px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--rank-color);
 		box-shadow: 0 0 8px var(--rank-color);
 		opacity: 0;
@@ -199,7 +207,7 @@
 				border-box;
 		backdrop-filter: var(--lb-glass-blur);
 		-webkit-backdrop-filter: var(--lb-glass-blur);
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		padding: 10px;
 		display: flex;
 		flex-direction: column;
@@ -215,7 +223,7 @@
 		inset: 0;
 		background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 42%);
 		pointer-events: none;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 	}
 
 	.avatar-section {
@@ -242,11 +250,12 @@
 	.trophy-medal {
 		width: 44px;
 		height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: radial-gradient(
 			circle at 30% 30%,
 			color-mix(in srgb, var(--rank-color) 50%, rgba(255, 255, 255, 0.7)),
-			color-mix(in srgb, var(--rank-color) 30%, rgba(15, 23, 42, 0.6)) 85%
+			color-mix(in srgb, var(--rank-color) 30%, var(--lb-medal-shadow, rgba(15, 23, 42, 0.6))) 85%
 		);
 		border: 1px solid color-mix(in srgb, var(--rank-color) 65%, rgba(255, 255, 255, 0.7));
 		box-shadow:
@@ -271,7 +280,8 @@
 		content: '';
 		position: absolute;
 		inset: 0;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		padding: 2px;
 		background: linear-gradient(
 			135deg,
@@ -349,7 +359,8 @@
 	.avatar-ring {
 		width: 72px;
 		height: 72px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		padding: 3px;
 		background: conic-gradient(
 			from 140deg,
@@ -361,6 +372,36 @@
 			0 5px 15px rgba(0, 0, 0, 0.35),
 			inset 0 2px 4px rgba(0, 0, 0, 0.35);
 		animation: lb-pulse-ring 4s ease-in-out infinite;
+		position: relative;
+	}
+
+	/* Punto de presencia sobre el anillo del podio */
+	.presence-dot {
+		position: absolute;
+		bottom: 2px;
+		right: 2px;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 2.5px solid var(--lb-card-bg, var(--bg-surface));
+		z-index: 5;
+		pointer-events: none;
+	}
+	.avatar-ring.is-online .presence-dot {
+		background: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 8px rgba(0, 212, 170, 0.6);
+	}
+	.avatar-ring.is-away .presence-dot {
+		background: var(--aero-gold, #f5b301);
+		box-shadow: 0 0 8px rgba(245, 179, 1, 0.6);
+	}
+	.avatar-ring.is-busy .presence-dot {
+		background: var(--aero-coral, #ec4899);
+		box-shadow: 0 0 8px rgba(236, 72, 153, 0.6);
+	}
+	.avatar-ring.is-offline .presence-dot {
+		background: var(--text-muted);
+		box-shadow: none;
 	}
 	.is-first .avatar-ring {
 		width: 88px;
@@ -371,13 +412,15 @@
 		display: block;
 		width: 100%;
 		height: 100%;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		overflow: hidden;
 	}
 	.avatar-img {
 		width: 100%;
 		height: 100%;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		object-fit: cover;
 		background: var(--bg-surface);
 	}
@@ -387,7 +430,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		font-family: var(--font-display);
 		font-weight: 800;
 		font-size: 1.8rem;
@@ -453,7 +497,7 @@
 	.user-name:focus-visible {
 		outline: 2px solid var(--accent-cyan);
 		outline-offset: 3px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 	}
 
 	.user-title {
@@ -471,13 +515,27 @@
 	.stats-box {
 		width: 100%;
 		margin-top: auto;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		border: 1px solid transparent;
 		background:
 			linear-gradient(var(--lb-stats-bg), var(--lb-stats-bg)) padding-box,
 			linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.05)) border-box;
 		position: relative;
 		z-index: 10;
+	}
+	.stats-box.is-streak {
+		background:
+			linear-gradient(
+					color-mix(in srgb, var(--lb-streak) 12%, var(--lb-stats-bg)),
+					color-mix(in srgb, var(--lb-streak) 12%, var(--lb-stats-bg))
+				)
+				padding-box,
+			linear-gradient(
+					135deg,
+					color-mix(in srgb, var(--lb-streak) 70%, #fff),
+					color-mix(in srgb, var(--lb-streak) 40%, transparent)
+				)
+				border-box;
 	}
 	.stats-row {
 		display: flex;
@@ -492,27 +550,28 @@
 		font-variant-numeric: tabular-nums;
 		font-size: 0.78rem;
 		font-weight: 700;
-		color: var(--text-primary);
+		color: var(--text-secondary);
 	}
 	.stats-row--streak {
 		justify-content: center;
 	}
 	.streak-icon {
-		color: var(--lb-streak);
-		font-size: 15px;
+		color: var(--text-primary);
+		font-size: 16px;
 	}
 	.streak-count {
-		color: var(--lb-streak);
-		font-weight: 800;
-		font-size: 0.95rem;
-		text-shadow: 0 0 6px rgba(249, 115, 22, 0.5);
+		color: var(--text-primary);
+		font-weight: 900;
+		font-size: 1.05rem;
+		text-shadow: 0 0 10px var(--lb-streak-glow, rgba(249, 115, 22, 0.6));
 	}
 	.streak-label {
-		font-size: 0.62rem;
+		font-size: 0.65rem;
 		text-transform: uppercase;
-		letter-spacing: 0.12em;
-		font-weight: 700;
-		color: var(--text-muted);
+		letter-spacing: 0.15em;
+		font-weight: 800;
+		color: var(--text-primary);
+		opacity: 0.85;
 	}
 
 	/* [VSocial: reduced-motion removido — aura-glow/avatar-ring/spark siempre animados] */

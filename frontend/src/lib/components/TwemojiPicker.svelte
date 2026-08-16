@@ -220,6 +220,7 @@
 	role="presentation"
 	onclick={(e) => e.stopPropagation()}
 	onkeydown={(e) => e.stopPropagation()}
+	onwheel={(e) => e.stopPropagation()}
 >
 	<!-- Tabs -->
 	<div class="tabs-container">
@@ -244,7 +245,7 @@
 	</div>
 
 	<!-- Grid -->
-	<div class="emoji-grid custom-scrollbar">
+	<div class="emoji-grid custom-scrollbar" onwheel={(e) => e.stopPropagation()}>
 		{#each EMOJI_CATEGORIES[activeTab].emojis as emoji}
 			<button
 				type="button"
@@ -266,8 +267,10 @@
 		right: 0;
 		margin-bottom: 8px;
 		width: 280px;
+		max-width: 100%;
 		padding: 12px;
 		z-index: 1000;
+		box-sizing: border-box;
 		background: var(--bg-sidebar) !important;
 		backdrop-filter: var(--glass-blur) !important;
 		-webkit-backdrop-filter: var(--glass-blur) !important;
@@ -294,24 +297,39 @@
 		right: auto;
 		margin-bottom: 0;
 		width: 100%;
+		max-width: 100%;
+		padding: 0;
+		box-sizing: border-box;
 		z-index: 1;
+		box-shadow: none;
+		background: transparent !important;
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+		border: none;
+	}
+	:global([data-theme='light']) .emoji-picker.variant-inline {
+		background: transparent !important;
 		box-shadow: none;
 	}
 	.tabs-container {
 		display: flex;
-		gap: 4px;
-		padding-bottom: 12px;
+		gap: 6px;
+		padding-bottom: 10px;
 		border-bottom: 1px solid var(--border-subtle);
 		align-items: center;
+		flex-shrink: 0;
 	}
 	.tab-btn {
 		background: transparent;
 		border: none;
-		padding: 6px 12px;
-		border-radius: 12px;
+		padding: 6px 10px;
+		border-radius: var(--radius-sm, 8px);
 		cursor: pointer;
 		transition: background var(--t-fast);
 		line-height: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.tab-btn:hover {
 		background: rgba(255, 255, 255, 0.1);
@@ -322,14 +340,15 @@
 	}
 	.tab-icon {
 		font-size: 20px;
-		font-family: 'Noto Color Emoji', sans-serif;
+		font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
 		display: block;
 		pointer-events: none;
+		line-height: 1;
 	}
 	.close-btn {
 		width: 28px;
 		height: 28px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -347,49 +366,62 @@
 	}
 	.emoji-grid {
 		display: grid;
-		grid-template-columns: repeat(7, 1fr);
-		gap: 4px;
-		max-height: 200px;
+		grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+		justify-items: center;
+		gap: 6px;
+		max-height: 210px;
 		overflow-y: auto;
 		overflow-x: hidden;
-		padding-right: 4px;
-		padding-bottom: 4px;
+		padding: 4px 6px 8px 4px;
+		box-sizing: border-box;
+		scrollbar-gutter: stable;
 	}
 	.emoji-grid::-webkit-scrollbar {
 		width: 6px;
 	}
 	.emoji-grid::-webkit-scrollbar-track {
 		background: rgba(0, 0, 0, 0.1);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 	}
 	.emoji-grid::-webkit-scrollbar-thumb {
 		background: rgba(14, 165, 233, 0.3);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 	}
 	.emoji-grid::-webkit-scrollbar-thumb:hover {
 		background: rgba(14, 165, 233, 0.5);
 	}
 	.emoji-btn {
+		width: 36px;
+		height: 36px;
+		min-width: 36px;
+		min-height: 36px;
 		background: transparent;
 		border: none;
 		cursor: pointer;
-		padding: 6px;
-		border-radius: 8px;
-		transition: all 0.2s;
+		padding: 0;
+		border-radius: var(--radius-sm, 8px);
+		transition:
+			transform 0.15s var(--ease-spring),
+			background var(--t-fast);
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		line-height: 1;
+		box-sizing: border-box;
 	}
 	.emoji-btn:hover {
-		background: rgba(255, 255, 255, 0.1);
-		transform: scale(1.15);
+		background: rgba(255, 255, 255, 0.12);
+		transform: scale(1.18);
+		z-index: 2;
 	}
 	.emoji-glyph {
 		font-size: 22px;
-		font-family: 'Noto Color Emoji', sans-serif;
-		display: block;
+		font-family: 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		pointer-events: none;
 		line-height: 1;
+		user-select: none;
 	}
 </style>

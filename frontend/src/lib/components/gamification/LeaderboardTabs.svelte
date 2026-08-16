@@ -10,6 +10,28 @@
 
 	let activeIndex = $derived(tabs.findIndex((t) => t.id === type));
 
+	let sliderEl = $state(undefined);
+
+	// Watchdog: algunos entornos (p. ej. webviews con el reloj de animación
+	// congelado) no ejecutan las transiciones CSS, y el slider se queda atascado
+	// bajo la pestaña anterior. Si tras el cambio no llegó a su destino,
+	// cancelamos las transiciones congeladas para que salte a la posición
+	// correcta. En navegadores normales la transición ya habrá terminado y esto
+	// no hace nada.
+	$effect(() => {
+		void type;
+		if (!sliderEl) return;
+		const timer = setTimeout(() => {
+			const active = sliderEl.parentElement?.querySelector('.lb-tab.is-active');
+			if (!active) return;
+			const dx = Math.abs(sliderEl.getBoundingClientRect().x - active.getBoundingClientRect().x);
+			if (dx > 2) {
+				sliderEl.getAnimations().forEach((a) => a.cancel());
+			}
+		}, 550);
+		return () => clearTimeout(timer);
+	});
+
 	function select(id) {
 		if (id !== type) onChange(id);
 	}
@@ -32,7 +54,8 @@
 	onkeydown={onKeydown}
 	style="--active-index: {activeIndex}; --tab-count: {tabs.length};"
 >
-	<span class="lb-tabs__slider lb-tabs__slider--{type}" aria-hidden="true"></span>
+	<span class="lb-tabs__slider lb-tabs__slider--{type}" bind:this={sliderEl} aria-hidden="true"
+	></span>
 	{#each tabs as tab (tab.id)}
 		<button
 			type="button"
@@ -65,7 +88,7 @@
 					135deg,
 					rgba(255, 255, 255, 0.32),
 					rgba(255, 255, 255, 0.08) 50%,
-					rgba(27, 133, 243, 0.25)
+					rgba(var(--accent-blue-rgb), 0.25)
 				)
 				border-box;
 		box-shadow: var(--shadow-sm), var(--glass-inset);
@@ -93,8 +116,12 @@
 		box-shadow: 0 4px 16px rgba(46, 180, 255, 0.4);
 	}
 	.lb-tabs__slider--streak {
-		background: linear-gradient(120deg, #fb923c, var(--lb-streak));
-		box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+		background: linear-gradient(
+			120deg,
+			color-mix(in srgb, var(--lb-streak) 70%, #fff),
+			var(--lb-streak)
+		);
+		box-shadow: 0 4px 16px var(--lb-streak-glow, rgba(249, 115, 22, 0.4));
 	}
 
 	.lb-tab {

@@ -22,6 +22,13 @@ export async function GET({ request, url, params }) {
 		const pendingReports = (
 			await db.prepare("SELECT COUNT(*) as c FROM reports WHERE status = 'pending'").get()
 		).c;
+		const pendingVerifications = (
+			await db
+				.prepare(
+					"SELECT COUNT(*) as c FROM verification_requests WHERE status IN ('pending', 'reviewing')"
+				)
+				.get()
+		).c;
 		const totalListings = (await db.prepare('SELECT COUNT(*) as c FROM marketplace_listings').get())
 			.c;
 		const newUsersToday = (
@@ -57,6 +64,7 @@ export async function GET({ request, url, params }) {
 				total_reels: totalReels,
 				total_stories: totalStories,
 				pending_reports: pendingReports,
+				pending_verifications: pendingVerifications,
 				total_listings: totalListings,
 				new_users_today: newUsersToday
 			},
@@ -116,21 +124,100 @@ export async function GET({ request, url, params }) {
 	}
 
 	if (action === 'reports') {
-		const status = url.searchParams.get('status') || 'pending';
+		const status = url.searchParams.get('status') || '';
+		const entityType = url.searchParams.get('type') || '';
+		const q = url.searchParams.get('q') || '';
+
+		let whereClauses = ['1=1'];
+		const vals = [];
+
+		if (status) {
+			whereClauses.push('r.status = ?');
+			vals.push(status);
+		}
+		if (entityType) {
+			whereClauses.push('r.entity_type = ?');
+			vals.push(entityType);
+		}
+		if (q) {
+			whereClauses.push('(r.reason LIKE ? OR u.username LIKE ?)');
+			vals.push(`%${q}%`, `%${q}%`);
+		}
+
 		const reports = await db
 			.prepare(
 				`
-			SELECT r.*, u.username as reporter_name, u.avatar_url as reporter_avatar,
+			SELECT r.*,
+				u.username as reporter_name,
+				u.avatar_url as reporter_avatar,
 				CASE r.entity_type
-					WHEN 'post' THEN (SELECT body FROM posts WHERE id = r.entity_id)
-					WHEN 'comment' THEN (SELECT body FROM comments WHERE id = r.entity_id)
-				END as content_preview
-			FROM reports r LEFT JOIN users u ON r.reporter_id = u.id
-			WHERE r.status = ? ORDER BY r.created_at DESC LIMIT 50
+					WHEN 'post' THEN (SELECT p.body FROM posts p WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT c.body FROM comments c WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT re.caption FROM reels re WHERE re.id = r.entity_id)
+					WHEN 'user' THEN (SELECT usr.bio FROM users usr WHERE usr.id = r.entity_id)
+				END as content_preview,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT pm.media_url FROM post_media pm WHERE pm.post_id = r.entity_id LIMIT 1)
+					WHEN 'reel' THEN (SELECT re.video_url FROM reels re WHERE re.id = r.entity_id)
+				END as content_media,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT p.user_id FROM posts p WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT c.user_id FROM comments c WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT re.user_id FROM reels re WHERE re.id = r.entity_id)
+					WHEN 'user' THEN r.entity_id
+				END as target_author_id,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT au.username FROM posts p JOIN users au ON p.user_id = au.id WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT au.username FROM comments c JOIN users au ON c.user_id = au.id WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT au.username FROM reels re JOIN users au ON re.user_id = au.id WHERE re.id = r.entity_id)
+					WHEN 'user' THEN (SELECT au.username FROM users au WHERE au.id = r.entity_id)
+				END as target_author_username,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT au.avatar_url FROM posts p JOIN users au ON p.user_id = au.id WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT au.avatar_url FROM comments c JOIN users au ON c.user_id = au.id WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT au.avatar_url FROM reels re JOIN users au ON re.user_id = au.id WHERE re.id = r.entity_id)
+					WHEN 'user' THEN (SELECT au.avatar_url FROM users au WHERE au.id = r.entity_id)
+				END as target_author_avatar,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT au.strike_count FROM posts p JOIN users au ON p.user_id = au.id WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT au.strike_count FROM comments c JOIN users au ON c.user_id = au.id WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT au.strike_count FROM reels re JOIN users au ON re.user_id = au.id WHERE re.id = r.entity_id)
+					WHEN 'user' THEN (SELECT au.strike_count FROM users au WHERE au.id = r.entity_id)
+				END as target_author_strikes,
+				CASE r.entity_type
+					WHEN 'post' THEN (SELECT au.muted_until FROM posts p JOIN users au ON p.user_id = au.id WHERE p.id = r.entity_id)
+					WHEN 'comment' THEN (SELECT au.muted_until FROM comments c JOIN users au ON c.user_id = au.id WHERE c.id = r.entity_id)
+					WHEN 'reel' THEN (SELECT au.muted_until FROM reels re JOIN users au ON re.user_id = au.id WHERE re.id = r.entity_id)
+					WHEN 'user' THEN (SELECT au.muted_until FROM users au WHERE au.id = r.entity_id)
+				END as target_author_muted_until
+			FROM reports r
+			LEFT JOIN users u ON r.reporter_id = u.id
+			WHERE ${whereClauses.join(' AND ')}
+			ORDER BY r.created_at DESC LIMIT 100
 		`
 			)
-			.all(status);
-		return json({ success: true, reports });
+			.all(...vals);
+
+		const pendingCount = (
+			await db.prepare("SELECT COUNT(*) as c FROM reports WHERE status = 'pending'").get()
+		).c;
+		const resolvedCount = (
+			await db.prepare("SELECT COUNT(*) as c FROM reports WHERE status = 'resolved'").get()
+		).c;
+		const dismissedCount = (
+			await db.prepare("SELECT COUNT(*) as c FROM reports WHERE status = 'dismissed'").get()
+		).c;
+
+		return json({
+			success: true,
+			reports,
+			stats: {
+				pending: pendingCount,
+				resolved: resolvedCount,
+				dismissed: dismissedCount,
+				total: pendingCount + resolvedCount + dismissedCount
+			}
+		});
 	}
 
 	if (action === 'content') {
@@ -171,32 +258,91 @@ export async function GET({ request, url, params }) {
 		return json({ success: true, settings });
 	}
 
-	if (action === 'logs') {
-		const logs = await db
-			.prepare(
-				`
-			SELECT t.*, u.username FROM transactions t
-			LEFT JOIN wallets w ON t.wallet_id = w.id
-			LEFT JOIN users u ON w.user_id = u.id
-			ORDER BY t.created_at DESC LIMIT 50
-		`
-			)
-			.all();
-		return json({ success: true, logs });
+	if (action === 'verifications') {
+		const status = url.searchParams.get('status') || '';
+		const category = url.searchParams.get('category') || '';
+		const q = url.searchParams.get('q') || '';
+		let whereClauses = ['1=1'];
+		const vals = [];
+		if (status) {
+			whereClauses.push('vr.status = ?');
+			vals.push(status);
+		}
+		if (category) {
+			whereClauses.push('vr.category = ?');
+			vals.push(category);
+		}
+		if (q) {
+			whereClauses.push(
+				'(vr.folio LIKE ? OR vr.applicant_handle LIKE ? OR vr.legal_name LIKE ? OR u.username LIKE ? OR vr.contact_email LIKE ?)'
+			);
+			vals.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
+		}
+
+		let query = `
+			SELECT vr.*,
+			       u.username, u.display_name, u.avatar_url, u.email as user_email,
+			       u.created_at as user_created_at, u.follower_count as user_follower_count,
+			       u.post_count as user_post_count, u.is_verified as user_is_verified,
+			       admin.username as reviewer_name
+			FROM verification_requests vr
+			JOIN users u ON vr.user_id = u.id
+			LEFT JOIN users admin ON vr.reviewed_by = admin.id
+			WHERE ${whereClauses.join(' AND ')}
+			ORDER BY vr.created_at DESC LIMIT 100
+		`;
+		const verifications = await db.prepare(query).all(...vals);
+
+		const pendingCount = (
+			await db
+				.prepare("SELECT COUNT(*) as c FROM verification_requests WHERE status = 'pending'")
+				.get()
+		).c;
+		const reviewingCount = (
+			await db
+				.prepare("SELECT COUNT(*) as c FROM verification_requests WHERE status = 'reviewing'")
+				.get()
+		).c;
+		const approvedCount = (
+			await db
+				.prepare("SELECT COUNT(*) as c FROM verification_requests WHERE status = 'approved'")
+				.get()
+		).c;
+		const rejectedCount = (
+			await db
+				.prepare("SELECT COUNT(*) as c FROM verification_requests WHERE status = 'rejected'")
+				.get()
+		).c;
+
+		return json({
+			success: true,
+			verifications,
+			stats: {
+				pending: pendingCount,
+				reviewing: reviewingCount,
+				approved: approvedCount,
+				rejected: rejectedCount,
+				total: pendingCount + reviewingCount + approvedCount + rejectedCount
+			}
+		});
 	}
 
-	if (action === 'activity') {
-		const limit = Math.min(50, parseInt(url.searchParams.get('limit')) || 10);
-		const activity = await db
-			.prepare(
-				`
-			SELECT n.*, u.username as actor_username, u.avatar_url as actor_avatar
-			FROM notifications n LEFT JOIN users u ON n.actor_id = u.id
-			ORDER BY n.created_at DESC LIMIT ?
-		`
-			)
-			.all(limit);
-		return json({ success: true, activity });
+	if (action === 'strikes') {
+		const targetUserId = parseInt(url.searchParams.get('user_id') || '0');
+		let query = `
+			SELECT s.*, u.username as target_username, u.avatar_url as target_avatar, admin.username as issuer_name
+			FROM user_strikes s
+			JOIN users u ON s.user_id = u.id
+			LEFT JOIN users admin ON s.issued_by = admin.id
+		`;
+		const vals = [];
+		if (targetUserId) {
+			query += ' WHERE s.user_id = ?';
+			vals.push(targetUserId);
+		}
+		query += ' ORDER BY s.created_at DESC LIMIT 100';
+		const strikes = await db.prepare(query).all(...vals);
+		return json({ success: true, strikes });
 	}
 
 	return json({ error: 'Admin endpoint not found' }, { status: 404 });
@@ -313,6 +459,166 @@ export async function POST({ request, _url, params }) {
 		return json({ success: true, message: 'Ajuste actualizado' });
 	}
 
+	if (action === 'verifications' && subaction) {
+		const reqId = parseInt(subaction);
+		const { resolution, admin_notes } = body;
+		const vReq = await db.prepare('SELECT * FROM verification_requests WHERE id = ?').get(reqId);
+		if (!vReq) return json({ error: 'Solicitud no encontrada' }, { status: 404 });
+
+		if (resolution === 'approved') {
+			await db
+				.prepare(
+					`UPDATE verification_requests
+					 SET status = 'approved', admin_notes = ?, reviewed_by = ?, reviewed_at = datetime('now')
+					 WHERE id = ?`
+				)
+				.run(admin_notes || null, adminId, reqId);
+
+			await db.prepare('UPDATE users SET is_verified = 1 WHERE id = ?').run(vReq.user_id);
+
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'verification_approved', '¡Felicidades! Tu solicitud de verificación ha sido aprobada.')`
+				)
+				.run(vReq.user_id, adminId);
+
+			if (globalThis.io) {
+				globalThis.io
+					.to(`user_${vReq.user_id}`)
+					.emit('verification_status_change', { status: 'approved' });
+			}
+
+			return json({ success: true, message: 'Solicitud aprobada y usuario verificado' });
+		} else if (resolution === 'rejected') {
+			await db
+				.prepare(
+					`UPDATE verification_requests
+					 SET status = 'rejected', admin_notes = ?, reviewed_by = ?, reviewed_at = datetime('now')
+					 WHERE id = ?`
+				)
+				.run(admin_notes || 'No cumple los requisitos mínimos.', adminId, reqId);
+
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'verification_rejected', ?)`
+				)
+				.run(
+					vReq.user_id,
+					adminId,
+					`Tu solicitud de verificación ha sido rechazada: ${admin_notes || 'No cumple los requisitos de autoría.'}`
+				);
+
+			if (globalThis.io) {
+				globalThis.io
+					.to(`user_${vReq.user_id}`)
+					.emit('verification_status_change', { status: 'rejected' });
+			}
+
+			return json({ success: true, message: 'Solicitud rechazada' });
+		} else if (resolution === 'reviewing') {
+			await db
+				.prepare(
+					`UPDATE verification_requests
+					 SET status = 'reviewing', admin_notes = ?, reviewed_by = ?
+					 WHERE id = ?`
+				)
+				.run(admin_notes || null, adminId, reqId);
+			return json({ success: true, message: 'Solicitud marcada en revisión' });
+		}
+		return json({ error: 'Resolución no válida' }, { status: 400 });
+	}
+
+	if (action === 'strikes' && subaction === 'issue') {
+		const { user_id, strike_level, reason, report_id } = body;
+		const targetId = parseInt(user_id);
+		if (!targetId || targetId === adminId) {
+			return json({ error: 'Usuario inválido para sanción' }, { status: 400 });
+		}
+		if (targetId === 1) {
+			return json({ error: 'El administrador principal no puede ser sancionado' }, { status: 400 });
+		}
+		if (!reason) {
+			return json({ error: 'Debe especificar un motivo para la sanción' }, { status: 400 });
+		}
+
+		const level = parseInt(strike_level) || 1;
+		let actionTaken = 'warning';
+		let expiresAt = null;
+
+		if (level === 1) {
+			actionTaken = 'warning';
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'warning', ?)`
+				)
+				.run(targetId, adminId, `Advertencia oficial de moderación: ${reason}`);
+		} else if (level === 2) {
+			actionTaken = 'timeout';
+			await db
+				.prepare("UPDATE users SET muted_until = datetime('now', '+24 hours') WHERE id = ?")
+				.run(targetId);
+			expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'timeout', ?)`
+				)
+				.run(targetId, adminId, `Tu cuenta ha sido silenciada por 24 horas: ${reason}`);
+		} else if (level === 3) {
+			actionTaken = 'temp_ban';
+			await db
+				.prepare(
+					"UPDATE users SET muted_until = datetime('now', '+7 days'), is_active = 0 WHERE id = ?"
+				)
+				.run(targetId);
+			await db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(targetId);
+			expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'temp_ban', ?)`
+				)
+				.run(targetId, adminId, `Tu cuenta ha sido suspendida por 7 días: ${reason}`);
+		} else if (level === 4) {
+			actionTaken = 'perm_ban';
+			await db.prepare('UPDATE users SET is_banned = 1, is_active = 0 WHERE id = ?').run(targetId);
+			await db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(targetId);
+			await db
+				.prepare(
+					`INSERT INTO notifications (recipient_id, actor_id, type, message)
+					 VALUES (?, ?, 'perm_ban', ?)`
+				)
+				.run(targetId, adminId, `Tu cuenta ha sido suspendida permanentemente: ${reason}`);
+		}
+
+		await db
+			.prepare(
+				`INSERT INTO user_strikes (user_id, issued_by, strike_level, action_taken, reason, report_id, expires_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			)
+			.run(targetId, adminId, level, actionTaken, reason, report_id || null, expiresAt);
+
+		await db.prepare('UPDATE users SET strike_count = strike_count + 1 WHERE id = ?').run(targetId);
+
+		if (report_id) {
+			await db
+				.prepare("UPDATE reports SET status = 'resolved' WHERE id = ?")
+				.run(parseInt(report_id));
+		}
+
+		return json({ success: true, message: `Sanción aplicada (${actionTaken})` });
+	}
+
+	if (action === 'strikes' && subaction === 'unmute') {
+		const targetId = parseInt(body.user_id);
+		if (!targetId) return json({ error: 'Usuario inválido' }, { status: 400 });
+		await db.prepare('UPDATE users SET muted_until = NULL WHERE id = ?').run(targetId);
+		return json({ success: true, message: 'Silencio levantado' });
+	}
+
 	if (action === 'content') {
 		const type = subaction; // 'trash'
 		const id = parseInt(parts[2] || '0');
@@ -390,7 +696,7 @@ export async function DELETE({ request, params }) {
 		const type = subId;
 		const id = parseInt(subId2);
 		if (type === 'post') {
-			await db.prepare('UPDATE posts SET deleted_at = datetime("now") WHERE id = ?').run(id);
+			await db.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ?").run(id);
 		} else if (type === 'reel') {
 			await db.prepare('DELETE FROM reels WHERE id = ?').run(id);
 		} else if (type === 'trash') {

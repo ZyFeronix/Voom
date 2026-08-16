@@ -9,31 +9,23 @@
 
 const STORAGE_KEY = 'vsocial_theme';
 
+// Fuente única de verdad de los temas. `label` (para tooltips/aria) se deriva
+// del `name` para no repetir datos. El icono es REPRESENTATIVO de cada tema
+// (distinto por tema, para reconocer de un vistazo en qué tema estás).
 export const THEME_OPTIONS = [
 	{ id: 'light', name: 'Claro', icon: 'light_mode', desc: 'Aurora clara' },
 	{ id: 'dark', name: 'Oscuro', icon: 'dark_mode', desc: 'Océano profundo' },
 	{ id: 'midnight', name: 'Noche', icon: 'bedtime', desc: 'Azul OLED' }
 ];
 
-// Metadatos de cada tema: icono REPRESENTATIVO del tema actual (cada uno
-// distinto, para que se reconozca de un vistazo en qué tema estás) y su
-// etiqueta legible.
-const THEME_META = {
-	light: { label: 'Tema: Claro', name: 'Claro', icon: 'light_mode', desc: 'Aurora clara' },
-	dark: { label: 'Tema: Oscuro', name: 'Oscuro', icon: 'dark_mode', desc: 'Océano profundo' },
-	midnight: { label: 'Tema: Noche', name: 'Noche', icon: 'bedtime', desc: 'Azul OLED' }
-};
+const THEME_META = Object.fromEntries(
+	THEME_OPTIONS.map((t) => [t.id, { ...t, label: `Tema: ${t.name}` }])
+);
 
 const THEMES = THEME_OPTIONS.map((t) => t.id);
 
 function isValidTheme(value) {
 	return THEMES.includes(value);
-}
-
-function prefersReducedMotion() {
-	return (
-		typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-	);
 }
 
 function getInitialTheme() {
@@ -55,11 +47,7 @@ function applyTheme(value) {
 
 export function setTheme(value) {
 	if (!isValidTheme(value)) return;
-	if (
-		typeof document !== 'undefined' &&
-		typeof document.startViewTransition === 'function' &&
-		!prefersReducedMotion()
-	) {
+	if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
 		try {
 			const transition = document.startViewTransition(() => applyTheme(value));
 			if (transition.ready) transition.ready.catch(() => {});

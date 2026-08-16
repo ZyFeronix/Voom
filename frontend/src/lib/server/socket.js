@@ -75,11 +75,33 @@ async function broadcastPresence(db, userId, online) {
 	try {
 		if (!(await canSharePresence(db, userId))) return;
 
+		const user = await db
+			.prepare(
+				'SELECT custom_status, custom_status_text, custom_status_expires_at FROM users WHERE id = ?'
+			)
+			.get(userId);
+		let finalStatus = online ? 'online' : 'offline';
+		let finalStatusText = null;
+
+		if (user && online) {
+			let isValid = true;
+			if (user.custom_status_expires_at) {
+				const exp = new Date(user.custom_status_expires_at + 'Z').getTime();
+				if (Date.now() > exp) isValid = false;
+			}
+			if (isValid && user.custom_status) {
+				finalStatus = user.custom_status;
+				finalStatusText = user.custom_status_text;
+			}
+		}
+
 		const nowIso = new Date().toISOString().slice(0, 19).replace('T', ' ');
 		const peers = await getConversationPeers(db, userId);
 		const payload = {
 			userId: Number(userId),
 			online,
+			status: finalStatus,
+			statusText: finalStatusText,
 			lastSeenAt: online ? null : nowIso
 		};
 		for (const peerId of peers) {
@@ -179,10 +201,34 @@ export function initSocketIO(httpServer) {
 			const onlinePeers = [];
 			for (const peerId of peers) {
 				if (isUserOnline(peerId) && (await canSharePresence(db, peerId))) {
-					onlinePeers.push(peerId);
+					const user = await db
+						.prepare(
+							'SELECT custom_status, custom_status_text, custom_status_expires_at FROM users WHERE id = ?'
+						)
+						.get(peerId);
+					let finalStatus = 'online';
+					let finalStatusText = null;
+
+					if (user) {
+						let isValid = true;
+						if (user.custom_status_expires_at) {
+							const exp = new Date(user.custom_status_expires_at + 'Z').getTime();
+							if (Date.now() > exp) isValid = false;
+						}
+						if (isValid && user.custom_status) {
+							finalStatus = user.custom_status;
+							finalStatusText = user.custom_status_text;
+						}
+					}
+					onlinePeers.push({
+						userId: peerId,
+						status: finalStatus,
+						statusText: finalStatusText,
+						online: true
+					});
 				}
 			}
-			socket.emit('presence:sync', { onlineUserIds: onlinePeers });
+			socket.emit('presence:sync', { users: onlinePeers });
 		} catch (err) {
 			console.error('[Socket] presence:sync error:', err);
 		}
@@ -203,6 +249,34 @@ export function initSocketIO(httpServer) {
 				userId,
 				isTyping
 			});
+		});
+
+		// Zumbido en tiempo real (estilo MSN Messenger)
+		socket.on('zumbido', async ({ convId }) => {
+			try {
+				if (!convId) return;
+				const cId = Number(convId);
+				const payload = {
+					convId: cId,
+					senderId: userId,
+					timestamp: Date.now()
+				};
+				// Emitir a la sala activa de la conversación
+				socket.to(`conv_${cId}`).emit('zumbido', payload);
+
+				// También emitir a las salas personales de los pares de la conversación
+				const db = getDb();
+				const peers = await db
+					.prepare(
+						`SELECT user_id FROM conversation_participants WHERE conversation_id = ? AND user_id != ?`
+					)
+					.all(cId, userId);
+				for (const p of peers) {
+					io.to(`user_${p.user_id}`).emit('zumbido', payload);
+				}
+			} catch (err) {
+				console.error('[Socket] zumbido event error:', err);
+			}
 		});
 
 		// Heartbeat: el cliente late periódicamente; refrescamos last_seen_at

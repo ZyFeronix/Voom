@@ -34,13 +34,46 @@ export async function requireAuth(request) {
 		throw error(401, 'Sesión inválida');
 	}
 
-	const expiresAt = new Date(session.expires_at + 'Z').getTime();
-	if (expiresAt < Date.now()) {
+	const rawExp = String(session.expires_at || '').trim();
+	const isoExp = (rawExp.includes('T') ? rawExp : rawExp.replace(' ', 'T')).replace(/Z?$/, 'Z');
+	const expiresAt = new Date(isoExp).getTime();
+	if (!isNaN(expiresAt) && expiresAt < Date.now()) {
 		await db.prepare('DELETE FROM user_sessions WHERE id = ?').run(session.id);
 		throw error(401, 'La sesión ha expirado');
 	}
 
+	const user = await db
+		.prepare('SELECT id, is_active, is_banned, muted_until FROM users WHERE id = ?')
+		.get(session.user_id);
+
+	if (!user) {
+		await db.prepare('DELETE FROM user_sessions WHERE id = ?').run(session.id);
+		throw error(401, 'Sesión no válida o usuario no encontrado');
+	}
+
+	if (user.is_banned || !user.is_active) {
+		await db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(session.user_id);
+		throw error(403, 'Tu cuenta ha sido suspendida o desactivada.');
+	}
+
 	return session.user_id;
+}
+
+/**
+ * Ensure user is not currently muted. Throws 403 if muted_until is in the future.
+ */
+export async function checkUserNotMuted(userId) {
+	const db = getDb();
+	const user = await db.prepare('SELECT muted_until FROM users WHERE id = ?').get(userId);
+	if (user && user.muted_until) {
+		const raw = String(user.muted_until).trim();
+		const iso = (raw.includes('T') ? raw : raw.replace(' ', 'T')).replace(/Z?$/, 'Z');
+		const muteEnd = new Date(iso).getTime();
+		if (!isNaN(muteEnd) && muteEnd > Date.now()) {
+			const formatted = new Date(muteEnd).toLocaleString('es-ES');
+			throw error(403, `Tu cuenta se encuentra temporalmente silenciada hasta ${formatted}`);
+		}
+	}
 }
 
 /**
@@ -91,4 +124,40 @@ export async function requireAdmin(request) {
 	return userId;
 }
 
-export default { requireAuth, optionalAuth, createSession, requireAdmin };
+/**
+ * Require Team V-SOCIAL badge role or higher staff level.
+ * Allowed roles: 'team', 'support', 'moderator', 'admin', 'super_admin', 'staff'
+ * Explicitly rejects regular users (even if verified) and government/institutional roles.
+ */
+export async function requireTeamOrHigher(request) {
+	const userId = await requireAuth(request);
+	const db = getDb();
+
+	const user = await db
+		.prepare(
+			`SELECT u.id, COALESCE(ur.role, u.role, 'user') AS role
+			 FROM users u
+			 LEFT JOIN user_roles ur ON ur.user_id = u.id
+			 WHERE u.id = ? LIMIT 1`
+		)
+		.get(userId);
+
+	const allowedRoles = ['team', 'support', 'moderator', 'admin', 'super_admin', 'staff'];
+	if (!user || !allowedRoles.includes(user.role)) {
+		throw error(
+			403,
+			'Acceso denegado. Función experimental exclusiva para usuarios con insignia "Equipo V-SOCIAL" y rangos superiores.'
+		);
+	}
+
+	return { userId, role: user.role };
+}
+
+export default {
+	requireAuth,
+	checkUserNotMuted,
+	optionalAuth,
+	createSession,
+	requireAdmin,
+	requireTeamOrHigher
+};

@@ -54,7 +54,8 @@
 					para la autenticación.
 				</li>
 				<li>
-					<strong>Transacciones:</strong> movimientos de la cartera virtual (créditos y saldo).
+					<strong>Enlaces de pago y apoyo (P2P):</strong> URL de métodos de cobro externos (PayPal, Ko-fi
+					o Patreon) si decides configurarlos voluntariamente en tu perfil.
 				</li>
 			</ul>
 		</section>
@@ -64,8 +65,8 @@
 			<p>
 				Tratamos tus datos para permitir el funcionamiento de la red social: crear y gestionar tu
 				cuenta, mostrar tu perfil y contenido, facilitar la interacción social (seguir, comentar,
-				mensajería), gestionar la cartera y la gamificación, enviar notificaciones, prevenir abusos
-				y mantener la seguridad de la plataforma.
+				mensajería), mostrar tus enlaces de apoyo directo (P2P) y la gamificación, enviar
+				notificaciones, prevenir abusos y mantener la seguridad de la plataforma.
 			</p>
 		</section>
 
@@ -178,7 +179,7 @@
 	}
 	.legal-card {
 		padding: 3rem;
-		border-radius: 24px;
+		border-radius: var(--radius-lg);
 	}
 	:global([data-theme='dark']) .legal-card {
 		background: rgba(15, 20, 25, 0.5);

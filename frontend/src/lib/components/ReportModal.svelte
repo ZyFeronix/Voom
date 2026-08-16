@@ -145,7 +145,7 @@
 		width: 100%;
 		max-width: 420px;
 		padding: 24px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
@@ -168,7 +168,8 @@
 	.close-btn {
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		border: none;
 		background: var(--glass-bg);
 		color: var(--text-muted);
@@ -198,7 +199,7 @@
 		padding: 8px 12px;
 		background: rgba(232, 74, 114, 0.08);
 		border: 1px solid rgba(232, 74, 114, 0.2);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		color: var(--aero-rose);
 		font-size: 0.8rem;
 		font-weight: 600;
@@ -217,7 +218,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 10px 14px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		border: 1px solid transparent;
 		background: var(--glass-bg);
 		color: var(--text-primary);
@@ -286,7 +287,8 @@
 		display: inline-block;
 		border: 3px solid rgba(255, 255, 255, 0.3);
 		border-top-color: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		animation: spin 0.75s linear infinite;
 	}
 

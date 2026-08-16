@@ -1,7 +1,7 @@
 /**
  * VSocial — Users API
  * GET    /api/users/me, /api/users/suggested, /api/users/search, /api/users/settings
- * GET    /api/users/:username, /api/users/:username/followers, /api/users/:username/following, /api/users/:username/posts
+ * GET    /api/users/:username, /api/users/:username/followers, /api/users/:username/following, /api/users/:username/posts, /api/users/:username/reposts
  * POST   /api/users/:username/follow, /api/users/avatar, /api/users/cover
  * DELETE /api/users/:username/follow
  * PUT    /api/users/profile, /api/users/me, /api/users/settings
@@ -12,6 +12,7 @@ import bcrypt from 'bcryptjs';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
 import { requireAuth, optionalAuth } from '$lib/server/auth.js';
 import { awardXP } from '$lib/server/gamification.js';
+import { anonymizePost } from '$lib/server/security.js';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -161,16 +162,6 @@ export async function GET({ request, url, params }) {
 			.prepare('SELECT * FROM gigs WHERE user_id = ? ORDER BY created_at DESC')
 			.all(userId);
 
-		// Cartera
-		data.wallet = await db
-			.prepare('SELECT id, user_id, balance, created_at, updated_at FROM wallets WHERE user_id = ?')
-			.get(userId);
-		data.wallet_transactions = await db
-			.prepare(
-				'SELECT id, type, amount, description, status, created_at FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC'
-			)
-			.all(userId);
-
 		// Notificaciones recibidas
 		data.notifications = await db
 			.prepare(
@@ -225,8 +216,9 @@ export async function GET({ request, url, params }) {
 				u.bio, u.location, u.website, u.category, u.is_verified, u.is_virtual,
 				(SELECT COUNT(*) FROM follows f JOIN users u2 ON f.follower_id = u2.id WHERE f.following_id = u.id AND u2.is_active = 1 AND u2.is_banned = 0) AS follower_count, 
 				(SELECT COUNT(*) FROM follows f JOIN users u2 ON f.following_id = u2.id WHERE f.follower_id = u.id AND u2.is_active = 1 AND u2.is_banned = 0) AS following_count, 
-				u.post_count, u.wallet_balance,
+				u.post_count, u.payment_link,
 				u.privacy_level, u.created_at, u.last_seen_at, u.level, u.xp_points, u.checkin_streak,
+				u.custom_status, u.custom_status_text, u.custom_status_expires_at,
 				COALESCE(ur.role, u.role, 'user') AS role,
 				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_text,
 				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_color
@@ -277,7 +269,7 @@ export async function GET({ request, url, params }) {
 			  AND u.id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = ?)
 			  AND u.is_active = 1 AND u.is_banned = 0
 			ORDER BY affinity_score DESC, u.is_virtual DESC, u.follower_count DESC
-			LIMIT 5
+			LIMIT 20
 		`
 			)
 			.all(userId, userId, userId, userId, userId);
@@ -332,37 +324,67 @@ export async function GET({ request, url, params }) {
 
 	// ── /api/users/:action/followers ──
 	if (action && subaction === 'followers') {
+		const currentUserId = await optionalAuth(request);
+		let targetUserId;
+		if (action === 'me') {
+			targetUserId = await requireAuth(request);
+		} else {
+			const target = await db
+				.prepare('SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
+				.get(action, action);
+			if (!target) return json({ followers: [] });
+			targetUserId = target.id;
+		}
+
 		const users = await db
 			.prepare(
 				`
-			SELECT u.id, u.username, u.display_name, u.avatar_url, u.bio, u.is_verified, u.is_virtual
+			SELECT u.id, u.username, u.display_name, u.avatar_url, u.bio, u.is_verified, u.is_virtual,
+			  COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') as role,
+			  u.level,
+			  ${currentUserId ? '(SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = u.id) > 0' : '0'} AS is_following
 			FROM follows f JOIN users u ON f.follower_id = u.id
-			WHERE f.following_id = (SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?)
+			WHERE f.following_id = ?
 			  AND u.is_active = 1 AND u.is_banned = 0
 		`
 			)
-			.all(action, action);
+			.all(...(currentUserId ? [currentUserId, targetUserId] : [targetUserId]));
 		return json({ followers: users });
 	}
 
 	// ── /api/users/:action/following ──
 	if (action && subaction === 'following') {
+		const currentUserId = await optionalAuth(request);
+		let targetUserId;
+		if (action === 'me') {
+			targetUserId = await requireAuth(request);
+		} else {
+			const target = await db
+				.prepare('SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
+				.get(action, action);
+			if (!target) return json({ following: [] });
+			targetUserId = target.id;
+		}
+
 		const users = await db
 			.prepare(
 				`
-			SELECT u.id, u.username, u.display_name, u.avatar_url, u.bio, u.is_verified, u.is_virtual
+			SELECT u.id, u.username, u.display_name, u.avatar_url, u.bio, u.is_verified, u.is_virtual,
+			  COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') as role,
+			  u.level,
+			  ${currentUserId ? '(SELECT COUNT(*) FROM follows WHERE follower_id = ? AND following_id = u.id) > 0' : '0'} AS is_following
 			FROM follows f JOIN users u ON f.following_id = u.id
-			WHERE f.follower_id = (SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?)
+			WHERE f.follower_id = ?
 			  AND u.is_active = 1 AND u.is_banned = 0
 		`
 			)
-			.all(action, action);
+			.all(...(currentUserId ? [currentUserId, targetUserId] : [targetUserId]));
 		return json({ following: users });
 	}
 
 	// ── /api/users/:action/posts ──
 	if (action && subaction === 'posts') {
-		const userId = await requireAuth(request);
+		const userId = await optionalAuth(request);
 		const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
 		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 10));
 		const offset = (page - 1) * limit;
@@ -370,6 +392,9 @@ export async function GET({ request, url, params }) {
 		const status = url.searchParams.get('status') || 'active';
 		let statusClause = 'AND p.deleted_at IS NULL';
 		if (status === 'deleted') {
+			if (!userId) {
+				return json({ posts: [] });
+			}
 			const targetUser = await db
 				.prepare('SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
 				.get(action, action);
@@ -388,13 +413,14 @@ export async function GET({ request, url, params }) {
 				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_text,
 				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_color,
 				(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
-				(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved
+				(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+				(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared
 			FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id
-			WHERE (u.username = ? OR CAST(u.id AS TEXT) = ?) AND u.is_active = 1 AND u.is_banned = 0 ${statusClause}
+			WHERE (u.username = ? OR CAST(u.id AS TEXT) = ?) AND (p.is_anonymous = 0 OR p.is_anonymous IS NULL) AND u.is_active = 1 AND u.is_banned = 0 ${statusClause}
 			ORDER BY p.created_at DESC LIMIT ? OFFSET ?
 		`
 			)
-			.all(userId, userId, action, action, limit, offset);
+			.all(userId || 0, userId || 0, userId || 0, action, action, limit, offset);
 
 		const mediaMap = await fetchPostMedia(
 			db,
@@ -407,6 +433,91 @@ export async function GET({ request, url, params }) {
 		return json({ posts });
 	}
 
+	// ── /api/users/:action/reposts ──
+	if (action && subaction === 'reposts') {
+		const userId = await optionalAuth(request);
+		const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
+		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 10));
+		const offset = (page - 1) * limit;
+
+		const targetUser = await db
+			.prepare(
+				'SELECT id, username, display_name, avatar_url FROM users WHERE (username = ? OR CAST(id AS TEXT) = ?) AND is_active = 1 AND is_banned = 0'
+			)
+			.get(action, action);
+
+		if (!targetUser) {
+			return json({ reposts: [], posts: [] });
+		}
+
+		const isOwner = Boolean(userId && targetUser.id === userId);
+		const privacyClause = isOwner ? '' : "AND (p.privacy = 'public' OR p.user_id = ?)";
+
+		const queryParams = [userId || 0, userId || 0, userId || 0, targetUser.id];
+
+		if (!isOwner) {
+			queryParams.push(userId || 0);
+		}
+
+		queryParams.push(limit, offset);
+
+		const posts = await db
+			.prepare(
+				`
+			SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level,
+				COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
+				ps.created_at AS reposted_at,
+				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_text,
+				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_color,
+				(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
+				(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+				(SELECT COUNT(*) FROM post_shares ps2 WHERE ps2.post_id = p.id AND ps2.user_id = ?) > 0 as user_shared
+			FROM post_shares ps
+			JOIN posts p ON ps.post_id = p.id
+			JOIN users u ON p.user_id = u.id
+			LEFT JOIN user_roles ur ON ur.user_id = u.id
+			LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
+			WHERE ps.user_id = ?
+			  AND p.deleted_at IS NULL
+			  AND u.is_active = 1
+			  AND u.is_banned = 0
+			  ${privacyClause}
+			ORDER BY ps.created_at DESC
+			LIMIT ? OFFSET ?
+		`
+			)
+			.all(...queryParams);
+
+		const mediaMap = await fetchPostMedia(
+			db,
+			posts.map((p) => p.id)
+		);
+		posts.forEach((p) => {
+			parsePostMetadata(p);
+			p.media = mediaMap[p.id] || [];
+			anonymizePost(p, userId);
+			p.reposted_by = {
+				id: targetUser.id,
+				username: targetUser.username,
+				display_name: targetUser.display_name,
+				avatar_url: targetUser.avatar_url,
+				reposted_at: p.reposted_at
+			};
+		});
+
+		return json({ reposts: posts, posts });
+	}
+
+	// ── /api/users/anon-identity — identidad anónima permanente del usuario ──
+	if (action === 'anon-identity' && !subaction) {
+		const userId = await requireAuth(request);
+		const ident = await db
+			.prepare('SELECT id, anon_username, created_at FROM anon_identities WHERE user_id = ?')
+			.get(userId);
+		return json({ identity: ident || null });
+	}
+
 	// ── /api/users/:username — profile info ──
 	if (action) {
 		const user = await db
@@ -416,7 +527,7 @@ export async function GET({ request, url, params }) {
 				(SELECT COUNT(*) FROM follows f JOIN users u2 ON f.follower_id = u2.id WHERE f.following_id = u.id AND u2.is_active = 1 AND u2.is_banned = 0) AS follower_count, 
 				(SELECT COUNT(*) FROM follows f JOIN users u2 ON f.following_id = u2.id WHERE f.follower_id = u.id AND u2.is_active = 1 AND u2.is_banned = 0) AS following_count, 
 				u.post_count, u.is_verified, u.is_virtual, u.created_at,
-				u.level, u.xp_points, u.checkin_streak,
+				u.level, u.xp_points, u.checkin_streak, u.payment_link,
 				COALESCE(ur.role, u.role, 'user') AS role,
 				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_text,
 				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY id DESC LIMIT 1) AS title_color
@@ -464,6 +575,68 @@ export async function POST({ request, _url, params }) {
 	const subaction = parts[1] || '';
 	const userId = await requireAuth(request);
 	const db = getDb();
+
+	// ── POST /api/users/anon-identity — crea la identidad anónima permanente del usuario ──
+	// El username anónimo se elige UNA sola vez y queda fijo para siempre (como en Facebook, pero
+	// exclusivo: no puede repetirse con otros usuarios anónimos ni con cuentas normales).
+	if (action === 'anon-identity' && !subaction) {
+		const existing = await db
+			.prepare('SELECT anon_username FROM anon_identities WHERE user_id = ?')
+			.get(userId);
+		if (existing) {
+			return json(
+				{
+					error: 'Ya tienes una identidad anónima permanente: @' + existing.anon_username,
+					code: 'ANON_IDENTITY_EXISTS'
+				},
+				{ status: 409 }
+			);
+		}
+
+		const body = await request.json().catch(() => ({}));
+		const anonUsername = String(body.username || '').trim();
+		const usernameRe = /^[a-zA-Z0-9_]{3,24}$/;
+		if (!usernameRe.test(anonUsername)) {
+			return json(
+				{ error: 'El nombre anónimo debe tener 3-24 caracteres (letras, números o guion bajo).' },
+				{ status: 400 }
+			);
+		}
+		const lower = anonUsername.toLowerCase();
+		if (['anonimo', 'anonymous', 'usuario', 'admin', 'vsocial', 'anon'].includes(lower)) {
+			return json(
+				{ error: 'Ese nombre anónimo no está disponible. Prueba con otro.' },
+				{ status: 400 }
+			);
+		}
+
+		// Exclusivo: no puede chocar con identidades anónimas ni con usernames normales
+		const clashAnon = await db
+			.prepare('SELECT 1 FROM anon_identities WHERE LOWER(anon_username) = LOWER(?)')
+			.get(anonUsername);
+		const clashUser = await db
+			.prepare('SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)')
+			.get(anonUsername);
+		if (clashAnon || clashUser) {
+			return json({ error: 'Ese nombre anónimo ya está en uso. Elige otro.' }, { status: 409 });
+		}
+
+		try {
+			const result = await db
+				.prepare('INSERT INTO anon_identities (user_id, anon_username) VALUES (?, ?)')
+				.run(userId, anonUsername);
+			return json({
+				success: true,
+				identity: { id: Number(result.lastInsertRowid), anon_username: anonUsername },
+				message: 'Identidad anónima creada: @' + anonUsername
+			});
+		} catch (e) {
+			if (String(e.message).includes('UNIQUE')) {
+				return json({ error: 'Ese nombre anónimo ya está en uso. Elige otro.' }, { status: 409 });
+			}
+			return json({ error: 'Error al crear la identidad anónima.' }, { status: 500 });
+		}
+	}
 
 	// ── POST /api/users/delete-account (RGPD: borrado self-service con ventana de 30 días) ──
 	if (action === 'delete-account' && !subaction) {
@@ -634,6 +807,13 @@ export async function PUT({ request, _url, params }) {
 			'gender',
 			'birth_date'
 		];
+		// Enlace P2P de cobro externo — validado en cliente y servidor
+		if ('payment_link' in body) {
+			const { validatePaymentLink } = await import('$lib/validators.js');
+			const v = validatePaymentLink(body.payment_link);
+			if (!v.ok) return json({ error: v.error }, { status: 400 });
+			allowedFields.push('payment_link');
+		}
 		const updates = [];
 		const vals = [];
 		for (const f of allowedFields) {
@@ -667,13 +847,49 @@ export async function PUT({ request, _url, params }) {
 				`
 			SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url,
 				u.bio, u.location, u.website, u.category, u.is_verified,
-				u.follower_count, u.following_count, u.wallet_balance,
+				u.follower_count, u.following_count, u.payment_link,
+				u.custom_status, u.custom_status_text, u.custom_status_expires_at,
 				COALESCE(ur.role, u.role, 'user') AS role
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE u.id = ? LIMIT 1
 		`
 			)
 			.get(userId);
 		return json({ success: true, user: updatedUser });
+	}
+
+	// PUT /api/users/me/status
+	if (action === 'me' && parts[1] === 'status') {
+		const { custom_status, custom_status_text, duration_minutes } = body;
+
+		let expires_at = null;
+		if (duration_minutes && duration_minutes !== 'forever') {
+			const date = new Date();
+			date.setMinutes(date.getMinutes() + parseInt(duration_minutes, 10));
+			expires_at = date.toISOString().slice(0, 19).replace('T', ' ');
+		}
+
+		await db
+			.prepare(
+				`UPDATE users SET custom_status = ?, custom_status_text = ?, custom_status_expires_at = ? WHERE id = ?`
+			)
+			.run(custom_status || 'online', custom_status_text || null, expires_at, userId);
+
+		// Import dynamically to avoid circular dependencies if any, though socket.js should be fine.
+		// We'll call broadcastPresence manually after we export it from socket.js
+		try {
+			const { broadcastPresence } = await import('$lib/server/socket.js');
+			await broadcastPresence(db, userId, true);
+		} catch (e) {
+			console.error('Failed to broadcast custom status:', e);
+		}
+
+		return json({
+			success: true,
+			message: 'Status updated',
+			custom_status,
+			custom_status_text,
+			expires_at
+		});
 	}
 
 	// PUT /api/users/me/customization

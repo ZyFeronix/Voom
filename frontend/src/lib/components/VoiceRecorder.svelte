@@ -262,8 +262,8 @@
 		background: rgba(255, 255, 255, 0.05);
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
-		border: 1px solid rgba(27, 133, 243, 0.5);
-		border-radius: 20px;
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.5);
+		border-radius: var(--radius-md);
 		padding: 2px 4px 2px 2px;
 		gap: 4px;
 		box-shadow:
@@ -321,7 +321,8 @@
 		width: 10px;
 		height: 10px;
 		background-color: #ef4444; /* red-500 */
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
 		animation: pulse 1.5s infinite ease-in-out;
 	}
@@ -348,7 +349,8 @@
 		max-width: 32px !important;
 		max-height: 32px !important;
 		flex: 0 0 32px !important;
-		border-radius: 50% !important;
+		border-radius: var(--radius-squircle) !important;
+		corner-shape: squircle !important;
 		border: none !important;
 		cursor: pointer;
 		transition: all var(--t-fast);
@@ -373,12 +375,12 @@
 
 	.stop-btn {
 		background: linear-gradient(135deg, var(--aero-sky), var(--aero-blue));
-		box-shadow: 0 4px 12px rgba(27, 133, 243, 0.3);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.3);
 	}
 
 	.stop-btn:hover {
 		transform: scale(1.05);
-		box-shadow: 0 6px 16px rgba(27, 133, 243, 0.5);
+		box-shadow: 0 6px 16px rgba(var(--accent-blue-rgb), 0.5);
 	}
 
 	@keyframes pulse {
@@ -431,7 +433,7 @@
 		border: 1px solid var(--glass-border);
 		color: var(--text-primary);
 		padding: 6px 12px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		font-size: 0.85rem;
 		outline: none;
 		display: flex;
@@ -444,7 +446,7 @@
 	}
 
 	.variant-compact .custom-select-trigger {
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		padding: 8px 16px;
 	}
 
@@ -468,15 +470,15 @@
 
 	.custom-dropdown-menu {
 		width: 100%;
-		background: rgba(15, 23, 42, 0.85);
+		background: var(--bg-surface-solid, #ffffff);
 		backdrop-filter: blur(16px);
 		-webkit-backdrop-filter: blur(16px);
-		border: 1px solid var(--glass-border);
-		border-radius: 16px;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
 		padding: 6px;
 		box-shadow:
-			0 10px 30px rgba(0, 0, 0, 0.4),
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
+			0 10px 30px rgba(0, 0, 0, 0.18),
+			inset 0 1px 0 var(--glass-border-t, rgba(255, 255, 255, 0.2));
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -490,7 +492,7 @@
 		border: none;
 		color: var(--text-secondary);
 		padding: 8px 12px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		font-size: 0.85rem;
 		text-align: left;
@@ -499,13 +501,13 @@
 	}
 
 	.dropdown-item:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		color: var(--text-primary);
 	}
 
 	.dropdown-item.active {
-		background: rgba(27, 133, 243, 0.15);
-		color: var(--aero-sky);
+		background: rgba(var(--accent-blue-rgb), 0.15);
+		color: var(--accent-blue-base);
 	}
 
 	.dropdown-item .check-icon {

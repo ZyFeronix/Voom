@@ -5,9 +5,10 @@
 	import { messages as messagesApi, posts as postsApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
-	import { twemojiAction } from '$lib/actions/twemoji.js';
-	import VoiceRecorder from '$lib/components/VoiceRecorder.svelte';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
+	import { twemojiAction } from '$lib/actions/twemoji.js';
+	import { parseMsnEmotes } from '$lib/data/msnEmoticons.js';
+	import VoiceRecorder from '$lib/components/VoiceRecorder.svelte';
 
 	let conversations = $state([]);
 	let activeConvId = $state(null);
@@ -624,7 +625,21 @@
 													</div>
 												{/if}
 												{#if msg.body || msg.content}
-													<div>{msg.body || msg.content}</div>
+													<div>
+														{#each parseMsnEmotes(msg.body || msg.content) as part}
+															{#if part.type === 'emote'}
+																<img
+																	class="msn-emoji-render"
+																	src={part.url}
+																	alt={part.code}
+																	title={part.code}
+																	style="width: 1.8em; height: 1.8em; vertical-align: middle; margin: 0 2px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15)); image-rendering: pixelated;"
+																/>
+															{:else}
+																{part.text || part.content}
+															{/if}
+														{/each}
+													</div>
 												{/if}
 											{/if}
 										</div>
@@ -666,7 +681,7 @@
 												src={activeConv.peer_avatar}
 												alt=""
 												class="qc-peer-mini-avatar"
-												style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-right:6px;"
+												style="width:24px;height:24px;border-radius: var(--radius-squircle); corner-shape: squircle;object-fit:cover;flex-shrink:0;margin-right:6px;"
 												width="24"
 												height="24"
 												loading="lazy"
@@ -675,7 +690,7 @@
 										{:else}
 											<div
 												class="qc-peer-mini-avatar"
-												style="width:24px;height:24px;border-radius:50%;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.6rem;flex-shrink:0;margin-right:6px;"
+												style="width:24px;height:24px;border-radius: var(--radius-squircle); corner-shape: squircle;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.6rem;flex-shrink:0;margin-right:6px;"
 											>
 												{getInitials(activeConv?.peer_display_name || activeConv?.peer_username)}
 											</div>
@@ -765,7 +780,7 @@
 		gap: 4px;
 		align-items: center;
 		padding: 8px 12px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		border-bottom-left-radius: 2px;
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
@@ -773,7 +788,8 @@
 	.qc-dot {
 		width: 5px;
 		height: 5px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-sky);
 		animation: qc-wave 1.3s linear infinite;
 	}
@@ -862,13 +878,13 @@
 	.qc-conv-list::-webkit-scrollbar-track,
 	.qc-messages::-webkit-scrollbar-track {
 		background: var(--scrollbar-track);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 	}
 
 	.qc-conv-list::-webkit-scrollbar-thumb,
 	.qc-messages::-webkit-scrollbar-thumb {
 		background: rgba(14, 165, 233, 0.25); /* Gel cyan/skyblue para Modo Día */
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 	}
 
 	.qc-conv-list::-webkit-scrollbar-thumb:hover,
@@ -893,7 +909,7 @@
 		align-items: center;
 		gap: 10px;
 		padding: 8px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		border: none;
 		background: transparent;
 		cursor: pointer;
@@ -913,7 +929,8 @@
 	.qc-conv-avatar-img {
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		object-fit: cover;
 		border: 1px solid var(--glass-border);
 	}
@@ -921,7 +938,8 @@
 	.qc-conv-avatar-fallback {
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: linear-gradient(135deg, rgba(46, 134, 232, 0.3), rgba(0, 229, 255, 0.2));
 		border: 1px solid var(--glass-border);
 		display: flex;
@@ -938,7 +956,8 @@
 		right: 0;
 		width: 9px;
 		height: 9px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: #22c55e;
 		border: 2px solid var(--bg-surface);
 	}
@@ -991,7 +1010,7 @@
 		font-size: 0.6rem;
 		font-weight: 700;
 		padding: 2px 6px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		min-width: 18px;
 		text-align: center;
 		flex-shrink: 0;
@@ -1018,7 +1037,8 @@
 	.skel-avatar {
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		flex-shrink: 0;
 		background: rgba(255, 255, 255, 0.06);
 		background-image: linear-gradient(
@@ -1040,7 +1060,7 @@
 
 	.skel-line {
 		height: 10px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		background: rgba(255, 255, 255, 0.06);
 		background-image: linear-gradient(
 			90deg,
@@ -1085,14 +1105,15 @@
 		padding: 10px 12px;
 		border-bottom: 1px solid var(--glass-border);
 		background: rgba(255, 255, 255, 0.03);
-		border-radius: 20px 20px 0 0;
+		border-radius: var(--radius-md) 20px var(--radius-xs) var(--radius-xs);
 		flex-shrink: 0;
 	}
 
 	.qc-back-btn {
 		width: 28px;
 		height: 28px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		border: none;
 		background: transparent;
 		color: var(--text-muted);
@@ -1121,7 +1142,8 @@
 	.qc-peer-avatar {
 		width: 26px;
 		height: 26px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		object-fit: cover;
 		flex-shrink: 0;
 	}
@@ -1129,7 +1151,8 @@
 	.qc-peer-avatar-fallback {
 		width: 26px;
 		height: 26px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(46, 134, 232, 0.2);
 		display: flex;
 		align-items: center;
@@ -1211,7 +1234,7 @@
 
 	.qc-msg-skel-bubble {
 		height: 32px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		background: rgba(255, 255, 255, 0.06);
 		background-image: linear-gradient(
 			90deg,
@@ -1304,7 +1327,7 @@
 
 	.qc-bubble {
 		padding: 7px 12px;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		font-size: 0.76rem;
 		line-height: 1.45;
 		word-break: break-word;
@@ -1345,7 +1368,8 @@
 		-webkit-user-select: none;
 		cursor: pointer;
 		padding: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1371,7 +1395,7 @@
 	.delete-confirm-inline {
 		background: rgba(15, 23, 42, 0.95);
 		border: 1px solid var(--rose-500, #f43f5e);
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		padding: 10px;
 		margin-top: 4px;
 		font-size: 0.8rem;
@@ -1387,7 +1411,7 @@
 		color: var(--rose-400, #fb7185);
 		border: 1px solid rgba(244, 63, 94, 0.3);
 		padding: 6px 12px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		cursor: pointer;
 		font-weight: 600;
 		transition: all 0.2s;
@@ -1399,10 +1423,10 @@
 	}
 	.btn-cancel-del {
 		background: transparent;
-		color: #94a3b8;
-		border: 1px solid #334155;
+		color: var(--text-muted, #7ba6b0);
+		border: 1px solid var(--border-subtle, rgba(14, 165, 233, 0.25));
 		padding: 6px 12px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		cursor: pointer;
 		font-weight: 600;
 		transition: all 0.2s;
@@ -1421,7 +1445,7 @@
 	}
 	.qc-reaction-tag {
 		padding: 2px 5px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		background: rgba(0, 229, 255, 0.06);
 		border: 1px solid rgba(0, 119, 255, 0.1);
 		font-size: 0.65rem;
@@ -1455,7 +1479,8 @@
 		flex: 0 0 44px;
 		min-width: 44px;
 		min-height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		border: none;
 		background: transparent;
 		display: flex;
@@ -1477,7 +1502,7 @@
 		min-width: 0;
 		height: 44px;
 		padding: 0 16px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		background: rgba(255, 255, 255, 0.06);
 		border: 1px solid var(--glass-border);
 		color: var(--text-primary);
@@ -1501,7 +1526,8 @@
 		flex: 0 0 44px;
 		min-width: 44px;
 		min-height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--grad-primary);
 		border: none;
 		color: #fff;
@@ -1539,7 +1565,7 @@
 	:global(.qc-messages::-webkit-scrollbar-thumb),
 	:global(.qc-conv-list::-webkit-scrollbar-thumb) {
 		background: rgba(46, 134, 232, 0.8) !important;
-		border-radius: 6px !important;
+		border-radius: var(--radius-xs) !important;
 		border: none !important;
 	}
 	:global(.qc-messages::-webkit-scrollbar-thumb:hover),

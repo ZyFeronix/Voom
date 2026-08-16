@@ -115,7 +115,7 @@
 		right: 0;
 		height: 50%;
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 100%);
-		border-radius: 9999px 9999px 0 0;
+		border-radius: 9999px 9999px var(--radius-xs) var(--radius-xs);
 		pointer-events: none;
 	}
 

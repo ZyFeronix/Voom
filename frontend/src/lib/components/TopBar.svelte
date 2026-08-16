@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 
@@ -10,6 +11,12 @@
 	let dropdownOpen = $state(false);
 	let dropdownRef = $state(null);
 	let searchWrapRef = $state(null);
+
+	// Presencia → variante del anillo aero (mismo mapeo que en el SideNav)
+	const _avatarPresence = $derived.by(() => {
+		const s = authStore.user?.custom_status || 'online';
+		return s === 'invisible' || s === 'offline' ? 'is-offline' : `is-${s}`;
+	});
 	let recentSearches = $state([]);
 	let searchResults = $state({ users: [], posts: [] });
 	let isSearching = $state(false);
@@ -156,7 +163,7 @@
 											<img
 												src={user.avatar_url}
 												alt={user.username}
-												style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
+												style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
 												width="36"
 												height="36"
 												loading="lazy"
@@ -164,7 +171,7 @@
 											/>
 										{:else}
 											<div
-												style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
+												style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
 											>
 												{(user.display_name || user.username)[0].toUpperCase()}
 											</div>
@@ -187,13 +194,13 @@
 							<div class="vs-search-recent-list">
 								{#each searchResults.posts as post}
 									<a
-										href={`/post/${post.id}`}
+										href={`/posts/${post.id}`}
 										class="vs-search-recent-item"
 										onclick={() => (searchFocused = false)}
 									>
 										<span
 											class="material-icons-round text-muted"
-											style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: 50%;"
+											style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: var(--radius-squircle); corner-shape: squircle;"
 											>article</span
 										>
 										<span class="vs-search-item-text"
@@ -252,7 +259,7 @@
 										<img
 											src={item.avatar_url}
 											alt={item.username}
-											style="width:36px;height:36px;border-radius:50%;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
+											style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
 											width="36"
 											height="36"
 											loading="lazy"
@@ -260,7 +267,7 @@
 										/>
 									{:else}
 										<div
-											style="width:36px;height:36px;border-radius:50%;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
+											style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
 										>
 											{(item.display_name || item.username)[0].toUpperCase()}
 										</div>
@@ -295,22 +302,14 @@
 		{#if authStore.user}
 			<div class="vs-avatar-wrap" bind:this={dropdownRef}>
 				<button class="vs-avatar-btn" onclick={toggleDropdown} aria-expanded={dropdownOpen}>
-					{#if authStore.user.avatar_url}
-						<img
-							src={authStore.user.avatar_url}
-							alt={authStore.user.username}
-							class="vs-avatar-img"
-							width="34"
-							height="34"
-							loading="lazy"
-							decoding="async"
-						/>
-					{:else}
-						<span class="vs-avatar-initial">
-							{(authStore.user.display_name || authStore.user.username || '?')[0].toUpperCase()}
-						</span>
-					{/if}
-					<span class="vs-avatar-online"></span>
+					<AeroAvatar
+						src={authStore.user.avatar_url}
+						alt={authStore.user.username}
+						size="sm"
+						online={authStore.user?.custom_status === 'online' || !authStore.user?.custom_status}
+						away={authStore.user?.custom_status === 'away'}
+						busy={authStore.user?.custom_status === 'busy'}
+					/>
 				</button>
 
 				{#if dropdownOpen}
@@ -321,7 +320,10 @@
 								<p class="vs-dd-handle">@{authStore.user.username}</p>
 							</div>
 							<div class="vs-dropdown-divider"></div>
-							<a href={`/u/${authStore.user.username}`} class="vs-dd-item">
+							<a
+								href={authStore.user?.username ? `/u/${authStore.user.username}` : '/settings'}
+								class="vs-dd-item"
+							>
 								<span class="material-icons-round" style="font-size:20px">person</span>
 								Mi Perfil
 							</a>
@@ -329,6 +331,15 @@
 								<span class="material-icons-round" style="font-size:20px">settings</span>
 								Ajustes
 							</a>
+							{#if authStore.isTeamOrHigher}
+								<a href="/studio/emotes" class="vs-dd-item vs-dd-team">
+									<span
+										class="material-icons-round"
+										style="font-size:20px; color: var(--aero-mint);">military_tech</span
+									>
+									Estudio Emotes (EXP)
+								</a>
+							{/if}
 							{#if authStore.isAdmin}
 								<a href="/admin" class="vs-dd-item vs-dd-admin">
 									<span class="material-icons-round" style="font-size:20px"
@@ -361,7 +372,7 @@
 	.vs-topbar {
 		position: sticky;
 		top: 0;
-		z-index: var(--z-sticky, 200);
+		z-index: 500;
 		height: 58px;
 		display: flex;
 		align-items: center;
@@ -450,12 +461,12 @@
 		top: calc(100% + 10px);
 		left: 0;
 		right: 0;
-		background: var(--bg-surface);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid var(--glass-border-t);
+		background: var(--bg-surface-solid);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow-lg);
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
 		padding: 8px 0;
 		z-index: var(--z-dropdown, 100);
 		overflow: hidden;
@@ -549,7 +560,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		transition: all var(--t-fast);
 	}
 	.vs-search-item-remove:hover {
@@ -625,72 +637,33 @@
 		position: relative;
 		display: flex;
 	}
-	.vs-avatar-img {
-		width: 34px;
-		height: 34px;
-		border-radius: 50%;
-		object-fit: cover;
-		border: 2px solid var(--glass-border-t);
-		box-shadow: var(--shadow-xs);
-		transition:
-			transform var(--t-spring),
-			box-shadow var(--t-base);
-	}
-	.vs-avatar-btn:hover .vs-avatar-img {
-		transform: scale(1.06);
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.22);
-	}
-	.vs-avatar-initial {
-		width: 34px;
-		height: 34px;
-		border-radius: 50%;
-		background: var(--grad-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #fff;
-		font-weight: 700;
-		font-size: 0.84rem;
-		border: 2px solid rgba(255, 255, 255, 0.5);
-		transition: transform var(--t-spring);
-	}
-	.vs-avatar-btn:hover .vs-avatar-initial {
-		transform: scale(1.06);
-	}
-	.vs-avatar-online {
-		position: absolute;
-		bottom: 1px;
-		right: 1px;
-		width: 9px;
-		height: 9px;
-		border-radius: 50%;
-		background: var(--aero-mint);
-		border: 2px solid var(--bg-canvas);
-	}
 
 	/* ─── Dropdown ──────────────────────────────── */
 	.vs-dropdown {
 		position: absolute;
 		top: calc(100% + 10px);
 		right: 0;
-		z-index: var(--z-dropdown, 100);
-		min-width: 200px;
+		z-index: 1000;
+		min-width: 210px;
 		animation: slideInUp 0.22s var(--ease-out) both;
 
-		background: var(--bg-surface);
+		background: var(--bg-surface-solid);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid var(--glass-border-t);
+		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-lg);
-		box-shadow: var(--shadow-lg);
+		box-shadow:
+			0 16px 40px rgba(0, 0, 0, 0.25),
+			0 2px 8px rgba(0, 0, 0, 0.08);
 		will-change: transform, opacity;
 	}
 	.vs-dropdown-inner {
-		padding: 12px;
+		padding: 10px;
 		border-radius: var(--radius-lg);
+		color: var(--text-primary);
 	}
 	.vs-dropdown-header {
-		padding: 4px 12px 14px;
+		padding: 6px 12px 12px;
 	}
 	.vs-dd-name {
 		font-size: 0.98rem;
@@ -705,21 +678,22 @@
 	.vs-dropdown-divider {
 		height: 1px;
 		background: var(--border-subtle);
-		margin: 4px 0;
+		margin: 6px 0;
 	}
 	.vs-dd-item {
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		padding: 10px 14px;
+		padding: 10px 12px;
 		border-radius: var(--radius-sm);
 		font-size: 0.94rem;
 		line-height: 1;
-		color: var(--text-secondary);
+		color: var(--text-primary);
 		text-decoration: none;
 		transition:
 			background var(--t-fast),
-			color var(--t-fast);
+			color var(--t-fast),
+			transform 0.15s var(--ease-spring);
 		cursor: pointer;
 		width: 100%;
 		border: none;
@@ -728,31 +702,32 @@
 		font-family: var(--font-sans);
 	}
 	.vs-dd-item:hover {
-		background: rgba(46, 134, 232, 0.08);
-		color: var(--aero-blue);
+		background: var(--bg-surface-hover);
+		color: var(--accent-blue-base);
+		transform: translateX(2px);
 	}
 	.vs-dd-admin {
 		color: var(--aero-amber);
 	}
 	.vs-dd-admin:hover {
-		background: rgba(232, 160, 35, 0.08);
+		background: rgba(232, 160, 35, 0.12);
 		color: var(--aero-amber);
 	}
 	.vs-dd-logout {
 		color: var(--aero-rose);
 	}
 	.vs-dd-logout:hover {
-		background: rgba(232, 74, 114, 0.08);
+		background: rgba(232, 74, 114, 0.12);
 		color: var(--aero-rose);
 	}
 
 	@keyframes glowPulse {
 		0%,
 		100% {
-			box-shadow: 0 2px 6px rgba(232, 74, 114, 0.35);
+			opacity: 0.35;
 		}
 		50% {
-			box-shadow: 0 2px 10px rgba(232, 74, 114, 0.55);
+			opacity: 1;
 		}
 	}
 

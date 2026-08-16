@@ -239,7 +239,7 @@
 		max-height: 200px;
 		overflow-y: auto;
 		padding: 4px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		background: var(--bg-panel, rgba(15, 23, 42, 0.9));
 		backdrop-filter: blur(12px);
 		-webkit-backdrop-filter: blur(12px);
@@ -253,7 +253,7 @@
 		padding: 8px 12px;
 		background: transparent;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		color: var(--text-primary);
 		font-size: 0.88rem;
 		cursor: pointer;

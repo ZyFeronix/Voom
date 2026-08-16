@@ -115,7 +115,10 @@ export const posts = {
 	restore: (id) => post(`/posts/${id}/restore`, {}),
 	like: (id) => post(`/posts/${id}/like`, {}),
 	unlike: (id) => del(`/posts/${id}/like`),
-	share: (id, data) => post(`/posts/${id}/share`, data),
+	share: (id, data = {}) => post(`/posts/${id}/share`, data),
+	unshare: (id) => del(`/posts/${id}/share`),
+	repost: (id, data = {}) => post(`/posts/${id}/share`, data),
+	unrepost: (id) => del(`/posts/${id}/share`),
 	save: (id) => post(`/posts/${id}/save`, {}),
 	unsave: (id) => del(`/posts/${id}/save`),
 	comments: {
@@ -141,6 +144,10 @@ export const users = {
 		const qs = new URLSearchParams(params).toString();
 		return get(`/users/${username}/posts${qs ? '?' + qs : ''}`);
 	},
+	reposts: (username, params = {}) => {
+		const qs = new URLSearchParams(params).toString();
+		return get(`/users/${username}/reposts${qs ? '?' + qs : ''}`);
+	},
 	follow: (username) => post(`/users/${username}/follow`, {}),
 	unfollow: (username) => del(`/users/${username}/follow`),
 	followers: (username, params = {}) => {
@@ -164,6 +171,11 @@ export const users = {
 		update: (data) => put('/users/settings', data)
 	},
 	suggestedCreators: () => get('/users/suggested'),
+	// Identidad anónima permanente (username exclusivo para posts/comentarios anónimos)
+	anonIdentity: {
+		get: () => get('/users/anon-identity'),
+		create: (username) => post('/users/anon-identity', { username })
+	},
 	// RGPD: borrado de cuenta (soft-delete con ventana de 30 días)
 	deleteAccount: (password) => post('/users/delete-account', { password }),
 	// RGPD: exportación de datos — devuelve la Response cruda para .blob()
@@ -209,6 +221,7 @@ export const reels = {
 	like: (id) => post(`/reels/${id}/like`, {}),
 	unlike: (id) => del(`/reels/${id}/like`),
 	view: (id) => post(`/reels/${id}/view`, {}),
+	share: (id) => post(`/reels/${id}/share`, {}),
 	delete: (id) => del(`/reels/${id}`),
 	comments: {
 		list: (id, params = {}) => {
@@ -237,9 +250,12 @@ export const messages = {
 	},
 	markRead: (convId, msgId) => post(`/messages/conversations/${convId}/read/${msgId}`, {}),
 	send: (convId, data) => post(`/messages/conversations/${convId}/messages`, data),
+	edit: (msgId, body) => put(`/messages/${msgId}`, { body }),
 	delete: (msgId) => del(`/messages/${msgId}`),
 	react: (msgId, emoji) => post(`/messages/${msgId}/reactions`, { emoji }),
 	typing: (convId) => post(`/messages/conversations/${convId}/typing`, {}),
+	pin: (convId) => post(`/messages/conversations/${convId}/pin`, {}),
+	mute: (convId) => post(`/messages/conversations/${convId}/mute`, {}),
 	unreadCount: () => get('/messages/unread-count')
 };
 
@@ -303,6 +319,21 @@ export const admin = {
 		},
 		resolve: (id, data) => post(`/admin/reports/${id}`, data)
 	},
+	verifications: {
+		list: (params = {}) => {
+			const qs = new URLSearchParams(params).toString();
+			return get(`/admin/verifications${qs ? '?' + qs : ''}`);
+		},
+		review: (id, data) => post(`/admin/verifications/${id}`, data)
+	},
+	strikes: {
+		list: (params = {}) => {
+			const qs = new URLSearchParams(params).toString();
+			return get(`/admin/strikes${qs ? '?' + qs : ''}`);
+		},
+		issue: (data) => post('/admin/strikes/issue', data),
+		unmute: (userId) => post('/admin/strikes/unmute', { user_id: userId })
+	},
 	content: {
 		list: (params = {}) => {
 			const qs = new URLSearchParams(params).toString();
@@ -319,18 +350,14 @@ export const admin = {
 };
 
 // ---------------------------------------------------------------------------
-// Wallet API
+// Verification API
 // ---------------------------------------------------------------------------
-export const wallet = {
-	balance: () => get('/wallet'),
-	transactions: (params = {}) => {
+export const verification = {
+	apply: (data) => post('/verification/apply', data),
+	status: (params = {}) => {
 		const qs = new URLSearchParams(params).toString();
-		return get(`/wallet/transactions${qs ? '?' + qs : ''}`);
-	},
-	transfer: (data) => post('/wallet/transfer', data),
-	tip: (data) => post('/wallet/tip', data),
-	deposit: (data) => post('/wallet/deposit', data),
-	withdraw: (data) => post('/wallet/withdraw', data)
+		return get(`/verification/status${qs ? '?' + qs : ''}`);
+	}
 };
 
 // ---------------------------------------------------------------------------
@@ -360,6 +387,19 @@ export const activity = {
 };
 
 // ---------------------------------------------------------------------------
+// Custom Assets API (Emotes, Stickers, Emojis, GIFs)
+// ---------------------------------------------------------------------------
+export const customAssets = {
+	list: (params = {}) => {
+		const query = new URLSearchParams(params).toString();
+		return get(`/custom-assets${query ? `?${query}` : ''}`);
+	},
+	getSpecs: () => get('/custom-assets/specs'),
+	upload: (formData) => upload('/custom-assets', formData),
+	delete: (id) => del(`/custom-assets/${id}`)
+};
+
+// ---------------------------------------------------------------------------
 // Misc
 // ---------------------------------------------------------------------------
 export const health = () => get('/health');
@@ -375,9 +415,10 @@ export default {
 	marketplace,
 	notifications,
 	admin,
-	wallet,
+	verification,
 	search,
 	media,
 	activity,
+	customAssets,
 	health
 };

@@ -183,6 +183,39 @@ export async function initDb() {
 					`CREATE UNIQUE INDEX IF NOT EXISTS unique_activity_idx ON activity_logs (user_id, action_type, entity_id, entity_type)`
 				)
 				.catch(() => {});
+			// payment_link (enlace P2P de cobro externo) — idempotente para bases existentes
+			await rawClient
+				.execute('ALTER TABLE users ADD COLUMN payment_link VARCHAR(255)')
+				.catch(() => {});
+			// marketplace_reviews (reseñas de listados) — idempotente para bases existentes
+			await rawClient
+				.execute(
+					`CREATE TABLE IF NOT EXISTS marketplace_reviews (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						listing_id INTEGER NOT NULL REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+						user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+						rating INTEGER NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+						comment TEXT,
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+					)`
+				)
+				.catch(() => {});
+			await rawClient
+				.execute(
+					`CREATE TABLE IF NOT EXISTS listing_offers (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+						job_id INTEGER,
+						buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+						seller_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+						amount REAL NOT NULL,
+						message TEXT,
+						status VARCHAR(20) DEFAULT 'pending',
+						created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+						expires_at DATETIME
+					)`
+				)
+				.catch(() => {});
 		} else {
 			await rawClient.execute('PRAGMA foreign_keys = ON').catch(() => {});
 		}

@@ -3,6 +3,7 @@ const path = require('path');
 
 const readmePath = path.join(__dirname, '../README.md');
 const docsPath = path.join(__dirname, '../DOCS.md');
+const architecturePath = path.join(__dirname, '../ARCHITECTURE.md');
 const contributingPath = path.join(__dirname, '../CONTRIBUTING.md');
 const licensePath = path.join(__dirname, '../LICENSE');
 
@@ -15,6 +16,7 @@ if (!fs.existsSync(outDir)) {
 
 const readme = fs.readFileSync(readmePath, 'utf-8');
 const docs = fs.readFileSync(docsPath, 'utf-8');
+const architecture = fs.readFileSync(architecturePath, 'utf-8');
 const contributing = fs.readFileSync(contributingPath, 'utf-8');
 const licenseText = fs.readFileSync(licensePath, 'utf-8');
 
@@ -28,6 +30,7 @@ const fixSoulLinks = (str) =>
 
 const readmeClean = fixSoulLinks(readme);
 const docsClean = fixSoulLinks(docs);
+const architectureClean = fixSoulLinks(architecture);
 const contributingClean = fixSoulLinks(contributing);
 
 const html = `<!DOCTYPE html>
@@ -389,14 +392,15 @@ const html = `<!DOCTYPE html>
                 <div style="margin-top: 0.5rem;">
                     <div class="status-badge">
                         <div class="status-dot"></div>
-                        Alpha v0.5 - Glassmorphism 2.0
+                        Beta v0.6.0-beta.1 - Glassmorphism 2.0
                     </div>
                 </div>
             </div>
             
             <div class="tabs">
                 <button class="tab-btn active" data-target="readme">README</button>
-                <button class="tab-btn" data-target="docs">Arquitectura (DOCS)</button>
+                <button class="tab-btn" data-target="docs">DOCS (Maestro)</button>
+                <button class="tab-btn" data-target="architecture">Arquitectura</button>
                 <button class="tab-btn" data-target="contributing">Contributing</button>
                 <button class="tab-btn" data-target="license">Licencia</button>
             </div>
@@ -405,6 +409,7 @@ const html = `<!DOCTYPE html>
         <main>
             <div id="readme" class="content-panel active markdown-body"></div>
             <div id="docs" class="content-panel markdown-body"></div>
+            <div id="architecture" class="content-panel markdown-body"></div>
             <div id="contributing" class="content-panel markdown-body"></div>
             <div id="license" class="content-panel markdown-body">
                 <h1>Licencia y Protección Legal</h1>
@@ -451,6 +456,7 @@ const html = `<!DOCTYPE html>
     <!-- Raw Markdown Content (Escaped for JS Injection) -->
     <script type="text/markdown" id="md-readme">\n${readmeClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/markdown" id="md-docs">\n${docsClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-architecture">\n${architectureClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/markdown" id="md-contributing">\n${contributingClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/plain" id="raw-license-content">\n${licenseText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
 
@@ -516,6 +522,7 @@ const html = `<!DOCTYPE html>
 
                 renderMd('readme');
                 renderMd('docs');
+                renderMd('architecture');
                 renderMd('contributing');
 
                 // Populate raw license code block
@@ -564,7 +571,7 @@ const html = `<!DOCTYPE html>
                         const href = link.getAttribute('href');
                         if (!href) return;
 
-                        const isMdDoc = /^\\.?\\/?(README|DOCS|CONTRIBUTING)\\.md(#.*)?$/i.test(href);
+                        const isMdDoc = /^\\.?\\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING)\\.md(#.*)?$/i.test(href);
                         const isLicenseLink = /^(\\.\\/)?LICENSE$/i.test(href) || 
                                               href.includes('license.html') || 
                                               href.includes('/docs/license');
@@ -588,10 +595,10 @@ const html = `<!DOCTYPE html>
                                         targetTab = document.querySelector('.content-panel.active')?.id || 'readme';
                                     }
                                 } else {
-                                    const match = href.match(/^\\.?\\/?(README|DOCS|CONTRIBUTING)\\.md(#.*)?$/i);
+                                    const match = href.match(/^\\.?\\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING)\\.md(#.*)?$/i);
                                     if (match) {
                                         const name = match[1].toLowerCase();
-                                        targetTab = name === 'readme' ? 'readme' : name === 'docs' ? 'docs' : 'contributing';
+                                        targetTab = name === 'readme' ? 'readme' : name === 'docs' ? 'docs' : name === 'architecture' ? 'architecture' : 'contributing';
                                         if (match[2]) anchorId = match[2].substring(1);
                                     }
                                 }
@@ -618,7 +625,7 @@ const html = `<!DOCTYPE html>
                     const hash = window.location.hash.substring(1);
                     if (!hash) return;
 
-                    if (['readme', 'docs', 'contributing', 'license'].includes(hash)) {
+                    if (['readme', 'docs', 'architecture', 'contributing', 'license'].includes(hash)) {
                         switchTab(hash);
                         return;
                     }

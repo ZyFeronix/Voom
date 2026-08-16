@@ -6,6 +6,8 @@ import { initDb, getDb, getDriverInfo, getUploadsDir } from '$lib/server/db.js';
 import { decodeToken } from '$lib/server/jwt.js';
 import { existsSync, unlinkSync } from 'fs';
 import { resolve, basename } from 'path';
+import { batchUpdateReputations } from '$lib/server/author-reputation.js';
+import { batchScanSpamSignals } from '$lib/server/spam-heuristics.js';
 
 // Auto-initialize database on server start
 try {
@@ -171,7 +173,7 @@ function startCrons() {
 				}
 			}
 
-			// Hard-delete: ON DELETE CASCADE elimina wallets/transacciones, posts, comentarios,
+			// Hard-delete: ON DELETE CASCADE elimina posts, comentarios,
 			// messages, reacciones, follows, stories, reels, marketplace, gigs, activity_logs,
 			// notifications, oauth_accounts, check_ins, sesiones, ajustes, etc.
 			const ids = expired.map((u) => u.id);
@@ -185,24 +187,79 @@ function startCrons() {
 		}
 	}, 86_400_000);
 
+	// ── 7. Author Reputation Refresh (every 6 hours) ──
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			const count = await batchUpdateReputations(db, 150);
+			if (count > 0) {
+				console.log(`[cron] Updated reputation for ${count} active user(s)`);
+			}
+		} catch (err) {
+			console.error('[cron] Author reputation error:', err.message);
+		}
+	}, 21_600_000);
+
+	// ── 8. Spam & Bot Scanning (every 30 min) ──
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			const count = await batchScanSpamSignals(db);
+			if (count > 0) {
+				console.log(`[cron] Scanned ${count} recent active user(s) for spam heuristics`);
+			}
+		} catch (err) {
+			console.error('[cron] Spam scanning error:', err.message);
+		}
+	}, 1_800_000);
+
+	// ── 9. Feed Impressions Cleanup (daily: prune records older than 7 days) ──
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			const result = await db
+				.prepare("DELETE FROM feed_impressions WHERE seen_at < datetime('now', '-7 days')")
+				.run();
+			if (result.changes > 0) {
+				console.log(`[cron] Pruned ${result.changes} old feed impression record(s)`);
+			}
+		} catch (err) {
+			console.error('[cron] Feed impressions cleanup error:', err.message);
+		}
+	}, 86_400_000);
+
 	console.log('[boot] All cron workers started');
 }
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
 	const { pathname } = event.url;
-	let clientIp = 'unknown';
+	let clientIp = '127.0.0.1';
 	try {
 		clientIp = event.getClientAddress();
 	} catch (_e) {
 		const forwarded = event.request.headers.get('x-forwarded-for');
-		clientIp = forwarded ? forwarded.split(',')[0] : '127.0.0.1';
+		clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
 	}
 	const method = event.request.method;
 
+	const isLocalhost =
+		!clientIp ||
+		clientIp === '127.0.0.1' ||
+		clientIp === '::1' ||
+		clientIp === 'localhost' ||
+		clientIp === 'unknown' ||
+		clientIp.includes('127.0.0.1') ||
+		clientIp.startsWith('::ffff:127.');
+
 	// ── 1. In-Memory Rate Limiter (Token Bucket / Sliding Window) ──
-	if (pathname.startsWith('/api/') || method !== 'GET') {
+	if (
+		(pathname.startsWith('/api/') || method !== 'GET') &&
+		pathname !== '/api/gamification/heartbeat' &&
+		pathname !== '/api/health'
+	) {
 		let isStaff = false;
+		let authUserId = null;
 
 		// Intentar verificar rol mediante JWT (Bypass de Rate Limit para Staff)
 		try {
@@ -212,6 +269,7 @@ export async function handle({ event, resolve }) {
 				if (match) {
 					const decoded = decodeToken(match[1]);
 					if (decoded && decoded.user_id) {
+						authUserId = decoded.user_id;
 						const db = getDb();
 						const user = await db
 							.prepare(
@@ -241,20 +299,22 @@ export async function handle({ event, resolve }) {
 			// Ignorar errores de BD aquí; si falla, asume que no es staff y aplica rate limit.
 		}
 
-		if (!isStaff && clientIp !== '127.0.0.1' && clientIp !== '::1') {
+		if (!isStaff && !isLocalhost) {
+			const rateLimitKey = authUserId ? `usr:${authUserId}` : `ip:${clientIp}`;
+			const limitCap = authUserId ? 2000 : MAX_REQUESTS;
 			const now = Date.now();
-			const rlData = rateLimits.get(clientIp);
+			const rlData = rateLimits.get(rateLimitKey);
 
 			if (!rlData) {
-				rateLimits.set(clientIp, { count: 1, start: now });
+				rateLimits.set(rateLimitKey, { count: 1, start: now });
 			} else {
 				if (now - rlData.start > 60_000) {
 					// Reiniciar ventana tras 1 minuto
-					rateLimits.set(clientIp, { count: 1, start: now });
+					rateLimits.set(rateLimitKey, { count: 1, start: now });
 				} else {
 					rlData.count++;
-					if (rlData.count > MAX_REQUESTS) {
-						console.warn(`[security] Rate limit superado por IP: ${clientIp}`);
+					if (rlData.count > limitCap) {
+						console.warn(`[security] Rate limit superado por ${rateLimitKey}`);
 						return new Response(JSON.stringify({ error: 'Too Many Requests' }), {
 							status: 429,
 							headers: { 'Content-Type': 'application/json', 'Retry-After': '60' }
@@ -280,6 +340,16 @@ export async function handle({ event, resolve }) {
 			console.warn(`[security] CSRF Referer rechazado: ${referer} vs ${host}`);
 			return new Response('Forbidden - Invalid Referer', { status: 403 });
 		}
+	}
+
+	// ── URL Normalization & Aliases (/user/* -> /u/*, /u/user/* -> /u/*) ──
+	if (pathname.startsWith('/user/')) {
+		const target = '/u/' + pathname.slice(6) + (event.url.search || '');
+		return new Response('', { status: 302, headers: { Location: target } });
+	}
+	if (pathname.startsWith('/u/user/')) {
+		const target = '/u/' + pathname.slice(8) + (event.url.search || '');
+		return new Response('', { status: 302, headers: { Location: target } });
 	}
 
 	// ── Feature Flags Guard ──
@@ -394,15 +464,16 @@ export async function handle({ event, resolve }) {
 }
 
 /**
- * Global error handler — catches unhandled async errors from +server.js endpoints
+ * Global error handler — catches unhandled async errors from +server.js endpoints and page loads
  * This prevents unhandled promise rejections from crashing the server
  * and provides structured error responses to the client
  */
-export function handleError({ error, event }) {
+export function handleError({ error, event, status, message }) {
 	const err = error instanceof Error ? error : new Error(String(error));
 
 	// Log detailed error server-side for debugging
 	console.error(`[error] ${event.url.pathname}:`, {
+		status: status || err.status || 500,
 		message: err.message,
 		stack: err.stack?.split('\n').slice(0, 3).join('\n'),
 		method: event.request.method,
@@ -416,14 +487,31 @@ export function handleError({ error, event }) {
 		err.message.includes('DB all error')
 	) {
 		return {
-			status: 500,
-			message: 'Database operation failed'
+			message: 'Error en la base de datos'
 		};
+	}
+
+	// 404 Not Found
+	if (status === 404 || err.status === 404 || err.message?.toLowerCase().includes('not found')) {
+		return {
+			message: 'Página o recurso no encontrado'
+		};
+	}
+
+	// 403 Forbidden
+	if (status === 403 || err.status === 403) {
+		return {
+			message: 'Acceso no autorizado'
+		};
+	}
+
+	// Preserved message if explicitly passed
+	if (message && message !== 'Internal Error') {
+		return { message };
 	}
 
 	// Generic error: don't leak internal details to client
 	return {
-		status: 500,
-		message: 'Internal server error'
+		message: 'Error interno del servidor'
 	};
 }

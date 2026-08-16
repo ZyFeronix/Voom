@@ -29,8 +29,14 @@ export async function GET({ request, url }) {
 	const notifs = await db
 		.prepare(
 			`
-		SELECT n.*, u.username as actor_username, u.display_name as actor_name, u.avatar_url as actor_avatar
-		FROM notifications n LEFT JOIN users u ON n.actor_id = u.id
+		SELECT n.*,
+			CASE WHEN p.is_anonymous = 1 THEN COALESCE(ai.anon_username, 'anonimo') ELSE u.username END as actor_username,
+			CASE WHEN p.is_anonymous = 1 THEN COALESCE(ai.anon_username, 'Usuario Anónimo') ELSE u.display_name END as actor_name,
+			CASE WHEN p.is_anonymous = 1 THEN NULL ELSE u.avatar_url END as actor_avatar
+		FROM notifications n
+		LEFT JOIN users u ON n.actor_id = u.id
+		LEFT JOIN posts p ON (n.entity_type = 'post' AND n.entity_id = p.id)
+		LEFT JOIN anon_identities ai ON ai.user_id = n.actor_id
 		WHERE ${where} ORDER BY n.id DESC LIMIT ?
 	`
 		)

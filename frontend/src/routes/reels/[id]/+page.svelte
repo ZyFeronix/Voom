@@ -31,7 +31,7 @@
 	<!-- Botón volver -->
 	<button
 		onclick={() => history.back()}
-		class="absolute top-6 left-6 z-50 p-3 rounded-full bg-black/50 text-white hover:bg-black/70 backdrop-blur-md transition-all"
+		class="absolute top-6 left-6 z-50 p-3 squircle bg-black/50 text-white hover:bg-black/70 backdrop-blur-md transition-all"
 	>
 		<span class="material-icons-round">arrow_back</span>
 	</button>
@@ -63,11 +63,11 @@
 					<img
 						src={data.reel.avatar_url}
 						alt={data.reel.username}
-						class="w-10 h-10 rounded-full border border-white/20 object-cover"
+						class="w-10 h-10 squircle border border-white/20 object-cover"
 					/>
 				{:else}
 					<div
-						class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold border border-white/20"
+						class="w-10 h-10 squircle bg-gradient-to-br from-sky-400 to-cyan-500 flex items-center justify-center text-white font-bold border border-white/20"
 					>
 						{data.reel.username[0].toUpperCase()}
 					</div>

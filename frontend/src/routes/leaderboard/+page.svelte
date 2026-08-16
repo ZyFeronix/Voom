@@ -1,13 +1,13 @@
 <script>
-	import { fly, fade } from 'svelte/transition';
-	import { cubicOut } from 'svelte/easing';
+	import { fade } from 'svelte/transition';
 	import AuroraPillar from '$lib/components/gamification/AuroraPillar.svelte';
 	import LeaderboardTabs from '$lib/components/gamification/LeaderboardTabs.svelte';
 	import PodiumCard from '$lib/components/gamification/PodiumCard.svelte';
 	import LeaderboardRow from '$lib/components/gamification/LeaderboardRow.svelte';
 	import CurrentUserCard from '$lib/components/gamification/CurrentUserCard.svelte';
+	import { authStore } from '$lib/stores/auth.svelte.js';
 
-	let type = $state('level'); // Controls the {#key} content
+	let type = $state('level'); // Tipo de contenido visible (pilar, beacon, datos)
 	let activeTab = $state('level'); // Controls the UI tabs instantly
 	let users = $state([]);
 	let currentUserRank = $state(null);
@@ -15,17 +15,18 @@
 	let loading = $state(true);
 	let error = $state(null);
 
-	let isInitialLoad = $state(true);
-
-	// Cache for instant transitions
+	// Cache para cambios de pestaña instantáneos
 	let cache = $state({});
+
+	// Fade fluido al cambiar entre Niveles/Rachas (ver applyContent)
+	let contentEl = $state(undefined); // bind:this del contenedor de contenido
+	let contentPhase = $state(''); // '' | 'leaving' | 'entering'
+	let fadeToken = 0; // invalida fades obsoletos ante clics rápidos
+	let hasShown = $state(false); // el primer render aparece sin fade
 
 	async function fetchLeaderboard(targetType) {
 		if (cache[targetType]) {
-			users = cache[targetType].users;
-			currentUserRank = cache[targetType].currentUserRank;
-			currentUserData = cache[targetType].currentUserData;
-			type = targetType;
+			applyContent(targetType, cache[targetType]);
 			loading = false;
 			return;
 		}
@@ -37,17 +38,13 @@
 
 		error = null;
 		try {
-			const res = await fetch(`/api/gamification/leaderboard?type=${targetType}`);
+			const res = await fetch(`/api/gamification/leaderboard?type=${targetType}`, {
+				headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+			});
 			if (res.ok) {
 				const data = await res.json();
 				cache[targetType] = data;
-
-				if (activeTab === targetType) {
-					users = data.users || [];
-					currentUserRank = data.currentUserRank;
-					currentUserData = data.currentUserData;
-					type = targetType; // Triggers the slide transition!
-				}
+				applyContent(targetType, data);
 			} else {
 				if (activeTab === targetType && !cache[targetType]) {
 					error = 'No pudimos cargar la clasificación. Inténtalo de nuevo.';
@@ -65,7 +62,56 @@
 		}
 	}
 
-	import { onMount } from 'svelte';
+	// Aplica los datos de la pestaña con un fundido fluido. La transición corre
+	// sobre el elemento .lb-content PERSISTENTE: las transiciones CSS completan
+	// su estado final aunque el entorno congele el reloj de animación, y el
+	// temporizador de respaldo garantiza que el contenido NUNCA quede invisible
+	// a medias (si transitionend no se dispara, el timer termina la secuencia).
+	function applyContent(targetType, data) {
+		if (activeTab !== targetType) return;
+
+		if (!hasShown) {
+			// Primer render: el contenido aparece al instante (sin fade).
+			commitContent(targetType, data);
+			hasShown = true;
+			return;
+		}
+
+		const token = ++fadeToken;
+		contentPhase = 'leaving'; // funde a 0 (transición CSS)
+
+		let finished = false;
+		const finish = async () => {
+			if (finished || token !== fadeToken) return;
+			finished = true;
+			clearTimeout(fallback);
+
+			commitContent(targetType, data);
+
+			// Fundido de entrada con origen desplazado: el contenido nuevo entra
+			// desde la derecha. La clase intermedia se fuerza con un reflow antes
+			// de limpiarla para que la transición arranque desde esa posición.
+			contentPhase = 'entering';
+			await tick();
+			if (token !== fadeToken) return; // un clic más reciente tomó el control
+			void contentEl?.offsetHeight;
+			contentPhase = '';
+		};
+
+		// Acelerador en navegadores; en entornos donde transitionend no se
+		// dispara (webviews), el timer termina la secuencia igualmente.
+		contentEl?.addEventListener('transitionend', () => finish(), { once: true });
+		const fallback = setTimeout(finish, 380);
+	}
+
+	function commitContent(targetType, data) {
+		users = data.users || [];
+		currentUserRank = data.currentUserRank;
+		currentUserData = data.currentUserData;
+		type = targetType; // cambia el pilar, el acento del beacon y el contenido
+	}
+
+	import { onMount, tick } from 'svelte';
 	onMount(() => {
 		fetchLeaderboard(activeTab);
 	});
@@ -79,12 +125,8 @@
 
 	let showBeacon = $derived(!loading && currentUserData && currentUserRank);
 
-	let direction = $state(1);
-
 	function changeType(next) {
 		if (activeTab === next) return;
-		isInitialLoad = false;
-		direction = next === 'streak' ? 1 : -1;
 		activeTab = next;
 		fetchLeaderboard(next);
 	}
@@ -98,7 +140,7 @@
 	<AuroraPillar {type} />
 
 	<!-- Header -->
-	<header class="lb-header" in:fade={{ duration: 400 }}>
+	<header class="lb-header">
 		<p class="lb-eyebrow">Comunidad VSocial</p>
 		<h1 class="lb-title">Salón de la Fama</h1>
 		<p class="lb-subtitle">
@@ -109,19 +151,13 @@
 	</header>
 
 	<!-- Tabs -->
-	<div class="lb-tabs-row" in:fly={{ y: -18, duration: 400, delay: 100, easing: cubicOut }}>
+	<div class="lb-tabs-row">
 		<LeaderboardTabs type={activeTab} onChange={changeType} />
 	</div>
 
 	<div id="lb-panel" role="tabpanel" aria-labelledby="lb-tab-{type}" class="lb-panel">
 		{#if loading && users.length === 0}
-			<div
-				class="lb-loading"
-				in:fade={{ duration: 250, delay: 150 }}
-				out:fade={{ duration: 200 }}
-				aria-live="polite"
-				aria-busy="true"
-			>
+			<div class="lb-loading" aria-live="polite" aria-busy="true">
 				<div class="lb-spinner"></div>
 				<p>Cargando clasificación…</p>
 			</div>
@@ -139,69 +175,48 @@
 				<p class="lb-empty__text">Sé el primero en aparecer en esta clasificación.</p>
 			</div>
 		{:else}
-			{#key type}
-				<div
-					class="lb-content"
-					in:fly={{
-						x: isInitialLoad ? 0 : 40 * direction,
-						y: isInitialLoad ? 20 : 0,
-						duration: 450,
-						easing: cubicOut
-					}}
-					out:fly={{ x: isInitialLoad ? 0 : -40 * direction, duration: 300, easing: cubicOut }}
-				>
-					<!-- Podium -->
-					{#if top3.length > 0}
-						<div class="lb-podium" role="list" aria-label="Top 3">
-							{#each podiumOrder as user, idx (user.id)}
-								<div
-									class="lb-podium__slot lb-podium__slot--{getRank(user)}"
-									role="listitem"
-									in:fly={{
-										y: isInitialLoad ? 60 : 0,
-										duration: isInitialLoad ? 600 : 0,
-										delay: isInitialLoad ? 200 + idx * 140 : 0,
-										easing: cubicOut
-									}}
-								>
-									<PodiumCard {user} rank={getRank(user)} {type} />
-								</div>
-							{/each}
-						</div>
-					{/if}
+			<div
+				class="lb-content"
+				class:lb-content--leaving={contentPhase === 'leaving'}
+				class:lb-content--entering={contentPhase === 'entering'}
+				bind:this={contentEl}
+			>
+				<!-- Podium -->
+				{#if top3.length > 0}
+					<div class="lb-podium" role="list" aria-label="Top 3">
+						{#each podiumOrder as user (user.id)}
+							<div class="lb-podium__slot lb-podium__slot--{getRank(user)}" role="listitem">
+								<PodiumCard {user} rank={getRank(user)} {type} />
+							</div>
+						{/each}
+					</div>
+				{/if}
 
-					<!-- List -->
-					{#if rest.length > 0}
-						<ol class="lb-list" aria-label="Resto de la clasificación">
-							{#each rest as user, i (user.id)}
-								<li
-									in:fly={{
-										y: isInitialLoad ? 18 : 0,
-										duration: isInitialLoad ? 380 : 0,
-										delay: isInitialLoad ? 360 + Math.min(i, 18) * 45 : 0,
-										easing: cubicOut
-									}}
-								>
-									<LeaderboardRow
-										{user}
-										{type}
-										rank={i + 4}
-										isCurrentUser={currentUserData && currentUserData.id === user.id}
-									/>
-								</li>
-							{/each}
-						</ol>
-					{/if}
-				</div>
-			{/key}
+				<!-- List -->
+				{#if rest.length > 0}
+					<ol class="lb-list" aria-label="Resto de la clasificación">
+						{#each rest as user, i (user.id)}
+							<li>
+								<LeaderboardRow
+									{user}
+									{type}
+									rank={i + 4}
+									isCurrentUser={currentUserData && currentUserData.id === user.id}
+								/>
+							</li>
+						{/each}
+					</ol>
+				{/if}
+			</div>
 		{/if}
 	</div>
 </main>
 
 {#if showBeacon}
-	<div in:fly={{ y: 100, duration: 500, delay: 700, easing: cubicOut }}>
-		<CurrentUserCard user={currentUserData} rank={currentUserRank} {type} />
-	</div>
+	<!-- Sin transición de entrada: si el reloj de animación se congela a mitad
+	     de vuelo, un transform congelado en el ancestro rompe el position: fixed
+	     del dock y desalinea el beacon. Aparece directo, siempre bien alineado. -->
+	<CurrentUserCard user={currentUserData} rank={currentUserRank} {type} />
 {/if}
 
 <style>
@@ -215,6 +230,12 @@
 	/* Room for the fixed beacon so the last row stays reachable */
 	.lb-page.has-beacon {
 		padding-bottom: 8.5rem;
+	}
+	/* En móvil el beacon se levanta por encima de la barra de navegación inferior */
+	@media (max-width: 768px) {
+		.lb-page.has-beacon {
+			padding-bottom: calc(8.5rem + 88px);
+		}
 	}
 
 	/* ── Header ── */
@@ -241,7 +262,7 @@
 		line-height: 1.02;
 		color: var(--text-primary);
 		margin: 0;
-		text-shadow: 0 4px 24px rgba(27, 133, 243, 0.25);
+		text-shadow: 0 4px 24px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.lb-subtitle {
 		max-width: 34ch;
@@ -263,14 +284,33 @@
 		z-index: 10;
 		display: grid;
 		align-items: start;
+		/* La columna debe ajustarse al contenedor (no al max-content de los
+		   ítems), o el podio desborda en móviles. */
+		grid-template-columns: minmax(0, 1fr);
 	}
 	.lb-panel > * {
 		grid-area: 1 / 1;
+		min-width: 0;
 	}
 	.lb-content {
 		display: flex;
 		flex-direction: column;
 		width: 100%;
+		/* Fundido fluido al cambiar entre Niveles/Rachas. La transición corre
+		   sobre este elemento persistente, así que completa su estado final
+		   incluso si el entorno congela el reloj de animación; el timer de
+		   applyContent garantiza que el contenido nunca quede invisible a medias. */
+		transition:
+			opacity 0.22s ease,
+			transform 0.22s ease;
+	}
+	.lb-content--leaving {
+		opacity: 0;
+		transform: translateX(-14px);
+	}
+	.lb-content--entering {
+		opacity: 0;
+		transform: translateX(14px);
 	}
 
 	/* ── Podium ── */
@@ -281,12 +321,20 @@
 		gap: 12px;
 		margin-top: 4.5rem;
 		padding-bottom: 1rem;
+		width: 100%;
+		max-width: 100%;
 	}
 	.lb-podium__slot {
-		flex: 0 0 auto;
+		/* Basis 0 + min-width 0: slots reparten el ancho disponible y las tarjetas
+		   (width: 100%) se encogen con ellos. max-width fija el ancho objetivo en
+		   pantallas anchas sin depender del contenido. */
+		flex: 1 1 0;
+		min-width: 0;
+		max-width: 145px;
 	}
 	.lb-podium__slot--1 {
 		order: 2;
+		max-width: 168px;
 	}
 	.lb-podium__slot--2 {
 		order: 1;
@@ -319,7 +367,8 @@
 		height: 42px;
 		border: 3px solid var(--glass-border);
 		border-top-color: var(--aero-sky);
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		animation: spin 1s linear infinite;
 	}
 	@keyframes spin {
@@ -346,7 +395,7 @@
 					135deg,
 					rgba(255, 255, 255, 0.28),
 					rgba(255, 255, 255, 0.06) 50%,
-					rgba(27, 133, 243, 0.2)
+					rgba(var(--accent-blue-rgb), 0.2)
 				)
 				border-box;
 		box-shadow: var(--shadow-md);
@@ -400,13 +449,13 @@
 		}
 	}
 
-	@media (max-width: 380px) {
+	/* Podium responsive: los slots son fluidos (flex: 1 1 0, min-width: 0) y las
+	   tarjetas usan max-width en vez de width fija, así el podio nunca desborda
+	   el viewport en móviles (sin depender de transform: scale). */
+	@media (max-width: 480px) {
 		.lb-podium {
-			gap: 6px;
-			transform: scale(0.9);
-			transform-origin: bottom center;
+			gap: 8px;
 		}
 	}
-
 	/* [VSocial: reduced-motion removido — spinner siempre a velocidad original] */
 </style>

@@ -10,6 +10,9 @@ import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
 import { requireAuth } from '$lib/server/auth.js';
 import { getCache, setCache } from '$lib/server/cache.js';
+import { queueImpressions } from '$lib/server/batch-writer.js';
+import { applyDiversityFilters } from '$lib/server/diversity.js';
+import { anonymizePost } from '$lib/server/security.js';
 
 function parsePostMetadata(post) {
 	if (!post) return;
@@ -49,11 +52,65 @@ async function fetchPostMedia(db, postIds) {
 	return map;
 }
 
-export async function GET({ request, url }) {
-	const parts = url.pathname.replace('/api/feed/', '').split('/');
-	const action = parts[0] === '' ? null : parts[0];
+export async function GET({ request, url, params }) {
+	const pathClean = params?.path || url.pathname.replace(/^\/api\/feed\/?/, '');
+	const parts = pathClean ? pathClean.split('/') : [];
+	const action = parts[0] || null;
 	const userId = await requireAuth(request);
 	const db = getDb();
+
+	// ── ANONYMOUS POSTS FEED ──
+	if (
+		action === 'anonymous' ||
+		url.searchParams.get('area') === 'anonymous' ||
+		url.searchParams.get('algo') === 'anonymous'
+	) {
+		const cursorStr = url.searchParams.get('cursor') || '';
+		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 20));
+		const cursor = parseInt(cursorStr) || 0;
+		const sinceId = parseInt(url.searchParams.get('since_id')) || 0;
+		let cursorClause = '';
+		const queryParams = [userId, userId, userId];
+		if (sinceId > 0) {
+			cursorClause = 'AND p.id > ?';
+			queryParams.push(sinceId);
+		} else if (cursor > 0) {
+			cursorClause = 'AND p.id < ?';
+			queryParams.push(cursor);
+		}
+		queryParams.push(limit);
+
+		const posts = await db
+			.prepare(
+				`
+			SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
+				(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
+				(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+				(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared,
+				(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
+				(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
+			FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
+			WHERE p.is_anonymous = 1 AND p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0
+			${cursorClause}
+			ORDER BY p.id DESC LIMIT ?
+		`
+			)
+			.all(...queryParams);
+
+		const mediaMap = await fetchPostMedia(
+			db,
+			posts.map((p) => p.id)
+		);
+		posts.forEach((p) => {
+			parsePostMetadata(p);
+			p.media = mediaMap[p.id] || [];
+			anonymizePost(p, userId);
+		});
+
+		const nextCursor = posts.length === limit ? String(posts[posts.length - 1].id) : '';
+		return json({ posts, next_cursor: nextCursor, limit, has_more: posts.length === limit });
+	}
 
 	// ── PREFERENCES ──
 	if (action === 'preferences') {
@@ -147,9 +204,10 @@ export async function GET({ request, url }) {
 				.prepare(
 					`
 				SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
 					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
-				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id
+				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
 				WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0 AND (p.privacy = 'public' OR p.user_id = ?) ${searchClause} ${cursorClause}
 				ORDER BY p.like_count DESC, p.id DESC LIMIT ?
 			`
@@ -183,15 +241,26 @@ export async function GET({ request, url }) {
 					`SELECT post_id FROM saved_posts WHERE user_id = ? AND post_id IN (${placeholders})`
 				)
 				.all(userId, ...postIds);
+			const sharedRows = await db
+				.prepare(
+					`SELECT post_id FROM post_shares WHERE user_id = ? AND post_id IN (${placeholders})`
+				)
+				.all(userId, ...postIds);
 
 			const likedSet = new Set(likedRows.map((r) => r.post_id));
 			const savedSet = new Set(savedRows.map((r) => r.post_id));
+			const sharedSet = new Set(sharedRows.map((r) => r.post_id));
 
 			posts.forEach((p) => {
 				p.user_liked = likedSet.has(p.id) ? 1 : 0;
 				p.user_saved = savedSet.has(p.id) ? 1 : 0;
+				p.user_shared = sharedSet.has(p.id) ? 1 : 0;
 			});
 		}
+
+		posts.forEach((p) => {
+			anonymizePost(p, userId);
+		});
 
 		const nextCursor =
 			posts.length === limit
@@ -252,12 +321,12 @@ export async function GET({ request, url }) {
 		let posts;
 		let nextCursor = '';
 
-		if (mode === 'radar' || mode === 'chronological') {
-			// Radar: Strict chronological but mixing following + recent trending
+		if (mode === 'following' || url.searchParams.get('area') === 'following') {
+			// Strict chronological feed of only following creators + self
 			const cursor = parseInt(cursorStr) || 0;
 			const sinceId = parseInt(url.searchParams.get('since_id')) || 0;
 			let cursorClause = '';
-			const params = [userId, userId, userId, userId];
+			const params = [userId, userId, userId, userId, userId, userId, userId];
 			if (sinceId > 0) {
 				cursorClause = 'AND p.id > ?';
 				params.push(sinceId);
@@ -271,13 +340,55 @@ export async function GET({ request, url }) {
 				.prepare(
 					`
 				SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
 					(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
 					(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+					(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared,
 					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
-				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id
+				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
+				WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0
+				  AND (p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) OR p.user_id = ?)
+				  AND (p.is_anonymous = 0 OR p.is_anonymous IS NULL)
+				  AND p.id NOT IN (SELECT cs.post_id FROM content_signals cs WHERE cs.user_id = ?)
+				  AND p.user_id NOT IN (SELECT su.snoozed_id FROM snoozed_users su WHERE su.snoozer_id = ? AND (su.snoozed_until IS NULL OR su.snoozed_until > datetime('now')))
+				${cursorClause}
+				ORDER BY p.id DESC LIMIT ?
+			`
+				)
+				.all(...params);
+
+			nextCursor = posts.length === limit ? String(posts[posts.length - 1].id) : '';
+		} else if (mode === 'radar' || mode === 'chronological') {
+			// Radar: Strict chronological but mixing following + recent trending
+			const cursor = parseInt(cursorStr) || 0;
+			const sinceId = parseInt(url.searchParams.get('since_id')) || 0;
+			let cursorClause = '';
+			const params = [userId, userId, userId, userId, userId, userId, userId];
+			if (sinceId > 0) {
+				cursorClause = 'AND p.id > ?';
+				params.push(sinceId);
+			} else if (cursor > 0) {
+				cursorClause = 'AND p.id < ?';
+				params.push(cursor);
+			}
+			params.push(limit);
+
+			posts = await db
+				.prepare(
+					`
+				SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
+					(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
+					(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+					(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared,
+					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
+					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
+				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
 				WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0
 				  AND (p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) OR p.user_id = ? OR p.privacy = 'public')
+				  AND p.id NOT IN (SELECT cs.post_id FROM content_signals cs WHERE cs.user_id = ?)
+				  AND p.user_id NOT IN (SELECT su.snoozed_id FROM snoozed_users su WHERE su.snoozer_id = ? AND (su.snoozed_until IS NULL OR su.snoozed_until > datetime('now')))
 				${cursorClause}
 				ORDER BY p.id DESC LIMIT ?
 			`
@@ -295,8 +406,7 @@ export async function GET({ request, url }) {
 			let wDiv = settings.w_diversity / 100.0; // deterministic spread
 
 			if (mode === 'retention') {
-				// TikTok-like "For You" logic: discovery over social graph — favor popularity,
-				// recency, diversity and thematic interest; de-emphasize who you already follow.
+				// Discovery over social graph — favor popularity, recency, diversity and thematic interest
 				wInt = 0.6;
 				wIta = 0.3;
 				wSoc = 0.2;
@@ -313,21 +423,32 @@ export async function GET({ request, url }) {
 				cursorId = parseInt(parts[1]);
 			}
 
-			// We introduce a penalty for already liked posts so fresh content always bubbles up.
-			// Use deterministic pseudo-random seeded by user_id and post id for stable pagination.
-			// Interactions = how often the viewer has reacted to this author's posts (affinity).
-			// Interests    = how many of the post's hashtags the viewer has previously engaged with.
+			// Deterministic ranking formula with xAI Heavy Ranker weights and exponential decay
 			const scoreExpr = `(
-				(${wSoc} * CASE WHEN p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 150 WHEN p.user_id = ? THEN 100 ELSE 0 END) +
-				(${wIta} * MIN(150, (SELECT COUNT(*) FROM post_reactions pra JOIN posts pa ON pa.id = pra.post_id WHERE pra.user_id = ? AND pa.user_id = p.user_id) * 30)) +
-				(${wInt} * MIN(120, (SELECT COUNT(*) FROM post_hashtags ph WHERE ph.post_id = p.id AND ph.tag_name IN (SELECT ph2.tag_name FROM post_hashtags ph2 JOIN post_reactions pri ON pri.post_id = ph2.post_id WHERE pri.user_id = ?)) * 40)) +
-				(${wPop} * MIN(150, (p.like_count * 2 + p.comment_count * 3 + p.share_count * 4) * 4)) +
-				(${wRec} * MAX(0, 100 - (julianday('now') - julianday(p.created_at))*12)) +
-				(${wDiv} * (((p.id * 17) + ?) % 100)) -
-				(CASE WHEN (SELECT 1 FROM post_reactions pr WHERE pr.post_id = p.id AND pr.user_id = ?) IS NOT NULL THEN 50 ELSE 0 END)
+				(
+					(${wSoc} * CASE WHEN p.is_anonymous = 1 THEN 40 WHEN p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) THEN 150 WHEN p.user_id = ? THEN 100 ELSE 0 END) +
+					(${wIta} * CASE WHEN p.is_anonymous = 1 THEN 0 ELSE MIN(150, (SELECT COUNT(*) FROM post_reactions pra JOIN posts pa ON pa.id = pra.post_id WHERE pra.user_id = ? AND pa.user_id = p.user_id) * 30) END) +
+					(${wInt} * MIN(120, (SELECT COUNT(*) FROM post_hashtags ph WHERE ph.post_id = p.id AND ph.tag_name IN (SELECT ph2.tag_name FROM post_hashtags ph2 JOIN post_reactions pri ON pri.post_id = ph2.post_id WHERE pri.user_id = ?)) * 40)) +
+					(${wPop} * (
+						MIN(40, p.like_count * 1) +
+						MIN(40, p.save_count * 5) +
+						MIN(50, p.share_count * 8) +
+						MIN(50, p.comment_count * 6) +
+						MIN(60, p.author_replies_count * 20)
+					)) +
+					(${wRec} * (100.0 * EXP(-0.693 * (julianday('now') - julianday(p.created_at)) / 0.25))) +
+					(CASE WHEN (julianday('now') - julianday(p.created_at)) * 1440 < 120 AND p.first_engagement_at IS NOT NULL
+						THEN MIN(100, (p.like_count + p.comment_count * 3 + p.share_count * 2) / MAX(1, (julianday('now') - julianday(p.first_engagement_at)) * 1440) * 10)
+						ELSE 0 END) +
+					(${wDiv} * (((p.id * 17) + ?) % 100)) -
+					(CASE WHEN (SELECT 1 FROM post_reactions pr WHERE pr.post_id = p.id AND pr.user_id = ?) IS NOT NULL THEN 50 ELSE 0 END)
+				) * (0.5 + (COALESCE(u.reputation_score, 50) / 100.0) * 0.8)
 			)`;
 
-			const includeDiversity = wDiv > 0.1 ? `OR p.privacy = 'public'` : '';
+			let retentionFilter = '';
+			if (mode === 'retention') {
+				retentionFilter = `AND p.id NOT IN (SELECT fi.post_id FROM feed_impressions fi WHERE fi.user_id = ? AND fi.seen_at > datetime('now', '-2 days'))`;
+			}
 
 			const sinceId = parseInt(url.searchParams.get('since_id')) || 0;
 			const paginationClause =
@@ -336,14 +457,19 @@ export async function GET({ request, url }) {
 			const query = `
 				SELECT * FROM (
 					SELECT p.*, p.body as content, u.username, u.display_name, u.avatar_url, u.is_verified, u.level, COALESCE(ur.role, u.role, 'user') AS role,
+				ai.anon_username,
 						(SELECT COUNT(*) FROM post_reactions pl WHERE pl.post_id = p.id AND pl.user_id = ?) > 0 as user_liked,
 						(SELECT COUNT(*) FROM saved_posts sp WHERE sp.post_id = p.id AND sp.user_id = ?) > 0 as user_saved,
+						(SELECT COUNT(*) FROM post_shares ps WHERE ps.post_id = p.id AND ps.user_id = ?) > 0 as user_shared,
 						(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 						(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color,
 						${scoreExpr} as feed_score
-					FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id
+					FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
 					WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0
-					  AND (p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) OR p.user_id = ? ${includeDiversity})
+					  AND (p.user_id IN (SELECT following_id FROM follows WHERE follower_id = ?) OR p.user_id = ? OR p.privacy = 'public')
+					  AND p.id NOT IN (SELECT cs.post_id FROM content_signals cs WHERE cs.user_id = ?)
+					  AND p.user_id NOT IN (SELECT su.snoozed_id FROM snoozed_users su WHERE su.snoozer_id = ? AND (su.snoozed_until IS NULL OR su.snoozed_until > datetime('now')))
+					  ${retentionFilter}
 				)
 				${paginationClause}
 				ORDER BY feed_score DESC, id DESC LIMIT ?
@@ -351,7 +477,8 @@ export async function GET({ request, url }) {
 
 			const queryParams = [
 				userId,
-				userId, // user_liked, user_saved
+				userId,
+				userId, // user_liked, user_saved, user_shared
 				userId,
 				userId, // scoreExpr (wSoc following check, wSoc self check)
 				userId, // scoreExpr (wIta interactions affinity seed)
@@ -359,21 +486,38 @@ export async function GET({ request, url }) {
 				userId, // scoreExpr (wDiv pseudo-random seed)
 				userId, // scoreExpr (liked penalty)
 				userId,
-				userId // base filter (following check, self check)
+				userId, // base filter (following check, self check)
+				userId, // content_signals filter
+				userId // snoozed_users filter
 			];
+
+			if (mode === 'retention') {
+				queryParams.push(userId); // feed_impressions filter
+			}
+
 			if (sinceId > 0) {
 				queryParams.push(sinceId);
 			} else {
 				queryParams.push(cursorScore, cursorScore, cursorId);
 			}
-			queryParams.push(limit);
+			// Fetch extra candidate batch for diversity filtering (3x limit ensures ample headroom)
+			queryParams.push(limit * 3);
 
-			posts = await db.prepare(query).all(...queryParams);
+			const rawCandidates = await db.prepare(query).all(...queryParams);
+			posts = applyDiversityFilters(rawCandidates, limit);
 
 			nextCursor =
 				posts.length === limit
 					? `${posts[posts.length - 1].feed_score}_${posts[posts.length - 1].id}`
 					: '';
+		}
+
+		// Asynchronously register impressions in batch buffer
+		if (posts.length > 0 && userId) {
+			queueImpressions(
+				userId,
+				posts.map((p) => p.id)
+			);
 		}
 
 		const mediaMap = await fetchPostMedia(
@@ -383,6 +527,7 @@ export async function GET({ request, url }) {
 		posts.forEach((p) => {
 			parsePostMetadata(p);
 			p.media = mediaMap[p.id] || [];
+			anonymizePost(p, userId);
 		});
 
 		return json({ posts, next_cursor: nextCursor, limit, has_more: posts.length === limit });
@@ -391,8 +536,9 @@ export async function GET({ request, url }) {
 	return json({ error: 'Endpoint not found' }, { status: 404 });
 }
 
-export async function PUT({ request, url }) {
-	const action = url.pathname.replace('/api/feed/', '');
+export async function PUT({ request, url, params }) {
+	const pathClean = params?.path || url.pathname.replace(/^\/api\/feed\/?/, '');
+	const action = pathClean ? pathClean.split('/')[0] : '';
 	if (action === 'preferences') {
 		const userId = await requireAuth(request);
 		const data = await request.json();

@@ -156,35 +156,7 @@
 							/>
 						</div>
 					</div>
-
-					<!-- Stripe (Coming Soon) -->
-					<div class="api-item coming-soon">
-						<div class="api-item-header">
-							<div class="api-item-icon stripe-icon">
-								<span class="material-icons-round">payments</span>
-							</div>
-							<div class="api-item-info">
-								<h4 class="api-item-name">
-									Stripe Payments
-									<span class="coming-soon-badge">Próximamente</span>
-								</h4>
-								<p class="api-item-desc">Procesamiento de pagos y suscripciones premium</p>
-							</div>
-						</div>
-						<div class="api-item-field">
-							<span class="form-label">Secret Key</span>
-							<input
-								type="password"
-								id="stripe_key"
-								name="stripe_key"
-								disabled
-								placeholder="sk_test_..."
-								class="aero-input"
-							/>
-						</div>
-					</div>
 				</div>
-
 				<div class="form-actions">
 					<button type="submit" class="btn-aero-primary" disabled={saving}>
 						{saving ? 'Guardando...' : 'Guardar API Keys'}
@@ -236,7 +208,7 @@
 		width: 48px;
 		height: 48px;
 		min-width: 48px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		background: rgba(46, 134, 232, 0.1);
 		display: flex;
 		align-items: center;
@@ -294,9 +266,6 @@
 	.api-item:hover .api-item-icon.smtp-icon {
 		box-shadow: 0 0 20px rgba(74, 171, 223, 0.4);
 	}
-	.api-item:hover .api-item-icon.stripe-icon {
-		box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
-	}
 
 	.api-item.coming-soon {
 		background: repeating-linear-gradient(
@@ -320,7 +289,7 @@
 		width: 48px;
 		height: 48px;
 		min-width: 48px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -336,9 +305,6 @@
 	}
 	.smtp-icon {
 		background: var(--grad-primary);
-	}
-	.stripe-icon {
-		background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
 	}
 
 	.api-item-info {
@@ -367,7 +333,7 @@
 		align-items: center;
 		gap: 6px;
 		padding: 4px 12px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		font-size: 0.7rem;
 		font-weight: 800;
 		text-transform: uppercase;
@@ -382,7 +348,8 @@
 	.api-status-badge.configured .dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--aero-mint);
 		box-shadow: 0 0 8px var(--aero-mint);
 		animation: pulse 2s infinite;
@@ -416,7 +383,7 @@
 		background: rgba(46, 134, 232, 0.12);
 		color: var(--aero-blue);
 		border: 1px solid rgba(46, 134, 232, 0.25);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		padding: 2px 8px;
 	}
 
@@ -450,7 +417,7 @@
 		align-items: center;
 		gap: 8px;
 		padding: 12px 16px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		margin-bottom: 24px;
 		font-weight: 600;
 		font-size: 0.88rem;

@@ -221,9 +221,10 @@
 					style="
           height: 140px; 
           background: {authStore.user?.cover_url
-						? `url('${authStore.user.cover_url}') center/cover`
-						: 'rgba(0,0,0,0.1)'}; 
-          border-radius: var(--radius-md) var(--radius-md) 0 0;
+						? `url('${authStore.user.cover_url}') center/cover no-repeat`
+						: 'var(--grad-primary)'}; 
+          border-radius: var(--radius-md) var(--radius-md) var(--radius-xs) var(--radius-xs);
+          overflow: hidden;
         "
 				></div>
 				<div class="profile-header px-6 pb-6 relative" style="margin-top: -40px;">
@@ -231,13 +232,14 @@
 						<div class="flex gap-4 items-end">
 							<div
 								class="avatar-mockup glass-card flex items-center justify-center text-3xl font-bold overflow-hidden"
-								style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-surface); border: 2px solid var(--border-subtle); box-shadow: var(--shadow-md);"
+								style="width: 100px; height: 100px; border-radius: var(--radius-squircle); corner-shape: squircle; background: var(--bg-surface); border: 2px solid var(--border-subtle); box-shadow: var(--shadow-md);"
 							>
 								{#if authStore.user?.avatar_url}
 									<img
 										src={authStore.user.avatar_url}
 										alt="Avatar"
 										class="w-full h-full object-cover"
+										style="object-position: center center; display: block;"
 									/>
 								{:else}
 									{authStore.user?.display_name?.[0] || 'U'}
@@ -286,7 +288,7 @@
 								<div class="glass-panel p-4 rounded-xl opacity-60">
 									<div class="flex items-center gap-3 mb-3">
 										<div
-											class="w-10 h-10 rounded-full bg-black/5"
+											class="w-10 h-10 squircle bg-black/5"
 											style={authStore.user?.avatar_url
 												? `background: url('${authStore.user.avatar_url}') center/cover`
 												: ''}
@@ -333,7 +335,7 @@
 					Re-Designer
 				</h2>
 				<a
-					href="/u/{authStore.user?.username}"
+					href={authStore.user?.username ? `/u/${authStore.user.username}` : '#'}
 					class="btn-icon"
 					target="_blank"
 					title="Ver Perfil Público"
@@ -664,7 +666,7 @@
 
 			<div
 				class="glass-panel p-4 rounded-lg mb-4 text-sm leading-relaxed"
-				style="background: rgba(27,133,243,0.08); border-color: rgba(27,133,243,0.15);"
+				style="background: rgba(var(--accent-blue-rgb),0.08); border-color: rgba(var(--accent-blue-rgb),0.15);"
 			>
 				<p class="font-bold text-main mb-2">¡Zona de Riesgo! Inyección de CSS Directo</p>
 				<p class="text-muted mb-2">
@@ -674,7 +676,7 @@
 					>.
 				</p>
 				<p class="text-muted font-mono text-xs bg-black/10 p-2 rounded">
-					.profile-custom-wrapper .glass-card {`{\n  border-radius: 0;\n  box-shadow: 10px 10px 0 #1b85f3;\n}`}
+					.profile-custom-wrapper .glass-card {`{\n  border-radius: var(--radius-xs);\n  box-shadow: 10px 10px 0 #1b85f3;\n}`}
 				</p>
 			</div>
 
@@ -771,7 +773,8 @@
 		justify-content: center;
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-surface);
 		color: var(--text-main);
 		text-decoration: none;
@@ -857,7 +860,7 @@
 		width: 36px;
 		height: 36px;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		padding: 0;
 		cursor: pointer;
 		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
@@ -876,7 +879,7 @@
 	.aero-input-sm:focus {
 		outline: none;
 		border-color: var(--accent-blue-base);
-		box-shadow: 0 0 0 3px rgba(27, 133, 243, 0.15);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.15);
 	}
 	.aero-textarea {
 		background: var(--bg-input);
@@ -888,7 +891,7 @@
 	}
 	.aero-textarea:focus {
 		border-color: var(--accent-blue-base);
-		box-shadow: 0 0 0 3px rgba(27, 133, 243, 0.15);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.15);
 	}
 
 	/* Block Editor Card */
@@ -931,7 +934,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 	}
 	.arrow-btn:hover:not(:disabled) {
 		background: rgba(0, 0, 0, 0.08);
@@ -957,7 +960,7 @@
 		gap: 6px;
 	}
 	.btn-advanced:hover {
-		background: rgba(27, 133, 243, 0.1);
+		background: rgba(var(--accent-blue-rgb), 0.1);
 	}
 
 	/* Modal Advanced CSS */
@@ -1008,7 +1011,8 @@
 		right: 436px; /* 400px panel + 20px margin + 16px gap */
 		width: 40px;
 		height: 40px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-surface);
 		border: 1px solid var(--glass-border);
 		display: flex;
@@ -1030,7 +1034,8 @@
 		right: 20px;
 		width: 56px;
 		height: 56px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-surface);
 		border: 1px solid var(--glass-border);
 		display: flex;

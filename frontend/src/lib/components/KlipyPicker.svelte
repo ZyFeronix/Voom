@@ -66,6 +66,7 @@
 	role="presentation"
 	onclick={(e) => e.stopPropagation()}
 	onkeydown={(e) => e.stopPropagation()}
+	onwheel={(e) => e.stopPropagation()}
 >
 	<div class="picker-header">
 		<div class="search-wrap">
@@ -85,7 +86,7 @@
 		</div>
 	</div>
 
-	<div class="gif-grid custom-scrollbar">
+	<div class="gif-grid custom-scrollbar" onwheel={(e) => e.stopPropagation()}>
 		{#if loading}
 			<div class="flex justify-center items-center h-full text-muted py-8">
 				<span class="loading loading-spinner text-primary"></span>
@@ -144,6 +145,7 @@
 		padding: 16px;
 		box-sizing: border-box;
 		z-index: var(--z-dropdown);
+		overscroll-behavior: contain;
 	}
 	.picker-header {
 		flex-shrink: 0;
@@ -165,7 +167,7 @@
 		padding-left: 38px;
 		padding-right: 38px;
 		height: 40px;
-		border-radius: 20px;
+		border-radius: var(--radius-md);
 		background: var(--bg-input, rgba(0, 0, 0, 0.05));
 		border: 1px solid var(--border-subtle);
 		box-shadow: var(--input-shadow-inner, inset 0 2px 4px rgba(0, 0, 0, 0.05));
@@ -177,7 +179,7 @@
 		outline: none;
 		border-color: var(--aero-blue);
 		box-shadow:
-			0 0 0 3px rgba(27, 133, 243, 0.15),
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.15),
 			var(--input-shadow-inner);
 	}
 	.close-btn {
@@ -185,7 +187,7 @@
 		right: 6px;
 		width: 28px;
 		height: 28px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -211,13 +213,14 @@
 		overflow-x: hidden;
 		padding: 10px;
 		margin: -10px;
+		overscroll-behavior: contain;
 	}
 	.gif-btn {
 		display: block;
 		width: 100%;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		overflow: hidden;
 		padding: 0;
@@ -232,7 +235,7 @@
 	.gif-btn:hover {
 		transform: scale(1.05) translateY(-2px);
 		box-shadow:
-			0 8px 16px rgba(27, 133, 243, 0.15),
+			0 8px 16px rgba(var(--accent-blue-rgb), 0.15),
 			0 0 0 1px var(--aero-blue);
 		border-color: transparent;
 		z-index: 10;
@@ -245,7 +248,7 @@
 		height: 100%;
 		object-fit: cover;
 		display: block;
-		border-radius: 11px;
+		border-radius: var(--radius-sm);
 		transition: opacity var(--t-fast);
 	}
 	.gif-btn:active {

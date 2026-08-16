@@ -44,8 +44,6 @@ CREATE TABLE IF NOT EXISTS users (
     follower_count INTEGER NOT NULL DEFAULT 0,
     following_count INTEGER NOT NULL DEFAULT 0,
     post_count INTEGER NOT NULL DEFAULT 0,
-    wallet_credits NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    wallet_balance REAL NOT NULL DEFAULT 0.00,
     privacy_level VARCHAR(15) DEFAULT 'public',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -53,14 +51,22 @@ CREATE TABLE IF NOT EXISTS users (
     profile_completion INTEGER DEFAULT 0,
     xp_points INTEGER DEFAULT 0,
     level INTEGER DEFAULT 1,
+    payment_link VARCHAR(255),
     checkin_streak INTEGER DEFAULT 0,
     last_checkin_at DATETIME,
+    custom_status VARCHAR(20) DEFAULT 'online',
+    custom_status_text VARCHAR(100),
+    custom_status_expires_at DATETIME,
     deleted_at DATETIME,
     terms_accepted_at DATETIME,
-    privacy_accepted_at DATETIME
+    privacy_accepted_at DATETIME,
+    reputation_score INTEGER NOT NULL DEFAULT 50,
+    muted_until DATETIME,
+    strike_count INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_users_reputation ON users(reputation_score);
 
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -145,12 +151,19 @@ CREATE TABLE IF NOT EXISTS posts (
     scheduled_at DATETIME,
     status VARCHAR(15) DEFAULT 'published',
     deleted_at DATETIME DEFAULT NULL,
+    save_count INTEGER NOT NULL DEFAULT 0,
+    author_replies_count INTEGER NOT NULL DEFAULT 0,
+    first_engagement_at DATETIME DEFAULT NULL,
+    is_anonymous BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_anonymous ON posts(is_anonymous, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_scheduled ON posts(scheduled_at) WHERE status = 'scheduled';
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_engagement_score ON posts(like_count, comment_count, share_count, save_count, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_velocity ON posts(created_at, first_engagement_at) WHERE first_engagement_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS post_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,6 +206,14 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, created_at);
 
+CREATE TABLE IF NOT EXISTS anon_identities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    anon_username TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_anon_identities_username ON anon_identities(anon_username);
+
 CREATE TABLE IF NOT EXISTS comment_reactions (
     comment_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
@@ -209,6 +230,35 @@ CREATE TABLE IF NOT EXISTS saved_posts (
     saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, post_id)
 );
+
+CREATE TRIGGER IF NOT EXISTS trg_save_inc AFTER INSERT ON saved_posts
+BEGIN
+    UPDATE posts SET save_count = save_count + 1 WHERE id = NEW.post_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_save_dec AFTER DELETE ON saved_posts
+BEGIN
+    UPDATE posts SET save_count = save_count - 1 WHERE id = OLD.post_id;
+END;
+
+CREATE TABLE IF NOT EXISTS post_shares (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, post_id)
+);
+CREATE INDEX IF NOT EXISTS idx_post_shares_user ON post_shares(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_post_shares_post ON post_shares(post_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_share_inc AFTER INSERT ON post_shares
+BEGIN
+    UPDATE posts SET share_count = share_count + 1 WHERE id = NEW.post_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_share_dec AFTER DELETE ON post_shares
+BEGIN
+    UPDATE posts SET share_count = MAX(share_count - 1, 0) WHERE id = OLD.post_id;
+END;
 
 CREATE TABLE IF NOT EXISTS hashtags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -289,10 +339,23 @@ CREATE TABLE IF NOT EXISTS reels (
     like_count INTEGER DEFAULT 0,
     comment_count INTEGER DEFAULT 0,
     share_count INTEGER DEFAULT 0,
+    views_50pct INTEGER NOT NULL DEFAULT 0,
+    quality_views INTEGER NOT NULL DEFAULT 0,
+    completion_count INTEGER NOT NULL DEFAULT 0,
     is_active BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_reels_user ON reels(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reels_scoring ON reels(like_count, views_50pct, quality_views, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS reel_view_progress (
+    reel_id    INTEGER NOT NULL REFERENCES reels(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    max_pct    INTEGER NOT NULL DEFAULT 0,
+    is_quality BOOLEAN NOT NULL DEFAULT 0,
+    viewed_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (reel_id, user_id)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS reel_likes (
     reel_id INTEGER REFERENCES reels(id) ON DELETE CASCADE,
@@ -333,6 +396,8 @@ CREATE TABLE IF NOT EXISTS conversation_participants (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_admin BOOLEAN DEFAULT 0,
+    is_pinned BOOLEAN DEFAULT 0,
+    is_muted BOOLEAN DEFAULT 0,
     PRIMARY KEY (conversation_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_participants_user ON conversation_participants(user_id);
@@ -348,6 +413,7 @@ CREATE TABLE IF NOT EXISTS messages_new (
     media_type VARCHAR(15),
     reply_to_id INTEGER REFERENCES messages_new(id) ON DELETE SET NULL,
     is_deleted BOOLEAN DEFAULT 0,
+    edited_at DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages_new(conversation_id, created_at DESC);
@@ -401,6 +467,49 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports(reporter_id, created_at DESC);
 
+-- -----------------------------------------------------------------------------
+-- Solicitudes de Verificación (Creadores, VTubers, Streamers, Organizaciones)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS verification_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    folio VARCHAR(64) UNIQUE NOT NULL,
+    category VARCHAR(32) NOT NULL,
+    legal_name VARCHAR(128),
+    applicant_handle VARCHAR(64) NOT NULL,
+    contact_email VARCHAR(128) NOT NULL,
+    specialty VARCHAR(64),
+    portfolio_links TEXT,
+    social_links TEXT,
+    id_document_url VARCHAR(512),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    admin_notes TEXT,
+    reviewed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_verif_status ON verification_requests(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_verif_user ON verification_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_verif_folio ON verification_requests(folio);
+
+-- -----------------------------------------------------------------------------
+-- Historial de Sanciones Disciplinarias (Strikes)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_strikes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    issued_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    strike_level INTEGER NOT NULL DEFAULT 1,
+    action_taken VARCHAR(32) NOT NULL,
+    reason TEXT NOT NULL,
+    report_id INTEGER REFERENCES reports(id) ON DELETE SET NULL,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_strikes_user ON user_strikes(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_strikes_expires ON user_strikes(expires_at);
+
+
 -- =============================================================================
 -- DOMAIN 7: MARKETPLACE
 -- =============================================================================
@@ -439,41 +548,30 @@ CREATE TABLE IF NOT EXISTS listing_media (
     position INTEGER DEFAULT 0
 );
 
--- =============================================================================
--- DOMAIN 8: WALLET & TRANSACTIONS
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS wallets (
+CREATE TABLE IF NOT EXISTS listing_offers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    balance REAL DEFAULT 0.00,
+    listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+    job_id INTEGER,
+    buyer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seller_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    amount REAL NOT NULL,
+    message TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    expires_at DATETIME
 );
 
-CREATE TABLE IF NOT EXISTS wallet_transactions (
+CREATE TABLE IF NOT EXISTS marketplace_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id INTEGER NOT NULL REFERENCES marketplace_listings(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type VARCHAR(30) NOT NULL,
-    amount REAL NOT NULL,
-    description TEXT,
-    status VARCHAR(20) DEFAULT 'completed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_wallet_user ON wallet_transactions(user_id, created_at DESC);
-
-CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,
-    amount REAL NOT NULL,
-    description TEXT,
-    reference_id TEXT,
+    rating INTEGER NOT NULL DEFAULT 5 CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =============================================================================
--- DOMAIN 9: FREELANCE GIGS
+-- DOMAIN 8: FREELANCE GIGS
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS gigs (
@@ -508,7 +606,7 @@ CREATE INDEX IF NOT EXISTS idx_gig_applications_gig ON gig_applications(gig_id, 
 CREATE INDEX IF NOT EXISTS idx_gig_applications_user ON gig_applications(user_id);
 
 -- =============================================================================
--- DOMAIN 10: WEB PUSH NOTIFICATIONS
+-- DOMAIN 9: WEB PUSH NOTIFICATIONS
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS web_push_subscriptions (
@@ -523,7 +621,7 @@ CREATE TABLE IF NOT EXISTS web_push_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_push_user ON web_push_subscriptions(user_id);
 
 -- =============================================================================
--- DOMAIN 11: SYSTEM (SETTINGS, ADS, CMS)
+-- DOMAIN 10: SYSTEM (SETTINGS, ADS, CMS)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS system_settings (
@@ -568,7 +666,7 @@ CREATE TABLE IF NOT EXISTS cms_pages (
 );
 
 -- =============================================================================
--- DOMAIN 12: GROUPS & PAGES
+-- DOMAIN 11: GROUPS & PAGES
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS groups (
@@ -645,7 +743,7 @@ CREATE TABLE IF NOT EXISTS page_followers (
 );
 
 -- =============================================================================
--- DOMAIN 13: AUTH & SECURITY (OAUTH, EMAIL TOKENS, PRIVACY)
+-- DOMAIN 12: AUTH & SECURITY (OAUTH, EMAIL TOKENS, PRIVACY)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS oauth_accounts (
@@ -692,7 +790,7 @@ CREATE TABLE IF NOT EXISTS snoozed_users (
 );
 
 -- =============================================================================
--- DOMAIN 14: USER AESTHETICS (GLASSMORPHISM 2.0 & BLOCKS)
+-- DOMAIN 13: USER AESTHETICS (GLASSMORPHISM 2.0 & BLOCKS)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS profile_customizations (
@@ -710,7 +808,7 @@ CREATE TABLE IF NOT EXISTS profile_customizations (
 );
 
 -- =============================================================================
--- DOMAIN 15: INFRASTRUCTURE (CACHE, RTC, GAMIFICATION)
+-- DOMAIN 14: INFRASTRUCTURE (CACHE, RTC, GAMIFICATION)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS system_cache (
@@ -786,3 +884,66 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs(user_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS unique_activity_idx ON activity_logs (user_id, action_type, entity_id, entity_type);
+
+-- =============================================================================
+-- DOMAIN 12: FEED ALGORITHM SIGNALS & IMPRESSIONS
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS content_signals (
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id     INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    signal_type VARCHAR(20) NOT NULL CHECK(signal_type IN ('not_interested', 'spam', 'offensive')),
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, post_id, signal_type)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_content_signals_user ON content_signals(user_id);
+CREATE INDEX IF NOT EXISTS idx_content_signals_post ON content_signals(post_id);
+
+CREATE TABLE IF NOT EXISTS feed_impressions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    seen_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, post_id)
+) WITHOUT ROWID;
+
+CREATE INDEX IF NOT EXISTS idx_feed_impressions_seen ON feed_impressions(user_id, seen_at);
+
+-- =============================================================================
+-- DOMAIN 13: USER REPOSTS / SHARES
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS post_shares (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, post_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_post_shares_user ON post_shares(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_post_shares_post ON post_shares(post_id);
+
+-- =============================================================================
+-- DOMAIN 14: CUSTOM ASSETS (EMOTES, STICKERS, EMOJIS, GIFS)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS custom_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(64) NOT NULL,
+    shortcode VARCHAR(64) NOT NULL,
+    asset_type VARCHAR(20) NOT NULL, -- 'emoji', 'emote', 'sticker', 'gif'
+    url VARCHAR(512) NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    mime_type VARCHAR(64) NOT NULL,
+    is_animated BOOLEAN DEFAULT 0,
+    is_approved BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_assets_user_id ON custom_assets(user_id);
+CREATE INDEX IF NOT EXISTS idx_custom_assets_type ON custom_assets(asset_type);
+CREATE INDEX IF NOT EXISTS idx_custom_assets_shortcode ON custom_assets(shortcode);
+

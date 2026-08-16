@@ -1,11 +1,12 @@
 <script>
-	import { fade, scale, slide } from 'svelte/transition';
+	import { fade, scale, slide, fly } from 'svelte/transition';
 	import { untrack } from 'svelte';
 	import { onMount } from 'svelte';
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
 	import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
 	import HashtagTextarea from '$lib/components/HashtagTextarea.svelte';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
 
 	import { backOut, expoOut } from 'svelte/easing';
 	import { goto } from '$app/navigation';
@@ -15,21 +16,30 @@
 	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
 	import KlipyPicker from '$lib/components/KlipyPicker.svelte';
 	import ProfileHoverCard from '$lib/components/ProfileHoverCard.svelte';
+	import AnonIdentityModal from '$lib/components/AnonIdentityModal.svelte';
+	import { getAnonIdentity } from '$lib/stores/anonIdentity.svelte.js';
 	import { compressImage } from '$lib/utils/imageCompression.js';
 	import { formatHashtags } from '$lib/utils/textFormatting.js';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 	import { getProxiedMediaUrl } from '$lib/utils/mediaProxy.js';
+	import { mediaViewer } from '$lib/stores/mediaViewer.svelte.js';
+	import { generateLikeSparkles } from '$lib/utils/likeSparkles.js';
 
 	let { post, onDelete } = $props();
-
-	let isCardHovered = $state(false);
 
 	// svelte-ignore state_referenced_locally
 	let liked = $state(post.user_liked || false);
 	// svelte-ignore state_referenced_locally
 	let likeCount = $state(post.like_count || 0);
-	let likeAnim = $state(false);
+	let isAnimatingLike = $state(false);
+	let isAnimatingUnlike = $state(false);
 	let likeParticles = $state([]);
+	let animLikeTimeout = null;
+	// svelte-ignore state_referenced_locally
+	let shared = $state(post.user_shared || false);
+	// svelte-ignore state_referenced_locally
+	let shareCount = $state(post.share_count || 0);
+	let shareAnim = $state(false);
 	// svelte-ignore state_referenced_locally
 	let saved = $state(post.user_saved || false);
 	let showComments = $state(false);
@@ -68,6 +78,22 @@
 	let showDeleteModal = $state(false);
 	let deleteError = $state('');
 
+	// Identidad anónima del usuario actual (para comentar en posts anónimos)
+	let myAnonUsername = $state(null);
+	let anonIdentityLoaded = $state(false);
+	let showAnonIdentityModal = $state(false);
+	let pendingAnonComment = $state(false);
+
+	// En posts anónimos los comentarios SIEMPRE son anónimos → cargamos la identidad al abrir
+	$effect(() => {
+		if (showComments && post?.is_anonymous) {
+			getAnonIdentity().then((ident) => {
+				myAnonUsername = ident?.anon_username || null;
+				anonIdentityLoaded = true;
+			});
+		}
+	});
+
 	// Load comments when section opens and poll for updates
 	$effect(() => {
 		if (showComments) {
@@ -80,7 +106,24 @@
 		return () => clearInterval(commentPollInterval);
 	});
 
+	// Sincronizar cambios desde el Media Lightbox
+	$effect(() => {
+		return mediaViewer.onPostUpdated((updatedPost) => {
+			if (updatedPost && updatedPost.id === post.id) {
+				liked = Boolean(updatedPost.user_liked);
+				likeCount = updatedPost.like_count !== undefined ? updatedPost.like_count : likeCount;
+				shared = Boolean(updatedPost.user_shared);
+				shareCount = updatedPost.share_count !== undefined ? updatedPost.share_count : shareCount;
+				saved = Boolean(updatedPost.user_saved);
+				if (updatedPost.comment_count !== undefined) {
+					post = { ...post, comment_count: updatedPost.comment_count };
+				}
+			}
+		});
+	});
+
 	async function loadComments() {
+		if (typeof document !== 'undefined' && document.hidden) return;
 		if (commentsLoading) return;
 		if (!post?.id) return;
 		commentsLoading = true;
@@ -163,26 +206,55 @@
 		const prev = liked;
 		liked = !liked;
 		likeCount += liked ? 1 : -1;
+
+		if (animLikeTimeout) clearTimeout(animLikeTimeout);
+
 		if (liked) {
-			likeAnim = true;
-			// Generate burst particles
-			likeParticles = Array.from({ length: 6 }, (_, i) => ({
-				id: Date.now() + i,
-				angle: i * 60 + Math.random() * 30,
-				distance: 20 + Math.random() * 15,
-				delay: i * 40
-			}));
-			setTimeout(() => {
-				likeAnim = false;
+			isAnimatingLike = true;
+			isAnimatingUnlike = false;
+			likeParticles = generateLikeSparkles(8, 22);
+			animLikeTimeout = setTimeout(() => {
+				isAnimatingLike = false;
 				likeParticles = [];
-			}, 600);
+			}, 650);
+		} else {
+			isAnimatingLike = false;
+			isAnimatingUnlike = true;
+			likeParticles = [];
+			animLikeTimeout = setTimeout(() => {
+				isAnimatingUnlike = false;
+			}, 350);
 		}
+
 		try {
 			if (liked) await postsApi.like(post.id);
 			else await postsApi.unlike(post.id);
 		} catch {
 			liked = prev;
 			likeCount += liked ? 1 : -1;
+		}
+	}
+
+	async function toggleShare() {
+		if (!authStore.isAuthenticated) {
+			goto('/login');
+			return;
+		}
+		const prevShared = shared;
+		shared = !shared;
+		shareCount += shared ? 1 : -1;
+		if (shared) {
+			shareAnim = true;
+			setTimeout(() => {
+				shareAnim = false;
+			}, 600);
+		}
+		try {
+			if (shared) await postsApi.share(post.id);
+			else await postsApi.unshare(post.id);
+		} catch {
+			shared = prevShared;
+			shareCount += shared ? 1 : -1;
 		}
 	}
 
@@ -204,6 +276,23 @@
 	async function submitComment() {
 		if ((!commentText.trim() && !attachedCommentGif && !attachedCommentImage) || submittingComment)
 			return;
+
+		// En posts anónimos los comentarios son SIEMPRE anónimos → se necesita la
+		// identidad anónima permanente. Si no existe, abrimos el modal y al crearla
+		// se reintenta automáticamente con el texto ya escrito.
+		if (post?.is_anonymous) {
+			if (!anonIdentityLoaded) {
+				const ident = await getAnonIdentity();
+				myAnonUsername = ident?.anon_username || null;
+				anonIdentityLoaded = true;
+			}
+			if (!myAnonUsername) {
+				pendingAnonComment = true;
+				showAnonIdentityModal = true;
+				return;
+			}
+		}
+
 		submittingComment = true;
 		try {
 			let finalBody = commentText.trim();
@@ -221,7 +310,13 @@
 			await loadComments();
 			newCommentCount = 0;
 		} catch (err) {
-			console.error('Error posting comment:', err);
+			// 403 ANON_IDENTITY_REQUIRED → forzar la creación de la identidad
+			if (err?.status === 403 || err?.code === 'ANON_IDENTITY_REQUIRED') {
+				pendingAnonComment = true;
+				showAnonIdentityModal = true;
+			} else {
+				console.error('Error posting comment:', err);
+			}
 		} finally {
 			submittingComment = false;
 		}
@@ -301,66 +396,55 @@
 <article
 	bind:this={cardRef}
 	class="aero-post-card animate-slide-in-up"
-	onmouseenter={() => (isCardHovered = true)}
-	onmouseleave={() => (isCardHovered = false)}
-	style="position: relative; z-index: {showCommentEmojis ||
-	showCommentGifs ||
-	showMenu ||
-	isCardHovered
-		? 40
-		: 1};"
+	style="position: relative; z-index: {showCommentEmojis || showCommentGifs || showMenu ? 40 : 2};"
 >
+	<!-- Repost Banner -->
+	{#if post.reposted_by}
+		<div class="repost-indicator-banner">
+			<span class="material-icons-round repost-icon">repeat</span>
+			<span>
+				<a
+					href={`/u/${post.reposted_by.username}`}
+					class="repost-user-link"
+					onclick={(e) => e.stopPropagation()}
+				>
+					{post.reposted_by.display_name || post.reposted_by.username}
+				</a>
+				reposteó
+			</span>
+		</div>
+	{/if}
+
 	<!-- Header -->
 	<div class="flex items-start justify-between mb-3">
-		<ProfileHoverCard
-			username={post.username}
-			basicUser={{
-				id: post.user_id,
-				username: post.username,
-				display_name: post.display_name,
-				avatar_url: post.avatar_url,
-				is_verified: post.is_verified,
-				level: post.level
-			}}
-		>
-			<a href={`/u/${post.username}`} class="flex items-center gap-3 group text-decoration-none">
-				<!-- Avatar -->
-				{#if post.avatar_url}
-					<div
-						class="avatar-ring {post.is_virtual
-							? 'avatar-ring-vtuber'
-							: ''} w-11 h-11 flex-shrink-0"
-					>
-						<img
-							src={post.avatar_url}
-							alt={post.username}
-							class="w-10 h-10 rounded-full object-cover"
-							width="40"
-							height="40"
-							loading="lazy"
-							decoding="async"
-						/>
+		{#if post.is_anonymous}
+			<div class="flex items-center gap-3">
+				<!-- Cyber Phantom / Anonymous Avatar -->
+				<div class="anon-avatar-wrapper" style="flex: 0 0 44px; min-width: 44px; min-height: 44px;">
+					<div class="anon-avatar-inner">
+						<span class="material-icons-round text-xl">visibility_off</span>
 					</div>
-				{:else}
-					<div class="vs-avatar-letter avatar-lg">
-						{(post.display_name || post.username || '?')[0].toUpperCase()}
-					</div>
-				{/if}
+				</div>
 
 				<!-- Name & meta -->
 				<div class="user-meta">
-					<div class="flex items-center gap-1">
-						<span
-							class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors"
-						>
-							{post.display_name || post.username}
+					<div class="flex items-center gap-1.5 flex-wrap">
+						<span class="font-semibold text-sm text-main tracking-wide">
+							{post.display_name === 'Usuario Anónimo'
+								? 'Usuario Anónimo'
+								: `@${post.display_name}`}
 						</span>
-						<VerifiedBadge role={post.role} isVerified={post.is_verified == 1} size="16px" />
-						{#if post.level}
-							<LevelBadge level={post.level} size="sm" showText={false} />
-						{/if}
-						{#if post.title_text}
-							<UserTitleBadge title={post.title_text} color={post.title_color} size="sm" />
+						<span class="anon-badge">
+							<span class="material-icons-round text-xs">theater_comedy</span>
+							Anónimo
+						</span>
+						{#if post.is_author}
+							<span
+								class="anon-owner-pill"
+								title="Publicación visible globalmente · Tu identidad real está protegida y oculta para los demás"
+							>
+								<span class="material-icons-round text-[11px]">visibility_off</span> Tu post anónimo
+							</span>
 						{/if}
 						{#if post.mood}
 							<span class="post-mood-badge">
@@ -379,23 +463,83 @@
 						{/if}
 					</div>
 					<div class="flex items-center gap-1 text-xs text-muted flex-wrap">
-						<span>@{post.username}</span>
+						<span>Identidad Oculta</span>
 						<span>·</span>
 						<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
-						{#if post.location}
-							<span>·</span>
-							<span
-								class="flex items-center gap-0.5 text-blue-500 font-semibold"
-								title="Ubicación de check-in"
-							>
-								<span class="material-icons-round text-xs">location_on</span>
-								{post.location}
-							</span>
-						{/if}
 					</div>
 				</div>
-			</a>
-		</ProfileHoverCard>
+			</div>
+		{:else}
+			<ProfileHoverCard
+				username={post.username}
+				basicUser={{
+					id: post.user_id,
+					username: post.username,
+					display_name: post.display_name,
+					avatar_url: post.avatar_url,
+					is_verified: post.is_verified,
+					level: post.level
+				}}
+			>
+				<a href={`/u/${post.username}`} class="flex items-center gap-3 group text-decoration-none">
+					<!-- Avatar -->
+					<AeroAvatar
+						src={post.avatar_url}
+						alt={post.username}
+						size="md"
+						isVtuber={post.is_virtual}
+					/>
+
+					<!-- Name & meta -->
+					<div class="user-meta">
+						<div class="flex items-center gap-1">
+							<span
+								class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors"
+							>
+								{post.display_name || post.username}
+							</span>
+							<VerifiedBadge role={post.role} isVerified={post.is_verified == 1} size="16px" />
+							{#if post.level}
+								<LevelBadge level={post.level} size="sm" showText={false} />
+							{/if}
+							{#if post.title_text}
+								<UserTitleBadge title={post.title_text} color={post.title_color} size="sm" />
+							{/if}
+							{#if post.mood}
+								<span class="post-mood-badge">
+									{#if post.mood === 'happy'}😊 Feliz
+									{:else if post.mood === 'creative'}🎨 Creativo
+									{:else if post.mood === 'gaming'}🎮 Jugando
+									{:else if post.mood === 'music'}🎵 Escuchando Musica
+									{:else if post.mood === 'thinking'}🤔 Pensando
+									{:else if post.mood === 'excited'}🔥 Emocionado
+									{:else if post.mood === 'traveling'}✈️ Viajando
+									{:else if post.mood === 'celebrating'}🥂 Celebrando
+									{:else if post.mood === 'working'}💻 Trabajando
+									{:else if post.mood === 'eating'}🍔 Comiendo
+									{/if}
+								</span>
+							{/if}
+						</div>
+						<div class="flex items-center gap-1 text-xs text-muted flex-wrap">
+							<span>@{post.username}</span>
+							<span>·</span>
+							<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
+							{#if post.location}
+								<span>·</span>
+								<span
+									class="flex items-center gap-0.5 text-blue-500 font-semibold"
+									title="Ubicación de check-in"
+								>
+									<span class="material-icons-round text-xs">location_on</span>
+									{post.location}
+								</span>
+							{/if}
+						</div>
+					</div>
+				</a>
+			</ProfileHoverCard>
+		{/if}
 
 		<!-- Post menu -->
 		<div class="relative">
@@ -404,7 +548,7 @@
 			</button>
 			{#if showMenu}
 				<div class="aero-dropdown-menu animate-slide-in-up">
-					{#if post.user_id === authStore.user?.id}
+					{#if post.is_author || (post.user_id && post.user_id === authStore.user?.id)}
 						<button
 							onclick={() => {
 								showMenu = false;
@@ -513,6 +657,8 @@
 						entityType="video"
 					/>
 				{:else}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<img
 						src={getProxiedMediaUrl(media.media_url)}
 						alt="Post media {i + 1}"
@@ -522,10 +668,24 @@
 						height={media.height || 600}
 						crossorigin="anonymous"
 						referrerpolicy="no-referrer"
-						class="media-item {post.media.length === 1 ? 'full-media' : 'square-media'}"
+						class="media-item {post.media.length === 1
+							? 'full-media'
+							: 'square-media'} is-clickable"
+						onclick={(e) => {
+							e.stopPropagation();
+							mediaViewer.openPostMedia(post, i);
+						}}
 					/>
 					{#if i === 3 && post.media.length > 4}
-						<div class="media-overlay">
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							class="media-overlay is-clickable"
+							onclick={(e) => {
+								e.stopPropagation();
+								mediaViewer.openPostMedia(post, 3);
+							}}
+						>
 							<span>+{post.media.length - 4}</span>
 						</div>
 					{/if}
@@ -555,19 +715,30 @@
 						? ' ' + likeCount.toLocaleString()
 						: ''}"
 				>
-					<span class="material-icons-round text-[18px] icon {likeAnim ? 'heart-pop' : ''}"
-						>{liked ? 'favorite' : 'favorite_border'}</span
+					<div class="like-icon-wrap">
+						{#if isAnimatingLike}
+							<span class="like-ring"></span>
+							<span class="like-ring-glow"></span>
+							<span class="like-sparkles">
+								{#each likeParticles as p (p.id)}
+									<span
+										class="sparkle-dot"
+										style="--spk-angle: {p.angle}deg; --spk-dist: {p.dist}px; --spk-size: {p.size}px; --spk-color: {p.color}; --spk-delay: {p.delay}ms;"
+									></span>
+								{/each}
+							</span>
+						{/if}
+						<span
+							class="material-icons-round text-[18px] icon {isAnimatingLike
+								? 'heart-pop'
+								: ''} {isAnimatingUnlike ? 'heart-unpop' : ''}"
+							>{liked ? 'favorite' : 'favorite_border'}</span
+						>
+					</div>
+					<span class="count {isAnimatingLike ? 'count-bump' : ''}"
+						>{likeCount > 0 ? likeCount.toLocaleString() : ''}</span
 					>
-					<span class="count">{likeCount > 0 ? likeCount.toLocaleString() : ''}</span>
 				</button>
-				<!-- Burst particles -->
-				{#each likeParticles as p (p.id)}
-					<span
-						class="like-particle"
-						style="--angle: {p.angle}deg; --dist: {p.distance}px; animation-delay: {p.delay}ms;"
-						>♥</span
-					>
-				{/each}
 			</div>
 
 			<!-- Comment -->
@@ -584,13 +755,18 @@
 				>
 			</button>
 
-			<!-- Share -->
+			<!-- Share / Repost -->
 			<button
-				class="action-btn"
-				aria-label="Compartir{post.share_count > 0 ? ' ' + post.share_count.toLocaleString() : ''}"
+				onclick={toggleShare}
+				class="action-btn action-btn-share {shared ? 'shared' : ''} {shareAnim
+					? 'share-bounce'
+					: ''}"
+				aria-label="{shared ? 'Deshacer repost' : 'Repostear'}{shareCount > 0
+					? ' ' + shareCount.toLocaleString()
+					: ''}"
 			>
-				<span class="material-icons-round text-[18px] icon">share</span>
-				<span class="count">{post.share_count > 0 ? post.share_count.toLocaleString() : ''}</span>
+				<span class="material-icons-round text-[18px] icon">repeat</span>
+				<span class="count">{shareCount > 0 ? shareCount.toLocaleString() : ''}</span>
 			</button>
 		</div>
 
@@ -608,14 +784,26 @@
 
 	<!-- Comments section -->
 	{#if showComments}
-		<div class="comments-section mt-3" transition:slide={{ duration: 450, easing: expoOut }}>
+		<div
+			class="comments-section mt-3"
+			class:is-anon-section={post?.is_anonymous == 1 || post?.is_anonymous === true}
+			transition:slide={{ duration: 350, easing: expoOut }}
+		>
 			{#if authStore.isAuthenticated}
 				<div class="flex items-start gap-2 mb-4">
-					{#if authStore.user?.avatar_url}
+					{#if post?.is_anonymous}
+						<div
+							class="anon-comment-avatar"
+							title="Comentarás de forma anónima"
+							style="flex: 0 0 32px; min-width: 32px; min-height: 32px;"
+						>
+							<span class="material-icons-round" style="font-size:16px">visibility_off</span>
+						</div>
+					{:else if authStore.user?.avatar_url}
 						<img
 							src={authStore.user.avatar_url}
 							alt="You"
-							class="w-8 h-8 rounded-full border border-white object-cover"
+							class="w-8 h-8 squircle border border-white object-cover"
 							width="32"
 							height="32"
 							loading="lazy"
@@ -687,12 +875,34 @@
 							</div>
 						{/if}
 
+						{#if post?.is_anonymous}
+							<button
+								type="button"
+								class="anon-comment-identity-pill"
+								onclick={() => {
+									if (!myAnonUsername) showAnonIdentityModal = true;
+								}}
+								title="Tu identidad para comentarios anónimos (permanente)"
+							>
+								<span class="material-icons-round" style="font-size:13px">theater_comedy</span>
+								{#if myAnonUsername}
+									<span>Comentarás como <strong>@{myAnonUsername}</strong></span>
+								{:else if anonIdentityLoaded}
+									<span>Crea tu identidad anónima para comentar</span>
+								{:else}
+									<span>Comentario anónimo…</span>
+								{/if}
+							</button>
+						{/if}
+
 						<div class="comment-input-wrapper" style="overflow: visible;">
 							<HashtagTextarea
 								id="comment_input_{post.id}"
 								bind:value={commentText}
 								onkeydown={handleKeydown}
-								placeholder="Escribe un comentario..."
+								placeholder={post?.is_anonymous
+									? 'Escribe un comentario anónimo...'
+									: 'Escribe un comentario...'}
 								class="aero-textarea pr-[150px]"
 								style="--hashtag-padding: 11px 150px 11px 16px; --hashtag-font-size: 0.88rem; --hashtag-line-height: 1.4;"
 								rows={1}
@@ -772,7 +982,7 @@
 
 						{#if showCommentMedia}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
-								<div class="glass-panel p-4" style="min-height: max-content;">
+								<div class="post-nested-panel p-4" style="min-height: max-content;">
 									<div
 										role="button"
 										tabindex="0"
@@ -804,7 +1014,7 @@
 						{#if showCommentEmojis}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
 								<div
-									class="glass-panel p-4"
+									class="post-nested-panel p-4"
 									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
 								>
 									<TwemojiPicker
@@ -821,7 +1031,7 @@
 						{#if showCommentGifs}
 							<div transition:slide={{ duration: 400, easing: expoOut }} class="mt-3">
 								<div
-									class="glass-panel p-4"
+									class="post-nested-panel p-4"
 									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
 								>
 									<KlipyPicker
@@ -866,8 +1076,15 @@
 				</div>
 			{:else if comments.length > 0}
 				<div class="comments-list">
-					{#each comments.slice(-10) as comment}
-						<CommentItem {comment} postId={post.id} onReload={loadComments} />
+					{#each comments.slice(-10) as comment, i (comment.id)}
+						<div in:fly={{ y: 12, duration: 250, delay: Math.min(i * 30, 200), easing: expoOut }}>
+							<CommentItem
+								{comment}
+								postId={post.id}
+								postIsAnonymous={post?.is_anonymous == 1 || post?.is_anonymous === true}
+								onReload={loadComments}
+							/>
+						</div>
 					{/each}
 				</div>
 				{#if comments.length > 10}
@@ -903,7 +1120,7 @@
 		>
 			<div class="flex items-center gap-3 mb-3">
 				<div
-					class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+					class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0"
 					style="background: rgba(232, 74, 114, 0.15); color: #e84a72;"
 				>
 					<span class="material-icons-round">warning</span>
@@ -936,14 +1153,29 @@
 	</div>
 {/if}
 
+<AnonIdentityModal
+	open={showAnonIdentityModal}
+	onClose={() => {
+		showAnonIdentityModal = false;
+		pendingAnonComment = false;
+	}}
+	onCreated={(_username) => {
+		myAnonUsername = _username;
+		anonIdentityLoaded = true;
+		showAnonIdentityModal = false;
+		if (pendingAnonComment) {
+			pendingAnonComment = false;
+			submitComment();
+		}
+	}}
+/>
+
 <style>
 	/* PostCard overrides to match topbar effect & prevent overlap */
 	.aero-post-card {
 		position: relative;
 		z-index: 2;
 		background: var(--bg-surface);
-		backdrop-filter: var(--glass-blur, blur(24px) saturate(1.8));
-		-webkit-backdrop-filter: var(--glass-blur, blur(24px) saturate(1.8));
 		isolation: isolate;
 		border-radius: var(--radius-lg);
 		padding: 1.5rem;
@@ -952,8 +1184,14 @@
 		box-shadow: var(--glass-shadow), var(--glass-inset);
 		margin-bottom: 2rem;
 		transition:
-			transform var(--t-base),
-			box-shadow var(--t-base);
+			border-color 0.25s ease,
+			box-shadow 0.25s ease;
+	}
+
+	.post-nested-panel {
+		background: var(--bg-surface-hover, rgba(255, 255, 255, 0.04));
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
 	}
 
 	.emoji-only-text {
@@ -964,7 +1202,10 @@
 	}
 
 	.aero-post-card:hover {
-		box-shadow: var(--shadow-md), var(--glass-inset);
+		border-color: rgba(27, 133, 243, 0.35);
+		box-shadow:
+			0 0 20px rgba(27, 133, 243, 0.15),
+			var(--glass-inset);
 	}
 
 	.text-main {
@@ -982,7 +1223,8 @@
 		background: transparent;
 		border: none;
 		color: var(--text-secondary);
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1006,9 +1248,7 @@
 		right: 0;
 		top: 100%;
 		margin-top: 4px;
-		background: var(--glass-surface, rgba(255, 255, 255, 0.05));
-		backdrop-filter: blur(14px) saturate(1.2);
-		-webkit-backdrop-filter: blur(14px) saturate(1.2);
+		background: var(--bg-surface-solid, var(--bg-surface));
 		border: 1px solid var(--glass-border);
 		border-top-color: var(--glass-border-t);
 		border-radius: var(--radius-sm);
@@ -1083,6 +1323,9 @@
 		max-height: 500px;
 		margin: 0 auto;
 		object-fit: cover;
+		/* Evita que el ancho intrínseco de la imagen fuerce el min-content de la
+		   tarjeta y la haga desbordar grids estrechos (min-width: auto) */
+		min-width: 0;
 	}
 
 	/* ── Imágenes en grid ── */
@@ -1116,15 +1359,35 @@
 		height: 100% !important;
 	}
 
+	.media-item.is-clickable {
+		cursor: pointer;
+		transition: filter 0.2s ease;
+	}
+
+	.media-item.is-clickable:hover {
+		filter: brightness(1.05);
+	}
+
 	.media-overlay {
 		position: absolute;
 		bottom: 0;
 		right: 0;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(8px);
 		color: white;
-		padding: 4px 8px;
-		border-top-left-radius: var(--radius-xs);
+		padding: 6px 10px;
+		border-top-left-radius: var(--radius-sm);
 		font-weight: bold;
+		user-select: none;
+	}
+
+	.media-overlay.is-clickable {
+		cursor: pointer;
+		transition: background-color 0.2s ease;
+	}
+
+	.media-overlay.is-clickable:hover {
+		background: var(--accent-blue-base, #1b85f3);
 	}
 
 	.aero-hashtag {
@@ -1164,97 +1427,34 @@
 		color: var(--text-secondary);
 		font-weight: 600;
 		cursor: pointer;
-		transition: all var(--t-fast);
+		transition:
+			transform var(--t-spring),
+			background var(--t-fast),
+			color var(--t-fast),
+			box-shadow var(--t-fast);
+		will-change: transform;
 	}
-
+	/* Press: feedback táctil suave */
+	.action-btn:active {
+		transform: scale(0.92);
+	}
 	.action-btn:hover {
 		background: var(--bg-overlay);
 		color: var(--aero-blue);
-		box-shadow: var(--glass-inset);
-	}
-
-	.action-btn:hover .icon {
-		transform: scale(1.1);
+		box-shadow: 0 0 12px rgba(27, 133, 243, 0.15);
 	}
 
 	.action-btn.liked {
 		color: var(--aero-rose, #ec4899);
 		background: rgba(236, 72, 153, 0.08);
 	}
-
-	.heart-pop {
-		animation: heartPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-		transform-origin: center;
-	}
-	@keyframes heartPop {
-		0% {
-			transform: scale(1);
-			filter: drop-shadow(0 0 0 transparent);
-		}
-		15% {
-			transform: scale(0.8);
-			filter: drop-shadow(0 0 4px var(--aero-rose, #ec4899));
-		}
-		30% {
-			transform: scale(1.6) rotate(-12deg);
-			filter: drop-shadow(0 0 10px var(--aero-rose, #ec4899));
-			color: var(--aero-rose, #ec4899);
-		}
-		50% {
-			transform: scale(1.3) rotate(8deg);
-			filter: drop-shadow(0 0 6px var(--aero-rose, #ec4899));
-			color: var(--aero-rose, #ec4899);
-		}
-		70% {
-			transform: scale(1.1) rotate(-4deg);
-			color: var(--aero-rose, #ec4899);
-		}
-		100% {
-			transform: scale(1) rotate(0);
-			filter: drop-shadow(0 0 0 transparent);
-			color: var(--aero-rose, #ec4899);
-		}
-	}
-
-	.action-btn.liked .icon {
-		filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.5));
-	}
-
-	/* Like button wrapper & particles */
-	.like-btn-wrapper {
-		position: relative;
-		display: inline-flex;
-	}
-
-	.like-particle {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		font-size: 10px;
-		color: var(--aero-rose, #ec4899);
-		pointer-events: none;
-		animation: particleBurst 0.5s ease-out forwards;
-		transform-origin: center;
-		text-shadow: 0 0 4px rgba(236, 72, 153, 0.5);
-	}
-
-	@keyframes particleBurst {
-		0% {
-			opacity: 1;
-			transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0) scale(1);
-		}
-		50% {
-			opacity: 0.8;
-		}
-		100% {
-			opacity: 0;
-			transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--dist) * -1))
-				scale(0.3);
-		}
-	}
-
 	.action-btn.liked:hover {
 		background: rgba(236, 72, 153, 0.15);
+		color: var(--aero-rose, #ec4899);
+		box-shadow: 0 0 14px rgba(236, 72, 153, 0.25);
+	}
+	.action-btn.liked .icon {
+		filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.5));
 	}
 
 	.action-btn-save {
@@ -1277,6 +1477,67 @@
 		background: rgba(46, 134, 232, 0.08);
 	}
 
+	.repost-indicator-banner {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin: -2px 0 10px 0;
+		padding-bottom: 8px;
+		border-bottom: 1px solid var(--border-subtle);
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: var(--text-muted);
+	}
+
+	.repost-indicator-banner .repost-icon {
+		font-size: 16px;
+		color: var(--aero-mint, #00d4aa);
+	}
+
+	.repost-indicator-banner .repost-user-link {
+		color: var(--text-secondary);
+		font-weight: 600;
+		text-decoration: none;
+		transition: color var(--t-fast);
+	}
+
+	.repost-indicator-banner .repost-user-link:hover {
+		color: var(--aero-mint, #00d4aa);
+		text-decoration: underline;
+	}
+
+	.action-btn.shared {
+		color: var(--aero-mint, #00d4aa);
+		background: rgba(0, 212, 170, 0.08);
+	}
+
+	.action-btn.shared .icon {
+		filter: drop-shadow(0 0 6px rgba(0, 212, 170, 0.5));
+	}
+
+	.action-btn.shared:hover {
+		background: rgba(0, 212, 170, 0.15);
+	}
+
+	.share-bounce {
+		animation: shareBounce 0.5s var(--ease-spring);
+	}
+
+	@keyframes shareBounce {
+		0% {
+			transform: scale(1);
+		}
+		30% {
+			transform: scale(1.3) rotate(15deg);
+		}
+		60% {
+			transform: scale(0.9) rotate(-5deg);
+		}
+		100% {
+			transform: scale(1) rotate(0);
+		}
+	}
+
 	.post-mood-badge {
 		font-size: 0.7rem;
 		font-weight: 600;
@@ -1284,16 +1545,109 @@
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
 		padding: 2px 8px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		margin-left: 6px;
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
 	}
 
+	.anon-avatar-wrapper {
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
+		background: var(
+			--anon-gradient,
+			linear-gradient(135deg, rgba(99, 102, 241, 0.18) 0%, rgba(34, 211, 238, 0.14) 100%)
+		);
+		padding: 2px;
+		box-shadow:
+			0 2px 8px rgba(99, 102, 241, 0.12),
+			inset 0 1px 1px rgba(255, 255, 255, 0.4);
+		border: 1px solid var(--anon-border, rgba(255, 255, 255, 0.25));
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.anon-avatar-inner {
+		width: 100%;
+		height: 100%;
+		border-radius: inherit;
+		background: var(--bg-surface);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--anon-accent, #818cf8);
+	}
+
+	.anon-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 8px;
+		border-radius: var(--radius-full);
+		font-size: 0.68rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		background: var(
+			--anon-gradient,
+			linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.08))
+		);
+		color: var(--anon-text, #4338ca);
+		border: 1px solid var(--anon-border, rgba(168, 85, 247, 0.25));
+		box-shadow: 0 1px 4px rgba(99, 102, 241, 0.08);
+	}
+
+	.anon-owner-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 8px;
+		border-radius: var(--radius-full);
+		font-size: 0.68rem;
+		font-weight: 600;
+		background: var(--anon-bg, rgba(99, 102, 241, 0.1));
+		color: var(--anon-text, #4338ca);
+		border: 1px solid var(--anon-border, rgba(168, 85, 247, 0.25));
+		box-shadow: 0 1px 4px rgba(99, 102, 241, 0.08);
+	}
+
 	.comments-section {
 		border-top: 1px solid var(--border-subtle);
 		padding-top: 12px;
+	}
+	.comments-section.is-anon-section {
+		border-top: 1px solid var(--anon-border, rgba(129, 140, 248, 0.25));
+		background: linear-gradient(180deg, rgba(99, 102, 241, 0.03) 0%, rgba(168, 85, 247, 0.01) 100%);
+		border-radius: 0 0 var(--radius-md) var(--radius-md);
+		padding: 12px 8px 4px;
+	}
+	.comments-section.is-anon-section .comment-input-wrapper {
+		border-color: var(--anon-border, rgba(129, 140, 248, 0.25));
+		background: var(--anon-bg, rgba(99, 102, 241, 0.05));
+	}
+	.comments-section.is-anon-section .comment-input-wrapper:focus-within {
+		border-color: var(--anon-accent, #818cf8);
+		box-shadow:
+			0 0 0 3px var(--anon-bg, rgba(99, 102, 241, 0.15)),
+			0 0 16px rgba(99, 102, 241, 0.2);
+	}
+	.comments-section.is-anon-section .comment-submit-btn {
+		background: var(--anon-gradient, linear-gradient(135deg, #6366f1, #a855f7));
+		border: 1px solid var(--anon-border-active, rgba(168, 85, 247, 0.7));
+		box-shadow: 0 3px 12px rgba(99, 102, 241, 0.35);
+	}
+	.comments-section.is-anon-section .comment-submit-btn:not(:disabled):hover {
+		box-shadow: 0 0 18px rgba(168, 85, 247, 0.5);
+		border-color: rgba(255, 255, 255, 0.6);
+	}
+	.comments-section.is-anon-section .comment-emoji-btn:hover,
+	.comments-section.is-anon-section .comment-gif-btn:hover,
+	.comments-section.is-anon-section .comment-photo-btn:hover {
+		color: var(--anon-accent, #818cf8);
 	}
 
 	.comment-input-wrapper {
@@ -1303,10 +1657,8 @@
 		align-items: center;
 		min-height: 44px;
 		background: var(--bg-input-tint);
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
 		border: 1.5px solid var(--glass-border);
-		border-radius: 22px;
+		border-radius: var(--radius-lg);
 		overflow: hidden;
 		transition:
 			border-color 0.2s ease,
@@ -1333,7 +1685,8 @@
 		justify-content: center;
 		background: transparent;
 		border: none;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		cursor: pointer;
 		transition: background var(--t-fast);
 		color: var(--text-muted);
@@ -1356,7 +1709,8 @@
 		justify-content: center;
 		background: transparent;
 		border: none;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		cursor: pointer;
 		transition: background var(--t-fast);
 		color: var(--text-muted);
@@ -1379,7 +1733,7 @@
 		justify-content: center;
 		background: transparent;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition: background var(--t-fast);
 		color: var(--text-muted);
@@ -1410,7 +1764,8 @@
 	.dropzone-icon {
 		width: 44px;
 		height: 44px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(34, 211, 238, 0.1);
 		border: 1px solid rgba(34, 211, 238, 0.2);
 		display: flex;
@@ -1432,11 +1787,12 @@
 		transform: translateY(-50%);
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: linear-gradient(135deg, var(--aero-sky), var(--aero-blue));
 		color: white;
 		border: none;
-		box-shadow: 0 3px 10px rgba(27, 133, 243, 0.3);
+		box-shadow: 0 3px 10px rgba(var(--accent-blue-rgb), 0.3);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1451,13 +1807,12 @@
 	}
 
 	.comment-submit-btn:not(:disabled):hover {
-		transform: translateY(-50%) scale(1.1);
-		box-shadow: 0 6px 16px rgba(27, 133, 243, 0.4);
+		box-shadow: 0 0 16px rgba(var(--accent-blue-rgb), 0.5);
 	}
 
 	.comment-submit-btn:not(:disabled):active {
-		transform: translateY(-50%) scale(0.94);
-		box-shadow: 0 2px 6px rgba(27, 133, 243, 0.25);
+		transform: translateY(-50%) scale(0.96);
+		box-shadow: 0 2px 6px rgba(var(--accent-blue-rgb), 0.25);
 	}
 
 	.comment-submit-btn:disabled {
@@ -1472,16 +1827,14 @@
 	@keyframes slideInUp {
 		from {
 			opacity: 0;
-			transform: translateY(20px);
 		}
 		to {
 			opacity: 1;
-			transform: translateY(0);
 		}
 	}
 
 	.animate-slide-in-up {
-		animation: slideInUp 0.5s ease-out;
+		animation: slideInUp 0.2s ease-out;
 	}
 
 	/* Real-time comments */
@@ -1510,7 +1863,7 @@
 		padding: 6px 12px;
 		background: rgba(74, 171, 223, 0.08);
 		border: 1px solid rgba(74, 171, 223, 0.2);
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		color: var(--aero-blue);
 		font-size: 0.75rem;
 		font-weight: 700;
@@ -1581,7 +1934,8 @@
 	.skeleton-avatar {
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: rgba(255, 255, 255, 0.06);
 		flex-shrink: 0;
 		background-image: linear-gradient(
@@ -1604,7 +1958,7 @@
 
 	.skeleton-line {
 		height: 10px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		background: rgba(255, 255, 255, 0.06);
 		background-image: linear-gradient(
 			90deg,
@@ -1643,14 +1997,39 @@
 		}
 	}
 
-	/* Móvil: blur más ligero en las superficies hardcoded de la tarjeta (dropdown + input
-	   de comentario). Solo ≤768px; desktop idéntico. La cabecera glass de PostCard usa
-	   var(--glass-blur) y se cubre desde layout.css. */
-	@media (max-width: 768px) {
-		.aero-dropdown-menu,
-		.comment-input-wrapper {
-			backdrop-filter: blur(8px);
-			-webkit-backdrop-filter: blur(8px);
-		}
+	/* ── Comentarios en posts anónimos ── */
+	.anon-comment-avatar {
+		border-radius: 50%;
+		background: var(
+			--anon-gradient,
+			linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(34, 211, 238, 0.22))
+		);
+		border: 1px solid var(--anon-border, rgba(129, 140, 248, 0.45));
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--anon-accent, #818cf8);
+		box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+	}
+	.anon-comment-identity-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: 8px;
+		padding: 5px 12px;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--anon-border, rgba(129, 140, 248, 0.35));
+		background: var(--anon-bg, rgba(99, 102, 241, 0.1));
+		color: var(--anon-text, #4338ca);
+		font-size: 0.74rem;
+		cursor: pointer;
+		transition: all var(--t-fast);
+	}
+	.anon-comment-identity-pill:hover {
+		border-color: var(--anon-accent, rgba(129, 140, 248, 0.6));
+		box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+	}
+	.anon-comment-identity-pill strong {
+		color: var(--anon-text, #4338ca);
 	}
 </style>

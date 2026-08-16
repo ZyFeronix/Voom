@@ -32,8 +32,16 @@ export async function load({ _locals }) {
 		console.error('Error loading system settings in layout:', e);
 	}
 
+	let needsSetup = false;
+	try {
+		const db = getDb();
+		const count = await db.prepare('SELECT COUNT(*) as cnt FROM users').get();
+		needsSetup = count?.cnt === 0;
+	} catch {}
+
 	return {
 		isInstalled: getIsInstalled(),
+		needsSetup,
 		globalSettings: settings
 	};
 }

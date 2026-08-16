@@ -2,14 +2,26 @@
 	import { scale } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 
+	import { goto } from '$app/navigation';
+
 	let { role = 'user', isVerified = false, size = '16px', interactive = false } = $props();
+
+	let isVerifiedBool = $derived(isVerified === true || isVerified === 1 || isVerified === '1');
 
 	let badgeType = $derived.by(() => {
 		if (role === 'super_admin' || role === 'admin') return 'admin';
 		if (role === 'moderator') return 'moderator';
 		if (role === 'support') return 'support';
 		if (role === 'team') return 'team';
-		if (isVerified) return 'verified';
+		if (
+			role === 'government' ||
+			role === 'gov' ||
+			role === 'official' ||
+			role === 'institutional' ||
+			role === 'legal'
+		)
+			return 'government';
+		if (isVerifiedBool) return 'verified';
 		return 'none';
 	});
 
@@ -50,6 +62,15 @@
 				linkText: 'Conocer al equipo'
 			};
 		}
+		if (badgeType === 'government') {
+			return {
+				icon: 'account_balance',
+				color: 'var(--badge-gov)',
+				title: 'Entidad Gubernamental / Legal',
+				desc: 'Esta cuenta representa a una institución gubernamental, cuerpo legal u organismo oficial autenticado.',
+				linkText: 'Conocer más'
+			};
+		}
 		if (badgeType === 'verified') {
 			return {
 				icon: 'verified',
@@ -66,9 +87,13 @@
 
 	let badgeEl = $state(null);
 
-	function togglePopup(_e) {
+	function togglePopup(e) {
 		if (!interactive) return;
 		if (badgeType === 'none') return;
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 		showPopup = !showPopup;
 	}
 
@@ -77,12 +102,31 @@
 		if (badgeEl && badgeEl.contains(e.target)) return;
 		showPopup = false;
 	}
+
+	function handleKeyDown(e) {
+		if (!interactive) return;
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			e.stopPropagation();
+			togglePopup();
+		} else if (e.key === 'Escape' && showPopup) {
+			e.preventDefault();
+			e.stopPropagation();
+			showPopup = false;
+		}
+	}
+
+	function handleLinkClick(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		showPopup = false;
+		goto('/about/verified');
+	}
 </script>
 
 <svelte:window onclick={closePopup} />
 
 {#if badgeType !== 'none'}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
@@ -91,19 +135,18 @@
 		role={interactive ? 'button' : 'presentation'}
 		tabindex={interactive ? '0' : '-1'}
 		onclick={togglePopup}
+		onkeydown={handleKeyDown}
 		style="--badge-color: {badgeData.color}; --badge-size: {size};"
 	>
 		<span class="material-icons-round badge-icon">{badgeData.icon}</span>
 
 		{#if showPopup}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="badge-popup glass-panel aero-modal"
 				transition:scale={{ duration: 300, start: 0.9, easing: quintOut }}
-				onclick={(e) => {
-					if (!e.target.closest('a')) {
-						e.stopPropagation();
-					}
-				}}
+				onclick={(e) => e.stopPropagation()}
 			>
 				<div class="popup-header">
 					<span class="popup-title">{badgeData.title}</span>
@@ -114,7 +157,10 @@
 						>{badgeData.icon}</span
 					>
 					<p class="popup-desc">
-						{badgeData.desc} <a href="/about/verified" class="popup-link">{badgeData.linkText}</a>
+						{badgeData.desc}
+						<a href="/about/verified" class="popup-link" onclick={handleLinkClick}>
+							{badgeData.linkText}
+						</a>
 					</p>
 				</div>
 			</div>
@@ -129,7 +175,7 @@
 		align-items: center;
 		justify-content: center;
 		margin-left: 6px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		outline: none;
 		transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 		background: color-mix(in srgb, var(--badge-color) 15%, transparent);
@@ -176,7 +222,7 @@
 			0 15px 45px rgba(0, 0, 0, 0.6),
 			inset 0 1px 0 rgba(255, 255, 255, 0.1),
 			0 0 25px var(--badge-color, rgba(0, 0, 0, 0));
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 14px;
 		z-index: 1000;
 		cursor: default;
@@ -194,7 +240,7 @@
 		height: 30%;
 		background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
 		pointer-events: none;
-		border-radius: 16px 16px 0 0;
+		border-radius: var(--radius-md) 16px var(--radius-xs) var(--radius-xs);
 	}
 
 	/* Flecha del popup */
@@ -244,6 +290,7 @@
 		text-decoration: none;
 		font-weight: 600;
 		transition: color 0.2s;
+		cursor: pointer;
 	}
 
 	.popup-link:hover {

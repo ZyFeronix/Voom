@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [RELEASED]
 
+## [0.6.0-beta.1] - 2026-08-16
+
+### Added
+- **Identidades Anónimas y Publicaciones Anónimas:** soporte completo para identidades anónimas persistentes y exclusivas, protección estricta de privacidad y flags de anonimato en publicaciones.
+- **Mejoras del Algoritmo de Feed y Reputación de Autores:** motor de reputación de autores, mitigación heurística de bots/spam, escritor de lotes en memoria (*In-Memory Batch Writer*) y sub-caps de popularidad.
+- **Sistema de Reposts y Shares:** funcionalidad de republicaciones y citas con conteo optimizado en tiempo real.
+- **Custom Assets & Emojis Clásicos:** soporte para activos personalizados por rol y catálogo ampliado de emoticonos retro estilo MSN.
+- **Flujo de Verificaciones de Creadores y VTubers:** workflow administrativo para aprobación/rechazo de insignias de verificación y control de strikes de moderación.
+
 ## [0.5] - 2026-07-23
 
 ### Added

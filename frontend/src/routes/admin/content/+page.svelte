@@ -148,9 +148,7 @@
 											<div class="media-thumb">
 												{#if currentType === 'reels' || item.media.includes('video')}
 													<span class="material-icons-round play-icon">play_circle</span>
-													<media-player src={item.media} muted playsInline>
-														<media-provider></media-provider>
-													</media-player>
+													<video src={item.media} muted playsinline preload="metadata"></video>
 												{:else}
 													<img src={item.media} alt="Media" />
 												{/if}
@@ -208,7 +206,7 @@
 		>
 			<div class="flex items-center gap-3 mb-3">
 				<div
-					class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 {isDanger
+					class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0 {isDanger
 						? 'bg-red-500/20 text-red-500'
 						: 'bg-blue-500/20 text-blue-500'}"
 				>
@@ -270,7 +268,7 @@
 		background: none;
 		border: none;
 		padding: 6px 16px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		font-weight: 600;
 		color: var(--text-muted);
 		cursor: pointer;
@@ -324,7 +322,8 @@
 	.user-avatar-mini {
 		width: 28px;
 		height: 28px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--grad-primary);
 		display: flex;
 		align-items: center;
@@ -352,14 +351,14 @@
 	.media-thumb {
 		width: 48px;
 		height: 48px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		overflow: hidden;
 		position: relative;
 		background: #000;
 		flex-shrink: 0;
 	}
 	.media-thumb img,
-	.media-thumb media-player {
+	.media-thumb video {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;

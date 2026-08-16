@@ -67,7 +67,7 @@ export async function POST({ request, url }) {
 			.prepare(
 				`
 			SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url,
-				u.bio, u.category, u.is_verified, u.wallet_balance, u.follower_count, u.following_count,
+				u.bio, u.category, u.is_verified, u.follower_count, u.following_count,
 				COALESCE(ur.role, u.role, 'user') AS role
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE u.id = ? LIMIT 1
 		`
@@ -86,7 +86,7 @@ export async function POST({ request, url }) {
 			.prepare(
 				`
 			SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_url,
-				u.cover_url, u.bio, u.category, u.is_verified, u.wallet_balance,
+				u.cover_url, u.bio, u.category, u.is_verified,
 				u.follower_count, u.following_count, u.is_banned, u.is_active, u.deleted_at,
 				COALESCE(ur.role, u.role, 'user') AS role
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -137,8 +137,8 @@ export async function POST({ request, url }) {
 	return json({ error: 'Endpoint no encontrado' }, { status: 404 });
 }
 
-export async function GET({ request, url }) {
-	const action = url.pathname.split('/').pop();
+export async function GET({ request, url, params }) {
+	const action = params?.action || url.pathname.replace(/\/+$/, '').split('/').pop();
 
 	if (action === 'me') {
 		const userId = await requireAuth(request);
@@ -146,9 +146,12 @@ export async function GET({ request, url }) {
 		const user = await db
 			.prepare(
 				`
-			SELECT id, username, email, display_name, avatar_url, cover_url, bio, category, role,
-				is_verified, wallet_balance, follower_count, following_count, created_at
-			FROM users WHERE id = ?
+			SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url, u.bio, u.category,
+				COALESCE(ur.role, u.role, 'user') AS role,
+				u.is_verified, u.payment_link, u.follower_count, u.following_count, u.created_at,
+				u.level, u.xp_points, u.custom_status, u.custom_status_text, u.custom_status_expires_at
+			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
+			WHERE u.id = ? LIMIT 1
 		`
 			)
 			.get(userId);

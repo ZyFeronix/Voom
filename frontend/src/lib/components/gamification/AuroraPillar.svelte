@@ -48,18 +48,9 @@
 		position: absolute;
 		inset: 0;
 		background: var(--pillar-aurora);
-		background-size: 100% 220%;
-		filter: blur(70px);
 		opacity: 0.35;
-		mask-image: linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%);
-		-webkit-mask-image: linear-gradient(
-			to right,
-			transparent 0%,
-			#000 20%,
-			#000 80%,
-			transparent 100%
-		);
-		animation: lb-aurora-drift 22s ease-in-out infinite alternate;
+		mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, #000 30%, transparent 100%);
+		-webkit-mask-image: radial-gradient(ellipse 60% 80% at 50% 50%, #000 30%, transparent 100%);
 	}
 
 	/* Glowing caps that anchor the pillar top & bottom */
@@ -69,7 +60,8 @@
 		transform: translateX(-50%);
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--pillar-cap);
 		box-shadow: 0 0 24px 6px var(--pillar-cap);
 		opacity: 0.5;

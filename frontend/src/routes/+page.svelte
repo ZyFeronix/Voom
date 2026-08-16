@@ -1,11 +1,21 @@
 <script>
 	import { onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
+	import { goto } from '$app/navigation';
+	import { authStore } from '$lib/stores/auth.svelte.js';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
+	import { generateLikeSparkles } from '$lib/utils/likeSparkles.js';
+
+	$effect(() => {
+		if (authStore.isAuthenticated && authStore.user) {
+			goto('/feed');
+		}
+	});
 
 	// --- Runes State ---
 	let activeTheme = $state('prism');
 	let heroVisible = $state(false);
+	let mobileMenuOpen = $state(false);
 
 	function selectActiveTheme(theme) {
 		if (typeof document !== 'undefined' && typeof document.startViewTransition === 'function') {
@@ -33,19 +43,23 @@
 	// Mockup dashboard state
 	let mockupLikes = $state(1204);
 	let mockupLiked = $state(false);
+	let mockupLikeAnim = $state(false);
+	let mockupLikeUnpop = $state(false);
+	let mockupSparkles = $state([]);
+	let mockupLikeTimeout = null;
 	let activeMockupTab = $state('feed');
 
 	// Sandbox posts state
 	let sandboxPosts = $state([
 		{
 			author: '@Aria_Hologram',
-			text: 'El sistema de gamificación de V-Social es el mejor que he visto. Los badges y el leaderboard hacen que crear contenido sea adictivo. 🏆✨',
+			text: 'El sistema de gamificación de V-Social es el mejor que he visto. Los badges y el leaderboard hacen que crear contenido sea emocionante y transparente. 🏆✨',
 			likes: 24,
 			time: 'Hace 3 min'
 		},
 		{
 			author: '@PixelWizard',
-			text: 'Por fin una red social que no cobra comisiones del 30% a los artistas ni nos oculta detrás de un algoritmo de pago. Esto es libertad digital. 💎🎨',
+			text: 'Por fin una red social que no cobra comisiones del 30% a los artistas ni nos oculta detrás de un algoritmo de pago. Soberanía digital real. 💎🎨',
 			likes: 12,
 			time: 'Hace 8 min'
 		}
@@ -64,24 +78,46 @@
 	}
 
 	function handleMockupLike() {
+		if (mockupLikeTimeout) clearTimeout(mockupLikeTimeout);
+
 		if (mockupLiked) {
 			mockupLikes--;
 			mockupLiked = false;
+			mockupLikeAnim = false;
+			mockupLikeUnpop = true;
+			mockupSparkles = [];
+			mockupLikeTimeout = setTimeout(() => {
+				mockupLikeUnpop = false;
+			}, 350);
 		} else {
 			mockupLikes++;
 			mockupLiked = true;
 			queryCount++;
+			mockupLikeAnim = true;
+			mockupLikeUnpop = false;
+			mockupSparkles = generateLikeSparkles(7, 18);
+			mockupLikeTimeout = setTimeout(() => {
+				mockupLikeAnim = false;
+				mockupSparkles = [];
+			}, 650);
 		}
 	}
 
 	function handleAddPost() {
 		if (!newPostText.trim()) return;
 		sandboxPosts = [
-			{ author: '@Visitante_Anon', text: newPostText, likes: 0, time: 'Ahora mismo' },
+			{ author: '@Visitante_Anon', text: newPostText.trim(), likes: 0, time: 'Ahora mismo' },
 			...sandboxPosts
 		];
 		newPostText = '';
 		queryCount++;
+	}
+
+	function handleSandboxKeydown(e) {
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+			e.preventDefault();
+			handleAddPost();
+		}
 	}
 
 	// Specular light coordinates for cards
@@ -246,18 +282,18 @@
 </script>
 
 <svelte:head>
-	<title>V-Social — La Red Social Libre para Creadores</title>
+	<title>V-Social — Red Social Libre para Creadores & Artistas Virtuales</title>
 	<meta
 		name="description"
-		content="Plataforma social open-source (AGPLv3) construida con SvelteKit 5, SQLite WAL y LiquidglassUI. 0% comisiones, feed cronológico puro, gamificación real. Auto-hospedable desde $4/mes."
+		content="Plataforma social open-source (AGPLv3) construida con SvelteKit 5 Runes, SQLite WAL y LiquidglassUI. 0% comisiones, feed cronológico puro, gamificación real y auto-hospedaje desde $4/mes."
 	/>
 </svelte:head>
 
 <div class="aero-wrapper theme-{activeTheme}">
 	<!-- ═══════════════════════════════════ HEADER ══════════════════════════════════ -->
-	<header class="aero-header glass-panel">
+	<header class="aero-header">
 		<div class="nav-container">
-			<a href="/" class="nav-logo">
+			<a href="/" class="nav-logo" aria-label="VSocial Inicio">
 				<span class="logo-prism">VS</span>ocial
 				<span class="nav-live-badge">
 					<span class="live-dot"></span>LIVE
@@ -265,24 +301,81 @@
 			</a>
 
 			<nav class="nav-links" aria-label="Navegación principal">
-				<a href="/explore">Explorar</a>
-				<a href="/reels">Reels</a>
-				<a href="/marketplace">Mercado</a>
-				<a href="/messages">Mensajes</a>
-				<a href="#features">Características</a>
-				<a href="#gamification">Gamification</a>
+				<a href="/explore" class="nav-link-item">Explorar</a>
+				<a href="/reels" class="nav-link-item">Reels</a>
+				<a href="/marketplace" class="nav-link-item">Mercado</a>
+				<a href="/messages" class="nav-link-item">Mensajes</a>
+				<a href="#features" class="nav-link-item">Capacidades</a>
+				<a href="#gamification" class="nav-link-item">Gamificación</a>
 			</nav>
 
 			<div class="nav-actions">
 				<ThemeSelector compact={true} align="right" />
-				<div class="btn-aero-wrap secondary-wrap" style="flex: 0 0 auto; min-width: 120px;">
-					<a href="/login" class="btn-aero-secondary">Iniciar Sesión</a>
+				<a href="/login" class="nav-login-link">Iniciar Sesión</a>
+				<div
+					class="btn-aero-wrap primary-wrap"
+					style="flex: 0 0 auto; min-width: 130px; min-height: 38px;"
+				>
+					<a href="/register" class="btn-aero-primary w-full h-full">Crear Cuenta</a>
 				</div>
-				<div class="btn-aero-wrap primary-wrap" style="flex: 0 0 auto; min-width: 140px;">
-					<a href="/register" class="btn-aero-primary">Crear Cuenta</a>
-				</div>
+				<button
+					type="button"
+					class="mobile-menu-btn"
+					onclick={() => (mobileMenuOpen = !mobileMenuOpen)}
+					aria-label={mobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+					aria-expanded={mobileMenuOpen}
+				>
+					<span class="material-icons-round">
+						{mobileMenuOpen ? 'close' : 'menu'}
+					</span>
+				</button>
 			</div>
 		</div>
+
+		{#if mobileMenuOpen}
+			<div class="mobile-nav-drawer" transition:slide={{ duration: 250 }}>
+				<nav class="mobile-nav-list" aria-label="Navegación móvil">
+					<a href="/explore" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">explore</span>
+						<span>Explorar</span>
+					</a>
+					<a href="/reels" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">play_circle</span>
+						<span>Reels</span>
+					</a>
+					<a href="/marketplace" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">storefront</span>
+						<span>Mercado P2P</span>
+					</a>
+					<a href="/messages" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">chat</span>
+						<span>Mensajes</span>
+					</a>
+					<a href="#features" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">auto_awesome</span>
+						<span>Capacidades</span>
+					</a>
+					<a href="#gamification" class="mobile-nav-item" onclick={() => (mobileMenuOpen = false)}>
+						<span class="material-icons-round">emoji_events</span>
+						<span>Gamificación</span>
+					</a>
+				</nav>
+				<div class="mobile-nav-footer">
+					<a href="/login" class="mobile-btn-login" onclick={() => (mobileMenuOpen = false)}>
+						Iniciar Sesión
+					</a>
+					<div class="btn-aero-wrap primary-wrap w-full" style="min-height: 42px;">
+						<a
+							href="/register"
+							class="btn-aero-primary w-full h-full"
+							onclick={() => (mobileMenuOpen = false)}
+						>
+							Crear Cuenta
+						</a>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</header>
 
 	<!-- ═══════════════════════════════════ HERO ════════════════════════════════════ -->
@@ -298,30 +391,36 @@
 			<div class="hero-content">
 				<div class="badge-premium">
 					<span class="badge-dot"></span>
-					Open Source · AGPLv3 · v2.1
+					Open Source · AGPLv3 · v3.0
 				</div>
 
 				<h1 class="title">
 					La red social que<br />
-					<span class="text-glossy typewriter">devuelve el control</span>
+					<span class="text-glossy">devuelve el control</span>
 				</h1>
 
 				<p class="subtitle">
 					Construida con <strong>SvelteKit 5 Runes</strong>, <strong>SQLite WAL mode</strong> y
-					<strong>LiquidglassUI 2.0</strong>. Feed cronológico puro sin algoritmos ocultos.
-					<strong>0% comisiones</strong>
-					para creadores. Auto-hospedable desde <strong>$4/mes</strong>.
+					<strong>LiquidglassUI 2.0</strong>. Feed cronológico puro sin algoritmos opacos,
+					<strong>0% comisiones</strong> para creadores y auto-hospedaje desde
+					<strong>$4/mes</strong>.
 				</p>
 
 				<div class="hero-actions">
-					<div class="btn-aero-wrap primary-wrap" style="flex: 0 0 auto;">
-						<a href="/register" class="btn-aero-primary">
+					<div
+						class="btn-aero-wrap primary-wrap"
+						style="flex: 0 0 auto; min-width: 160px; min-height: 46px;"
+					>
+						<a href="/register" class="btn-aero-primary w-full h-full">
 							<span class="material-icons-round">rocket_launch</span>
 							Únete Gratis
 						</a>
 					</div>
-					<div class="btn-aero-wrap secondary-wrap" style="flex: 0 0 auto;">
-						<a href="#features" class="btn-aero-secondary">
+					<div
+						class="btn-aero-wrap secondary-wrap"
+						style="flex: 0 0 auto; min-width: 175px; min-height: 46px;"
+					>
+						<a href="#features" class="btn-aero-secondary w-full h-full">
 							<span class="material-icons-round">explore</span>
 							Ver Capacidades
 						</a>
@@ -358,7 +457,7 @@
 							<span class="close"></span><span class="min"></span><span class="max"></span>
 						</div>
 						<div class="window-title">VSocial Dashboard — Open Core Node</div>
-						<div class="window-status" style="flex: 0 0 80px; min-width: 80px;">
+						<div class="window-status" style="flex: 0 0 84px; min-width: 84px;">
 							<span class="ws-dot"></span> WAL: ON
 						</div>
 					</div>
@@ -387,7 +486,7 @@
 								onclick={() => (activeMockupTab = 'gamification')}
 							>
 								<span class="material-icons-round">emoji_events</span>
-								<span>Gamification</span>
+								<span>Gamificación</span>
 							</button>
 							<button
 								class="sidebar-item"
@@ -449,11 +548,29 @@
 												class:liked={mockupLiked}
 												onclick={handleMockupLike}
 												style="flex: 0 0 auto; min-height: 32px;"
+												aria-label="Me gusta de demostración"
 											>
-												<span class="material-icons-round"
-													>{mockupLiked ? 'favorite' : 'favorite_border'}</span
-												>
-												<span>{mockupLikes}</span>
+												<div class="like-icon-wrap" style="width: 16px; height: 16px;">
+													{#if mockupLikeAnim}
+														<span class="like-ring" style="width: 12px; height: 12px;"></span>
+														<span class="like-ring-glow" style="width: 22px; height: 22px;"></span>
+														<span class="like-sparkles">
+															{#each mockupSparkles as p (p.id)}
+																<span
+																	class="sparkle-dot"
+																	style="--spk-angle: {p.angle}deg; --spk-dist: {p.dist}px; --spk-size: {p.size}px; --spk-color: {p.color}; --spk-delay: {p.delay}ms;"
+																></span>
+															{/each}
+														</span>
+													{/if}
+													<span
+														class="material-icons-round {mockupLikeAnim
+															? 'heart-pop'
+															: ''} {mockupLikeUnpop ? 'heart-unpop' : ''}"
+														>{mockupLiked ? 'favorite' : 'favorite_border'}</span
+													>
+												</div>
+												<span class={mockupLikeAnim ? 'count-bump' : ''}>{mockupLikes}</span>
 											</button>
 											<span class="mock-comment-stat">
 												<span class="material-icons-round">chat_bubble_outline</span>
@@ -466,7 +583,7 @@
 								<div class="mock-analytics">
 									<div class="analytics-header">
 										<h3>Nodo Autogestionado</h3>
-										<p class="desc">Stack mínimo, máximo rendimiento.</p>
+										<p class="desc">Stack mínimo, máximo rendimiento en producción.</p>
 									</div>
 									<div class="analytics-grid">
 										<div
@@ -494,7 +611,7 @@
 										>
 											<span class="title">Costo / mes</span>
 											<span class="value">~$4 USD</span>
-											<span class="meta">VPS básico</span>
+											<span class="meta">VPS estándar</span>
 										</div>
 									</div>
 									<div
@@ -504,7 +621,7 @@
 									>
 										<div class="chart-legend">
 											<span class="legend-dot queries"></span>
-											<span>Queries/seg · WAL Mode activo</span>
+											<span>Queries/seg · Modo WAL activo</span>
 										</div>
 										<svg class="analytics-svg" viewBox="0 0 300 80" aria-hidden="true">
 											<defs>
@@ -564,7 +681,7 @@
 								<div class="mock-gamification">
 									<div class="gami-header">
 										<h3>Sistema de Gamificación</h3>
-										<p class="desc">Gana XP, sube de nivel, desbloquea badges.</p>
+										<p class="desc">Gana XP, sube de nivel y desbloquea badges de logros.</p>
 									</div>
 									<div class="gami-leaderboard">
 										<div class="lb-row lb-gold glass-card">
@@ -628,19 +745,19 @@
 									<div class="code-terminal glass-card">
 										<div class="terminal-bar">
 											<div class="terminal-tabs">
-												<span class="tab active"
-													><span class="material-icons-round font-icon">javascript</span
-													>feed-engine.js</span
-												>
-												<span class="tab"
-													><span class="material-icons-round font-icon">table_chart</span
-													>schema.sql</span
-												>
+												<span class="tab active">
+													<span class="material-icons-round font-icon">javascript</span>
+													feed-engine.js
+												</span>
+												<span class="tab">
+													<span class="material-icons-round font-icon">table_chart</span>
+													schema.sql
+												</span>
 											</div>
 											<span class="lang-tag">AGPLv3</span>
 										</div>
 										<pre class="code-content"><code
-												>{`// Feed cronológico puro — sin magia opaca
+												>{`// Feed cronológico puro — sin algoritmos opacos
 const stmt = db.prepare(\`
   SELECT p.*, u.username, u.display_name,
     u.avatar_url, u.is_verified, u.level
@@ -651,9 +768,9 @@ const stmt = db.prepare(\`
   LIMIT ? OFFSET ?
 \`);
 
-// WAL mode: lecturas concurrentes sin bloqueos
-export const getFeed = (limit=20, offset=0) =>
-  stmt.all(limit, offset);`}</code
+// @libsql/client async + WAL mode
+export const getFeed = async (limit = 20, offset = 0) =>
+  await stmt.all(limit, offset);`}</code
 											></pre>
 									</div>
 								</div>
@@ -683,7 +800,11 @@ export const getFeed = (limit=20, offset=0) =>
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
-						><span class="material-icons-round">wifi</span> WebSocket + SSE</span
+						><span class="material-icons-round">forum</span> Socket.IO & Presence</span
+					>
+					<span class="marquee-sep">·</span>
+					<span class="marquee-item"
+						><span class="material-icons-round">videocam</span> WebRTC Calls</span
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
@@ -691,7 +812,7 @@ export const getFeed = (limit=20, offset=0) =>
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
-						><span class="material-icons-round">lock</span> JWT httpOnly · CSRF</span
+						><span class="material-icons-round">security</span> JWT Auth · CSRF Guard</span
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
@@ -699,7 +820,7 @@ export const getFeed = (limit=20, offset=0) =>
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
-						><span class="material-icons-round">storefront</span> Marketplace P2P</span
+						><span class="material-icons-round">storefront</span> Marketplace 0% Fee</span
 					>
 					<span class="marquee-sep">·</span>
 					<span class="marquee-item"
@@ -721,7 +842,7 @@ export const getFeed = (limit=20, offset=0) =>
 			<div class="section-eyebrow">Ecosistema</div>
 			<h2 class="section-title">Libertad sin compromisos</h2>
 			<p class="section-subtitle">
-				Cada módulo diseñado para empoderar al creador — sin algoritmos opacos, sin comisiones, sin
+				Cada módulo diseñado para empoderar al creador — sin algoritmos opacos, sin comisiones y sin
 				muros de pago.
 			</p>
 		</div>
@@ -751,9 +872,9 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Feed Cronológico Puro</h3>
 					<p>
-						Sin retención algorítmica ni promociones pagadas. Tu timeline es una línea de tiempo
-						estricta ordenada por <code>created_at DESC</code>. Lo que sigues, lo ves. Sin
-						excepciones.
+						Sin retención algorítmica ni promociones forzadas. Tu timeline es una línea de tiempo
+						estricta ordenada por <code>created_at DESC</code>. Lo que sigues, lo ves en tiempo
+						real.
 					</p>
 					<div class="card-footer-tech">
 						<span class="tech-pill">SQLite · keyset pagination</span>
@@ -774,11 +895,12 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Marketplace 0% Fee</h3>
 					<p>
-						Vende assets digitales, ilustraciones y suscripciones sin peajes de plataforma. V-SOCIAL
-						retiene <strong>0%</strong>. Cada centavo va directo a tu billetera.
+						Vende assets digitales, modelos 3D, encargos e ilustraciones sin peajes de plataforma.
+						V-SOCIAL retiene <strong>0%</strong>. Los pagos se procesan de forma directa (P2P) a tus
+						enlaces personales (PayPal, Ko-fi o Patreon).
 					</p>
 					<div class="card-footer-tech">
-						<span class="tech-pill">marketplace_listings · wallet</span>
+						<span class="tech-pill">marketplace_listings · P2P</span>
 					</div>
 				</div>
 
@@ -796,8 +918,8 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Reels & Stories 60FPS</h3>
 					<p>
-						Video vertical renderizado por hardware, delegado al GPU. Interfaz inmersiva libre de
-						micro-cortes, telemetría invasiva y colapso volumétrico.
+						Video vertical y stories inmersivas aceleradas por hardware GPU. Interfaz reactiva libre
+						de micro-cortes, telemetría pesada y caídas de frames.
 					</p>
 					<div class="card-footer-tech">
 						<span class="tech-pill">GPU compositing · will-change</span>
@@ -816,13 +938,13 @@ export const getFeed = (limit=20, offset=0) =>
 						</div>
 						<span class="feature-tag-chip">Real-Time</span>
 					</div>
-					<h3>Mensajería SSE + WS</h3>
+					<h3>Mensajería & Llamadas WebRTC</h3>
 					<p>
-						Notificaciones instantáneas via Server-Sent Events. Chat P2P con WebSockets
-						persistentes, heartbeat y reconexión exponencial automática.
+						Chat instantáneo con Socket.IO, presencia en vivo y llamadas de voz/video P2P cifradas
+						con WebRTC, con reconexión automática resiliente.
 					</p>
 					<div class="card-footer-tech">
-						<span class="tech-pill">SSE · WebSocket · Socket.io</span>
+						<span class="tech-pill">Socket.IO · WebRTC · Presence</span>
 					</div>
 				</div>
 
@@ -840,11 +962,11 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>XP, Niveles & Badges</h3>
 					<p>
-						Sistema de puntos de experiencia, leaderboard global, niveles desbloqueables y badges de
-						logros. Crear contenido nunca fue tan adictivo y recompensado.
+						Sistema nativo de experiencia, racha diaria de check-in, leaderboard global y badges de
+						logros. Tu actividad construye tu reputación de forma transparente.
 					</p>
 					<div class="card-footer-tech">
-						<span class="tech-pill">user_xp · badges · leaderboard</span>
+						<span class="tech-pill">user_xp · streaks · leaderboard</span>
 					</div>
 				</div>
 
@@ -862,11 +984,11 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Auto-hospedable · $4/mes</h3>
 					<p>
-						Con SQLite WAL + better-sqlite3 síncrono, un nodo de $4/mes pulveriza el throughput de
-						clústeres cloud bajo estrés viral. Sin infraestructuras sobredimensionadas.
+						Arquitectura ultra-eficiente con <code>@libsql/client</code> y SQLite WAL. Un único servidor
+						modesto soporta miles de usuarios concurrentes sin clústeres inflados.
 					</p>
 					<div class="card-footer-tech">
-						<span class="tech-pill">better-sqlite3 · WAL · @libsql</span>
+						<span class="tech-pill">@libsql/client · WAL · Node.js</span>
 					</div>
 				</div>
 			</div>
@@ -881,11 +1003,11 @@ export const getFeed = (limit=20, offset=0) =>
 		<div class="tech-layout">
 			<div class="tech-content">
 				<div class="section-eyebrow">Arquitectura</div>
-				<h2 class="section-title text-left">SQLite WAL:<br />Brutal en producción</h2>
+				<h2 class="section-title text-left">SQLite WAL:<br />Rendimiento sin intermediarios</h2>
 				<p class="desc">
-					En V-SOCIAL apostamos por la simplicidad radical. <strong>better-sqlite3</strong> en modo WAL
+					En V-SOCIAL apostamos por la simplicidad radical. <strong>@libsql/client</strong> en modo WAL
 					permite lecturas concurrentes ilimitadas mientras las escrituras ocurren atómicamente en el
-					Write-Ahead Log. Un solo nodo. Zero configuración distribuida. Código auditado línea a línea.
+					Write-Ahead Log. Un solo archivo, cero sobrecarga distribuida y código 100% auditable.
 				</p>
 
 				<div class="performance-indicators">
@@ -897,7 +1019,7 @@ export const getFeed = (limit=20, offset=0) =>
 							<h4>
 								Latencia media de query: <span class="text-accent">{averageResponseTime}ms</span>
 							</h4>
-							<p>Actualizado en tiempo real — modo WAL, índices compuestos, keyset pagination.</p>
+							<p>Optimizada con modo WAL, índices compuestos y paginación por keyset.</p>
 						</div>
 					</div>
 					<div class="indicator-row">
@@ -905,9 +1027,10 @@ export const getFeed = (limit=20, offset=0) =>
 							<span class="material-icons-round">lock_open</span>
 						</div>
 						<div class="indicator-text">
-							<h4>SQL 100% transparente y auditable</h4>
+							<h4>SQL transparente y auditable</h4>
 							<p>
-								Sin ORMs ni cajas negras. Cada consulta está en el repositorio público bajo AGPLv3.
+								Sin ORMs lentos ni cajas negras. Cada consulta está en el repositorio público bajo
+								AGPLv3.
 							</p>
 						</div>
 					</div>
@@ -918,8 +1041,8 @@ export const getFeed = (limit=20, offset=0) =>
 						<div class="indicator-text">
 							<h4>Infraestructura sostenible</h4>
 							<p>
-								Huella de carbono mínima. Un servidor de $4/mes para miles de usuarios activos
-								concurrentes.
+								Huella de servidor mínima. Un nodo económico rinde con soltura para comunidades
+								completas.
 							</p>
 						</div>
 					</div>
@@ -944,11 +1067,11 @@ export const getFeed = (limit=20, offset=0) =>
 			<div class="tech-visual glass-panel" role="presentation" onmousemove={handleCardMouseMove}>
 				<div class="card-refraction"></div>
 				<h3 class="tv-title">Concurrencia WAL en Tiempo Real</h3>
-				<p class="tv-sub">Lecturas paralelas, escritura secuencial atómica:</p>
+				<p class="tv-sub">Lecturas paralelas ilimitadas con escritura secuencial atómica:</p>
 
 				<div class="wal-schema">
 					<div class="schema-box readers glass-card">
-						<span class="schema-title">Lectores Concurrentes</span>
+						<span class="schema-title">Lectores Concurrentes (Paralelos)</span>
 						<div class="readers-list">
 							<span class="user-pill">@Lumina</span>
 							<span class="user-pill">@Aria</span>
@@ -960,7 +1083,7 @@ export const getFeed = (limit=20, offset=0) =>
 
 					<div class="schema-box database glass-card">
 						<span class="db-icon material-icons-round">storage</span>
-						<span class="db-title">vsocial.db</span>
+						<span class="db-title">database.sqlite</span>
 						<span class="db-status">∞ LECTURAS SIMULTÁNEAS</span>
 						<span class="db-wal">WAL ✓ ACTIVE</span>
 					</div>
@@ -969,7 +1092,7 @@ export const getFeed = (limit=20, offset=0) =>
 						<span class="schema-title">Escritura WAL (Atómica)</span>
 						<div class="operations-stream">
 							<code>INSERT INTO posts...</code>
-							<code>UPDATE users SET xp...</code>
+							<code>UPDATE users SET xp_points...</code>
 							<code>INSERT INTO likes...</code>
 						</div>
 						<div class="flow-line write-line"></div>
@@ -982,11 +1105,11 @@ export const getFeed = (limit=20, offset=0) =>
 	<!-- ══════════════════════════ GAMIFICATION SECTION ═════════════════════════ -->
 	<section id="gamification" class="gami-section" data-section="gami">
 		<div class="section-head">
-			<div class="section-eyebrow">Sistema Exclusivo</div>
+			<div class="section-eyebrow">Gamificación Nativa</div>
 			<h2 class="section-title">Crear tiene su recompensa</h2>
 			<p class="section-subtitle">
-				El primer motor de gamificación nativo en una red social libre. Gana XP, sube de nivel y
-				compite en el leaderboard global.
+				El primer motor de gamificación integrado en una red social libre. Gana XP, sube de nivel y
+				destaca en el leaderboard global.
 			</p>
 		</div>
 
@@ -1003,8 +1126,8 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Sistema XP</h3>
 					<p>
-						Cada post, like, comentario y check-in suma puntos de experiencia. Tu actividad
-						construye tu reputación de forma orgánica y transparente.
+						Cada post, like recibido, comentario y check-in diario suma puntos de experiencia. Tu
+						actividad construye tu reputación de forma orgánica.
 					</p>
 					<div class="gami-demo-bar">
 						<div class="gami-xp-track">
@@ -1025,8 +1148,8 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Badges de Logro</h3>
 					<p>
-						Desbloquea insignias únicas por hitos reales: primer post viral, 10 días seguidos
-						activo, verificación de creador, contribuciones al código abierto.
+						Desbloquea insignias por hitos auténticos: racha de 10 días, posts destacados,
+						verificación de creador y aportes a la comunidad.
 					</p>
 					<div class="gami-badges-preview">
 						<div class="gbp-badge" style="--badge-glow: #e81cff" title="Artista">
@@ -1061,8 +1184,8 @@ export const getFeed = (limit=20, offset=0) =>
 					</div>
 					<h3>Leaderboard Global</h3>
 					<p>
-						Clasificación semanal y mensual de los creadores más activos. Ranking transparente
-						basado en XP acumulado, no en métricas de pago.
+						Clasificación semanal de los creadores más activos. Ranking equitativo basado en XP
+						acumulado, sin pagar por alcance artificial.
 					</p>
 					<div class="gami-lb-preview">
 						<div class="glb-row">
@@ -1090,20 +1213,23 @@ export const getFeed = (limit=20, offset=0) =>
 					<span class="material-icons-round">emoji_events</span>
 				</div>
 				<div class="gami-cta-content">
-					<h3>¿Listo para escalar?</h3>
+					<h3>¿Listo para escalar en el ranking?</h3>
 					<p>
-						Únete ahora y comienza a acumular XP desde tu primer post. El leaderboard se resetea
-						cada semana — cada ciclo es una nueva oportunidad.
+						Únete ahora y comienza a ganar XP desde tu primer post. El ranking semanal abre
+						oportunidades a todos los creadores por igual.
 					</p>
 				</div>
 				<div class="gami-cta-actions">
-					<div class="btn-aero-wrap primary-wrap" style="flex: 0 0 44px; min-height: 44px;">
+					<div
+						class="btn-aero-wrap primary-wrap"
+						style="flex: 0 0 auto; min-width: 180px; min-height: 44px;"
+					>
 						<a href="/register" class="btn-aero-primary w-full h-full">
 							<span class="material-icons-round">rocket_launch</span>
 							Empezar a ganar XP
 						</a>
 					</div>
-					<a href="/leaderboard" class="gami-lb-link">Ver leaderboard actual →</a>
+					<a href="/explore" class="gami-lb-link">Explorar creadores →</a>
 				</div>
 			</div>
 		</div>
@@ -1122,8 +1248,8 @@ export const getFeed = (limit=20, offset=0) =>
 				<div class="section-eyebrow">LiquidglassUI 2.0</div>
 				<h2 class="card-title">Motor de Temas Dinámico</h2>
 				<p class="card-desc">
-					Sistema de color tokenizado con 4 paletas Aero curadas. Cambia el acento en tiempo real
-					sin recargar:
+					Sistema de color tokenizado con 4 paletas Neo-Aero curadas. Cambia la atmósfera en tiempo
+					real sin recargar la página:
 				</p>
 
 				<div class="theme-picker-grid">
@@ -1131,6 +1257,7 @@ export const getFeed = (limit=20, offset=0) =>
 						class="picker-btn theme-prism"
 						class:active={activeTheme === 'prism'}
 						onclick={() => selectActiveTheme('prism')}
+						type="button"
 					>
 						<div class="liquid-sphere"></div>
 						<div class="picker-info">
@@ -1142,6 +1269,7 @@ export const getFeed = (limit=20, offset=0) =>
 						class="picker-btn theme-sunset"
 						class:active={activeTheme === 'sunset'}
 						onclick={() => selectActiveTheme('sunset')}
+						type="button"
 					>
 						<div class="liquid-sphere"></div>
 						<div class="picker-info">
@@ -1153,6 +1281,7 @@ export const getFeed = (limit=20, offset=0) =>
 						class="picker-btn theme-mint"
 						class:active={activeTheme === 'mint'}
 						onclick={() => selectActiveTheme('mint')}
+						type="button"
 					>
 						<div class="liquid-sphere"></div>
 						<div class="picker-info">
@@ -1164,6 +1293,7 @@ export const getFeed = (limit=20, offset=0) =>
 						class="picker-btn theme-fire"
 						class:active={activeTheme === 'fire'}
 						onclick={() => selectActiveTheme('fire')}
+						type="button"
 					>
 						<div class="liquid-sphere"></div>
 						<div class="picker-info">
@@ -1180,8 +1310,7 @@ export const getFeed = (limit=20, offset=0) =>
 				<div class="section-eyebrow">Svelte 5 Runes</div>
 				<h2 class="card-title">Playground Reactivo</h2>
 				<p class="card-desc">
-					Motor de publicaciones en caliente con reactividad sin boilerplate. Escribe algo y ve la
-					magia:
+					Motor de publicaciones instantáneo con estado reactivo fino. Escribe un mensaje de prueba:
 				</p>
 
 				<div class="sandbox-compose-box">
@@ -1190,9 +1319,10 @@ export const getFeed = (limit=20, offset=0) =>
 							id="sandbox_post_input"
 							name="sandbox_post"
 							class="sandbox-textarea"
-							placeholder="Escribe tu primer post libre de algoritmos corporativos..."
+							placeholder="Escribe tu publicación de prueba libre de algoritmos..."
 							bind:value={newPostText}
-							style="min-height: 80px;"
+							onkeydown={handleSandboxKeydown}
+							rows="2"
 						></textarea>
 					</div>
 
@@ -1201,29 +1331,33 @@ export const getFeed = (limit=20, offset=0) =>
 							<button
 								onclick={() => (newPostText += '✨')}
 								class="emoji-btn"
+								type="button"
 								aria-label="Añadir estrella">✨</button
 							>
 							<button
 								onclick={() => (newPostText += '🎨')}
 								class="emoji-btn"
+								type="button"
 								aria-label="Añadir paleta">🎨</button
 							>
 							<button
 								onclick={() => (newPostText += '🌊')}
 								class="emoji-btn"
+								type="button"
 								aria-label="Añadir ola">🌊</button
 							>
 							<button
 								onclick={() => (newPostText += '💎')}
 								class="emoji-btn"
+								type="button"
 								aria-label="Añadir diamante">💎</button
 							>
 						</div>
 						<div
 							class="btn-aero-wrap primary-wrap"
-							style="flex: 0 0 160px; min-height: 40px; border-radius: var(--radius-full);"
+							style="flex: 0 0 auto; min-width: 145px; min-height: 38px; border-radius: var(--radius-full);"
 						>
-							<button class="btn-aero-primary w-full h-full" onclick={handleAddPost}>
+							<button class="btn-aero-primary w-full h-full" onclick={handleAddPost} type="button">
 								<span class="material-icons-round">send</span>
 								Publicar Demo
 							</button>
@@ -1264,7 +1398,7 @@ export const getFeed = (limit=20, offset=0) =>
 			<div class="section-eyebrow">Comunidad</div>
 			<h2 class="section-title">Creadores en movimiento</h2>
 			<p class="section-subtitle">
-				Artistas, diseñadores 3D y músicos que habitan V-SOCIAL y co-diseñan su futuro abierto.
+				Artistas 3D, ilustradores, VTubers y productores que crean y comparten en V-SOCIAL.
 			</p>
 		</div>
 
@@ -1285,8 +1419,8 @@ export const getFeed = (limit=20, offset=0) =>
 					<span class="status-badge live"><span class="dot"></span> LIVE</span>
 				</div>
 				<p class="creator-bio">
-					Rigs de VTubers de código abierto y modelos en formato libre. El 100% de sus ventas, sin
-					intermediarios.
+					Rigs de VTubers de código abierto y modelos en formato libre. El 100% de sus ventas
+					directo a su cuenta.
 				</p>
 				<div class="creator-stats">
 					<div class="stat"><strong>24.5k</strong><span>Seguidores</span></div>
@@ -1295,7 +1429,7 @@ export const getFeed = (limit=20, offset=0) =>
 				</div>
 				<div
 					class="btn-aero-wrap primary-wrap w-full mt-4"
-					style="flex: 0 0 44px; min-height: 44px;"
+					style="flex: 0 0 auto; min-height: 42px;"
 				>
 					<a href="/register" class="btn-aero-primary w-full h-full">Ver Portafolio</a>
 				</div>
@@ -1317,8 +1451,7 @@ export const getFeed = (limit=20, offset=0) =>
 					<span class="status-badge offline"><span class="dot"></span> IDLE</span>
 				</div>
 				<p class="creator-bio">
-					Ilustraciones Aero e interfaces retro-futuristas. Comisiones directas sin retención de
-					plataforma.
+					Ilustraciones Neo-Aero y texturas futuristas. Comisiones y packs directos sin retenciones.
 				</p>
 				<div class="creator-stats">
 					<div class="stat"><strong>18.9k</strong><span>Seguidores</span></div>
@@ -1327,7 +1460,7 @@ export const getFeed = (limit=20, offset=0) =>
 				</div>
 				<div
 					class="btn-aero-wrap primary-wrap w-full mt-4"
-					style="flex: 0 0 44px; min-height: 44px;"
+					style="flex: 0 0 auto; min-height: 42px;"
 				>
 					<a href="/register" class="btn-aero-primary w-full h-full">Ver Galería</a>
 				</div>
@@ -1349,8 +1482,8 @@ export const getFeed = (limit=20, offset=0) =>
 					<span class="status-badge live"><span class="dot"></span> LIVE</span>
 				</div>
 				<p class="creator-bio">
-					Música líquida y sintetizadores retro-futuristas bajo licencias CC. Distribución sin
-					plataformas que se queden con tu arte.
+					Música ambiental y sintetizadores retro-futuristas bajo CC. Distribución directa sin
+					intermediarios.
 				</p>
 				<div class="creator-stats">
 					<div class="stat"><strong>12.1k</strong><span>Seguidores</span></div>
@@ -1359,7 +1492,7 @@ export const getFeed = (limit=20, offset=0) =>
 				</div>
 				<div
 					class="btn-aero-wrap primary-wrap w-full mt-4"
-					style="flex: 0 0 44px; min-height: 44px;"
+					style="flex: 0 0 auto; min-height: 42px;"
 				>
 					<a href="/register" class="btn-aero-primary w-full h-full">Escuchar Loops</a>
 				</div>
@@ -1370,27 +1503,33 @@ export const getFeed = (limit=20, offset=0) =>
 	<!-- ═══════════════════════════════ FAQ ═════════════════════════════════════ -->
 	<section id="faq" class="faq-section" data-section="faq">
 		<div class="section-head">
-			<div class="section-eyebrow">Preguntas</div>
+			<div class="section-eyebrow">Preguntas Frecuentes</div>
 			<h2 class="section-title">Todo lo que necesitas saber</h2>
 			<p class="section-subtitle">
-				Sobre código libre, auto-alojamiento, comisiones y gamificación en V-SOCIAL.
+				Transparencia total sobre código abierto, comisiones, auto-hospedaje y privacidad.
 			</p>
 		</div>
 
 		<div class="faq-list">
 			<div class="faq-item glass-panel" class:open={faqOpenStates[0]}>
-				<button class="faq-question" onclick={() => toggleFaq(0)}>
+				<button
+					class="faq-question"
+					onclick={() => toggleFaq(0)}
+					type="button"
+					aria-expanded={faqOpenStates[0]}
+					aria-controls="faq-ans-0"
+				>
 					<span>¿V-Social es realmente 100% gratuito y de código abierto?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[0]}
-					<div class="faq-answer-container" transition:slide>
+					<div id="faq-ans-0" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
 								Sí, absolutamente. V-Social se publica bajo la <strong>Licencia AGPLv3</strong>,
-								garantizando que el código sea libre y permanezca libre. Cualquier instancia cloud
-								debe hacer públicas sus modificaciones. No existen suscripciones premium, muros de
-								pago ocultos, publicidad invasiva ni minería de datos corporativa.
+								garantizando que el código sea libre y permanezca libre para siempre. No existen
+								suscripciones forzadas, muros de pago ocultos, publicidad invasiva ni
+								comercialización de datos privados.
 							</p>
 						</div>
 					</div>
@@ -1398,18 +1537,25 @@ export const getFeed = (limit=20, offset=0) =>
 			</div>
 
 			<div class="faq-item glass-panel" class:open={faqOpenStates[1]}>
-				<button class="faq-question" onclick={() => toggleFaq(1)}>
-					<span>¿Cómo gestionan las comisiones y pagos de artistas?</span>
+				<button
+					class="faq-question"
+					onclick={() => toggleFaq(1)}
+					type="button"
+					aria-expanded={faqOpenStates[1]}
+					aria-controls="faq-ans-1"
+				>
+					<span>¿Cómo funciona el cobro sin comisiones para artistas?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[1]}
-					<div class="faq-answer-container" transition:slide>
+					<div id="faq-ans-1" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
-								A diferencia de plataformas que cobran entre 5% y 30% por venta, <strong
-									>V-Social cobra el 0%</strong
-								>. Las transacciones se realizan mediante pasarelas de pago tradicionales, seguras y
-								configurables. El 100% de los ingresos va a la cuenta del creador.
+								A diferencia de las plataformas tradicionales que retienen entre 10% y 30% por
+								venta,
+								<strong>V-Social cobra el 0%</strong>. Las publicaciones en el Marketplace vinculan
+								directamente a tu enlace de pago personal (PayPal, Ko-fi o Patreon). El 100% del
+								ingreso llega a tus manos sin intermediarios financieros.
 							</p>
 						</div>
 					</div>
@@ -1417,18 +1563,24 @@ export const getFeed = (limit=20, offset=0) =>
 			</div>
 
 			<div class="faq-item glass-panel" class:open={faqOpenStates[2]}>
-				<button class="faq-question" onclick={() => toggleFaq(2)}>
-					<span>¿Qué necesito para hospedar mi propio nodo de V-Social?</span>
+				<button
+					class="faq-question"
+					onclick={() => toggleFaq(2)}
+					type="button"
+					aria-expanded={faqOpenStates[2]}
+					aria-controls="faq-ans-2"
+				>
+					<span>¿Qué requisitos tiene montar mi propio nodo de V-Social?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[2]}
-					<div class="faq-answer-container" transition:slide>
+					<div id="faq-ans-2" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
-								Un VPS Linux de <strong>$4 USD/mes</strong> es más que suficiente para miles de
-								usuarios. Con SQLite WAL en un solo archivo local, el backup es tan simple como
-								copiar el <code>.db</code>. Node.js + el bundle de SvelteKit es todo lo que
-								necesitas.
+								Un VPS básico de <strong>$4 USD/mes</strong> (1 vCPU, 1GB RAM) es suficiente para
+								miles de usuarios activos. Con <code>@libsql/client</code> y SQLite en modo WAL, la base
+								de datos se guarda en un único archivo local de alto rendimiento. Node.js y el bundle
+								de SvelteKit es todo lo necesario.
 							</p>
 						</div>
 					</div>
@@ -1436,18 +1588,24 @@ export const getFeed = (limit=20, offset=0) =>
 			</div>
 
 			<div class="faq-item glass-panel" class:open={faqOpenStates[3]}>
-				<button class="faq-question" onclick={() => toggleFaq(3)}>
-					<span>¿Los algoritmos deciden qué publicaciones se muestran?</span>
+				<button
+					class="faq-question"
+					onclick={() => toggleFaq(3)}
+					type="button"
+					aria-expanded={faqOpenStates[3]}
+					aria-controls="faq-ans-3"
+				>
+					<span>¿El feed oculta publicaciones o usa algoritmos de recomendación forzada?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[3]}
-					<div class="faq-answer-container" transition:slide>
+					<div id="faq-ans-3" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
-								No. El feed es <strong>estrictamente cronológico inverso</strong>:
-								<code>ORDER BY created_at DESC</code>. Ves exactamente lo que publican quienes
-								sigues, libre de promociones forzadas y filtros opacos que manipulen tu alcance
-								orgánico.
+								No. El feed principal es <strong>estrictamente cronológico inverso</strong>:
+								<code>ORDER BY created_at DESC</code>. Ves exactamente el contenido de las personas
+								a quienes sigues, en el orden en que fue publicado, sin penalizaciones de
+								visibilidad ni favoritismos corporativos.
 							</p>
 						</div>
 					</div>
@@ -1455,19 +1613,25 @@ export const getFeed = (limit=20, offset=0) =>
 			</div>
 
 			<div class="faq-item glass-panel" class:open={faqOpenStates[4]}>
-				<button class="faq-question" onclick={() => toggleFaq(4)}>
-					<span>¿Cómo funciona el sistema de gamificación y leaderboard?</span>
+				<button
+					class="faq-question"
+					onclick={() => toggleFaq(4)}
+					type="button"
+					aria-expanded={faqOpenStates[4]}
+					aria-controls="faq-ans-4"
+				>
+					<span>¿Cómo se consiguen puntos XP, badges y puestos en el Leaderboard?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[4]}
-					<div class="faq-answer-container" transition:slide>
+					<div id="faq-ans-4" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
-								Cada acción en la plataforma genera <strong>puntos de experiencia (XP)</strong>:
-								publicar, recibir likes, comentar, hacer check-in diario y más. Al acumular XP subes
-								de nivel y desbloqueas badges de logro. El <strong>leaderboard global</strong> se actualiza
-								en tiempo real y se resetea semanalmente, dando oportunidades equitativas a todos los
-								creadores sin importar su antigüedad.
+								Las acciones genuinas dentro de la plataforma otorgan <strong
+									>puntos de experiencia (XP)</strong
+								>: crear posts, recibir likes, comentar, completar rachas de check-in diario y
+								participar en la comunidad. Al subir de nivel desbloqueas badges de logro y títulos
+								que decoran tu perfil.
 							</p>
 						</div>
 					</div>
@@ -1478,36 +1642,39 @@ export const getFeed = (limit=20, offset=0) =>
 
 	<!-- ══════════════════════════════ FINAL CTA ════════════════════════════════ -->
 	<section class="final-cta-section" data-section="cta">
-		<div class="cta-aurora" aria-hidden="true">
-			<div class="blob blob-1"></div>
-			<div class="blob blob-2"></div>
-		</div>
+		<div class="cta-aurora" aria-hidden="true"></div>
 		<div class="cta-inner glass-panel" role="presentation" onmousemove={handleCardMouseMove}>
 			<div class="card-refraction"></div>
 			<div class="cta-badge">
 				<span class="badge-dot"></span> Código Abierto para Siempre
 			</div>
 			<h2 class="cta-title">
-				Deja de pagar<br />
-				<span class="text-glossy">comisiones que no mereces.</span>
+				Tu comunidad,<br />
+				<span class="text-glossy">tus reglas, tu contenido.</span>
 			</h2>
 			<p class="cta-sub">
-				Únete a la plataforma social construida por creadores, para creadores. Gratis. Para siempre.
-				Sin trampa.
+				Únete a la plataforma social pensada para creadores, artistas y comunidades que valoran la
+				libertad. Gratis, transparente y sin comisiones.
 			</p>
 			<div class="cta-actions">
-				<div class="btn-aero-wrap primary-wrap" style="flex: 0 0 auto;">
-					<a href="/register" class="btn-aero-primary cta-btn-lg">
+				<div
+					class="btn-aero-wrap primary-wrap"
+					style="flex: 0 0 auto; min-width: 190px; min-height: 48px;"
+				>
+					<a href="/register" class="btn-aero-primary cta-btn-lg w-full h-full">
 						<span class="material-icons-round">rocket_launch</span>
 						Crear Cuenta Libre
 					</a>
 				</div>
-				<div class="btn-aero-wrap secondary-wrap" style="flex: 0 0 auto;">
+				<div
+					class="btn-aero-wrap secondary-wrap"
+					style="flex: 0 0 auto; min-width: 170px; min-height: 48px;"
+				>
 					<a
 						href="https://github.com"
 						target="_blank"
 						rel="noopener noreferrer"
-						class="btn-aero-secondary cta-btn-lg"
+						class="btn-aero-secondary cta-btn-lg w-full h-full"
 					>
 						<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
 							<path
@@ -1525,12 +1692,12 @@ export const getFeed = (limit=20, offset=0) =>
 	<footer class="aero-footer">
 		<div class="footer-container">
 			<div class="footer-brand">
-				<a href="/" class="nav-logo footer-logo">
+				<a href="/" class="nav-logo footer-logo" aria-label="VSocial Inicio">
 					<span class="logo-prism">VS</span>ocial
 				</a>
 				<p>
-					Plataforma social open-source para creadores. Libre de algoritmos, libre de comisiones,
-					libre de corporaciones. AGPLv3 para siempre.
+					Plataforma social libre para creadores y comunidades. Sin algoritmos opacos, sin
+					comisiones abusivas. Licencia AGPLv3 para siempre.
 				</p>
 				<div class="footer-socials">
 					<a
@@ -1584,8 +1751,8 @@ export const getFeed = (limit=20, offset=0) =>
 					<a href="#features">Características</a>
 					<a href="/reels">Reels & Stories</a>
 					<a href="/marketplace">Marketplace</a>
-					<a href="/messages">Mensajería Live</a>
-					<a href="/leaderboard">Leaderboard</a>
+					<a href="/messages">Mensajería</a>
+					<a href="/explore">Explorar</a>
 				</div>
 				<div class="footer-col">
 					<h4>Comunidad</h4>
@@ -1599,18 +1766,20 @@ export const getFeed = (limit=20, offset=0) =>
 					<a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub Repo</a>
 					<a href="https://github.com" target="_blank" rel="noopener noreferrer">Reportar Bug</a>
 					<a href="https://github.com" target="_blank" rel="noopener noreferrer">Contribuir</a>
-					<a href="https://github.com" target="_blank" rel="noopener noreferrer">Documentación</a>
+					<a href="/about/verified">Verificaciones</a>
 				</div>
 				<div class="footer-col">
 					<h4>Tecnología</h4>
-					<a href="https://svelte.dev" target="_blank" rel="noopener noreferrer">Svelte 5 Runes</a>
+					<a href="https://svelte.dev" target="_blank" rel="noopener noreferrer"
+						>SvelteKit 5 Runes</a
+					>
 					<a href="https://sqlite.org" target="_blank" rel="noopener noreferrer">SQLite WAL</a>
 					<a
-						href="https://github.com/WiseLibs/better-sqlite3"
+						href="https://github.com/tursodatabase/libsql"
 						target="_blank"
-						rel="noopener noreferrer">better-sqlite3</a
+						rel="noopener noreferrer">@libsql/client</a
 					>
-					<a href="#sandbox">LiquidglassUI</a>
+					<a href="#sandbox">LiquidglassUI 2.0</a>
 				</div>
 				<div class="footer-col">
 					<h4>Legal</h4>
@@ -1623,8 +1792,8 @@ export const getFeed = (limit=20, offset=0) =>
 
 		<div class="footer-bottom">
 			<p>
-				© 2026 V-Social · Open Source bajo Licencia AGPLv3 · LiquidglassUI v2.1 · Hecho con ❤️ por
-				la comunidad
+				© 2026 V-Social · Open Source bajo Licencia AGPLv3 · LiquidglassUI 2.0 · Hecho con ❤️ por la
+				comunidad
 			</p>
 		</div>
 	</footer>
@@ -1658,7 +1827,7 @@ export const getFeed = (limit=20, offset=0) =>
 		--glass-border: rgba(255, 255, 255, 0.12);
 		--glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 		--glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-		--noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+		--noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
 		--depth-1: 0 2px 6px rgba(0, 0, 0, 0.12);
 		--depth-2: 0 4px 12px rgba(0, 0, 0, 0.2);
 
@@ -1706,38 +1875,65 @@ export const getFeed = (limit=20, offset=0) =>
 		--footer-bg: rgba(0, 0, 0, 0.02);
 	}
 
+	:global([data-theme='midnight']) .aero-wrapper {
+		--glass-bg: rgba(6, 12, 24, 0.65);
+		--glass-border: rgba(255, 255, 255, 0.08);
+		--glass-panel-bg: rgba(6, 12, 24, 0.6);
+		--glass-panel-border: rgba(255, 255, 255, 0.07);
+		--glass-card-bg: rgba(6, 12, 24, 0.4);
+		--glass-card-border: rgba(255, 255, 255, 0.05);
+		--glass-card-hover: rgba(10, 18, 36, 0.7);
+		--glass-separator: rgba(255, 255, 255, 0.05);
+		--code-bg: rgba(255, 255, 255, 0.05);
+		--icon-bg: rgba(255, 255, 255, 0.04);
+		--input-bg: rgba(4, 7, 14, 0.85);
+		--footer-bg: rgba(2, 4, 8, 0.6);
+	}
+
 	/* ── Colorway Themes ─────────────────────────────────────────── */
 	.aero-wrapper.theme-prism {
 		--accent-primary: #1b85f3;
 		--accent-light: #2eb4ff;
-		--accent-glow: var(--glow-blue);
+		--accent-rgb: 27, 133, 243;
+		--accent-light-rgb: 46, 180, 255;
+		--accent-secondary-rgb: 0, 212, 170;
+		--accent-glow: var(--glow-blue, rgba(27, 133, 243, 0.35));
 		--liquid-gradient: linear-gradient(135deg, #1b85f3 0%, #2eb4ff 100%);
-		--neon-glow: var(--glow-blue-subtle);
-		--neon-glow-strong: var(--glow-blue-strong);
+		--neon-glow: var(--glow-blue-subtle, 0 4px 20px rgba(27, 133, 243, 0.25));
+		--neon-glow-strong: var(--glow-blue-strong, 0 8px 30px rgba(27, 133, 243, 0.45));
 	}
 	.aero-wrapper.theme-sunset {
 		--accent-primary: #ec4899;
 		--accent-light: #f472b6;
-		--accent-glow: var(--glow-pink);
+		--accent-rgb: 236, 72, 153;
+		--accent-light-rgb: 244, 114, 182;
+		--accent-secondary-rgb: 191, 90, 242;
+		--accent-glow: var(--glow-pink, rgba(236, 72, 153, 0.35));
 		--liquid-gradient: linear-gradient(135deg, #bf5af2 0%, #ff007f 100%);
-		--neon-glow: var(--glow-pink-subtle);
-		--neon-glow-strong: var(--glow-pink-strong);
+		--neon-glow: var(--glow-pink-subtle, 0 4px 20px rgba(236, 72, 153, 0.25));
+		--neon-glow-strong: var(--glow-pink-strong, 0 8px 30px rgba(236, 72, 153, 0.45));
 	}
 	.aero-wrapper.theme-mint {
 		--accent-primary: #00d4aa;
 		--accent-light: #2ee5b3;
-		--accent-glow: var(--glow-green);
+		--accent-rgb: 0, 212, 170;
+		--accent-light-rgb: 46, 229, 179;
+		--accent-secondary-rgb: 0, 163, 136;
+		--accent-glow: var(--glow-green, rgba(0, 212, 170, 0.35));
 		--liquid-gradient: linear-gradient(135deg, #00a388 0%, #00ffaa 100%);
-		--neon-glow: var(--glow-green-subtle);
-		--neon-glow-strong: var(--glow-green-strong);
+		--neon-glow: var(--glow-green-subtle, 0 4px 20px rgba(0, 212, 170, 0.25));
+		--neon-glow-strong: var(--glow-green-strong, 0 8px 30px rgba(0, 212, 170, 0.45));
 	}
 	.aero-wrapper.theme-fire {
 		--accent-primary: #f5a623;
 		--accent-light: #fbbf24;
-		--accent-glow: var(--glow-orange);
+		--accent-rgb: 245, 166, 35;
+		--accent-light-rgb: 251, 191, 36;
+		--accent-secondary-rgb: 255, 69, 0;
+		--accent-glow: var(--glow-orange, rgba(245, 166, 35, 0.35));
 		--liquid-gradient: linear-gradient(135deg, #ff4500 0%, #ffaa00 100%);
-		--neon-glow: var(--glow-orange-subtle);
-		--neon-glow-strong: var(--glow-orange-strong);
+		--neon-glow: var(--glow-orange-subtle, 0 4px 20px rgba(245, 166, 35, 0.25));
+		--neon-glow-strong: var(--glow-orange-strong, 0 8px 30px rgba(245, 166, 35, 0.45));
 	}
 
 	/* ── Glass Primitives ────────────────────────────────────────── */
@@ -1778,9 +1974,9 @@ export const getFeed = (limit=20, offset=0) =>
 		background: linear-gradient(
 			90deg,
 			transparent,
-			var(--border-highlight) 30%,
-			var(--border-highlight) 50%,
-			var(--border-highlight) 70%,
+			var(--border-highlight, rgba(255, 255, 255, 0.4)) 30%,
+			var(--border-highlight, rgba(255, 255, 255, 0.4)) 50%,
+			var(--border-highlight, rgba(255, 255, 255, 0.4)) 70%,
 			transparent
 		);
 		z-index: 4;
@@ -1798,7 +1994,7 @@ export const getFeed = (limit=20, offset=0) =>
 		inset: 0;
 		background: radial-gradient(
 			circle 220px at var(--mouse-x, -999px) var(--mouse-y, -999px),
-			var(--surface-highlight),
+			var(--surface-highlight, rgba(255, 255, 255, 0.12)),
 			transparent 75%
 		);
 		z-index: 3;
@@ -1815,10 +2011,10 @@ export const getFeed = (limit=20, offset=0) =>
 	.hover-lift:hover {
 		transform: translateY(-4px) scale(1.01);
 		box-shadow: var(--glass-shadow), var(--glass-inset), var(--neon-glow);
-		border-color: var(--border-highlight);
+		border-color: var(--border-highlight, rgba(255, 255, 255, 0.3));
 	}
 
-	/* ── Aurora Background ───────────────────────────────────────── */
+	/* ── Hero Mesh Background ────────────────────────────────────── */
 	.aurora-blobs {
 		position: absolute;
 		top: -20%;
@@ -1827,125 +2023,138 @@ export const getFeed = (limit=20, offset=0) =>
 		bottom: 0;
 		pointer-events: none;
 		z-index: 0;
-		filter: blur(140px);
-		opacity: 0.6;
 		overflow: hidden;
+		/* Mesh gradient multicapa — 4 focos elípticos posicionados con difusión suave */
+		background:
+			radial-gradient(
+				ellipse 75% 60% at 5% 5%,
+				rgba(27, 133, 243, 0.2) 0%,
+				rgba(46, 180, 255, 0.04) 50%,
+				transparent 70%
+			),
+			radial-gradient(ellipse 70% 55% at 100% 95%, rgba(0, 212, 170, 0.16) 0%, transparent 65%),
+			radial-gradient(ellipse 48% 42% at 100% 5%, rgba(91, 114, 204, 0.14) 0%, transparent 55%),
+			radial-gradient(ellipse 60% 38% at 50% 85%, rgba(46, 180, 255, 0.07) 0%, transparent 60%);
+	}
+	/* Capa de respiro sobre el hero — compositor-only y calmado */
+	.aurora-blobs::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(
+			ellipse 80% 65% at 35% 65%,
+			rgba(0, 229, 255, 0.08) 0%,
+			transparent 60%
+		);
+		animation: vsHeroBreathe 24s ease-in-out infinite alternate;
+		will-change: opacity;
+	}
+	@keyframes vsHeroBreathe {
+		0% {
+			opacity: 0.65;
+		}
+		100% {
+			opacity: 1;
+		}
 	}
 	.blob {
-		position: absolute;
-		border-radius: 50%;
-		background: var(--liquid-gradient);
-		mix-blend-mode: screen;
-		will-change: transform;
-	}
-	.blob-1 {
-		width: 65vw;
-		height: 65vw;
-		top: 5%;
-		left: -10%;
-		animation: floatBlob1 28s ease-in-out infinite alternate;
-		opacity: 0.4;
-	}
-	.blob-2 {
-		width: 55vw;
-		height: 55vw;
-		bottom: 5%;
-		right: -10%;
-		animation: floatBlob2 35s ease-in-out infinite alternate;
-		opacity: 0.3;
-	}
-	.blob-3 {
-		width: 40vw;
-		height: 40vw;
-		top: 30%;
-		left: 35%;
-		animation: floatBlob3 24s ease-in-out infinite alternate;
-		opacity: 0.25;
-	}
-	@keyframes floatBlob1 {
-		0% {
-			transform: translate3d(0, 0, 0) scale(1);
-		}
-		100% {
-			transform: translate3d(6%, 10%, 0) scale(1.12);
-		}
-	}
-	@keyframes floatBlob2 {
-		0% {
-			transform: translate3d(0, 0, 0) scale(1.1);
-		}
-		100% {
-			transform: translate3d(-8%, -6%, 0) scale(0.9);
-		}
-	}
-	@keyframes floatBlob3 {
-		0% {
-			transform: translate3d(0, 0, 0) scale(0.9);
-		}
-		100% {
-			transform: translate3d(5%, -10%, 0) scale(1.05);
-		}
+		display: none;
 	}
 
-	/* ── Header ─────────────────────────────────────────────────── */
+	/* ── Floating Aero Header ──────────────────────────────────────── */
 	.aero-header {
 		position: fixed;
-		top: 1.2rem;
+		top: 1.15rem;
 		left: 50%;
 		transform: translateX(-50%);
-		width: calc(100% - 10%);
-		max-width: 1400px;
-		z-index: 200;
-		padding: 0.75rem 2rem;
-		border-radius: var(--radius-full);
-		background: var(--surface-glass-deep);
-		border: 1px solid var(--border-light);
-		box-shadow: var(--shadow-deep), var(--glass-inset);
+		width: min(1280px, calc(100% - 2.5rem));
+		height: 60px;
+		z-index: var(--z-sticky, 200);
+		border-radius: var(--radius-full, 9999px);
+		background: var(--surface-glass-deep, rgba(15, 23, 42, 0.78));
+		backdrop-filter: blur(20px) saturate(1.4);
+		-webkit-backdrop-filter: blur(20px) saturate(1.4);
+		border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.14));
+		box-shadow:
+			0 12px 36px rgba(0, 0, 0, 0.35),
+			inset 0 1px 0 rgba(255, 255, 255, 0.22),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+		display: flex;
+		align-items: center;
+		padding: 0 1.25rem 0 1.5rem;
+		transition:
+			width var(--t-base),
+			top var(--t-base),
+			background var(--t-base),
+			border-color var(--t-base),
+			box-shadow var(--t-base);
 		overflow: visible;
-		contain: none;
 	}
+
+	:global([data-theme='light']) .aero-header {
+		background: rgba(255, 255, 255, 0.85);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		box-shadow:
+			0 10px 30px rgba(0, 0, 0, 0.08),
+			inset 0 1px 0 rgba(255, 255, 255, 0.95),
+			inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+	}
+
+	:global([data-theme='midnight']) .aero-header {
+		background: rgba(8, 14, 28, 0.85);
+		border: 1px solid rgba(34, 211, 238, 0.18);
+		box-shadow:
+			0 12px 36px rgba(0, 0, 0, 0.45),
+			0 0 20px rgba(34, 211, 238, 0.08),
+			inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	}
+
 	.nav-container {
+		width: 100%;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 1rem;
+		height: 100%;
 	}
 	.nav-logo {
 		font-family: var(--font-display);
 		font-weight: 900;
-		font-size: 1.5rem;
+		font-size: 1.35rem;
 		letter-spacing: -0.02em;
 		color: var(--text-primary);
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		text-decoration: none;
+		flex-shrink: 0;
 	}
 	.logo-prism {
 		background: var(--liquid-gradient);
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		filter: drop-shadow(0 2px 10px var(--accent-light));
+		filter: drop-shadow(0 2px 8px var(--accent-light));
 	}
 	.nav-live-badge {
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font-size: 0.65rem;
+		font-size: 0.62rem;
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		color: var(--accent-light);
-		background: var(--surface-green-subtle);
-		border: 1px solid var(--border-green);
-		padding: 2px 8px;
-		border-radius: 99px;
+		background: rgba(0, 212, 170, 0.12);
+		border: 1px solid rgba(0, 212, 170, 0.3);
+		padding: 2px 7px;
+		border-radius: var(--radius-xl);
 	}
 	.live-dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
-		background: var(--color-green);
-		box-shadow: 0 0 8px var(--color-green);
+		border-radius: var(--radius-full);
+		background: #00e464;
+		box-shadow: 0 0 8px #00e464;
 		animation: livePulse 1.6s ease-in-out infinite;
 	}
 	@keyframes livePulse {
@@ -1963,38 +2172,141 @@ export const getFeed = (limit=20, offset=0) =>
 	.nav-links {
 		display: none;
 		align-items: center;
-		gap: 1.75rem;
+		gap: 0.25rem;
 	}
-	.nav-links a {
-		font-size: 0.88rem;
+	.nav-link-item {
+		font-size: 0.85rem;
 		font-weight: 500;
 		color: var(--text-secondary);
-		transition: color var(--t-fast);
+		text-decoration: none;
+		padding: 6px 12px;
+		border-radius: var(--radius-full);
+		transition:
+			color var(--t-fast),
+			background var(--t-fast);
 	}
-	.nav-links a:hover {
+	.nav-link-item:hover {
+		color: var(--text-primary);
+		background: var(--bg-overlay, rgba(255, 255, 255, 0.08));
+	}
+
+	.nav-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-shrink: 0;
+	}
+	.nav-login-link {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-decoration: none;
+		padding: 6px 12px;
+		border-radius: var(--radius-full);
+		transition:
+			color var(--t-fast),
+			background var(--t-fast);
+		display: none;
+	}
+	.nav-login-link:hover {
+		color: var(--text-primary);
+		background: var(--bg-overlay, rgba(255, 255, 255, 0.08));
+	}
+
+	.mobile-menu-btn {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		border-radius: var(--radius-full);
+		background: var(--icon-bg, rgba(255, 255, 255, 0.06));
+		border: 1px solid var(--glass-card-border, rgba(255, 255, 255, 0.12));
+		color: var(--text-primary);
+		cursor: pointer;
+		transition: all var(--t-fast);
+	}
+	.mobile-menu-btn:hover {
+		background: var(--glass-card-hover, rgba(255, 255, 255, 0.14));
 		color: var(--accent-primary);
+	}
+
+	/* Floating mobile dropdown card */
+	.mobile-nav-drawer {
+		position: absolute;
+		top: calc(100% + 10px);
+		left: 0;
+		right: 0;
+		border-radius: 20px;
+		background: var(--bg-surface-solid, #0f172a);
+		backdrop-filter: blur(24px) saturate(1.4);
+		-webkit-backdrop-filter: blur(24px) saturate(1.4);
+		border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.14));
+		box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+		padding: 1.25rem 1.25rem 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		z-index: 1000;
+	}
+	:global([data-theme='light']) .mobile-nav-drawer {
+		background: #ffffff;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+	}
+	.mobile-nav-list {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.mobile-nav-item {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 9px 12px;
+		border-radius: var(--radius-md);
+		color: var(--text-primary);
+		text-decoration: none;
+		font-weight: 500;
+		font-size: 0.92rem;
+		transition: background var(--t-fast);
+	}
+	.mobile-nav-item .material-icons-round {
+		font-size: 20px;
+		color: var(--accent-primary);
+	}
+	.mobile-nav-item:hover {
+		background: var(--bg-overlay, rgba(255, 255, 255, 0.08));
+	}
+	.mobile-nav-footer {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 0.85rem;
+		border-top: 1px solid var(--glass-separator, rgba(255, 255, 255, 0.08));
+	}
+	.mobile-btn-login {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		padding: 9px;
+		border-radius: var(--radius-full);
+		font-weight: 600;
+		font-size: 0.88rem;
+		color: var(--text-primary);
+		text-decoration: none;
+		background: var(--icon-bg, rgba(255, 255, 255, 0.06));
+		border: 1px solid var(--glass-card-border, rgba(255, 255, 255, 0.1));
+		transition: background var(--t-fast);
+	}
+	.mobile-btn-login:hover {
+		background: var(--glass-card-hover, rgba(255, 255, 255, 0.12));
 	}
 	.nav-actions {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-	}
-	.btn-theme-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		border-radius: 12px;
-		background: var(--icon-bg);
-		border: 1px solid var(--glass-card-border);
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all var(--t-fast);
-	}
-	.btn-theme-toggle:hover {
-		background: var(--glass-card-hover);
-		color: var(--accent-primary);
 	}
 
 	/* ── Hero ────────────────────────────────────────────────────── */
@@ -2003,7 +2315,7 @@ export const getFeed = (limit=20, offset=0) =>
 		min-height: 100vh;
 		display: flex;
 		align-items: center;
-		padding: 7rem 5% 4rem;
+		padding: 7.5rem 5% 4rem;
 		opacity: 0;
 		transform: translateY(20px);
 		transition:
@@ -2019,7 +2331,7 @@ export const getFeed = (limit=20, offset=0) =>
 		z-index: 5;
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 3rem;
+		gap: 3.5rem;
 		align-items: center;
 		width: 100%;
 		max-width: 1400px;
@@ -2043,22 +2355,22 @@ export const getFeed = (limit=20, offset=0) =>
 		background: var(--icon-bg);
 		border: 1px solid var(--glass-card-border);
 		padding: 6px 14px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		width: fit-content;
 	}
 	.badge-dot {
 		width: 7px;
 		height: 7px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background: var(--accent-primary);
 		box-shadow: var(--neon-glow);
 	}
 
 	.title {
 		font-family: var(--font-display);
-		font-size: clamp(2.5rem, 5vw, 4rem);
+		font-size: clamp(2.6rem, 5vw, 4.2rem);
 		font-weight: 900;
-		line-height: 1.1;
+		line-height: 1.12;
 		letter-spacing: -0.03em;
 		color: var(--text-primary);
 		margin: 0;
@@ -2069,41 +2381,14 @@ export const getFeed = (limit=20, offset=0) =>
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
 		filter: drop-shadow(0 4px 20px var(--accent-glow));
-	}
-	/* Typewriter CSS animation */
-	.typewriter {
 		display: inline-block;
-		overflow: hidden;
-		white-space: nowrap;
-		border-right: 2px solid var(--accent-primary);
-		animation:
-			typewriter 2s steps(18, end) 0.5s forwards,
-			blinkCaret 0.75s step-end infinite 0.5s;
-		max-width: 0;
-	}
-	@keyframes typewriter {
-		from {
-			max-width: 0;
-		}
-		to {
-			max-width: 100%;
-		}
-	}
-	@keyframes blinkCaret {
-		from,
-		to {
-			border-color: transparent;
-		}
-		50% {
-			border-color: var(--accent-primary);
-		}
 	}
 
 	.subtitle {
-		font-size: 1rem;
+		font-size: 1.05rem;
 		line-height: 1.7;
 		color: var(--text-secondary);
-		max-width: 520px;
+		max-width: 540px;
 		margin: 0;
 	}
 	.subtitle strong {
@@ -2113,7 +2398,8 @@ export const getFeed = (limit=20, offset=0) =>
 	.hero-actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: 0.85rem;
+		align-items: center;
 	}
 
 	.quick-stats {
@@ -2122,6 +2408,7 @@ export const getFeed = (limit=20, offset=0) =>
 		border-radius: var(--radius-lg);
 		padding: 0;
 		overflow: hidden;
+		margin-top: 0.5rem;
 	}
 	.q-stat {
 		display: flex;
@@ -2135,7 +2422,7 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.q-stat .num {
 		font-family: var(--font-display);
-		font-size: 1.1rem;
+		font-size: 1.15rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		letter-spacing: -0.02em;
@@ -2157,11 +2444,11 @@ export const getFeed = (limit=20, offset=0) =>
 		position: relative;
 	}
 	.aero-window {
-		border-radius: 12px;
+		border-radius: var(--radius-md);
 		overflow: hidden;
 		box-shadow:
 			var(--glass-shadow),
-			0 0 60px var(--shadow-deep);
+			0 0 60px var(--shadow-deep, rgba(0, 0, 0, 0.4));
 	}
 	.window-header {
 		display: flex;
@@ -2180,16 +2467,16 @@ export const getFeed = (limit=20, offset=0) =>
 		display: inline-block;
 		width: 12px;
 		height: 12px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 	}
 	.window-controls .close {
-		background: var(--status-red);
+		background: #ff5f56;
 	}
 	.window-controls .min {
-		background: var(--status-yellow);
+		background: #ffbd2e;
 	}
 	.window-controls .max {
-		background: var(--status-green);
+		background: #27c93f;
 	}
 	.window-title {
 		flex: 1;
@@ -2203,19 +2490,19 @@ export const getFeed = (limit=20, offset=0) =>
 		align-items: center;
 		gap: 4px;
 		font-size: 0.68rem;
-		color: var(--color-green);
+		color: #00e464;
 		font-weight: 600;
 	}
 	.ws-dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
-		background: var(--color-green);
-		box-shadow: 0 0 6px var(--color-green);
+		border-radius: var(--radius-full);
+		background: #00e464;
+		box-shadow: 0 0 6px #00e464;
 	}
 	.window-container {
 		display: flex;
-		height: 340px;
+		height: 350px;
 	}
 	.window-sidebar {
 		display: flex;
@@ -2224,14 +2511,14 @@ export const getFeed = (limit=20, offset=0) =>
 		padding: 10px 8px;
 		background: var(--glass-card-bg);
 		border-right: 1px solid var(--glass-separator);
-		min-width: 110px;
+		min-width: 120px;
 	}
 	.sidebar-item {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		padding: 8px 10px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		border: none;
 		background: transparent;
 		color: var(--text-muted);
@@ -2248,6 +2535,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.sidebar-item.active {
 		background: var(--glass-panel-bg);
 		color: var(--accent-primary);
+		font-weight: 600;
 	}
 	.sidebar-item .material-icons-round {
 		font-size: 16px;
@@ -2255,10 +2543,15 @@ export const getFeed = (limit=20, offset=0) =>
 	.window-body {
 		flex: 1;
 		overflow: auto;
-		padding: 12px;
+		padding: 14px;
 	}
 
 	/* Feed mock */
+	.mock-feed {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
 	.mock-post {
 		padding: 14px;
 		display: flex;
@@ -2273,7 +2566,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.post-avatar {
 		width: 40px;
 		height: 40px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -2297,20 +2590,20 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 0.6rem;
 		font-weight: 700;
 		padding: 2px 8px;
-		border-radius: 99px;
-		background: var(--surface-red-subtle);
-		border: 1px solid var(--border-red);
-		color: var(--status-red);
+		border-radius: var(--radius-xl);
+		background: rgba(239, 68, 68, 0.15);
+		border: 1px solid rgba(239, 68, 68, 0.3);
+		color: #ef4444;
 		animation: livePulse 1.6s ease-in-out infinite;
 	}
 	.post-content {
-		font-size: 0.78rem;
-		line-height: 1.5;
+		font-size: 0.82rem;
+		line-height: 1.55;
 		color: var(--text-secondary);
 		margin: 0;
 	}
 	.post-visual-chart {
-		padding: 10px;
+		padding: 10px 12px;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
@@ -2335,28 +2628,28 @@ export const getFeed = (limit=20, offset=0) =>
 		flex: 1;
 		height: 6px;
 		background: var(--glass-separator);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		overflow: hidden;
 	}
 	.bar {
 		height: 100%;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.bar-fast {
 		background: var(--liquid-gradient);
 	}
 	.bar-slow {
-		background: var(--surface-slow-bar);
+		background: rgba(239, 68, 68, 0.6);
 	}
 	.val {
 		font-size: 0.65rem;
 		color: var(--text-muted);
-		width: 40px;
+		width: 45px;
 		text-align: right;
 	}
 	.post-footer-actions {
 		display: flex;
-		gap: 10px;
+		gap: 12px;
 		align-items: center;
 	}
 	.mock-like-btn {
@@ -2365,7 +2658,7 @@ export const getFeed = (limit=20, offset=0) =>
 		gap: 4px;
 		border: none;
 		background: var(--icon-bg);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		color: var(--text-muted);
 		padding: 4px 12px;
 		cursor: pointer;
@@ -2376,8 +2669,11 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 14px;
 	}
 	.mock-like-btn.liked {
-		color: var(--status-red);
-		background: var(--surface-red-subtle);
+		color: var(--aero-rose, #ec4899);
+		background: rgba(236, 72, 153, 0.12);
+	}
+	.mock-like-btn.liked .material-icons-round {
+		filter: drop-shadow(0 0 5px rgba(236, 72, 153, 0.5));
 	}
 	.mock-comment-stat {
 		display: flex;
@@ -2416,7 +2712,7 @@ export const getFeed = (limit=20, offset=0) =>
 		gap: 6px;
 	}
 	.analytic-card {
-		padding: 8px;
+		padding: 8px 10px;
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
@@ -2435,7 +2731,7 @@ export const getFeed = (limit=20, offset=0) =>
 		color: var(--text-muted);
 	}
 	.green-glow {
-		color: var(--color-green);
+		color: #00d4aa;
 	}
 	.analytics-chart-container {
 		padding: 10px;
@@ -2453,7 +2749,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.legend-dot {
 		width: 8px;
 		height: 8px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 	}
 	.legend-dot.queries {
 		background: var(--accent-primary);
@@ -2496,11 +2792,11 @@ export const getFeed = (limit=20, offset=0) =>
 		align-items: center;
 		gap: 8px;
 		padding: 7px 10px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 	}
 	.lb-row.lb-gold {
-		background: var(--surface-gold-subtle);
-		border-color: var(--border-gold);
+		background: rgba(251, 191, 36, 0.12);
+		border-color: rgba(251, 191, 36, 0.3);
 	}
 	.lb-rank {
 		font-size: 0.85rem;
@@ -2510,7 +2806,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.lb-avatar {
 		width: 30px;
 		height: 30px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -2529,14 +2825,14 @@ export const getFeed = (limit=20, offset=0) =>
 	.lb-xp-bar {
 		height: 3px;
 		background: var(--glass-separator);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		margin-top: 3px;
 		overflow: hidden;
 	}
 	.lb-xp-fill {
 		height: 100%;
 		background: var(--liquid-gradient);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.lb-points {
 		font-size: 0.65rem;
@@ -2552,7 +2848,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.badge-chip {
 		font-size: 0.65rem;
 		padding: 2px 8px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		background: var(--icon-bg);
 		border: 1px solid var(--glass-card-border);
 		color: var(--text-secondary);
@@ -2581,7 +2877,7 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 0.65rem;
 		color: var(--text-muted);
 		padding: 3px 8px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		background: var(--icon-bg);
 	}
 	.tab.active {
@@ -2594,9 +2890,9 @@ export const getFeed = (limit=20, offset=0) =>
 	.lang-tag {
 		font-size: 0.6rem;
 		padding: 1px 6px;
-		border-radius: 4px;
-		background: var(--surface-green-subtle);
-		color: var(--color-green);
+		border-radius: var(--radius-xs);
+		background: rgba(0, 212, 170, 0.12);
+		color: #00d4aa;
 		font-weight: 600;
 		letter-spacing: 0.05em;
 	}
@@ -2614,7 +2910,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.marquee-band {
 		position: relative;
 		overflow: hidden;
-		padding: 1rem 0;
+		padding: 1.1rem 0;
 		border-top: 1px solid var(--glass-separator);
 		border-bottom: 1px solid var(--glass-separator);
 		background: var(--glass-panel-bg);
@@ -2659,7 +2955,7 @@ export const getFeed = (limit=20, offset=0) =>
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		font-size: 0.78rem;
+		font-size: 0.8rem;
 		font-weight: 600;
 		color: var(--text-muted);
 		padding: 0 1.5rem;
@@ -2683,16 +2979,6 @@ export const getFeed = (limit=20, offset=0) =>
 		text-align: center;
 		margin-bottom: 3rem;
 	}
-	.badge-new {
-		font-size: 0.65rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		text-transform: uppercase;
-		background: var(--icon-bg);
-		border: 1px solid var(--glass-border);
-		padding: 3px 10px;
-		border-radius: 99px;
-	}
 	.section-eyebrow {
 		display: inline-block;
 		font-size: 0.72rem;
@@ -2702,13 +2988,13 @@ export const getFeed = (limit=20, offset=0) =>
 		color: var(--accent-primary);
 		margin-bottom: 0.75rem;
 		padding: 4px 12px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		background: var(--icon-bg);
 		border: 1px solid var(--glass-card-border);
 	}
 	.section-title {
 		font-family: var(--font-display);
-		font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+		font-size: clamp(1.9rem, 3.5vw, 2.9rem);
 		font-weight: 900;
 		letter-spacing: -0.03em;
 		color: var(--text-primary);
@@ -2716,10 +3002,11 @@ export const getFeed = (limit=20, offset=0) =>
 		line-height: 1.15;
 	}
 	.section-subtitle {
-		font-size: 1rem;
+		font-size: 1.02rem;
 		color: var(--text-secondary);
-		max-width: 580px;
+		max-width: 600px;
 		margin: 0 auto;
+		line-height: 1.6;
 	}
 
 	/* ── Features Section ────────────────────────────────────────── */
@@ -2738,7 +3025,7 @@ export const getFeed = (limit=20, offset=0) =>
 		overflow-y: hidden;
 		cursor: grab;
 		padding: 1rem 0;
-		margin-bottom: 2rem;
+		margin-bottom: 1.5rem;
 		scrollbar-width: none;
 		-webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
 		mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
@@ -2779,7 +3066,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.icon-wrapper {
 		width: 44px;
 		height: 44px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -2799,14 +3086,14 @@ export const getFeed = (limit=20, offset=0) =>
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--accent-primary);
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid var(--glass-border);
+		background: var(--icon-bg);
+		border: 1px solid var(--glass-card-border);
 		padding: 3px 10px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.features-card h3 {
 		font-family: var(--font-display);
-		font-size: 1.1rem;
+		font-size: 1.15rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
@@ -2815,32 +3102,32 @@ export const getFeed = (limit=20, offset=0) =>
 	.features-card p {
 		font-size: 0.88rem;
 		line-height: 1.65;
-		color: var(--text-landing-secondary);
+		color: var(--text-secondary);
 		margin: 0;
 		flex: 1;
 	}
 	.features-card p code {
-		font-size: 0.78em;
+		font-size: 0.82em;
 		color: var(--accent-primary);
 		background: var(--code-bg);
-		padding: 1px 5px;
-		border-radius: 4px;
+		padding: 2px 6px;
+		border-radius: var(--radius-xs);
 	}
 	.card-footer-tech {
 		margin-top: auto;
 	}
 	.tech-pill {
-		font-size: 0.65rem;
-		color: var(--text-landing-muted);
+		font-size: 0.68rem;
+		color: var(--text-muted);
 		background: var(--icon-bg);
 		border: 1px solid var(--glass-separator);
 		padding: 3px 10px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		font-family: monospace;
 	}
 	.drag-hint {
 		text-align: center;
-		margin-top: 1.25rem;
+		margin-top: 0.5rem;
 		font-size: 0.78rem;
 		color: var(--text-muted);
 		display: flex;
@@ -2873,7 +3160,7 @@ export const getFeed = (limit=20, offset=0) =>
 		margin-bottom: 0;
 	}
 	.desc {
-		font-size: 1rem;
+		font-size: 1.02rem;
 		line-height: 1.7;
 		color: var(--text-secondary);
 		margin: 0;
@@ -2894,7 +3181,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.indicator-icon {
 		width: 40px;
 		height: 40px;
-		border-radius: 10px;
+		border-radius: var(--radius-sm);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -2939,14 +3226,14 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 
 	.tech-visual {
-		padding: 1.5rem;
+		padding: 1.75rem;
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
 	}
 	.tv-title {
 		font-family: var(--font-display);
-		font-size: 1.1rem;
+		font-size: 1.15rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
@@ -2980,14 +3267,14 @@ export const getFeed = (limit=20, offset=0) =>
 	.user-pill {
 		font-size: 0.68rem;
 		padding: 2px 10px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		background: var(--code-bg);
 		border: 1px solid var(--glass-card-border);
 		color: var(--text-secondary);
 	}
 	.flow-line {
 		height: 2px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.read-line {
 		background: linear-gradient(90deg, var(--accent-primary), transparent);
@@ -3024,7 +3311,7 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 0.65rem;
 		color: var(--text-muted);
 		background: rgba(0, 212, 170, 0.1);
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 		padding: 2px 6px;
 		width: fit-content;
 	}
@@ -3035,11 +3322,11 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.operations-stream code {
 		font-family: monospace;
-		font-size: 0.65rem;
-		color: var(--text-landing-muted);
+		font-size: 0.68rem;
+		color: var(--text-secondary);
 		background: var(--code-bg);
 		padding: 2px 8px;
-		border-radius: 4px;
+		border-radius: var(--radius-xs);
 	}
 
 	/* ── Gamification Section ────────────────────────────────────── */
@@ -3049,14 +3336,14 @@ export const getFeed = (limit=20, offset=0) =>
 	.gami-layout {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 1.5rem;
 		max-width: 1400px;
 		margin: 0 auto;
 	}
 	.gami-cards {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: 1.25rem;
+		gap: 1.5rem;
 	}
 	.gami-feature-card {
 		padding: 1.75rem;
@@ -3067,7 +3354,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.gami-icon-wrap {
 		width: 52px;
 		height: 52px;
-		border-radius: 14px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3079,9 +3366,9 @@ export const getFeed = (limit=20, offset=0) =>
 		color: #fbbf24;
 	}
 	.badge-icon {
-		background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.1));
-		border: 1px solid rgba(168, 85, 247, 0.3);
-		color: #a855f7;
+		background: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(16, 185, 129, 0.1));
+		border: 1px solid rgba(13, 148, 136, 0.3);
+		color: #0d9488;
 	}
 	.lb-icon {
 		background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.1));
@@ -3093,7 +3380,7 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.gami-feature-card h3 {
 		font-family: var(--font-display);
-		font-size: 1.1rem;
+		font-size: 1.15rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
@@ -3111,18 +3398,18 @@ export const getFeed = (limit=20, offset=0) =>
 	.gami-xp-track {
 		height: 6px;
 		background: var(--glass-panel-bg);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		overflow: hidden;
 		margin-bottom: 6px;
 	}
 	.gami-xp-fill {
 		height: 100%;
 		background: var(--liquid-gradient);
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 		transition: width 1s var(--ease-spring);
 	}
 	.gami-xp-label {
-		font-size: 0.65rem;
+		font-size: 0.68rem;
 		color: var(--text-muted);
 	}
 	.gami-badges-preview {
@@ -3137,9 +3424,9 @@ export const getFeed = (limit=20, offset=0) =>
 		justify-content: center;
 		width: 38px;
 		height: 38px;
-		border-radius: 12px;
-		background: var(--glass-surface);
-		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-sm);
+		background: var(--glass-card-bg);
+		border: 1px solid var(--glass-card-border);
 		color: var(--badge-glow, var(--text-muted));
 		transition: all var(--t-fast) var(--ease-spring);
 		cursor: default;
@@ -3150,12 +3437,11 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.gbp-badge:hover {
 		transform: translateY(-4px) scale(1.1);
-		background: rgba(255, 255, 255, 0.05);
+		background: rgba(255, 255, 255, 0.08);
 		border-color: var(--badge-glow, var(--accent-primary));
 		box-shadow:
 			0 4px 15px var(--badge-glow, rgba(0, 0, 0, 0.2)),
 			inset 0 1px 0 rgba(255, 255, 255, 0.2);
-		text-shadow: 0 0 10px var(--badge-glow, transparent);
 	}
 	.gbp-locked {
 		opacity: 0.3;
@@ -3172,13 +3458,13 @@ export const getFeed = (limit=20, offset=0) =>
 		align-items: center;
 		gap: 8px;
 		padding: 5px 8px;
-		border-radius: 6px;
+		border-radius: var(--radius-xs);
 		background: var(--glass-panel-bg);
 	}
 	.glb-rank {
 		width: 20px;
 		height: 20px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3208,18 +3494,18 @@ export const getFeed = (limit=20, offset=0) =>
 		font-weight: 600;
 	}
 	.gami-cta-card {
-		padding: 2rem;
+		padding: 2rem 2.5rem;
 		display: flex;
 		flex-direction: row;
 		align-items: center;
 		justify-content: space-between;
 		text-align: left;
-		gap: 1.5rem;
+		gap: 2rem;
 	}
 	.gami-cta-icon {
 		width: 64px;
 		height: 64px;
-		border-radius: 18px;
+		border-radius: var(--radius-md);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3235,19 +3521,20 @@ export const getFeed = (limit=20, offset=0) =>
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.4rem;
 	}
 	.gami-cta-content h3 {
 		font-family: var(--font-display);
-		font-size: 1.2rem;
+		font-size: 1.25rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
 	}
 	.gami-cta-content p {
-		font-size: 0.85rem;
+		font-size: 0.88rem;
 		color: var(--text-secondary);
 		margin: 0;
+		line-height: 1.5;
 	}
 	.gami-cta-actions {
 		display: flex;
@@ -3256,13 +3543,14 @@ export const getFeed = (limit=20, offset=0) =>
 		flex-shrink: 0;
 	}
 	.gami-lb-link {
-		font-size: 0.8rem;
+		font-size: 0.85rem;
 		color: var(--accent-primary);
 		text-decoration: none;
 		transition: opacity var(--t-fast);
+		font-weight: 600;
 	}
 	.gami-lb-link:hover {
-		opacity: 0.7;
+		opacity: 0.75;
 	}
 
 	/* ── Sandbox Section ─────────────────────────────────────────── */
@@ -3272,40 +3560,41 @@ export const getFeed = (limit=20, offset=0) =>
 	.sandbox-layout {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 1.5rem;
+		gap: 2rem;
 		max-width: 1400px;
 		margin: 0 auto;
 	}
 	.theme-customizer,
 	.live-sandbox {
-		padding: 2rem;
+		padding: 2.25rem;
 		display: flex;
 		flex-direction: column;
 		gap: 1.25rem;
 	}
 	.card-title {
 		font-family: var(--font-display);
-		font-size: 1.3rem;
+		font-size: 1.35rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
 	}
 	.card-desc {
-		font-size: 0.88rem;
+		font-size: 0.92rem;
 		color: var(--text-secondary);
 		margin: 0;
+		line-height: 1.6;
 	}
 	.theme-picker-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem;
+		gap: 0.85rem;
 	}
 	.picker-btn {
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.85rem 1rem;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		border: 1px solid var(--glass-panel-border);
 		background: var(--glass-panel-bg);
 		cursor: pointer;
@@ -3324,7 +3613,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.liquid-sphere {
 		width: 36px;
 		height: 36px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		flex-shrink: 0;
 		background: var(--liquid-gradient);
 		box-shadow:
@@ -3366,8 +3655,8 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.sandbox-textarea {
 		width: 100%;
-		padding: 0.5rem 0.5rem;
-		border-radius: 0;
+		padding: 0.5rem;
+		border-radius: var(--radius-xs);
 		background: transparent;
 		border: none;
 		color: var(--text-primary);
@@ -3398,7 +3687,7 @@ export const getFeed = (limit=20, offset=0) =>
 		border: 1px solid var(--glass-card-border);
 		cursor: pointer;
 		padding: 6px;
-		border-radius: 8px;
+		border-radius: var(--radius-sm);
 		transition: all var(--t-fast);
 		display: flex;
 		align-items: center;
@@ -3410,12 +3699,12 @@ export const getFeed = (limit=20, offset=0) =>
 		transform: translateY(-2px) scale(1.1);
 		background: var(--glass-card-hover);
 		border-color: var(--accent-primary);
-		box-shadow: var(--shadow-sm);
+		box-shadow: var(--shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.1));
 	}
 	.sandbox-feed-display {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: 0.85rem;
 		max-height: 280px;
 		overflow-y: auto;
 		padding-right: 4px;
@@ -3438,7 +3727,7 @@ export const getFeed = (limit=20, offset=0) =>
 		transform: translateY(-2px);
 		box-shadow:
 			0 8px 24px rgba(0, 0, 0, 0.15),
-			var(--glass-inset-highlight);
+			var(--glass-inset);
 		border-color: var(--glass-panel-border);
 	}
 	@keyframes post-appear {
@@ -3459,7 +3748,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.item-avatar {
 		width: 38px;
 		height: 38px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3499,12 +3788,12 @@ export const getFeed = (limit=20, offset=0) =>
 	.creators-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: 1.25rem;
+		gap: 1.5rem;
 		max-width: 1400px;
 		margin: 0 auto;
 	}
 	.creator-card {
-		padding: 1.75rem;
+		padding: 1.85rem;
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
@@ -3517,7 +3806,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.creator-avatar {
 		width: 52px;
 		height: 52px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3526,13 +3815,13 @@ export const getFeed = (limit=20, offset=0) =>
 		color: white;
 	}
 	.creator-meta h3 {
-		font-size: 0.95rem;
+		font-size: 0.98rem;
 		font-weight: 700;
 		color: var(--text-primary);
 		margin: 0;
 	}
 	.creator-meta span {
-		font-size: 0.72rem;
+		font-size: 0.75rem;
 		color: var(--text-muted);
 	}
 	.status-badge {
@@ -3543,12 +3832,12 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 0.65rem;
 		font-weight: 700;
 		padding: 3px 10px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.status-badge .dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		flex-shrink: 0;
 	}
 	.status-badge.live {
@@ -3570,14 +3859,14 @@ export const getFeed = (limit=20, offset=0) =>
 		background: var(--text-muted);
 	}
 	.creator-bio {
-		font-size: 0.86rem;
+		font-size: 0.88rem;
 		color: var(--text-secondary);
 		margin: 0;
 		line-height: 1.6;
 	}
 	.creator-stats {
 		display: flex;
-		gap: 1rem;
+		gap: 1.25rem;
 	}
 	.stat {
 		display: flex;
@@ -3585,12 +3874,12 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.stat strong {
 		font-family: var(--font-display);
-		font-size: 1rem;
+		font-size: 1.05rem;
 		font-weight: 800;
 		color: var(--text-primary);
 	}
 	.stat span {
-		font-size: 0.68rem;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 	}
 
@@ -3601,8 +3890,8 @@ export const getFeed = (limit=20, offset=0) =>
 	.faq-list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
-		max-width: 800px;
+		gap: 0.75rem;
+		max-width: 840px;
 		margin: 0 auto;
 	}
 	.faq-item {
@@ -3618,11 +3907,11 @@ export const getFeed = (limit=20, offset=0) =>
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 1.1rem 1.5rem;
+		padding: 1.15rem 1.6rem;
 		background: none;
 		border: none;
 		color: var(--text-primary);
-		font-size: 0.95rem;
+		font-size: 0.98rem;
 		font-weight: 600;
 		cursor: pointer;
 		text-align: left;
@@ -3636,7 +3925,7 @@ export const getFeed = (limit=20, offset=0) =>
 		color: var(--accent-primary);
 	}
 	.chevron {
-		transition: transform var(--t-base);
+		transition: transform var(--t-base) var(--ease-spring);
 		flex-shrink: 0;
 	}
 	.faq-item.open .chevron {
@@ -3646,10 +3935,10 @@ export const getFeed = (limit=20, offset=0) =>
 		overflow: hidden;
 	}
 	.faq-answer {
-		padding: 0 1.5rem 1.25rem;
+		padding: 0 1.6rem 1.35rem;
 	}
 	.faq-answer p {
-		font-size: 0.9rem;
+		font-size: 0.92rem;
 		line-height: 1.7;
 		color: var(--text-secondary);
 		margin: 0;
@@ -3662,33 +3951,89 @@ export const getFeed = (limit=20, offset=0) =>
 		font-size: 0.85em;
 		color: var(--accent-primary);
 		background: var(--code-bg);
-		padding: 1px 5px;
-		border-radius: 4px;
+		padding: 2px 6px;
+		border-radius: var(--radius-xs);
 	}
 
 	/* ── Final CTA ───────────────────────────────────────────────── */
 	.final-cta-section {
-		padding: 6rem 5%;
+		padding: 7rem 5% 6rem;
 		position: relative;
+		overflow: visible;
 	}
 	.cta-aurora {
 		position: absolute;
-		inset: 0;
+		inset: -15% 0;
 		pointer-events: none;
-		filter: blur(120px);
-		opacity: 0.5;
+		z-index: 1;
+		-webkit-mask-image: linear-gradient(
+			to bottom,
+			transparent 0%,
+			black 20%,
+			black 80%,
+			transparent 100%
+		);
+		mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+		/* Difusión suave y centrada detrás del contenedor CTA */
+		background:
+			radial-gradient(
+				ellipse 60% 50% at 50% 50%,
+				rgba(var(--accent-rgb, 27, 133, 243), 0.16) 0%,
+				rgba(var(--accent-secondary-rgb, 0, 212, 170), 0.04) 50%,
+				transparent 75%
+			),
+			radial-gradient(
+				ellipse 40% 35% at 50% 50%,
+				rgba(var(--accent-light-rgb, 46, 180, 255), 0.1) 0%,
+				transparent 60%
+			);
+		transition: opacity var(--t-slow);
+	}
+	:global([data-theme='light']) .cta-aurora {
+		background: radial-gradient(
+			ellipse 60% 50% at 50% 50%,
+			rgba(var(--accent-light-rgb, 46, 180, 255), 0.14) 0%,
+			rgba(255, 255, 255, 0.7) 40%,
+			transparent 75%
+		);
+		opacity: 0.85;
+	}
+	:global([data-theme='midnight']) .cta-aurora {
+		background: radial-gradient(
+			ellipse 55% 45% at 50% 50%,
+			rgba(var(--accent-rgb, 27, 133, 243), 0.1) 0%,
+			rgba(var(--accent-light-rgb, 46, 180, 255), 0.03) 45%,
+			transparent 70%
+		);
+		opacity: 0.7;
 	}
 	.cta-inner {
 		position: relative;
 		z-index: 2;
-		max-width: 780px;
+		max-width: 820px;
 		margin: 0 auto;
-		padding: 4rem 3rem;
+		padding: 4.5rem 3.5rem;
 		text-align: center;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 1.5rem;
+		border-radius: var(--radius-xl);
+		background: var(--glass-panel-bg);
+		border: 1px solid var(--glass-panel-border);
+		box-shadow:
+			var(--glass-shadow),
+			0 20px 50px rgba(0, 0, 0, 0.15);
+	}
+	:global([data-theme='light']) .cta-inner {
+		box-shadow:
+			0 20px 45px rgba(14, 165, 233, 0.08),
+			0 4px 14px rgba(0, 0, 0, 0.03);
+	}
+	:global([data-theme='midnight']) .cta-inner {
+		box-shadow:
+			0 24px 60px rgba(0, 0, 0, 0.4),
+			inset 0 1px 0 rgba(255, 255, 255, 0.06);
 	}
 	.cta-badge {
 		display: inline-flex;
@@ -3702,37 +4047,39 @@ export const getFeed = (limit=20, offset=0) =>
 		background: var(--icon-bg);
 		border: 1px solid var(--glass-card-border);
 		padding: 5px 14px;
-		border-radius: 99px;
+		border-radius: var(--radius-xl);
 	}
 	.cta-title {
 		font-family: var(--font-display);
-		font-size: clamp(2rem, 4vw, 3.2rem);
+		font-size: clamp(2.2rem, 4vw, 3.4rem);
 		font-weight: 900;
 		letter-spacing: -0.03em;
-		line-height: 1.1;
+		line-height: 1.12;
 		color: var(--text-primary);
 		margin: 0;
 	}
 	.cta-sub {
-		font-size: 1.05rem;
+		font-size: 1.08rem;
 		color: var(--text-secondary);
-		max-width: 480px;
+		max-width: 520px;
 		margin: 0;
+		line-height: 1.6;
 	}
 	.cta-actions {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 1rem;
 		justify-content: center;
+		align-items: center;
 	}
 	.cta-btn-lg {
-		font-size: 1rem !important;
+		font-size: 1.02rem !important;
 		padding: 0.85rem 2rem !important;
 	}
 
 	/* ── Footer ──────────────────────────────────────────────────── */
 	.aero-footer {
-		padding: 4rem 5% 0;
+		padding: 4.5rem 5% 0;
 		border-top: 1px solid var(--glass-separator);
 		background: var(--footer-bg);
 		margin-top: auto;
@@ -3740,7 +4087,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.footer-container {
 		display: grid;
 		grid-template-columns: 1.5fr repeat(4, 1fr);
-		gap: 2rem;
+		gap: 2.5rem;
 		max-width: 1400px;
 		margin: 0 auto;
 	}
@@ -3755,7 +4102,7 @@ export const getFeed = (limit=20, offset=0) =>
 	.footer-brand p {
 		font-size: 0.85rem;
 		color: var(--text-muted);
-		line-height: 1.6;
+		line-height: 1.65;
 		margin: 0;
 	}
 	.footer-socials {
@@ -3763,9 +4110,9 @@ export const getFeed = (limit=20, offset=0) =>
 		gap: 0.75rem;
 	}
 	.social-icon {
-		width: 36px;
-		height: 36px;
-		border-radius: 9px;
+		width: 38px;
+		height: 38px;
+		border-radius: var(--radius-sm);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3786,18 +4133,18 @@ export const getFeed = (limit=20, offset=0) =>
 	.footer-col {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.6rem;
 	}
 	.footer-col h4 {
 		font-size: 0.8rem;
 		font-weight: 700;
 		color: var(--text-primary);
-		margin: 0 0 0.25rem;
+		margin: 0 0 0.35rem;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
 	.footer-col a {
-		font-size: 0.84rem;
+		font-size: 0.85rem;
 		color: var(--text-muted);
 		text-decoration: none;
 		transition: color var(--t-fast);
@@ -3807,9 +4154,9 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 	.footer-bottom {
 		text-align: center;
-		padding: 1.5rem 0;
+		padding: 1.75rem 0;
 		border-top: 1px solid var(--glass-separator);
-		margin-top: 3rem;
+		margin-top: 3.5rem;
 	}
 	.footer-bottom p {
 		font-size: 0.78rem;
@@ -3827,9 +4174,18 @@ export const getFeed = (limit=20, offset=0) =>
 		margin-top: 1rem;
 	}
 
-	/* ── Responsive ──────────────────────────────────────────────── */
-	@media (min-width: 768px) {
+	/* ── Responsive Breakpoints ──────────────────────────────────── */
+	@media (min-width: 1024px) {
 		.nav-links {
+			display: flex;
+		}
+		.nav-login-link {
+			display: inline-flex;
+		}
+	}
+
+	@media (max-width: 1023px) {
+		.mobile-menu-btn {
 			display: flex;
 		}
 	}
@@ -3837,12 +4193,14 @@ export const getFeed = (limit=20, offset=0) =>
 	@media (max-width: 1100px) {
 		.hero-inner {
 			grid-template-columns: 1fr;
+			gap: 2.5rem;
 		}
 		.hero-mockup {
 			display: none;
 		}
 		.tech-layout {
 			grid-template-columns: 1fr;
+			gap: 2.5rem;
 		}
 		.gami-cards {
 			grid-template-columns: 1fr 1fr;
@@ -3853,6 +4211,18 @@ export const getFeed = (limit=20, offset=0) =>
 	}
 
 	@media (max-width: 768px) {
+		.aero-header {
+			top: 0.75rem;
+			width: calc(100% - 1.5rem);
+			height: 54px;
+			padding: 0 0.85rem 0 1.15rem;
+		}
+		.nav-container {
+			gap: 0.5rem;
+		}
+		.hero {
+			padding: 6.25rem 5% 3rem;
+		}
 		.sandbox-layout {
 			grid-template-columns: 1fr;
 		}
@@ -3866,39 +4236,43 @@ export const getFeed = (limit=20, offset=0) =>
 			flex-direction: column;
 			text-align: center;
 			justify-content: center;
+			padding: 2rem 1.5rem;
 		}
 		.gami-cta-actions {
 			flex-direction: column;
+			gap: 1rem;
 		}
 		.wal-stats-row {
 			grid-template-columns: 1fr;
-		}
-		.footer-container {
-			grid-template-columns: 1fr 1fr;
-		}
-		.hero {
-			padding: 6rem 5% 3rem;
 		}
 		.quick-stats {
 			flex-wrap: wrap;
 		}
 		.q-stat {
-			min-width: 40%;
+			min-width: 45%;
 		}
 		.cta-inner {
-			padding: 2.5rem 1.5rem;
+			padding: 3rem 1.5rem;
+		}
+		.theme-picker-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 
 	@media (max-width: 480px) {
 		.footer-container {
 			grid-template-columns: 1fr;
+			gap: 2rem;
 		}
 		.analytics-grid {
 			grid-template-columns: 1fr 1fr;
 		}
-		.creators-grid {
-			grid-template-columns: 1fr;
+		.quick-stats {
+			flex-direction: column;
+		}
+		.q-stat.border-l {
+			border-left: none;
+			border-top: 1px solid var(--glass-separator);
 		}
 	}
 </style>

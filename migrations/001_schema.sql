@@ -36,7 +36,6 @@ CREATE TABLE users (
     follower_count INT NOT NULL DEFAULT 0,
     following_count INT NOT NULL DEFAULT 0,
     post_count INT NOT NULL DEFAULT 0,
-    wallet_credits NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     privacy_level VARCHAR(15) DEFAULT 'public',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

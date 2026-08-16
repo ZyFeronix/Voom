@@ -75,7 +75,7 @@ npm run dev
 Types: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
 
 Scopes: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
-`notifications`, `wallet`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`,
+`notifications`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`,
 `security`, `api`, `gamification`, `docs`, `deps`, `gdpr`, `legal`, `settings`
 
 Examples:
@@ -112,8 +112,8 @@ perf(db): add composite index on posts(user_id, created_at)
 - File: `src/lib/components/<Name>.svelte`
 - Use runes for internal state.
 - Accept `$props()` for public API.
-- Use `class:` directive for conditional Tailwind classes.
-- Dynamic class names must be in Tailwind safelist OR use inline styles.
+- Use tokenized Glassmorphism 2.0 / Neo-Aero CSS classes and design tokens (`layout.css`).
+- Maintain volumetric shields on flex items with dynamic content (e.g. avatars, action buttons).
 
 ### Stores
 
@@ -140,7 +140,8 @@ npm run test:watch  # watch mode
 
 - Unit tests for server modules and utilities.
 - Integration tests for API endpoints.
-- Current test file: `tests/auth.test.js` (security validators + DB connectivity).
+- Current suites (8, 50 tests) in `tests/`: `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`.
+- Run a single suite from the repo root: `npx vitest run tests/auth.test.js` (or filter with `-t "<name>"`).
 - Add tests in `tests/` with `.test.js` extension.
 
 ---
@@ -181,7 +182,7 @@ Good first contributions:
 1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
 2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
 3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Testing** – `tests/auth.test.js` exists. Need more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
+4. **Testing** – 8 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
 6. **Email templates** — improve verification and password reset email HTML.
 
 ---

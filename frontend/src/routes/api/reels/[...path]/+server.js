@@ -3,11 +3,12 @@
  */
 import { json } from '@sveltejs/kit';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
-import { requireAuth } from '$lib/server/auth.js';
+import { requireAuth, optionalAuth } from '$lib/server/auth.js';
 import { awardXP } from '$lib/server/gamification.js';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { logActivity } from '$lib/server/activity.js';
+import { queueReelProgress } from '$lib/server/batch-writer.js';
 
 export async function GET({ request, url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
@@ -16,7 +17,7 @@ export async function GET({ request, url, params }) {
 	const db = getDb();
 
 	if (action === 'feed') {
-		const userId = await requireAuth(request);
+		const userId = (await optionalAuth(request)) || 0;
 		const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
 		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 10));
 		const offset = (page - 1) * limit;
@@ -25,30 +26,41 @@ export async function GET({ request, url, params }) {
 			.prepare(
 				`
 			SELECT r.*, u.username, u.display_name, u.avatar_url, u.is_verified,
-				(SELECT COUNT(*) FROM reel_likes pl WHERE pl.reel_id = r.id AND pl.user_id = ?) > 0 as user_liked
+				(SELECT COUNT(*) FROM reel_likes pl WHERE pl.reel_id = r.id AND pl.user_id = ?) > 0 as user_liked,
+				(SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) > 0 as is_following,
+				(
+					(r.like_count * 1 + r.comment_count * 27 + r.share_count * 20) *
+					(1.0 + CASE WHEN r.view_count > 0 THEN
+						(CAST(r.views_50pct AS REAL) / r.view_count) * 1.0 +
+						(CAST(r.quality_views AS REAL) / r.view_count) * 1.5 +
+						(CAST(r.completion_count AS REAL) / r.view_count) * 2.0
+					ELSE 0 END) *
+					(100.0 * EXP(-0.693 * (julianday('now') - julianday(r.created_at)) / 0.5))
+				) as reel_score
 			FROM reels r JOIN users u ON r.user_id = u.id
-			WHERE r.is_active = 1 ORDER BY r.created_at DESC LIMIT ? OFFSET ?
+			WHERE r.is_active = 1 ORDER BY reel_score DESC, r.created_at DESC LIMIT ? OFFSET ?
 		`
 			)
-			.all(userId, limit, offset);
+			.all(userId, userId, limit, offset);
 		return json({ data: reels, page, limit, has_more: reels.length === limit });
 	}
 
 	if (action && !subaction) {
+		const userId = (await optionalAuth(request)) || 0;
 		const reel = await db
 			.prepare(
-				`SELECT r.*, u.username, u.display_name, u.avatar_url, u.is_verified FROM reels r JOIN users u ON r.user_id = u.id WHERE r.id = ?`
+				`SELECT r.*, u.username, u.display_name, u.avatar_url, u.is_verified,
+					(SELECT COUNT(*) FROM reel_likes pl WHERE pl.reel_id = r.id AND pl.user_id = ?) > 0 as user_liked,
+					(SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) > 0 as is_following
+				FROM reels r JOIN users u ON r.user_id = u.id WHERE r.id = ?`
 			)
-			.get(parseInt(action));
+			.get(userId, userId, parseInt(action));
 		if (!reel) return json({ error: 'Reel not found' }, { status: 404 });
 		return json({ reel });
 	}
 
 	if (action && subaction === 'comments') {
-		let userId = null;
-		try {
-			userId = await requireAuth(request);
-		} catch (_e) {}
+		const userId = (await optionalAuth(request)) || 0;
 
 		await db
 			.prepare(
@@ -64,7 +76,7 @@ export async function GET({ request, url, params }) {
 			FROM reel_comments c JOIN users u ON c.user_id = u.id WHERE c.reel_id = ? ORDER BY c.created_at ASC
 		`
 			)
-			.all(userId || 0, parseInt(action));
+			.all(userId, parseInt(action));
 
 		// Map 1/0 to true/false for has_liked
 		comments.forEach((c) => (c.has_liked = !!c.has_liked));
@@ -86,18 +98,42 @@ export async function POST({ request, _url, params }) {
 			const formData = await request.formData();
 			const file = formData.get('video');
 			const caption = formData.get('caption') || '';
+			const thumbnailField = formData.get('thumbnail');
+			const durationSeconds = parseInt(formData.get('duration_seconds')) || null;
 			if (!file) return json({ error: 'No video file provided' }, { status: 400 });
 
 			const uploadDir = getUploadsDir('reels');
-			const ext = file.name.split('.').pop() || 'mp4';
+			const ext = file.name ? file.name.split('.').pop() || 'mp4' : 'mp4';
 			const newName = `reel_${Date.now()}.${ext}`;
 			const buffer = Buffer.from(await file.arrayBuffer());
 			writeFileSync(resolve(uploadDir, newName), buffer);
 			const videoUrl = `/uploads/reels/${newName}`;
 
+			let thumbnailUrl = null;
+			if (thumbnailField) {
+				try {
+					if (typeof thumbnailField === 'string' && thumbnailField.startsWith('data:image/')) {
+						const base64Data = thumbnailField.replace(/^data:image\/\w+;base64,/, '');
+						const thumbBuffer = Buffer.from(base64Data, 'base64');
+						const thumbName = `thumb_${Date.now()}.jpg`;
+						writeFileSync(resolve(uploadDir, thumbName), thumbBuffer);
+						thumbnailUrl = `/uploads/reels/${thumbName}`;
+					} else if (thumbnailField && typeof thumbnailField.arrayBuffer === 'function') {
+						const thumbBuffer = Buffer.from(await thumbnailField.arrayBuffer());
+						const thumbName = `thumb_${Date.now()}.jpg`;
+						writeFileSync(resolve(uploadDir, thumbName), thumbBuffer);
+						thumbnailUrl = `/uploads/reels/${thumbName}`;
+					}
+				} catch (thumbErr) {
+					console.error('[Reel Thumbnail Save Error]:', thumbErr);
+				}
+			}
+
 			const result = await db
-				.prepare('INSERT INTO reels (user_id, video_url, caption) VALUES (?, ?, ?)')
-				.run(userId, videoUrl, caption);
+				.prepare(
+					'INSERT INTO reels (user_id, video_url, thumbnail_url, caption, duration_seconds) VALUES (?, ?, ?, ?, ?)'
+				)
+				.run(userId, videoUrl, thumbnailUrl, caption, durationSeconds);
 
 			// Gamification: Create Reel
 			setTimeout(async () => {
@@ -111,7 +147,12 @@ export async function POST({ request, _url, params }) {
 			await logActivity(userId, 'create', 'reel', Number(result.lastInsertRowid));
 
 			return json(
-				{ success: true, reel_id: Number(result.lastInsertRowid), video_url: videoUrl },
+				{
+					success: true,
+					reel_id: Number(result.lastInsertRowid),
+					video_url: videoUrl,
+					thumbnail_url: thumbnailUrl
+				},
 				{ status: 201 }
 			);
 		}
@@ -132,6 +173,15 @@ export async function POST({ request, _url, params }) {
 			return json({ success: true, message: 'Reel liked' });
 		}
 
+		// View Progress (buffered batch write)
+		if (subaction === 'view-progress' || subaction === 'view_progress') {
+			const body = await request.json().catch(() => ({}));
+			const progress = Math.min(100, Math.max(0, parseInt(body.progress) || 0));
+			const quality = Boolean(body.quality);
+			queueReelProgress(reelId, userId, progress, quality);
+			return json({ success: true, message: 'Progreso encolado' });
+		}
+
 		// View
 		if (subaction === 'view') {
 			await db.prepare('UPDATE reels SET view_count = view_count + 1 WHERE id = ?').run(reelId);
@@ -145,6 +195,13 @@ export async function POST({ request, _url, params }) {
 			if (!existingView) await logActivity(userId, 'view', 'reel', reelId);
 
 			return json({ success: true });
+		}
+
+		// Share
+		if (subaction === 'share') {
+			await db.prepare('UPDATE reels SET share_count = share_count + 1 WHERE id = ?').run(reelId);
+			await logActivity(userId, 'share', 'reel', reelId);
+			return json({ success: true, message: 'Reel shared' });
 		}
 
 		// Comment Action
@@ -228,9 +285,19 @@ export async function DELETE({ request, _url, params }) {
 		}
 
 		if (!subaction) {
-			const result = await db
-				.prepare('DELETE FROM reels WHERE id = ? AND user_id = ?')
-				.run(reelId, userId);
+			const user = await db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
+			const isStaff =
+				user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'moderator');
+
+			let result;
+			if (isStaff) {
+				result = await db.prepare('DELETE FROM reels WHERE id = ?').run(reelId);
+			} else {
+				result = await db
+					.prepare('DELETE FROM reels WHERE id = ? AND user_id = ?')
+					.run(reelId, userId);
+			}
+
 			if (result.changes > 0) {
 				await logActivity(userId, 'delete', 'reel', reelId);
 				// Gamification: Delete Reel penalty

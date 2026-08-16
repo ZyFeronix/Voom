@@ -7,9 +7,9 @@
 		green: 'bg-green-500/20 text-green-300 border-green-500/30',
 		red: 'bg-red-500/20 text-red-300 border-red-500/30',
 		yellow: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-		purple: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+		purple: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
 		cyan: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-		neon: 'bg-primary/20 text-primary-content border-primary/40 shadow-[0_0_10px_rgba(27,133,243,0.3)]'
+		neon: 'bg-primary/20 text-primary-content border-primary/40 shadow-[0_0_10px_rgba(var(--accent-blue-rgb),0.3)]'
 	});
 
 	let themeClass = $derived(colorMap[color] || colorMap['blue']);

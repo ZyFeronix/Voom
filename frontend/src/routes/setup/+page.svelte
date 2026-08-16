@@ -315,7 +315,8 @@
 
 	.particle {
 		position: absolute;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--glass-bg);
 		border: 1px solid var(--glass-border);
 		animation: float-up 12s linear infinite;
@@ -369,7 +370,8 @@
 	.progress-segment {
 		width: 32px;
 		height: 32px;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -573,7 +575,8 @@
 		display: inline-block;
 		border: 3px solid rgba(255, 255, 255, 0.3);
 		border-top-color: #fff;
-		border-radius: 50%;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		animation: spin 0.75s linear infinite;
 	}
 </style>
