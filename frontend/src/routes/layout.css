@@ -202,7 +202,7 @@
 	--bg-surface: rgba(12, 35, 55, 0.55); /* Sleek teal-blue glass */
 	--bg-surface-solid: #0d1f33; /* Solid fallback/backdrop for hover cards */
 	--bg-surface-hover: rgba(18, 50, 75, 0.68);
-	--bg-input: rgba(10, 25, 40, 0.65);
+	--bg-input: rgba(15, 34, 56, 0.8); /* Contenedor visible sobre el fondo de página */
 	--bg-input-tint: rgba(20, 184, 166, 0.12); /* Emerald tint */
 
 	/* Tipografía y Detalles */
@@ -311,7 +311,7 @@
 	--bg-surface: rgba(6, 12, 24, 0.75); /* Indigo glass surface */
 	--bg-surface-solid: #050a14; /* Solid fallback/backdrop */
 	--bg-surface-hover: rgba(10, 18, 36, 0.85);
-	--bg-input: rgba(4, 7, 14, 0.85);
+	--bg-input: rgba(10, 20, 38, 0.9); /* Contenedor visible sobre el fondo de página */
 	--bg-input-tint: rgba(56, 189, 248, 0.06); /* Cyber cyan tint sutil */
 
 	/* Tipografía y Detalles */
@@ -1103,6 +1103,21 @@ a {
 		box-shadow var(--t-base),
 		background var(--t-base);
 	width: 100%;
+}
+
+/* En temas oscuros el borde base de los campos (--border-subtle) apenas se
+   distingue del fondo, así que el contenedor del texto se vuelve invisible.
+   Se refuerza el contorno solo de los controles de formulario; el hover y el
+   focus (definidos después) siguen sustituyéndolo con su acento. */
+[data-theme='dark'] .aero-input,
+[data-theme='dark'] .aero-textarea,
+[data-theme='dark'] .aero-select,
+[data-theme='dark'] .vs-input,
+[data-theme='midnight'] .aero-input,
+[data-theme='midnight'] .aero-textarea,
+[data-theme='midnight'] .aero-select,
+[data-theme='midnight'] .vs-input {
+	border-color: rgba(56, 189, 248, 0.3); /* Sky tint visible sobre fondo oscuro */
 }
 .aero-input::placeholder,
 .aero-textarea::placeholder,

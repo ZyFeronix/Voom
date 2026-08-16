@@ -273,6 +273,17 @@ CREATE TABLE IF NOT EXISTS post_hashtags (
     PRIMARY KEY(post_id, tag_name)
 );
 
+-- Tags curados por administración (ver migración 013). El feed de /explore
+-- los usa como filtro real: los posts se emparejan por hashtag #slug vía post_hashtags.
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(60) NOT NULL,
+    slug VARCHAR(60) NOT NULL UNIQUE,
+    icon VARCHAR(40) DEFAULT 'sell',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags(slug);
+
 CREATE TABLE IF NOT EXISTS check_ins (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -850,6 +861,13 @@ INSERT OR IGNORE INTO marketplace_categories (name, icon, slug) VALUES
     ('Cursos & Tutoriales', 'school', 'educacion'),
     ('Música & Audio', 'audiotrack', 'musica'),
     ('Fotografía & Video', 'videocam', 'multimedia');
+
+INSERT OR IGNORE INTO tags (name, slug, icon) VALUES
+    ('Gaming', 'gaming', 'sports_esports'),
+    ('Arte Digital', 'arte-digital', 'palette'),
+    ('Música', 'musica', 'music_note'),
+    ('VTubing', 'vtubing', 'auto_awesome'),
+    ('Streaming', 'streaming', 'live_tv');
 
 INSERT OR IGNORE INTO system_settings (key, value) VALUES
     ('site_name', 'VSocial'),

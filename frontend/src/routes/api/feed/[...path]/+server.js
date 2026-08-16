@@ -168,9 +168,12 @@ export async function GET({ request, url, params }) {
 		const cursor = url.searchParams.get('cursor') || '';
 		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 20));
 		const q = (url.searchParams.get('q') || '').trim();
+		// Categoría/tag curado (slug de la tabla tags): filtra posts por hashtag #slug
+		const category = (url.searchParams.get('category') || '').trim().toLowerCase();
 
 		let cursorClause = '';
 		let searchClause = '';
+		let categoryClause = '';
 		const params = [];
 
 		if (q) {
@@ -184,6 +187,11 @@ export async function GET({ request, url, params }) {
 			}
 		}
 
+		if (category && category !== 'undefined' && category !== 'null') {
+			categoryClause = 'AND p.id IN (SELECT post_id FROM post_hashtags WHERE tag_name = ?)';
+			params.push(category);
+		}
+
 		if (cursor) {
 			const [cursorLike, cursorId] = cursor.split('_').map(Number);
 			if (cursorLike !== undefined && cursorId !== undefined) {
@@ -193,7 +201,7 @@ export async function GET({ request, url, params }) {
 		}
 		params.push(limit);
 
-		const cacheKey = `explore_base_${userId}_${cursor}_${limit}_${encodeURIComponent(q)}`;
+		const cacheKey = `explore_base_${userId}_${cursor}_${limit}_${encodeURIComponent(q)}_${category}`;
 		let posts = await getCache(cacheKey);
 
 		if (!posts) {
@@ -208,7 +216,7 @@ export async function GET({ request, url, params }) {
 					(SELECT title FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_text,
 					(SELECT color FROM user_titles WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as title_color
 				FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN anon_identities ai ON ai.user_id = p.user_id
-				WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0 AND (p.privacy = 'public' OR p.user_id = ?) ${searchClause} ${cursorClause}
+				WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.is_banned = 0 AND (p.privacy = 'public' OR p.user_id = ?) ${searchClause} ${categoryClause} ${cursorClause}
 				ORDER BY p.like_count DESC, p.id DESC LIMIT ?
 			`
 				)

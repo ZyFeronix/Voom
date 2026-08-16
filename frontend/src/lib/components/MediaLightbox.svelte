@@ -1740,7 +1740,11 @@
 			var(--shadow-xs);
 	}
 
-	:global(.aero-textarea) {
+	/* OJO: esta regla debe ir acotada a los textareas de comentarios (dentro de
+	   .comment-input-wrapper). Como MediaLightbox está montado en el layout raíz,
+	   un selector global sin ancestro rompía TODOS los .aero-textarea de la app
+	   (p. ej. la biografía de Ajustes quedaba sin fondo ni borde). */
+	:global(.comment-input-wrapper .aero-textarea) {
 		width: 100%;
 		background: transparent !important;
 		border: none !important;

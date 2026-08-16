@@ -94,7 +94,12 @@ export const feed = {
 		return get(`/feed${qs ? '?' + qs : ''}`);
 	},
 	explore: (params = {}) => {
-		const qs = new URLSearchParams(params).toString();
+		// URLSearchParams convierte undefined/null/'' en el string "undefined"/"null";
+		// se descartan para no mandar parámetros vacíos al backend (p. ej. category).
+		const clean = Object.fromEntries(
+			Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+		);
+		const qs = new URLSearchParams(clean).toString();
 		return get(`/feed/explore${qs ? '?' + qs : ''}`);
 	},
 	trendingTags: () => get('/feed/trending-tags'),
@@ -278,6 +283,19 @@ export const marketplace = {
 		const qs = new URLSearchParams({ q: query, ...params }).toString();
 		return get(`/marketplace/search?${qs}`);
 	}
+};
+
+// ---------------------------------------------------------------------------
+// Tags API (lectura pública; escritura solo admin)
+// ---------------------------------------------------------------------------
+export const tags = {
+	list: (params = {}) => {
+		const qs = new URLSearchParams(params).toString();
+		return get(`/tags${qs ? '?' + qs : ''}`);
+	},
+	create: (data) => post('/tags', data),
+	update: (id, data) => put(`/tags/${id}`, data),
+	remove: (id) => del(`/tags/${id}`)
 };
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@
 		{ href: '/admin/users', icon: 'people', label: 'Usuarios' },
 		{ href: '/admin/content', icon: 'grid_view', label: 'Contenido' },
 		{ href: '/admin/reports', icon: 'flag', label: 'Reportes' },
+		{ href: '/admin/tags', icon: 'sell', label: 'Tags' },
 		{ href: '/admin/settings', icon: 'tune', label: 'Sistema' },
 		{ href: '/admin/apis', icon: 'api', label: 'APIs & Integraciones' }
 	];

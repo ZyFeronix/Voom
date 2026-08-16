@@ -8,7 +8,8 @@
 		feed as feedApi,
 		users as usersApi,
 		marketplace as marketplaceApi,
-		reels as reelsApi
+		reels as reelsApi,
+		tags as tagsApi
 	} from '$lib/api.js';
 	import PostCard from '$lib/components/PostCard.svelte';
 	import { getProxiedMediaUrl } from '$lib/utils/mediaProxy.js';
@@ -24,14 +25,9 @@
 	let marketplaceItems = $state([]);
 	let reelsList = $state([]);
 
-	const categories = [
-		{ id: 'all', name: 'Todo', icon: 'grid_view' },
-		{ id: 'gaming', name: 'Gaming', icon: 'sports_esports' },
-		{ id: 'art', name: 'Arte Digital', icon: 'palette' },
-		{ id: 'music', name: 'Música', icon: 'music_note' },
-		{ id: 'vtubing', name: 'VTubing', icon: 'auto_awesome' },
-		{ id: 'streaming', name: 'Streaming', icon: 'live_tv' }
-	];
+	// Tags reales gestionados por administración (/admin/tags). Cada tag filtra
+	// los posts que usan el hashtag #slug en el backend (api/feed explore).
+	let exploreTags = $state([]);
 
 	// Definición puramente visual de las pestañas (iconos Material)
 	const tabs = [
@@ -52,9 +48,15 @@
 	});
 
 	// ── Lifecycle ────────────────────────────────────────────────────────────
-	onMount(() => {
+	onMount(async () => {
 		searchQuery = urlQuery;
 		// Let $effect handle the initial load
+		try {
+			const res = await tagsApi.list();
+			exploreTags = res.tags || [];
+		} catch (err) {
+			console.error('Error cargando tags:', err);
+		}
 	});
 
 	// ── Actions ──────────────────────────────────────────────────────────────
@@ -195,15 +197,23 @@
 		</div>
 	</div>
 
-	<!-- Category Filter Chips -->
+	<!-- Category Filter Chips (tags reales desde /api/tags, gestionados en /admin/tags) -->
 	<div class="category-chips">
-		{#each categories as cat}
+		<button
+			onclick={() => selectCategory('all')}
+			class="chip"
+			class:active={activeCategory === 'all'}
+		>
+			<span class="material-icons-round">grid_view</span>
+			Todo
+		</button>
+		{#each exploreTags as cat}
 			<button
-				onclick={() => selectCategory(cat.id)}
+				onclick={() => selectCategory(cat.slug)}
 				class="chip"
-				class:active={activeCategory === cat.id}
+				class:active={activeCategory === cat.slug}
 			>
-				<span class="material-icons-round">{cat.icon}</span>
+				<span class="material-icons-round">{cat.icon || 'sell'}</span>
 				{cat.name}
 			</button>
 		{/each}
@@ -429,6 +439,23 @@
 												</div>
 											</div>
 											<div class="reel-bg">
+												{#if reel.thumbnail_url}
+													<img
+														src={getProxiedMediaUrl(reel.thumbnail_url)}
+														alt={reel.description}
+														class="reel-thumb"
+														loading="lazy"
+														decoding="async"
+													/>
+												{:else if reel.video_url}
+													<video
+														src={reel.video_url}
+														class="reel-thumb"
+														muted
+														playsinline
+														preload="metadata"
+													/>
+												{/if}
 												<span class="reel-play">
 													<span class="material-icons-round">play_arrow</span>
 												</span>
@@ -1206,6 +1233,7 @@
 	}
 
 	.reel-bg {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(0, 119, 255, 0.08) 100%);
@@ -1214,7 +1242,18 @@
 		justify-content: center;
 	}
 
+	.reel-thumb {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
 	.reel-play {
+		position: relative;
+		z-index: 2;
 		width: 52px;
 		height: 52px;
 		border-radius: var(--radius-full);

@@ -736,12 +736,12 @@ Vsocial/                     ← raíz del proyecto
 - **Transacciones ACID**: WAL mode, foreign keys ON, busy_timeout 5000ms.
 - ** Índices estratégicos**: Cada tabla tiene índices para los patrones de consulta más frecuentes.
 
-### 4.2 Dominios del Esquema (14 dominios, 63 tablas)
+### 4.2 Dominios del Esquema (14 dominios, 64 tablas)
 
 | Dominio | Tablas | Función |
 |---------|--------|---------|
 | **1. Users & Auth** | `users`, `user_roles`, `user_titles`, `user_sessions`, `user_settings` | Perfil, roles, sesiones, preferencias. `users` incluye columnas RGPD: `birth_date`, `deleted_at` (soft-delete + ventana 30 días), `terms_accepted_at`, `privacy_accepted_at` (migración `003_gdpr.sql`) |
-| **2. Posts & Content** | `posts`, `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins` | Publicaciones (con `mood` y encuesta serializada en `body`), media, reacciones, comentarios anidados, hashtags, check-ins geolocalizados |
+| **2. Posts & Content** | `posts`, `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`, `tags` | Publicaciones (con `mood` y encuesta serializada en `body`), media, reacciones, comentarios anidados, hashtags, check-ins geolocalizados, tags curados por administración (filtro real de `/explore` vía `#slug`) |
 | **3. Stories** | `stories`, `story_highlights`, `story_highlight_items` | Historias efímeras (24h) + highlights permanentes |
 | **4. Reels** | `reels`, `reel_likes`, `reel_comments` | Videos cortos estilo TikTok/Reels |
 | **5. Messaging** | `conversations`, `conversation_participants`, `messages_new`, `message_reactions`, `message_read_receipts` | Chat DM + grupos, voz, media, replies, reacciones, recibos de lectura |
@@ -786,7 +786,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/install` | `install/+page.svelte` | Wizard de instalación inicial |
 | `/setup` | `setup/+page.svelte` | Configuración inicial (primer admin) |
 | `/feed` | `feed/+page.svelte` | Feed de publicaciones |
-| `/explore` | `explore/+page.svelte` | Explorar / descubrir contenido |
+| `/explore` | `explore/+page.svelte` | Explorar / descubrir contenido — chips de **tags curados** (tabla `tags`, gestionados en `/admin/tags`) que filtran el feed por hashtag `#slug` |
 | `/following` | `following/+page.svelte` | Feed de seguidos |
 | `/notifications` | `notifications/+page.svelte` | Centro de notificaciones con pestañas |
 | `/messages` | `messages/+page.svelte` | Chat / mensajería |
@@ -810,6 +810,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/admin/reports` | `admin/reports/+page.svelte` | Gestión de reportes |
 | `/admin/content` | `admin/content/+page.svelte` | Moderación de contenido |
 | `/admin/settings` | `admin/settings/+page.svelte` | Configuración del sistema |
+| `/admin/tags` | `admin/tags/+page.svelte` | CRUD de tags curados (crear, renombrar, icono, eliminar; muestra posts por tag) |
 | `/admin/verifications` | `admin/verifications/+page.svelte` | Revisión de solicitudes de verificación |
 | `/about` | `about/+page.svelte` | Acerca de VSocial |
 | `/about/verified` | `about/verified/+page.svelte` | Info sobre verificación de creadores |
@@ -822,7 +823,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/docs` | `static/docs/index.html` | Portal de documentación (README + DOCS + Contributing en pestañas). Generado por `scripts/build_docs.js` |
 | `/docs/license` | `static/docs/license.html` | Página de Licencia y Protección (AGPLv3) — HTML estático autocontenido, diseño Glassmorphism 2.0 |
 
-### 5.2 API Endpoints — 25 grupos de endpoints
+### 5.2 API Endpoints — 26 grupos de endpoints
 
 | Ruta API | Métodos | Función |
 |----------|---------|---------|
@@ -832,7 +833,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/api/install` | POST | Instalación inicial: crea tablas, admin user, system settings |
 | `/api/setup` | POST | Wizard post-instalación |
 | `/api/posts/[...path]` | GET, POST, PUT, DELETE | CRUD de posts + like/unlike + save/unsave + pin/unpin + `/:id/vote` (encuestas) + `/:id/restore` + **`/:id/share` / `/:id/repost`** + **comentarios anidados** (`/:id/comments`, `/:id/comments/:commentId`) + posts y comentarios **anónimos**. El POST de creación acepta `mood`, `scheduled_at`, `location_name` y `poll` (JSON con pregunta, opciones y duración) |
-| `/api/feed/[...path]` | GET | Feed inteligente, timeline, trending, explore |
+| `/api/feed/[...path]` | GET | Feed inteligente, timeline, trending, explore. `GET /explore` acepta `?category=&lt;slug&gt;` para filtrar posts por hashtag `#slug` (tag curado) |
 | `/api/reels/[...path]` | GET, POST, PUT, DELETE | CRUD de reels + like/unlike + comentarios |
 | `/api/stories/[...path]` | GET, POST, DELETE | CRUD de stories + highlights |
 | `/api/notifications/[...path]` | GET, PUT, PATCH | Lista con paginación de cursor, marcar leídas, marcar todas leídas (push en tiempo real vía Socket.IO `new_notification`) |
@@ -852,6 +853,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/api/activity/view` | POST | Registrar vista de contenido |
 | `/api/activity/history` | GET | Historial de actividad del usuario |
 | `/api/admin/[...path]` | GET, POST, PUT | Panel admin: dashboard, users, reports, content, settings, **verifications** (listar/aprobar), strikes |
+| `/api/tags/[...path]` | GET, POST, PUT, DELETE | Tags curados: `GET /api/tags` (lista pública con `post_count`), `POST` / `PUT /:id` / `DELETE /:id` solo admin (crear, editar nombre/icono, eliminar) |
 | `/api/cron` | GET, POST | Workers cron (publicación programada, limpiezas, recuerdos) — protegido con `CRON_SECRET` |
 | `/api/gifs/search` | GET | Proxy de búsqueda GIFs (Tenor) |
 
@@ -1283,7 +1285,7 @@ erDiagram
 
 ### Dominios Principales:
 1. **Users & Auth:** `users` (con campos RGPD `birth_date`, `deleted_at`, `terms_accepted_at`, `privacy_accepted_at`), `user_roles`, `user_titles`, `user_sessions`, `user_settings`.
-2. **Posts & Content:** `posts` (soporte para `mood`, encuesta serializada en `body`, `location_name`, `scheduled_at`), `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`.
+2. **Posts & Content:** `posts` (soporte para `mood`, encuesta serializada en `body`, `location_name`, `scheduled_at`), `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`, `tags` (tags curados por administración; el feed de `/explore` filtra por hashtag `#slug`).
 3. **Stories & Highlights:** `stories` (24h efímeras), `story_highlights`, `story_highlight_items`.
 4. **Reels:** `reels`, `reel_likes`, `reel_comments`.
 5. **Mensajería:** `conversations`, `conversation_participants`, `messages_new`, `message_reactions`, `message_read_receipts`.

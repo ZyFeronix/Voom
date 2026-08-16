@@ -49,7 +49,7 @@ erDiagram
 
 ### Dominios Principales:
 1. **Users & Auth:** `users` (con campos RGPD `birth_date`, `deleted_at`, `terms_accepted_at`, `privacy_accepted_at`), `user_roles`, `user_titles`, `user_sessions`, `user_settings`.
-2. **Posts & Content:** `posts` (soporte para `mood`, encuesta serializada en `body`, `location_name`, `scheduled_at`), `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`.
+2. **Posts & Content:** `posts` (soporte para `mood`, encuesta serializada en `body`, `location_name`, `scheduled_at`), `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`, `tags` (tags curados por administración; el feed de `/explore` filtra por hashtag `#slug`).
 3. **Stories & Highlights:** `stories` (24h efímeras), `story_highlights`, `story_highlight_items`.
 4. **Reels:** `reels`, `reel_likes`, `reel_comments`.
 5. **Mensajería:** `conversations`, `conversation_participants`, `messages_new`, `message_reactions`, `message_read_receipts`.
