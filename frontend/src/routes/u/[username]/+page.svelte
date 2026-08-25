@@ -3,16 +3,20 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { users as usersApi, messages as messagesApi, posts as postsApi } from '$lib/api.js';
+	import {
+		users as usersApi,
+		messages as messagesApi,
+		posts as postsApi,
+		reels as reelsApi
+	} from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import PostCard from '$lib/components/PostCard.svelte';
-	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
-	import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
-	import UserTitleBadge from '$lib/components/gamification/UserTitleBadge.svelte';
-	import { formatHashtags } from '$lib/utils/textFormatting.js';
+	import Portal from '$lib/components/Portal.svelte';
+	import ProfileHeaderCard from '$lib/components/profile/ProfileHeaderCard.svelte';
+	import ProfileThemeShell from '$lib/components/profile/ProfileThemeShell.svelte';
+	import ProfileBlocks from '$lib/components/profile/ProfileBlocks.svelte';
 	import ActivityHistory from '$lib/components/ActivityHistory.svelte';
 	import ImageCropperModal from '$lib/components/ImageCropperModal.svelte';
-	import { mediaViewer } from '$lib/stores/mediaViewer.svelte.js';
 
 	// ── Runes State ──────────────────────────────────────────────────────────
 	let username = $derived(page.params.username);
@@ -27,9 +31,19 @@
 	let hasMoreReposts = $state(true);
 	let loadingMoreReposts = $state(false);
 	let loadingReposts = $state(false);
-	let activeTab = $state('posts'); // 'posts', 'reposts', 'about', 'history', 'trash'
+
+	let reels = $state([]);
+	let reelsPage = $state(1);
+	let hasMoreReels = $state(true);
+	let loadingReels = $state(false);
+	let loadingMoreReels = $state(false);
+
+	let activeTab = $state('posts'); // 'posts', 'reposts', 'reels', 'about', 'history', 'trash'
 	let loading = $state(true);
 	let deletedPosts = $state([]);
+
+	const formatCount = (n) =>
+		Intl.NumberFormat('es', { notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
 
 	// ── Cropper State for Profile Direct Upload ──
 	let cropFile = $state(null);
@@ -92,23 +106,12 @@
 		cropType = null;
 	}
 
-	// ── Gamification XP Logic ──
-	const XP_PER_LEVEL_FACTOR = 100;
-	let currentXp = $derived(user?.xp_points || 0);
-	let currentLevel = $derived(user?.level || 1);
-	let currentLevelBaseXp = $derived(
-		currentLevel <= 1 ? 0 : Math.pow(currentLevel - 1, 2) * XP_PER_LEVEL_FACTOR
-	);
-	let nextLevelBaseXp = $derived(Math.pow(currentLevel, 2) * XP_PER_LEVEL_FACTOR);
-	let xpIntoLevel = $derived(currentXp - currentLevelBaseXp);
-	let xpRequiredForNext = $derived(nextLevelBaseXp - currentLevelBaseXp);
-	let xpPercentage = $derived(Math.min(100, Math.max(0, (xpIntoLevel / xpRequiredForNext) * 100)));
-
 	let tabKey = $state(0);
 	function selectTab(tabId) {
 		activeTab = tabId;
 		tabKey++;
 		if (activeTab === 'reposts') loadReposts();
+		if (activeTab === 'reels') loadReels();
 		if (activeTab === 'trash' && deletedPosts.length === 0) loadTrash();
 	}
 	let loadingTrash = $state(false);
@@ -312,6 +315,61 @@
 		};
 	}
 
+	async function loadReels() {
+		loadingReels = true;
+		reelsPage = 1;
+		hasMoreReels = true;
+		try {
+			const data = await reelsApi.byUser(username, { page: 1, limit: 12 });
+			const list = data.data || [];
+			reels = list;
+			if (list.length < 12) hasMoreReels = false;
+		} catch (e) {
+			console.error('Failed to load reels:', e);
+			reels = [];
+		} finally {
+			loadingReels = false;
+		}
+	}
+
+	async function loadMoreReels() {
+		if (loadingMoreReels || !hasMoreReels || loadingReels) return;
+		loadingMoreReels = true;
+		try {
+			const nextPage = reelsPage + 1;
+			const data = await reelsApi.byUser(username, { page: nextPage, limit: 12 });
+			const list = data.data || [];
+			if (list.length === 0) {
+				hasMoreReels = false;
+			} else {
+				reels = [...reels, ...list];
+				reelsPage = nextPage;
+				if (list.length < 12) hasMoreReels = false;
+			}
+		} catch (e) {
+			console.error('Failed to load more reels:', e);
+		} finally {
+			loadingMoreReels = false;
+		}
+	}
+
+	function infiniteScrollReels(node) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && !loadingMoreReels && hasMoreReels && !loadingReels) {
+					loadMoreReels();
+				}
+			},
+			{ rootMargin: '300px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
+
 	async function loadTrash() {
 		loadingTrash = true;
 		try {
@@ -339,65 +397,23 @@
 		}
 	}
 
-	function getLuminance(hex) {
-		if (!hex) return 0;
-		hex = hex.replace('#', '');
-		if (hex.length === 3)
-			hex = hex
-				.split('')
-				.map((c) => c + c)
-				.join('');
-		const r = parseInt(hex.substring(0, 2), 16);
-		const g = parseInt(hex.substring(2, 4), 16);
-		const b = parseInt(hex.substring(4, 6), 16);
-		return (r * 299 + g * 587 + b * 114) / 1000;
-	}
-
-	let hasCustomBg = $derived(
-		!!(user?.customization?.bg_color || user?.customization?.bg_image_url)
-	);
-	let isLightBg = $derived(
-		user?.customization?.bg_image_url
-			? false
-			: user?.customization?.bg_color
-				? getLuminance(user.customization.bg_color) > 150
-				: false
-	);
+	let profileBlocks = $derived.by(() => {
+		const raw = user?.customization?.blocks_layout;
+		if (!raw) return [];
+		try {
+			const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+			return Array.isArray(arr) ? arr : [];
+		} catch {
+			return [];
+		}
+	});
 </script>
 
 <svelte:head>
 	<title>{user ? user.display_name : 'Cargando perfil...'} — VSocial</title>
-	{#if user?.customization?.custom_font_url}
-		{@html `<style>
-      @font-face {
-        font-family: '${user.customization.font_family}';
-        src: url('${user.customization.custom_font_url}');
-        font-display: swap;
-      }
-    </style>`}
-	{/if}
-	{#if user?.customization?.custom_css}
-		{@html `<style>${user.customization.custom_css}</style>`}
-	{/if}
 </svelte:head>
 
-<div
-	class="profile-custom-wrapper {hasCustomBg ? (isLightBg ? 'force-light' : 'force-dark') : ''}"
-	style:--bg-main={user?.customization?.bg_color || undefined}
-	style:--accent-blue-base={user?.customization?.primary_color || undefined}
-	style:--glass-blur={user?.customization?.glass_blur
-		? `blur(${user.customization.glass_blur}px) saturate(1.2)`
-		: undefined}
-	style:--font-sans={user?.customization?.font_family
-		? `'${user.customization.font_family}', sans-serif`
-		: undefined}
-	style:--font-display={user?.customization?.font_family
-		? `'${user.customization.font_family}', sans-serif`
-		: undefined}
-	style={user?.customization?.bg_image_url
-		? `background: url('${user.customization.bg_image_url}') center/cover fixed !important;`
-		: ''}
->
+<ProfileThemeShell customization={user?.customization}>
 	<div class="profile-container px-4 py-6">
 		{#if loading}
 			<!-- Loading State -->
@@ -412,439 +428,303 @@
 				<p>El perfil que buscas no existe o ha sido eliminado.</p>
 			</div>
 		{:else}
-			<!-- Profile Banner & Info -->
-			<div class="profile-header-card glass-panel">
-				<!-- Banner/Cover Image -->
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="profile-cover {user.cover_url ? 'is-expandable' : ''}"
-					onclick={() => {
-						if (user.cover_url) mediaViewer.openProfileCover(user);
-					}}
-					title={user.cover_url ? 'Ver foto de portada completa' : ''}
-				>
-					{#if user.cover_url}
-						<img
-							src={user.cover_url}
-							alt="Cover"
-							width="1200"
-							height="180"
-							loading="eager"
-							fetchpriority="high"
-							decoding="async"
-						/>
-					{/if}
-					<div class="cover-glow-bubble"></div>
+			<!-- Cabecera del perfil — componente compartido con el editor (/settings/design) -->
+			<ProfileHeaderCard
+				{user}
+				postsCount={posts.length}
+				{followersCount}
+				{followingState}
+				{activeTab}
+				{isOwnProfile}
+				onTabSelect={selectTab}
+				onAvatarCamera={() => avatarInput?.click()}
+				onCoverCamera={() => coverInput?.click()}
+				onStartDm={startDirectMessage}
+				onToggleFollow={toggleFollow}
+			/>
 
-					{#if isOwnProfile}
-						<button
-							type="button"
-							class="profile-cover-camera-btn"
-							onclick={(e) => {
-								e.stopPropagation();
-								coverInput?.click();
-							}}
-							title="Cambiar portada (16:5)"
-							aria-label="Cambiar foto de portada"
-						>
-							<span class="material-icons-round">photo_camera</span>
-							<span class="btn-text">Cambiar portada</span>
-						</button>
-					{/if}
-				</div>
-
-				<!-- Avatar & Basic Info -->
-				<div class="profile-header">
-					<div class="avatar-and-names">
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
-							class="profile-avatar {user.avatar_url ? 'is-expandable' : ''}"
-							onclick={() => {
-								if (user.avatar_url) mediaViewer.openProfileAvatar(user);
-							}}
-							title={user.avatar_url ? 'Ver foto de perfil completa' : ''}
-						>
-							{#if user.avatar_url}
-								<img
-									src={user.avatar_url}
-									alt="Avatar de {user.display_name}"
-									crossorigin="anonymous"
-									width="84"
-									height="84"
-									loading="lazy"
-									decoding="async"
-								/>
+			<!-- Tab Content Area -->
+			<div class="smooth-transition-wrapper profile-content-area">
+				{#key tabKey}
+					<div
+						in:fade={{ duration: 250, delay: 100 }}
+						out:fade={{ duration: 150 }}
+						class="smooth-transition-content"
+					>
+						{#if activeTab === 'posts'}
+							{#if posts.length === 0}
+								<div class="glass-card empty-posts-box">
+									<span class="material-icons-round">feed</span>
+									<p>Este creador no ha publicado nada todavía.</p>
+								</div>
 							{:else}
-								<div class="avatar-initials-fallback">
-									{user.display_name.charAt(0).toUpperCase()}
-								</div>
-							{/if}
-
-							{#if isOwnProfile}
-								<button
-									type="button"
-									class="profile-avatar-camera-btn"
-									onclick={(e) => {
-										e.stopPropagation();
-										avatarInput?.click();
-									}}
-									title="Cambiar foto de perfil (1:1)"
-									aria-label="Cambiar foto de perfil"
-								>
-									<span class="material-icons-round">photo_camera</span>
-								</button>
-							{/if}
-						</div>
-						<div class="profile-credentials">
-							<div class="display-name-row">
-								<h1 class="profile-display-name">{user.display_name}</h1>
-								<VerifiedBadge
-									role={user.role}
-									isVerified={user.is_verified == 1}
-									size="24px"
-									interactive={true}
-								/>
-								{#if user.level != null}
-									<LevelBadge level={user.level || 1} size="md" />
-								{/if}
-								{#if user.title_text}
-									<UserTitleBadge title={user.title_text} color={user.title_color} size="md" />
-								{/if}
-								{#if user.is_virtual}
-									<span class="aero-badge-virtual">VTuber</span>
-								{/if}
-							</div>
-							<p class="profile-username">@{user.username}</p>
-						</div>
-					</div>
-
-					<div class="profile-actions-row">
-						{#if isOwnProfile}
-							<a
-								href="/settings"
-								class="btn-aero-secondary"
-								style="white-space: nowrap; flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 20px; font-size: 0.9rem;"
-							>
-								<span class="material-icons-round text-[18px]">settings</span> Editar perfil
-							</a>
-						{:else}
-							<button
-								onclick={startDirectMessage}
-								class="btn-aero-secondary"
-								style="white-space: nowrap; flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 20px; font-size: 0.9rem;"
-							>
-								<span class="material-icons-round text-[18px]">message</span> Mensaje
-							</button>
-							<button
-								class="profile-follow-btn"
-								class:following={followingState}
-								onclick={toggleFollow}
-							>
-								{followingState ? 'Siguiendo' : 'Seguir'}
-							</button>
-						{/if}
-
-						{#if user && user.payment_link}
-							<a
-								href={user.payment_link}
-								target="_blank"
-								rel="noopener noreferrer nofollow"
-								class="btn-aero-primary profile-pay-btn"
-								title="Apoyar a {user.display_name || user.username}"
-							>
-								<span class="material-icons-round text-[18px]">payments</span> Apoyar
-							</a>
-						{/if}
-					</div>
-				</div>
-
-				<!-- User Stats Row -->
-				<div class="profile-stats-bar">
-					<div class="stat-col">
-						<span class="stat-num">{posts.length}</span>
-						<span class="stat-label">Publicaciones</span>
-					</div>
-					<a href="/u/{user.username}/following?tab=followers" class="stat-col interactive"
-						><span class="stat-num">{followersCount}</span>
-						<span class="stat-label">Seguidores</span></a
-					>
-					<a href="/u/{user.username}/following?tab=following" class="stat-col interactive"
-						><span class="stat-num">{user.following_count || 0}</span>
-						<span class="stat-label">Siguiendo</span></a
-					>
-				</div>
-
-				<!-- XP Progress Bar -->
-				<div class="profile-xp-container">
-					<div class="profile-xp-header">
-						<span class="xp-current">{currentXp} XP</span>
-						<span class="xp-level">Lv. {currentLevel + 1} ({nextLevelBaseXp} XP)</span>
-					</div>
-					<div class="xp-bar-track">
-						<div class="xp-bar-fill" style="width: {xpPercentage}%"></div>
-					</div>
-				</div>
-
-				<!-- Bio / Info Section -->
-				<div class="profile-details-block">
-					{#if user.bio}
-						<p class="profile-bio">{@html formatHashtags(user.bio)}</p>
-					{/if}
-
-					<div class="profile-meta-row">
-						{#if user.location}
-							<span class="meta-item">
-								<span class="material-icons-round" style="font-size: 0.9rem;">place</span>
-								{user.location}
-							</span>
-						{/if}
-						{#if user.website}
-							<span class="meta-item">
-								<span class="material-icons-round" style="font-size: 0.9rem;">link</span>
-								<a href={user.website} target="_blank" rel="noopener noreferrer" class="meta-link"
-									>{user.website}</a
-								>
-							</span>
-						{/if}
-						<span class="meta-item">
-							<span class="material-icons-round" style="font-size: 0.9rem;">calendar_today</span>
-							Se unió en {new Date(
-								user.created_at || user.joined_at || Date.now()
-							).toLocaleDateString('es', { month: 'long', year: 'numeric' })}
-						</span>
-					</div>
-				</div>
-
-				<!-- Tab selectors -->
-				<div class="tabs-container">
-					{#each [{ id: 'posts', label: 'Posts' }, { id: 'reposts', label: 'Reposts' }, { id: 'about', label: 'Sobre mí' }, ...(isOwnProfile ? [{ id: 'history', label: 'Historial' }, { id: 'trash', label: 'Papelera' }] : [])] as tab}
-						<button
-							onclick={() => selectTab(tab.id)}
-							class="tab-button"
-							class:active={activeTab === tab.id}
-						>
-							{tab.label}
-						</button>
-					{/each}
-				</div>
-
-				<!-- Tab Content Area -->
-				<div class="smooth-transition-wrapper profile-content-area">
-					{#key tabKey}
-						<div
-							in:fade={{ duration: 250, delay: 100 }}
-							out:fade={{ duration: 150 }}
-							class="smooth-transition-content"
-						>
-							{#if activeTab === 'posts'}
-								{#if posts.length === 0}
-									<div class="glass-card empty-posts-box">
-										<span class="material-icons-round">feed</span>
-										<p>Este creador no ha publicado nada todavía.</p>
-									</div>
-								{:else}
-									<div class="profile-posts-list">
-										{#each posts as post (post.id)}
-											<PostCard
-												{post}
-												onDelete={() => (posts = posts.filter((p) => p.id !== post.id))}
-											/>
-										{/each}
-										{#if hasMorePosts}
-											<div
-												class="text-center py-4"
-												use:infiniteScrollPosts
-												style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
-											>
-												{#if loadingMorePosts}
-													<span
-														class="material-icons-round notif-pulse"
-														style="color: var(--aero-blue); font-size: 24px;">sync</span
-													>
-												{/if}
-											</div>
-										{/if}
-									</div>
-								{/if}
-							{:else if activeTab === 'reposts'}
-								{#if loadingReposts}
-									<div class="glass-card empty-posts-box">
-										<span
-											class="material-icons-round notif-pulse"
-											style="color: var(--aero-mint, #00d4aa);">repeat</span
-										>
-										<p>Cargando reposteos...</p>
-									</div>
-								{:else if reposts.length === 0}
-									<div class="glass-card empty-posts-box">
-										<span class="material-icons-round" style="color: var(--aero-mint, #00d4aa);"
-											>repeat</span
-										>
-										<p>Este usuario no ha reposteado ninguna publicación todavía.</p>
-									</div>
-								{:else}
-									<div class="profile-posts-list">
-										{#each reposts as post (post.id + '-' + (post.reposted_by?.id || 'r'))}
-											<PostCard
-												{post}
-												onDelete={() => (reposts = reposts.filter((p) => p.id !== post.id))}
-											/>
-										{/each}
-										{#if hasMoreReposts}
-											<div
-												class="text-center py-4"
-												use:infiniteScrollReposts
-												style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
-											>
-												{#if loadingMoreReposts}
-													<span
-														class="material-icons-round notif-pulse"
-														style="color: var(--aero-mint); font-size: 24px;">sync</span
-													>
-												{/if}
-											</div>
-										{/if}
-									</div>
-								{/if}
-							{:else if activeTab === 'about'}
-								<div class="about-grid">
-									<!-- Lore & Description Card -->
-									<div class="about-main-info">
-										<div class="glass-card about-card">
-											<h3 class="about-card-title">Biografía</h3>
-											<p class="about-card-desc">{user.bio || 'Sin biografía disponible.'}</p>
-										</div>
-
-										{#if user.is_virtual && user.vtuber_profile}
-											<div class="glass-card about-card" style="margin-top: 16px;">
-												<h3 class="about-card-title">Ficha Virtual</h3>
-												<div class="setup-details">
-													<div class="setup-row">
-														<span class="setup-label">Personaje</span>
-														<span class="setup-val" style="color: var(--secondary);"
-															>{user.vtuber_profile.character_name || user.display_name}</span
-														>
-													</div>
-													{#if user.vtuber_profile.lore}
-														<div class="setup-row" style="margin-top: 12px;">
-															<span class="setup-label">Historia / Lore</span>
-															<p class="about-card-desc" style="margin-top: 2px;">
-																{user.vtuber_profile.lore}
-															</p>
-														</div>
-													{/if}
-												</div>
-											</div>
-										{/if}
-									</div>
-
-									<!-- Technical Setup Card -->
-									<div class="about-side-info">
-										{#if user.is_virtual && user.vtuber_profile}
-											<div class="glass-card about-card">
-												<h3 class="about-card-title">Setup Técnico</h3>
-												<div
-													class="setup-details"
-													style="display: flex; flex-direction: column; gap: 12px;"
-												>
-													{#if user.vtuber_profile.model_creator}
-														<div class="setup-row">
-															<span class="setup-label">Artista / Rigging:</span>
-															<span class="setup-val">{user.vtuber_profile.model_creator}</span>
-														</div>
-													{/if}
-													{#if user.vtuber_profile.software}
-														<div class="setup-row">
-															<span class="setup-label">Software Utilizado:</span>
-															<span class="setup-val">{user.vtuber_profile.software}</span>
-														</div>
-													{/if}
-												</div>
-											</div>
-										{/if}
-
-										<!-- Interests -->
-										{#if user.interests && user.interests.length > 0}
-											<div class="glass-card about-card" style="margin-top: 16px;">
-												<h3 class="about-card-title">Temas de Interés</h3>
-												<div class="tags-row">
-													{#each user.interests as interest}
-														<span class="interest-tag">
-															{interest}
-														</span>
-													{/each}
-												</div>
-											</div>
-										{/if}
-									</div>
-								</div>
-							{:else if activeTab === 'history' && isOwnProfile}
-								<div class="glass-card about-card" style="padding: 0;">
-									<ActivityHistory />
-								</div>
-							{:else if activeTab === 'trash'}
-								{#if loadingTrash}
-									<div class="profile-loading">
-										<span class="loading loading-spinner text-primary"></span>
-										<span>Cargando papelera...</span>
-									</div>
-								{:else if deletedPosts.length === 0}
-									<div class="glass-card empty-posts-box">
-										<span class="material-icons-round">delete_outline</span>
-										<p>No tienes publicaciones en la papelera.</p>
-									</div>
-								{:else}
-									<div class="profile-posts-list">
+								<div class="profile-posts-list">
+									{#each posts as post (post.id)}
+										<PostCard
+											{post}
+											onDelete={() => (posts = posts.filter((p) => p.id !== post.id))}
+										/>
+									{/each}
+									{#if hasMorePosts}
 										<div
-											class="glass-panel p-4 mb-4 flex items-center gap-3 text-sm rounded-lg"
-											style="background: rgba(46, 134, 232, 0.05); border-color: rgba(46, 134, 232, 0.1);"
+											class="text-center py-4"
+											use:infiniteScrollPosts
+											style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
 										>
-											<span class="material-icons-round text-[20px] text-primary">info</span>
-											<span class="text-muted"
-												>Los posts eliminados permanecerán aquí durante 30 días antes de ser
-												eliminados permanentemente.</span
-											>
-										</div>
-
-										{#if restoreError}
-											<div
-												class="glass-panel p-3 mb-4 flex items-center gap-2 text-sm rounded-lg"
-												style="background: rgba(232, 74, 114, 0.1); border-color: rgba(232, 74, 114, 0.2); color: var(--aero-rose);"
-											>
-												<span class="material-icons-round text-[18px]">error_outline</span>
-												{restoreError}
-											</div>
-										{/if}
-
-										{#each deletedPosts as post (post.id)}
-											<div class="glass-panel p-4 flex justify-between items-center mb-3">
-												<div class="min-w-0 flex-1 mr-4">
-													<p class="text-sm text-main truncate font-semibold mb-1">
-														Post #{post.id}
-													</p>
-													<p class="text-xs text-muted truncate">
-														{post.body || (post.media?.length ? '[Multimedia]' : 'Sin contenido')}
-													</p>
-												</div>
-												<button
-													onclick={() => restorePost(post.id)}
-													class="btn-aero-primary"
-													style="padding: 6px 14px; font-size: 0.8rem;">Restaurar</button
+											{#if loadingMorePosts}
+												<span
+													class="material-icons-round notif-pulse"
+													style="color: var(--aero-blue); font-size: 24px;">sync</span
 												>
-											</div>
-										{/each}
+											{/if}
+										</div>
+									{/if}
+								</div>
+							{/if}
+						{:else if activeTab === 'reposts'}
+							{#if loadingReposts}
+								<div class="glass-card empty-posts-box">
+									<span
+										class="material-icons-round notif-pulse"
+										style="color: var(--aero-mint, #00d4aa);">repeat</span
+									>
+									<p>Cargando reposteos...</p>
+								</div>
+							{:else if reposts.length === 0}
+								<div class="glass-card empty-posts-box">
+									<span class="material-icons-round" style="color: var(--aero-mint, #00d4aa);"
+										>repeat</span
+									>
+									<p>Este usuario no ha reposteado ninguna publicación todavía.</p>
+								</div>
+							{:else}
+								<div class="profile-posts-list">
+									{#each reposts as post (post.id + '-' + (post.reposted_by?.id || 'r'))}
+										<PostCard
+											{post}
+											onDelete={() => (reposts = reposts.filter((p) => p.id !== post.id))}
+										/>
+									{/each}
+									{#if hasMoreReposts}
+										<div
+											class="text-center py-4"
+											use:infiniteScrollReposts
+											style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
+										>
+											{#if loadingMoreReposts}
+												<span
+													class="material-icons-round notif-pulse"
+													style="color: var(--aero-mint); font-size: 24px;">sync</span
+												>
+											{/if}
+										</div>
+									{/if}
+								</div>
+							{/if}
+						{:else if activeTab === 'reels'}
+							{#if loadingReels}
+								<div class="glass-card empty-posts-box">
+									<span class="material-icons-round notif-pulse" style="color: var(--aero-rose);"
+										>smart_display</span
+									>
+									<p>Cargando reels...</p>
+								</div>
+							{:else if reels.length === 0}
+								<div class="glass-card empty-posts-box">
+									<span class="material-icons-round" style="color: var(--aero-rose);"
+										>smart_display</span
+									>
+									<p>Este creador no ha subido reels todavía.</p>
+								</div>
+							{:else}
+								<div class="profile-reels-grid">
+									{#each reels as reel (reel.id)}
+										<a
+											href="/reels?id={reel.id}"
+											class="reel-tile"
+											title={reel.caption || `@${reel.username}`}
+										>
+											{#if reel.thumbnail_url}
+												<img src={reel.thumbnail_url} alt="" loading="lazy" />
+											{:else}
+												<video src={reel.video_url} muted preload="metadata" playsinline></video>
+											{/if}
+											<span class="reel-tile-overlay">
+												<span class="material-icons-round">play_arrow</span>
+											</span>
+											{#if reel.like_count > 0 || reel.comment_count > 0}
+												<span class="reel-tile-stats">
+													{#if reel.like_count > 0}
+														<span class="reel-tile-stat">
+															<span class="material-icons-round">favorite</span>
+															{formatCount(reel.like_count)}
+														</span>
+													{/if}
+													{#if reel.comment_count > 0}
+														<span class="reel-tile-stat">
+															<span class="material-icons-round">chat_bubble</span>
+															{formatCount(reel.comment_count)}
+														</span>
+													{/if}
+												</span>
+											{/if}
+										</a>
+									{/each}
+								</div>
+								{#if hasMoreReels}
+									<div
+										class="text-center py-4"
+										use:infiniteScrollReels
+										style="min-height: 40px; display: flex; align-items: center; justify-content: center;"
+									>
+										{#if loadingMoreReels}
+											<span
+												class="material-icons-round notif-pulse"
+												style="color: var(--aero-rose); font-size: 24px;">sync</span
+											>
+										{/if}
 									</div>
 								{/if}
 							{/if}
-						</div>
-					{/key}
-				</div>
+						{:else if activeTab === 'about'}
+							<div class="about-grid">
+								<!-- Lore & Description Card -->
+								<div class="about-main-info">
+									<div class="glass-card about-card">
+										<h3 class="about-card-title">Biografía</h3>
+										<p class="about-card-desc">{user.bio || 'Sin biografía disponible.'}</p>
+									</div>
+
+									{#if user.is_virtual && user.vtuber_profile}
+										<div class="glass-card about-card" style="margin-top: 16px;">
+											<h3 class="about-card-title">Ficha Virtual</h3>
+											<div class="setup-details">
+												<div class="setup-row">
+													<span class="setup-label">Personaje</span>
+													<span class="setup-val" style="color: var(--secondary);"
+														>{user.vtuber_profile.character_name || user.display_name}</span
+													>
+												</div>
+												{#if user.vtuber_profile.lore}
+													<div class="setup-row" style="margin-top: 12px;">
+														<span class="setup-label">Historia / Lore</span>
+														<p class="about-card-desc" style="margin-top: 2px;">
+															{user.vtuber_profile.lore}
+														</p>
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/if}
+								</div>
+
+								<!-- Technical Setup Card -->
+								<div class="about-side-info">
+									{#if user.is_virtual && user.vtuber_profile}
+										<div class="glass-card about-card">
+											<h3 class="about-card-title">Setup Técnico</h3>
+											<div
+												class="setup-details"
+												style="display: flex; flex-direction: column; gap: 12px;"
+											>
+												{#if user.vtuber_profile.model_creator}
+													<div class="setup-row">
+														<span class="setup-label">Artista / Rigging:</span>
+														<span class="setup-val">{user.vtuber_profile.model_creator}</span>
+													</div>
+												{/if}
+												{#if user.vtuber_profile.software}
+													<div class="setup-row">
+														<span class="setup-label">Software Utilizado:</span>
+														<span class="setup-val">{user.vtuber_profile.software}</span>
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/if}
+
+									<!-- Interests -->
+									{#if user.interests && user.interests.length > 0}
+										<div class="glass-card about-card" style="margin-top: 16px;">
+											<h3 class="about-card-title">Temas de Interés</h3>
+											<div class="tags-row">
+												{#each user.interests as interest}
+													<span class="interest-tag">
+														{interest}
+													</span>
+												{/each}
+											</div>
+										</div>
+									{/if}
+								</div>
+							</div>
+						{:else if activeTab === 'history' && isOwnProfile}
+							<div class="glass-card about-card" style="padding: 0;">
+								<ActivityHistory />
+							</div>
+						{:else if activeTab === 'trash'}
+							{#if loadingTrash}
+								<div class="profile-loading">
+									<span class="loading loading-spinner text-primary"></span>
+									<span>Cargando papelera...</span>
+								</div>
+							{:else if deletedPosts.length === 0}
+								<div class="glass-card empty-posts-box">
+									<span class="material-icons-round">delete_outline</span>
+									<p>No tienes publicaciones en la papelera.</p>
+								</div>
+							{:else}
+								<div class="profile-posts-list">
+									<div
+										class="glass-panel p-4 mb-4 flex items-center gap-3 text-sm rounded-lg"
+										style="background: rgba(46, 134, 232, 0.05); border-color: rgba(46, 134, 232, 0.1);"
+									>
+										<span class="material-icons-round text-[20px] text-primary">info</span>
+										<span class="text-muted"
+											>Los posts eliminados permanecerán aquí durante 30 días antes de ser
+											eliminados permanentemente.</span
+										>
+									</div>
+
+									{#if restoreError}
+										<div
+											class="glass-panel p-3 mb-4 flex items-center gap-2 text-sm rounded-lg"
+											style="background: rgba(232, 74, 114, 0.1); border-color: rgba(232, 74, 114, 0.2); color: var(--aero-rose);"
+										>
+											<span class="material-icons-round text-[18px]">error_outline</span>
+											{restoreError}
+										</div>
+									{/if}
+
+									{#each deletedPosts as post (post.id)}
+										<div class="glass-panel p-4 flex justify-between items-center mb-3">
+											<div class="min-w-0 flex-1 mr-4">
+												<p class="text-sm text-main truncate font-semibold mb-1">
+													Post #{post.id}
+												</p>
+												<p class="text-xs text-muted truncate">
+													{post.body || (post.media?.length ? '[Multimedia]' : 'Sin contenido')}
+												</p>
+											</div>
+											<button
+												onclick={() => restorePost(post.id)}
+												class="btn-aero-primary"
+												style="padding: 6px 14px; font-size: 0.8rem;">Restaurar</button
+											>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						{/if}
+					</div>
+				{/key}
 			</div>
+
+			<!-- Bloques personalizados del perfil (bio, enlaces, mini-feed, galería) -->
+			<ProfileBlocks username={user.username} blocks={profileBlocks} />
 		{/if}
 	</div>
-</div>
+</ProfileThemeShell>
 
 {#if isOwnProfile}
 	<input
@@ -867,18 +747,22 @@
 	/>
 
 	{#if cropFile}
-		<ImageCropperModal
-			imageFile={cropFile}
-			aspectRatio={cropRatio}
-			shape={cropType === 'avatar' ? 'circle' : 'rect'}
-			{cropType}
-			title={cropType === 'avatar' ? 'Ajustar Foto de Perfil' : 'Ajustar Portada de Perfil'}
-			subtitle={cropType === 'avatar'
-				? 'Centra y escala tu avatar • Proporción 1:1'
-				: 'Encuadra tu banner panorámico • Proporción 16:5'}
-			onCrop={handleCrop}
-			onCancel={cancelCrop}
-		/>
+		<!-- Portal: el cropper es fixed y dentro de la tarjeta glass (backdrop-filter)
+		     quedaría anclado a la tarjeta, fuera del viewport. -->
+		<Portal>
+			<ImageCropperModal
+				imageFile={cropFile}
+				aspectRatio={cropRatio}
+				shape={cropType === 'avatar' ? 'circle' : 'rect'}
+				{cropType}
+				title={cropType === 'avatar' ? 'Ajustar Foto de Perfil' : 'Ajustar Portada de Perfil'}
+				subtitle={cropType === 'avatar'
+					? 'Centra y escala tu avatar • Proporción 1:1'
+					: 'Encuadra tu banner panorámico • Proporción 16:5'}
+				onCrop={handleCrop}
+				onCancel={cancelCrop}
+			/>
+		</Portal>
 	{/if}
 {/if}
 
@@ -895,29 +779,9 @@
 		width: 100%;
 	}
 
-	.profile-custom-wrapper {
-		background-color: var(--bg-main, transparent);
-		min-height: calc(100vh - 70px);
-		transition: background-color 0.3s ease;
-	}
-
-	.force-dark {
-		--text-primary: #ffffff;
-		--text-main: #ffffff;
-		--text-secondary: rgba(255, 255, 255, 0.7);
-		--text-muted: rgba(255, 255, 255, 0.5);
-		--border-subtle: rgba(255, 255, 255, 0.15);
-		--glass-border: rgba(255, 255, 255, 0.15);
-	}
-
-	.force-light {
-		--text-primary: #111111;
-		--text-main: #000000;
-		--text-secondary: rgba(0, 0, 0, 0.7);
-		--text-muted: rgba(0, 0, 0, 0.5);
-		--border-subtle: rgba(0, 0, 0, 0.15);
-		--glass-border: rgba(0, 0, 0, 0.15);
-	}
+	/* Los estilos de .profile-custom-wrapper, .has-bg-image, .force-dark y
+	   .force-light viven en ProfileThemeShell.svelte (fuente única compartida
+	   con el editor de diseño). Aquí solo queda el layout interno. */
 
 	.profile-container {
 		max-width: 800px;
@@ -963,471 +827,28 @@
 		margin: 0;
 	}
 
-	.profile-header-card {
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-
-	.profile-cover {
-		width: 100%;
-		height: 200px;
-		background: var(--grad-primary);
-		border-top-left-radius: var(--radius-lg);
-		border-top-right-radius: var(--radius-lg);
-		border-bottom-left-radius: 0;
-		border-bottom-right-radius: 0;
-		position: relative;
-		overflow: hidden;
-		box-shadow: inset 0 -20px 50px rgba(0, 0, 0, 0.15);
-	}
-
-	.profile-cover.is-expandable {
-		cursor: pointer;
-	}
-
-	.profile-cover.is-expandable:hover img {
-		filter: brightness(1.04);
-		transition: filter 0.25s ease;
-	}
-
-	.profile-cover-camera-btn {
-		position: absolute;
-		top: 14px;
-		right: 14px;
-		z-index: 8;
-		background: rgba(0, 0, 0, 0.55);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		color: #ffffff;
-		border-radius: var(--radius-full);
-		padding: 6px 14px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-		transition:
-			background var(--t-fast),
-			border-color var(--t-fast),
-			transform var(--t-fast);
-	}
-
-	.profile-cover-camera-btn:hover {
-		background: var(--aero-blue);
-		border-color: #ffffff;
-		transform: translateY(-1px);
-	}
-
-	.profile-cover-camera-btn:active {
-		transform: translateY(1px);
-	}
-
-	.profile-cover img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		object-position: center center;
-		opacity: 1; /* override the container opacity for images */
-		display: block;
-	}
-
-	.cover-glow-bubble {
-		position: absolute;
-		bottom: -40px;
-		right: 40px;
-		width: 140px;
-		height: 140px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: rgba(255, 255, 255, 0.25);
-		filter: blur(40px);
-		pointer-events: none;
-	}
-
-	.profile-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 16px 24px 0;
-		position: relative;
-		z-index: 10;
-		gap: 16px;
-		flex-wrap: wrap;
-	}
-
-	@media (max-width: 576px) {
-		.profile-header {
-			flex-direction: column;
-			align-items: flex-start;
-			padding: 0 16px 12px;
-			gap: 12px;
+	@media (max-width: 768px) {
+		/* Portada más baja en móvil: el header queda más compacto y los tabs no
+		   caen detrás de la barra de navegación flotante (antes se mezclaban
+		   sus etiquetas con las del nav y el perfil parecía roto). */
+		.profile-container {
+			padding-bottom: 116px;
 		}
 	}
 
-	.avatar-and-names {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		margin-top: -50px;
-	}
-
 	@media (max-width: 576px) {
-		.avatar-and-names {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 8px;
-			margin-top: 0;
+		.profile-container {
+			padding-top: 6px; /* el py-6 de Tailwind (24px) sobra en móvil */
 		}
-	}
-
-	.profile-avatar {
-		width: 84px;
-		height: 84px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		padding: 3px;
-		background: var(--bg-surface);
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-		overflow: hidden;
-		flex-shrink: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		position: relative;
-		transition: box-shadow 0.25s ease;
-	}
-
-	.profile-avatar.is-expandable {
-		cursor: pointer;
-	}
-
-	.profile-avatar.is-expandable:hover {
-		box-shadow: 0 0 16px rgba(27, 133, 243, 0.35);
-	}
-
-	.profile-avatar-camera-btn {
-		position: absolute;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.45);
-		backdrop-filter: blur(2px);
-		-webkit-backdrop-filter: blur(2px);
-		border: none;
-		border-radius: inherit;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #ffffff;
-		font-size: 24px;
-		opacity: 0;
-		cursor: pointer;
-		transition: opacity var(--t-fast);
-		z-index: 5;
-	}
-
-	.profile-avatar:hover .profile-avatar-camera-btn,
-	.profile-avatar-camera-btn:focus-visible {
-		opacity: 1;
-	}
-
-	@media (max-width: 576px) {
-		.profile-avatar {
-			margin-top: -42px;
-		}
-	}
-
-	.profile-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		object-position: center center;
-		border-radius: calc(var(--radius-squircle) - 2px);
-		corner-shape: squircle;
-		display: block;
-	}
-
-	.avatar-initials-fallback {
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--grad-primary);
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		color: #fff;
-		font-size: 2rem;
-		font-weight: 900;
-		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-	}
-
-	.profile-credentials {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		margin-top: 36px;
-	}
-
-	@media (max-width: 576px) {
-		.profile-credentials {
-			margin-top: 0;
-		}
-	}
-
-	.display-name-row {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		flex-wrap: wrap;
-	}
-
-	.profile-display-name {
-		font-size: 1.4rem;
-		font-weight: 900;
-		color: var(--text-primary);
-		margin: 0;
-		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
-	}
-
-	.profile-username {
-		font-size: 0.85rem;
-		color: var(--text-muted);
-		margin: 0;
-	}
-
-	.profile-actions-row {
-		display: flex;
-		gap: 10px;
-		margin-top: 10px;
-		flex-wrap: wrap;
-	}
-
-	.profile-pay-btn {
-		white-space: nowrap;
-		flex: 0 0 auto;
-		min-height: 44px;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		padding: 0 20px;
-		font-size: 0.9rem;
-	}
-
-	@media (max-width: 576px) {
-		.profile-actions-row {
-			margin-top: 0;
-		}
-	}
-
-	.profile-stats-bar {
-		display: flex;
-		justify-content: flex-start;
-		gap: 24px;
-		padding: 14px 24px;
-		border-top: 1px solid var(--border-subtle);
-		border-bottom: 1px solid var(--border-subtle);
-		margin: 20px 24px 0 24px;
-		font-size: 0.85rem;
-	}
-
-	@media (max-width: 576px) {
-		.profile-stats-bar {
-			justify-content: space-around;
-			gap: 0;
-			margin: 16px 16px 0 16px;
-			padding: 12px 0;
-		}
-	}
-
-	.stat-col {
-		display: flex;
-		flex-direction: row;
-		align-items: center;
-		gap: 6px;
-		text-decoration: none;
-		border-radius: var(--radius-sm);
-		padding: 4px 8px;
-		transition: background var(--t-fast);
-	}
-	.stat-col.interactive:hover {
-		background: rgba(255, 255, 255, 0.05);
-	}
-
-	@media (max-width: 576px) {
-		.stat-col {
-			flex-direction: column;
-			gap: 2px;
-		}
-	}
-
-	.stat-num {
-		font-weight: 900;
-		color: var(--text-main);
-		font-size: 0.95rem;
-	}
-
-	@media (max-width: 576px) {
-		.stat-num {
-			font-size: 1rem;
-		}
-	}
-
-	.stat-label {
-		color: var(--text-muted);
-	}
-
-	.profile-xp-container {
-		padding: 16px 24px;
-		margin: 0 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-
-	@media (max-width: 576px) {
-		.profile-xp-container {
-			margin: 0 16px;
-			padding: 12px 0;
-		}
-	}
-
-	.profile-xp-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-		font-weight: 600;
-	}
-
-	.xp-current {
-		color: var(--aero-blue);
-		font-weight: 800;
-	}
-
-	.xp-level {
-		font-family: var(--font-sans);
-		opacity: 0.8;
-	}
-
-	.xp-bar-track {
-		width: 100%;
-		height: 8px;
-		background: rgba(0, 0, 0, 0.08);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		position: relative;
-		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	:global([data-theme='dark']) .xp-bar-track {
-		background: rgba(255, 255, 255, 0.06);
-	}
-
-	.xp-bar-fill {
-		height: 100%;
-		background: linear-gradient(90deg, var(--aero-sky), var(--aero-blue));
-		border-radius: var(--radius-sm);
-		box-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.35);
-		transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
-	}
-
-	.profile-details-block {
-		padding: 0 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-top: 16px;
-	}
-
-	@media (max-width: 576px) {
-		.profile-details-block {
-			padding: 0 16px;
-		}
-	}
-
-	.profile-bio {
-		font-size: 0.85rem;
-		color: var(--text-primary);
-		line-height: 1.5;
-		margin: 0;
-		max-width: 640px;
-	}
-
-	.profile-meta-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 16px;
-		font-size: 0.8rem;
-		color: var(--text-secondary);
-	}
-
-	.meta-item {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.meta-link {
-		color: var(--aero-sky);
-		text-decoration: none;
-		font-weight: 600;
-	}
-
-	.meta-link:hover {
-		text-decoration: underline;
-	}
-
-	.tabs-container {
-		margin: 24px 24px 0 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		display: flex;
-		gap: 12px;
-		overflow-x: auto;
-		scrollbar-width: none;
-	}
-
-	.tabs-container::-webkit-scrollbar {
-		display: none;
-	}
-
-	@media (max-width: 576px) {
-		.tabs-container {
-			margin: 16px 16px 0 16px;
-		}
-	}
-
-	.tab-button {
-		padding: 12px 20px;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		background: none;
-		border: none;
-		border-bottom: 2px solid transparent;
-		cursor: pointer;
-		transition: all 0.2s;
-		white-space: nowrap;
-	}
-
-	.tab-button:hover {
-		color: var(--text-main);
-	}
-
-	.tab-button.active {
-		color: var(--aero-blue);
-		font-weight: 700;
-		border-bottom-color: var(--aero-blue);
-		text-shadow: 0 0 8px rgba(46, 134, 232, 0.3);
 	}
 
 	.profile-content-area {
 		padding: 24px;
+		/* El .glass-panel > * global da z-index: 3 al contenido, creando un
+		   stacking context que atrapa al modal (su z-index 500 queda local y
+		   los tabs sticky z-40 lo tapan al scrollear). Sin z-index el modal
+		   fixed escapa y compite a nivel de página. */
+		z-index: auto;
 	}
 
 	@media (max-width: 576px) {
@@ -1456,6 +877,77 @@
 		display: flex;
 		flex-direction: column;
 		gap: 20px;
+	}
+
+	/* ── Reels del creador (cuadrícula estilo Instagram) ── */
+	.profile-reels-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.reel-tile {
+		position: relative;
+		display: block;
+		aspect-ratio: 9 / 16;
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: #000000;
+		border: 1px solid var(--border-subtle);
+		text-decoration: none;
+		transition:
+			transform 0.2s var(--ease-spring),
+			border-color 0.2s ease,
+			box-shadow 0.2s ease;
+	}
+	.reel-tile:hover {
+		transform: translateY(-2px);
+		border-color: rgba(236, 72, 153, 0.5);
+		box-shadow: 0 8px 22px rgba(236, 72, 153, 0.18);
+	}
+	.reel-tile img,
+	.reel-tile video {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.reel-tile-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(0, 0, 0, 0.25);
+		opacity: 0;
+		transition: opacity 0.2s ease;
+	}
+	.reel-tile:hover .reel-tile-overlay {
+		opacity: 1;
+	}
+	.reel-tile-overlay .material-icons-round {
+		color: #ffffff;
+		font-size: 40px;
+		text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+	}
+	.reel-tile-stats {
+		position: absolute;
+		bottom: 6px;
+		left: 6px;
+		right: 6px;
+		display: flex;
+		gap: 8px;
+		color: #ffffff;
+		font-size: 0.68rem;
+		font-weight: 700;
+		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+	}
+	.reel-tile-stat {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.reel-tile-stat .material-icons-round {
+		font-size: 13px;
 	}
 
 	.about-grid {
@@ -1536,50 +1028,5 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-	}
-
-	.profile-follow-btn {
-		background: var(--grad-primary);
-		color: var(--text-on-accent, white);
-		font-size: 0.9rem;
-		font-weight: 700;
-		padding: 0 16px;
-		border-radius: var(--radius-xl);
-		border: 1px solid transparent;
-		box-shadow:
-			0 4px 12px rgba(14, 165, 233, 0.3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.3);
-		transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-		cursor: pointer;
-		min-width: 110px;
-		min-height: 44px;
-		display: inline-flex;
-		justify-content: center;
-		align-items: center;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-	}
-	.profile-follow-btn:hover {
-		transform: translateY(-2px) scale(1.02);
-		box-shadow:
-			0 6px 16px rgba(14, 165, 233, 0.4),
-			inset 0 1px 0 rgba(255, 255, 255, 0.4);
-		background: var(--grad-primary-hover, linear-gradient(135deg, #0ea5e9, #3b82f6));
-	}
-	.profile-follow-btn:active {
-		transform: translateY(1px) scale(0.98);
-		box-shadow: 0 2px 8px rgba(14, 165, 233, 0.2);
-	}
-	.profile-follow-btn.following {
-		background: rgba(255, 255, 255, 0.1);
-		color: var(--text-primary);
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		box-shadow: none;
-		text-shadow: none;
-	}
-	.profile-follow-btn.following:hover {
-		background: rgba(244, 63, 94, 0.1);
-		color: var(--rose-500, #f43f5e);
-		border-color: rgba(244, 63, 94, 0.3);
-		box-shadow: 0 0 12px rgba(244, 63, 94, 0.1);
 	}
 </style>
