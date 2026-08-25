@@ -30,30 +30,38 @@
 	--scrollbar-thumb: rgba(14, 165, 233, 0.25); /* Cyan/Skyblue gel */
 	--scrollbar-thumb-hover: rgba(14, 165, 233, 0.45);
 
-	/* Typography */
+	/* Typography — caras de reserva métrica primero: mientras carga la fuente
+	   web, el fallback compone con métricas idénticas (sin CLS por font-swap). */
 	--font-sans:
-		'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-		sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+		'Inter', 'Inter Fallback', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 	--font-display:
-		'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-		sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+		'Outfit', 'Outfit Fallback', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
 	/* =========================================
-     Fondos y Superficies (Light/Aero) - Sentimental Aqua & Emerald
+     Fondos y Superficies (Light/Aero) - Frutiger Aqua / Eco Luminous Real
      ========================================= */
-	--bg-sidebar: rgba(235, 252, 248, 0.55); /* Sutil tinte menta-aqua cristalino */
-	--bg-main: linear-gradient(
-		160deg,
-		#d1fae5 0%,
-		#99f6e4 30%,
-		#bae6fd 65%,
-		#f0fdf4 100%
-	); /* Menta suave -> Teal -> Skyblue -> Blanco frío (Vista Aurora Vibe) */
-	--bg-surface: rgba(242, 255, 252, 0.65); /* Cristal con destello menta/cyan muy suave */
-	--bg-surface-solid: #e8f9f6; /* Solid fallback/backdrop for hover cards */
-	--bg-surface-hover: rgba(232, 252, 255, 0.8);
-	--bg-input: rgba(240, 253, 255, 0.75);
-	--bg-input-tint: rgba(187, 247, 208, 0.4);
+	--bg-sidebar: rgba(236, 250, 253, 0.68); /* Cristal aqua translúcido */
+	--bg-main:
+		radial-gradient(at 12% 15%, rgba(255, 255, 255, 0.95) 0px, transparent 40%),
+		radial-gradient(at 88% 85%, rgba(0, 212, 170, 0.42) 0px, transparent 48%),
+		radial-gradient(at 80% 12%, rgba(14, 165, 233, 0.42) 0px, transparent 52%),
+		radial-gradient(at 35% 80%, rgba(56, 189, 248, 0.35) 0px, transparent 45%),
+		linear-gradient(135deg, #a0ebf8 0%, #c4f3fa 42%, #7ae5d4 100%);
+	--bg-surface: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.78) 0%,
+		rgba(224, 248, 254, 0.58) 100%
+	); /* Cristal líquido translúcido que deja pasar la atmósfera del fondo */
+	--bg-surface-solid: #ebf8fa; /* Fallback sólido de alto rendimiento */
+	--bg-surface-hover: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.88) 0%,
+		rgba(215, 246, 254, 0.72) 100%
+	);
+	--bg-input: rgba(255, 255, 255, 0.82);
+	--bg-input-tint: rgba(14, 165, 233, 0.09);
 
 	/* Acentos */
 	--accent-blue-base: #1b85f3;
@@ -101,7 +109,7 @@
 		rgba(168, 85, 247, 0.08) 100%
 	);
 
-	/* Tipografía y Detalles */
+	/* Tipografía y Detalles — WCAG AA/AAA */
 	--text-primary: #0f172a; /* Slate oscuro para excelente contraste */
 	--text-main: var(--text-primary); /* Alias for backward compatibility */
 
@@ -110,9 +118,10 @@
 		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='24' viewBox='0 0 14 24'%3E%3Cpath d='M3 3h8v2H8v14h3v2H3v-2h3V5H3V3z' fill='%230f172a' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
 			7 12,
 		text;
-	--text-secondary: #334155;
-	--border-subtle: rgba(14, 165, 233, 0.25); /* Tinte skyblue para los bordes de los cristales */
-	--icon-muted: #556579; /* Slate reforzado: mejor legibilidad sobre cristal claro vívido */
+	--text-secondary: #1e293b; /* Alto contraste para subtítulos y navegación */
+	--text-tertiary: #334155; /* Contraste óptimo (>5.5:1) para timestamps/contadores */
+	--border-subtle: rgba(14, 165, 233, 0.28); /* Tinte skyblue para los bordes de los cristales */
+	--icon-muted: #475569; /* Slate reforzado: mejor legibilidad */
 	--bg-icon-btn: #d8edef; /* Niebla aqua */
 
 	/* === MAPPING TO ORIGINAL APP VARIABLES === */
@@ -120,29 +129,29 @@
 	--bg-surface2: var(--bg-sidebar);
 	--bg-overlay: rgba(224, 242, 254, 0.6);
 	--glass-bg: var(--bg-surface);
-	--glass-border: var(--border-subtle);
-	--glass-border-t: rgba(255, 255, 255, 0.45); /* Borde blanco suavizado */
-	--glass-shadow: 0 0 0 transparent; /* Sombras eliminadas por diseño */
-	--glass-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.6); /* Borde interno más marcado */
-	--glass-inset-highlight:
-		inset 0 2px 4px rgba(255, 255, 255, 0.9), inset 0 -2px 4px rgba(255, 255, 255, 0.3); /* Brillo intenso */
+	--glass-border: rgba(255, 255, 255, 0.82);
+	--glass-shadow: none;
+	--glass-inset: none;
+	--glass-inset-highlight: none;
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #ffffff;
-	--text-on-accent: #ffffff;
+	--text-on-accent: #042c33; /* WCAG AA: texto oscuro sobre gradiente cian/teal */
+	--btn-primary-text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 	--text-link: #1b85f3;
 
-	--border-glass: var(--border-subtle);
+	--border-glass: rgba(255, 255, 255, 0.75);
 
-	/* Sombras eliminadas - Reemplazadas por contrastes e insets */
-	--shadow-xs: 0 0 0 transparent;
-	--shadow-sm: 0 0 0 transparent;
-	--shadow-md: 0 0 0 transparent;
-	--shadow-lg: 0 0 0 transparent;
+	/* Sombras limpias: sin manchas oscuras en tema claro */
+	--shadow-xs: none;
+	--shadow-sm: none;
+	--shadow-md: none;
+	--shadow-lg: none;
 
-	/* GlassKit Advanced Shadows */
-	--shadow-btn-primary: 0 0 0 transparent;
-	--shadow-glow: 0 0 0 transparent;
+	/* GlassKit Advanced Luminosity & Glow */
+	--shadow-btn-primary:
+		0 4px 14px rgba(14, 165, 233, 0.28), inset 0 1px 1.5px rgba(255, 255, 255, 0.9);
+	--shadow-glow: none;
 
 	--grad-primary: var(--accent-gradient);
 	--grad-primary-hover: linear-gradient(90deg, #38bdf8 0%, #34d399 100%);
@@ -152,7 +161,8 @@
 	--accent-blue-mid: #1773d4;
 	--accent-blue-deep: var(--accent-blue-dark);
 
-	--input-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+	--input-shadow-inner:
+		inset 0 1px 3px rgba(14, 165, 233, 0.08), inset 0 0 0 1px rgba(14, 165, 233, 0.08);
 	--glass-blur: blur(14px) saturate(1.2);
 
 	/* Border radius - Más cuadrados y definidos (menos ovalados) */
@@ -205,7 +215,7 @@
 	--bg-input: rgba(15, 34, 56, 0.8); /* Contenedor visible sobre el fondo de página */
 	--bg-input-tint: rgba(20, 184, 166, 0.12); /* Emerald tint */
 
-	/* Tipografía y Detalles */
+	/* Tipografía y Detalles — WCAG AAA */
 	--text-primary: #ffffff; /* Blanco puro para contraste máximo */
 	--text-main: var(--text-primary); /* Alias for backward compatibility */
 
@@ -214,9 +224,10 @@
 		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='24' viewBox='0 0 14 24'%3E%3Cpath d='M3 3h8v2H8v14h3v2H3v-2h3V5H3V3z' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
 			7 12,
 		text;
-	--text-secondary: #cbd5e1;
+	--text-secondary: #e2e8f0; /* Slate 200: contraste reforzado */
+	--text-tertiary: #cbd5e1; /* Slate 300: contraste reforzado (>7:1) para timestamps/contadores */
 	--border-subtle: rgba(255, 255, 255, 0.12); /* Clean glass border */
-	--icon-muted: #94a3b8;
+	--icon-muted: #cbd5e1;
 	--bg-icon-btn: rgba(9, 72, 96, 0.5); /* Tinte aqua profundo */
 
 	/* === MAPPING TO ORIGINAL APP VARIABLES === */
@@ -225,26 +236,27 @@
 	--bg-overlay: rgba(11, 26, 46, 0.7);
 	--glass-bg: var(--bg-surface);
 	--glass-border: rgba(255, 255, 255, 0.12); /* Contraste en bordes */
-	--glass-border-t: rgba(255, 255, 255, 0.15);
-	--glass-shadow: 0 0 0 transparent; /* Sin sombras externas */
-	--glass-inset: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-	--glass-inset-highlight:
-		inset 0 1px 3px rgba(255, 255, 255, 0.25), inset 0 -1px 3px rgba(0, 229, 255, 0.1);
+	--glass-shadow: none;
+	--glass-inset: none;
+	--glass-inset-highlight: none;
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0f2136;
+	--text-on-accent: #ffffff; /* WCAG AA: blanco puro sobre gradiente oscuro */
+	--btn-primary-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--text-link: #4da8da;
 
 	--border-glass: rgba(255, 255, 255, 0.12);
 
-	--shadow-xs: 0 0 0 transparent;
-	--shadow-sm: 0 0 0 transparent;
-	--shadow-md: 0 0 0 transparent;
-	--shadow-lg: 0 0 0 transparent;
+	/* Sombras y Luminosidad Suave Bioluminiscente Dark */
+	--shadow-xs: 0 0 8px rgba(56, 189, 248, 0.06);
+	--shadow-sm: 0 0 14px rgba(56, 189, 248, 0.09);
+	--shadow-md: 0 0 22px rgba(56, 189, 248, 0.12), 0 2px 10px rgba(45, 212, 191, 0.06);
+	--shadow-lg: 0 0 32px rgba(56, 189, 248, 0.16), 0 4px 18px rgba(45, 212, 191, 0.08);
 
-	/* GlassKit Advanced Shadows */
-	--shadow-btn-primary: 0 0 0 transparent;
-	--shadow-glow: 0 0 0 transparent;
+	/* GlassKit Advanced Shadows / Bioluminescent Aura */
+	--shadow-btn-primary: 0 0 20px rgba(56, 189, 248, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+	--shadow-glow: 0 0 20px rgba(56, 189, 248, 0.22);
 
 	--aero-blue: #1b85f3;
 	--aero-sky: #2eb4ff;
@@ -279,7 +291,8 @@
 		rgba(168, 85, 247, 0.1) 100%
 	);
 
-	--input-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+	--input-shadow-inner:
+		inset 0 1px 3px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(56, 189, 248, 0.12);
 }
 
 /* =========================================================================
@@ -314,7 +327,7 @@
 	--bg-input: rgba(10, 20, 38, 0.9); /* Contenedor visible sobre el fondo de página */
 	--bg-input-tint: rgba(56, 189, 248, 0.06); /* Cyber cyan tint sutil */
 
-	/* Tipografía y Detalles */
+	/* Tipografía y Detalles — WCAG AAA */
 	--text-primary: #ffffff; /* Blanco puro */
 	--text-main: var(--text-primary);
 
@@ -323,9 +336,10 @@
 		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='24' viewBox='0 0 14 24'%3E%3Cpath d='M3 3h8v2H8v14h3v2H3v-2h3V5H3V3z' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
 			7 12,
 		text;
-	--text-secondary: #cbd5e1;
+	--text-secondary: #e2e8f0; /* Slate 200: contraste reforzado */
+	--text-tertiary: #cbd5e1; /* Slate 300: contraste reforzado (>7:1) para timestamps/contadores */
 	--border-subtle: rgba(255, 255, 255, 0.1); /* Borde de cristal discreto pero visible */
-	--icon-muted: #94a3b8;
+	--icon-muted: #cbd5e1;
 	--bg-icon-btn: rgba(12, 42, 70, 0.55);
 
 	/* === MAPPING TO ORIGINAL APP VARIABLES === */
@@ -334,26 +348,28 @@
 	--bg-overlay: rgba(6, 11, 20, 0.85);
 	--glass-bg: var(--bg-surface);
 	--glass-border: rgba(160, 210, 255, 0.09); /* Reflejo índigo/cyan visible */
-	--glass-border-t: rgba(160, 210, 255, 0.12);
-	--glass-shadow: 0 0 0 transparent;
-	--glass-inset: inset 0 0 0 1px rgba(160, 210, 255, 0.07);
-	--glass-inset-highlight:
-		inset 0 1px 2px rgba(160, 210, 255, 0.1), inset 0 -1px 2px rgba(0, 229, 255, 0.03);
+	--glass-shadow: none;
+	--glass-inset: none;
+	--glass-inset-highlight: none;
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0d131c;
+	--text-on-accent: #ffffff; /* WCAG AA: blanco puro sobre gradiente oscuro */
+	--btn-primary-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--text-link: #4da8da;
 
 	--border-glass: rgba(160, 210, 255, 0.09);
 
-	--shadow-xs: 0 0 0 transparent;
-	--shadow-sm: 0 0 0 transparent;
-	--shadow-md: 0 0 0 transparent;
-	--shadow-lg: 0 0 0 transparent;
+	/* Sombras y Luminosidad Abisal Midnight */
+	--shadow-xs: 0 0 8px rgba(77, 200, 255, 0.07);
+	--shadow-sm: 0 0 14px rgba(77, 200, 255, 0.1);
+	--shadow-md: 0 0 24px rgba(77, 200, 255, 0.14), 0 2px 10px rgba(62, 230, 195, 0.06);
+	--shadow-lg: 0 0 36px rgba(77, 200, 255, 0.18), 0 4px 20px rgba(62, 230, 195, 0.08);
 
-	/* GlassKit Advanced Shadows */
-	--shadow-btn-primary: 0 0 0 transparent;
-	--shadow-glow: 0 0 0 transparent;
+	/* GlassKit Advanced Shadows / Deep Abyssal Glow */
+	--shadow-btn-primary:
+		0 0 22px rgba(77, 200, 255, 0.38), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+	--shadow-glow: 0 0 22px rgba(77, 200, 255, 0.25);
 
 	--aero-blue: #1b85f3;
 	--aero-sky: #2eb4ff;
@@ -388,7 +404,8 @@
 		rgba(168, 85, 247, 0.08) 100%
 	);
 
-	--input-shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+	--input-shadow-inner:
+		inset 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(77, 200, 255, 0.14);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────── */
@@ -406,9 +423,6 @@ html {
 	color: var(--text-primary);
 	-webkit-font-smoothing: antialiased;
 	background: var(--bg-canvas);
-	background-size: 200% 200%;
-	animation: fluidBg 20s ease infinite;
-	background-attachment: fixed;
 	overflow-x: clip;
 }
 
@@ -418,29 +432,399 @@ html {
    theme.svelte.js): el navegador toma una foto del antes y del después y
    las funde. A diferencia de transition:background, esto SÍ funde los
    gradientes de fondo, así que el cambio se siente como un desvanecido
-   suave de toda la pantalla, no como saltos por capas.
+   suave de toda la pantalla, no como saltos por capas. La duración/estilo
+   responde al perfil de rendimiento activo (ver sección 6, más abajo).
 
    APTO PARA FOTOSENSIBILIDAD: es un crossfade de opacidad puro (sin
-   desplazamientos, zoom ni flashes) y con duración larga y suave. Además,
-   si la persona pidió movimiento reducido, theme.svelte.js NI SIQUIERA
-   inicia la transición → cambio instantáneo. El bloque @media de abajo es
-   una segunda red de seguridad que anula la animación en ese caso.
+   desplazamientos, zoom ni flashes) y con duración larga y suave, por lo
+   que se mantiene incluso con movimiento reducido activo.
+   En navegadores sin soporte de View Transitions API existe un fallback
+   por clase temporal (.theme-transitioning, junto a los keyframes VT).
    ========================================================================= */
 ::view-transition-group(root) {
-	animation-duration: 0.45s;
-	animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	animation-duration: 0.32s;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 ::view-transition-old(root) {
-	animation: vt-fade-out 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-	z-index: 2;
-}
-
-::view-transition-new(root) {
-	animation: none;
+	animation: vt-crossfade-old 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	will-change: opacity, transform;
+	contain: paint;
 	z-index: 1;
 }
 
+::view-transition-new(root) {
+	animation: vt-crossfade-new 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+@keyframes vt-crossfade-old {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.996);
+	}
+}
+
+@keyframes vt-crossfade-new {
+	from {
+		opacity: 0;
+		transform: translateY(6px) scale(0.996);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* ── MOTOR DE RENDIMIENTO & OPTIMIZACIÓN VISUAL (VSOCIAL GPU/CPU ACCEL) ── */
+
+/* 1. Control de Desenfoque de Cristal (Backdrop-Filter) por Niveles */
+:root[data-glass-blur='none'],
+:root[data-perf-mode='true'],
+:root[data-perf-profile='lite'] {
+	--glass-blur: none !important;
+	--lb-glass-blur: none !important;
+	--mp-blur: none !important;
+	--glass-blur-subtle: none !important;
+}
+
+:root[data-glass-blur='subtle'] {
+	--glass-blur: blur(8px) saturate(1.15) !important;
+	--lb-glass-blur: blur(8px) saturate(1.15) !important;
+	--mp-blur: blur(8px) saturate(1.15) !important;
+	--glass-blur-subtle: blur(4px) saturate(1.05) !important;
+}
+
+:root[data-glass-blur='full'] {
+	--glass-blur: blur(16px) saturate(1.35) !important;
+	--lb-glass-blur: blur(16px) saturate(1.35) !important;
+	--mp-blur: blur(16px) saturate(1.35) !important;
+	--glass-blur-subtle: blur(6px) saturate(1.15) !important;
+}
+
+:root[data-glass-blur='none'] .aero-glass,
+:root[data-glass-blur='none'] .glass-panel,
+:root[data-glass-blur='none'] .glass-card,
+:root[data-glass-blur='none'] .aero-post-card,
+:root[data-glass-blur='none'] .topbar-glass,
+:root[data-glass-blur='none'] .sidebar-glass,
+:root[data-glass-blur='none'] .mobile-nav-glass,
+:root[data-glass-blur='none'] .dropdown-glass,
+:root[data-glass-blur='none'] .vs-topbar,
+:root[data-glass-blur='none'] .vs-topbar::before,
+:root[data-glass-blur='none'] .vs-sidenav,
+:root[data-glass-blur='none'] .vs-mobile-container,
+:root[data-glass-blur='none'] .vs-theme-dropdown,
+:root[data-glass-blur='none'] .aero-modal-content,
+:root[data-perf-mode='true'] .aero-glass,
+:root[data-perf-mode='true'] .glass-panel,
+:root[data-perf-mode='true'] .glass-card,
+:root[data-perf-mode='true'] .aero-post-card,
+:root[data-perf-mode='true'] .topbar-glass,
+:root[data-perf-mode='true'] .sidebar-glass,
+:root[data-perf-mode='true'] .mobile-nav-glass,
+:root[data-perf-mode='true'] .dropdown-glass,
+:root[data-perf-mode='true'] .vs-topbar,
+:root[data-perf-mode='true'] .vs-topbar::before,
+:root[data-perf-mode='true'] .vs-sidenav,
+:root[data-perf-mode='true'] .vs-mobile-container,
+:root[data-perf-mode='true'] .vs-theme-dropdown,
+:root[data-perf-mode='true'] .aero-modal-content,
+:root[data-perf-profile='lite'] .aero-glass,
+:root[data-perf-profile='lite'] .glass-panel,
+:root[data-perf-profile='lite'] .glass-card,
+:root[data-perf-profile='lite'] .aero-post-card,
+:root[data-perf-profile='lite'] .topbar-glass,
+:root[data-perf-profile='lite'] .sidebar-glass,
+:root[data-perf-profile='lite'] .mobile-nav-glass,
+:root[data-perf-profile='lite'] .dropdown-glass,
+:root[data-perf-profile='lite'] .vs-topbar,
+:root[data-perf-profile='lite'] .vs-topbar::before,
+:root[data-perf-profile='lite'] .vs-sidenav,
+:root[data-perf-profile='lite'] .vs-mobile-container,
+:root[data-perf-profile='lite'] .vs-theme-dropdown,
+:root[data-perf-profile='lite'] .aero-modal-content {
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+/* 2. Supresión de Ruido SVG feTurbulence (Ahorro crítico de CPU/GPU Rasterizer) */
+:root[data-disable-noise='true'],
+:root[data-perf-mode='true'] {
+	--noise-texture: none !important;
+}
+
+:root[data-disable-noise='true'] .aero-glass::before,
+:root[data-disable-noise='true'] .glass-panel::before,
+:root[data-disable-noise='true'] .glass-card::before,
+:root[data-disable-noise='true'] .aero-post-card::before,
+:root[data-perf-mode='true'] .aero-glass::before,
+:root[data-perf-mode='true'] .glass-panel::before,
+:root[data-perf-mode='true'] .glass-card::before,
+:root[data-perf-mode='true'] .aero-post-card::before {
+	display: none !important;
+}
+
+/* 2B. Consumo real de data-simplify-shadows.
+   El atributo lo sincronizaban perfStore y app.html pero ninguna regla CSS lo
+   leía: el aura VTuber (.avatar-ring.is-vtuber) anima box-shadow en bucle
+   infinito (repaint continuo por cada avatar visible) sin forma de apagarse. */
+:root[data-simplify-shadows='true'] .avatar-ring.is-vtuber {
+	animation: none;
+}
+
+/* 3. Sin sombras difusas globales. La lista previa de selectores (perfiles y
+   temas) era redundante: cualquier elemento coincide con :root, así que estas
+   variables ya eran "none" para todos. La profundidad la dan borde + inset. */
+:root {
+	--glass-shadow: none !important;
+	--shadow-glow: none !important;
+	--glass-inset-highlight: none !important;
+}
+
+/* 4. Renderizado Diferido Fuera de Pantalla (content-visibility: auto).
+   Solo su ajuste dedicado (activo por defecto en TODOS los perfiles, incluido
+   Lite vía syncDomAttributes). La lista paralela de data-perf-mode era un
+   duplicado que forzaba CV incluso con el ajuste apagado manualmente. */
+:root[data-content-visibility='true'] .feed-post-wrap,
+:root[data-content-visibility='true'] .aero-post-card,
+:root[data-content-visibility='true'] .comment-item,
+:root[data-content-visibility='true'] .notif-item,
+:root[data-content-visibility='true'] .listing-card {
+	content-visibility: auto;
+	contain-intrinsic-size: auto none auto 250px;
+}
+
+/* 4B. Aceleración GPU y Control de Capas */
+:root[data-gpu-acceleration='false'] .aero-glass,
+:root[data-gpu-acceleration='false'] .glass-panel,
+:root[data-gpu-acceleration='false'] .glass-card,
+:root[data-gpu-acceleration='false'] .aero-post-card {
+	transform: none !important;
+	will-change: auto !important;
+}
+
+/* 4C. Supresión de Cálculos de Brillo en Hover */
+:root[data-disable-hover-glow='true'] .aero-post-card:hover,
+:root[data-disable-hover-glow='true'] .glass-card:hover,
+:root[data-disable-hover-glow='true'] .glass-panel:hover {
+	transform: none !important;
+}
+
+/* 4D. Sistema de Cristal Líquido & Glassmorphism 2.0 por Niveles (GPU-Native)
+   ─────────────────────────────────────────────────────────────
+   Aceleración nativa de hardware con fidelidad progresiva por perfil:
+   • Modo Alta Fidelidad: desenfoque profundo (16px), saturación rica (1.35),
+     capas especulares de prisma dual (--glass-sheen) y resplandor etéreo multicapa.
+   • Modo Equilibrado: desenfoque suave optimizado (8px, 1.15), corte aero 135°
+     y reflectividad contenida para 60-120 FPS estables.
+   • Modo Lite: supresión total de blur y renderizado directo en 1 sola pasada.
+*/
+
+/* Superficies Héroe en Alta Fidelidad (TopBar, Modales, Dropdowns, SideNav, Tarjetas, Compositor) */
+:root[data-perf-profile='high'] .vs-topbar,
+:root[data-perf-profile='high'] .vs-sidenav,
+:root[data-perf-profile='high'] .aero-modal-content,
+:root[data-perf-profile='high'] .vs-theme-dropdown,
+:root[data-perf-profile='high'] .vs-mobile-container,
+:root[data-perf-profile='high'] .glass-panel,
+:root[data-perf-profile='high'] .glass-card,
+:root[data-perf-profile='high'] .aero-glass,
+:root[data-perf-profile='high'] .aero-post-card,
+:root[data-perf-profile='high'] .composer-card,
+:root[data-perf-profile='high'] .feed-filter-band {
+	backdrop-filter: var(--glass-blur);
+	-webkit-backdrop-filter: var(--glass-blur);
+	transform: translateZ(0);
+}
+
+/* Modo Equilibrado: Compositing fluido sin sobrecarga de rasterización */
+:root[data-perf-profile='balanced'] .vs-topbar,
+:root[data-perf-profile='balanced'] .vs-sidenav,
+:root[data-perf-profile='balanced'] .aero-modal-content,
+:root[data-perf-profile='balanced'] .vs-theme-dropdown,
+:root[data-perf-profile='balanced'] .vs-mobile-container,
+:root[data-perf-profile='balanced'] .glass-panel,
+:root[data-perf-profile='balanced'] .glass-card,
+:root[data-perf-profile='balanced'] .aero-glass,
+:root[data-perf-profile='balanced'] .aero-post-card,
+:root[data-perf-profile='balanced'] .composer-card,
+:root[data-perf-profile='balanced'] .feed-filter-band {
+	backdrop-filter: var(--glass-blur);
+	-webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Salvaguarda: Evitar anidamiento redundante dentro de modales que multiplican el coste GPU */
+.aero-modal-content .glass-panel,
+.aero-modal-content .aero-post-card {
+	backdrop-filter: none;
+	-webkit-backdrop-filter: none;
+}
+
+/* 5. Reducción de Movimiento — solo elementos decorativos
+   Las view-transitions (navegación, tema) y el drawer se excluyen intencionalmente:
+   suprimir esas transiciones causa desorientación espacial sin beneficio de accesibilidad real.
+   Los blobs, pulsos y animaciones de fondo sí se suprimen (son puramente estéticos). */
+:root[data-reduced-motion='true'] .blob,
+:root[data-reduced-motion='true'] .aero-bg-wrapper,
+:root[data-reduced-motion='true'] .aero-bg-wrapper::after,
+:root[data-reduced-motion='true'] .vs-boot__pulse,
+:root[data-reduced-motion='true'] .vs-boot__prism,
+:root[data-reduced-motion='true'] [class*='squircle-pulse'],
+:root[data-reduced-motion='true'] [class*='squircle-glow'] {
+	animation: none !important;
+	transition-duration: 0.001ms !important;
+}
+
+/* 5B. Decoración con movimiento continuo FUERA en Lite.
+   El aura VTuber ya se apaga vía data-simplify-shadows (activo en Lite);
+   aquí se cortan los bucles infinitos puramente estéticos que ningún otro
+   ajuste cubría y que seguían consumiendo GPU/compositor en el modo pensado
+   para hardware modesto. El feedback funcional (spinners, skeletons, barras
+   de carga, ecualizadores del reproductor) se conserva intacto. */
+:root[data-perf-mode='true'] .animate-float,
+:root[data-perf-mode='true'] .animate-pulse {
+	animation: none;
+}
+
+/* Suprimir scroll snap y kinetics de listas en reduced-motion */
+:root[data-reduced-motion='true'] {
+	scroll-behavior: auto !important;
+}
+
+/* 6. View Transitions por perfil de rendimiento (Arquitectura Cinemática Neo-Aero)
+   ─────────────────────────────────────────────────────────────────────────
+   Persistencia de navegación: SideNav, TopBar y MobileNav permanecen firmes
+   mientras el canvas transiciona con física orgánica en TODOS los perfiles.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.vs-shell__rail {
+	view-transition-name: vs-sidenav;
+}
+
+.vs-topbar {
+	view-transition-name: vs-topbar;
+}
+
+.vs-mobile-nav {
+	view-transition-name: vs-mobilenav;
+}
+
+.vs-shell__canvas {
+	view-transition-name: vs-canvas;
+}
+
+/* Chrome de la interfaz anclado sin parpadeos */
+::view-transition-group(vs-sidenav),
+::view-transition-group(vs-mobilenav) {
+	animation-duration: 0s;
+}
+
+::view-transition-group(vs-topbar) {
+	animation-duration: 0.28s;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Transición Global y Canvas (Perfil High / Enabled ~0.32s) ── */
+::view-transition-group(vs-canvas),
+[data-view-transitions='enabled']::view-transition-group(vs-canvas),
+[data-view-transitions='enabled']::view-transition-group(root) {
+	animation-duration: 0.32s !important;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+::view-transition-old(vs-canvas),
+[data-view-transitions='enabled']::view-transition-old(vs-canvas),
+[data-view-transitions='enabled']::view-transition-old(root) {
+	animation: vt-crossfade-old 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+::view-transition-new(vs-canvas),
+[data-view-transitions='enabled']::view-transition-new(vs-canvas),
+[data-view-transitions='enabled']::view-transition-new(root) {
+	animation: vt-crossfade-new 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+/* ── fast: Fluido y ágil (~0.26s con elevación física) ── */
+[data-view-transitions='fast']::view-transition-group(vs-canvas),
+[data-view-transitions='fast']::view-transition-group(root) {
+	animation-duration: 0.26s !important;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+[data-view-transitions='fast']::view-transition-old(vs-canvas),
+[data-view-transitions='fast']::view-transition-old(root) {
+	animation: vt-crossfade-old 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+[data-view-transitions='fast']::view-transition-new(vs-canvas),
+[data-view-transitions='fast']::view-transition-new(root) {
+	animation: vt-crossfade-new 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+/* ── lite: Optimizado para hardware económico (~0.22s, GPU-friendly con elevación suave) ── */
+[data-view-transitions='lite']::view-transition-group(vs-canvas),
+[data-view-transitions='lite']::view-transition-group(root),
+[data-perf-mode='true']::view-transition-group(vs-canvas),
+[data-perf-mode='true']::view-transition-group(root) {
+	animation-duration: 0.22s !important;
+	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+[data-view-transitions='lite']::view-transition-old(vs-canvas),
+[data-view-transitions='lite']::view-transition-old(root),
+[data-perf-mode='true']::view-transition-old(vs-canvas),
+[data-perf-mode='true']::view-transition-old(root) {
+	animation: vt-crossfade-old 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+[data-view-transitions='lite']::view-transition-new(vs-canvas),
+[data-view-transitions='lite']::view-transition-new(root),
+[data-perf-mode='true']::view-transition-new(vs-canvas),
+[data-perf-mode='true']::view-transition-new(root) {
+	animation: vt-crossfade-new 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+/* ── disabled: Crossfade ultra-rápido de rescate ── */
+[data-view-transitions='disabled']::view-transition-group(vs-canvas),
+[data-view-transitions='disabled']::view-transition-group(root) {
+	animation-duration: 0.16s !important;
+	animation-timing-function: linear !important;
+}
+[data-view-transitions='disabled']::view-transition-old(vs-canvas),
+[data-view-transitions='disabled']::view-transition-old(root) {
+	animation: vt-fade-out 0.14s linear forwards !important;
+	will-change: opacity;
+	contain: paint;
+	z-index: 1;
+}
+[data-view-transitions='disabled']::view-transition-new(vs-canvas),
+[data-view-transitions='disabled']::view-transition-new(root) {
+	animation: vt-fade-in 0.16s linear forwards !important;
+	will-change: opacity;
+	contain: paint;
+	z-index: 2;
+}
+
+/* Keyframes compartidos para fade sin movimiento (GPU-friendly: solo compositor) */
 @keyframes vt-fade-out {
 	from {
 		opacity: 1;
@@ -449,33 +833,209 @@ html {
 		opacity: 0;
 	}
 }
-
-/* ── Variante optimizada Lite para Modo Rendimiento / Bajo Consumo ── */
-/* Mantiene la vida y suavidad sensorial en hardware modesto sin carga de GPU/CPU */
-[data-perf-mode='true']::view-transition-group(root),
-[data-reduced-motion='true']::view-transition-group(root) {
-	animation-duration: 0.24s !important;
-	animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+@keyframes vt-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
 }
 
-[data-perf-mode='true']::view-transition-old(root),
-[data-reduced-motion='true']::view-transition-old(root) {
-	animation: vt-fade-out-lite 0.24s cubic-bezier(0.4, 0, 0.2, 1) forwards !important;
-	will-change: opacity;
-	contain: paint;
-	z-index: 2;
+/* ── Congelamiento durante View Transition de navegación (.is-vt-active) ──
+   El <html> recibe esta clase justo antes de document.startViewTransition()
+   (+layout.svelte) y la pierde cuando updateCallbackDone resuelve. Mientras
+   está activa, las animaciones de entrada propias de cada página (stagger,
+   fades, slides al montar) se pausan: el snapshot "new" debe capturar la
+   página en su estado final, si no el crossfade arrastraría elementos a
+   medio animar y el fundido se ve sucio o con saltos. */
+html.is-vt-active [data-vt-freeze],
+html.is-vt-active .feed-post-wrap,
+html.is-vt-active .aero-post-card {
+	animation-play-state: paused !important;
 }
 
-@keyframes vt-fade-out-lite {
+/* ── Barra de progreso de navegación (RouteProgress.svelte) ──
+   Con movimiento reducido la barra NO se renderiza (gate en JS vía
+   perfStore.reduceMotion); esta regla es red de seguridad para el caso
+   de cambio del ajuste con la barra ya en pantalla. */
+@media (prefers-reduced-motion: reduce) {
+	.vs-route-progress__bar {
+		animation-duration: 2s !important;
+		box-shadow: none;
+	}
+	/* Decoración continua fuera (flotación, pulsos, aura de avatar). El feedback
+	   funcional (spinners, skeletons, barras de carga) se conserva intacto. */
+	.animate-float,
+	.animate-pulse,
+	.avatar-ring.is-vtuber {
+		animation: none !important;
+	}
+}
+
+/* ── Fallback de transición de tema para navegadores sin View Transitions API.
+   Se activa vía clase temporal .theme-transitioning (ver theme.svelte.js):
+   añade la clase con los colores viejos visibles, fuerza reflow, cambia el
+   tema y retira la clase tras ~300ms. Solo propiedades baratas de interpolar
+   — box-shadow se excluye por su coste en el selector universal. Sin
+   !important: la especificidad 0,1,1 supera a los selectores de componente
+   y las reglas !important existentes siguen prevaleciendo donde apliquen. ── */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+	transition:
+		background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+		color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+		border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+		fill 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+		stroke 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Keyframes de navegación completa (perfil 'enabled' / 'balanced') */
+@keyframes vt-crossfade-old-lite {
 	from {
 		opacity: 1;
+		transform: translateY(0);
 	}
 	to {
 		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+@keyframes vt-crossfade-new-lite {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
 	}
 }
 
-/* [VSocial: reduced-motion override removed — animaciones siempre activas por diseño] */
+/* ══════════════════════════════════════════════════════════════════════
+   Suavizado Sólido y Ligero de Cambio de Tema (Ultra-Smooth Solid Theme Shift)
+   Transiciona únicamente background-color, border-color y color a 0.2s con aceleración
+   de GPU sin forzar repintados pesados de sombras o gradientes.
+   ══════════════════════════════════════════════════════════════════════ */
+html,
+body,
+.vs-shell,
+.vs-shell__canvas,
+.vs-shell__stage,
+.vs-shell__rail,
+.glass-card,
+.glass-panel,
+.aero-glass,
+.aero-post-card,
+.topbar-wrapper,
+.vs-topbar,
+.vs-sidenav,
+.vs-nav-item,
+.vs-brand,
+.vs-footer,
+.vs-user-card,
+.aero-input,
+.vs-input,
+.dropdown-glass,
+.mobile-nav-glass,
+.sidebar-glass,
+.vs-theme-dropdown,
+.vs-theme-trigger-btn,
+.vs-theme-trigger-compact,
+.comment-item,
+.notif-item,
+.listing-card {
+	transition:
+		background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+		border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+		color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 7. Contraste Reforzado y Superficies Sólidas por Tema para Modo Rendimiento / Sin Desenfoque */
+:root[data-perf-mode='true'] .aero-glass,
+:root[data-perf-mode='true'] .glass-panel,
+:root[data-perf-mode='true'] .glass-card,
+:root[data-perf-mode='true'] .aero-post-card,
+:root[data-perf-profile='lite'] .aero-glass,
+:root[data-perf-profile='lite'] .glass-panel,
+:root[data-perf-profile='lite'] .glass-card,
+:root[data-perf-profile='lite'] .aero-post-card,
+:root[data-glass-blur='none'] .aero-glass,
+:root[data-glass-blur='none'] .glass-panel,
+:root[data-glass-blur='none'] .glass-card,
+:root[data-glass-blur='none'] .aero-post-card {
+	background: var(--bg-surface-solid, var(--bg-surface)) !important;
+	border-color: var(--border-subtle) !important;
+	box-shadow: var(--glass-shadow), var(--glass-inset-highlight) !important;
+}
+
+/* Tema Light - Modo Rendimiento (Frutiger Aqua con 95% de translucidez calibrada, 60 FPS fijos) */
+:root[data-theme='light'][data-perf-mode='true'],
+:root[data-theme='light'][data-perf-profile='lite'],
+:root[data-theme='light'][data-glass-blur='none'] {
+	--bg-surface: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.95) 0%,
+		rgba(224, 246, 252, 0.9) 100%
+	);
+	--bg-surface-solid: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.95) 0%,
+		rgba(224, 246, 252, 0.9) 100%
+	);
+	--bg-surface-hover: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.98) 0%,
+		rgba(215, 242, 250, 0.94) 100%
+	);
+	--bg-sidebar: rgba(230, 248, 252, 0.92);
+	--bg-input: rgba(255, 255, 255, 0.95);
+	--bg-input-tint: rgba(14, 165, 233, 0.1);
+	--border-subtle: rgba(14, 165, 233, 0.32);
+	--border-glass: rgba(14, 165, 233, 0.28);
+	--glass-border-t: rgba(255, 255, 255, 1);
+	--text-primary: #0f172a;
+	--text-secondary: #334155;
+	--text-muted: #64748b;
+	--glass-shadow: none;
+	--shadow-glow: none;
+	--glass-inset-highlight:
+		inset 0 1.5px 2px rgba(255, 255, 255, 1), inset 0 -1px 2px rgba(14, 165, 233, 0.12);
+}
+
+/* Tema Dark - Modo Rendimiento */
+:root[data-theme='dark'][data-perf-mode='true'],
+:root[data-theme='dark'][data-perf-profile='lite'],
+:root[data-theme='dark'][data-glass-blur='none'] {
+	--bg-surface: #0c2035;
+	--bg-surface-solid: #0c2035;
+	--bg-surface-hover: #122b46;
+	--bg-sidebar: #071727;
+	--bg-input: #091a2c;
+	--border-subtle: rgba(255, 255, 255, 0.16);
+	--border-glass: rgba(255, 255, 255, 0.14);
+	--text-primary: #ffffff;
+	--text-secondary: #e2e8f0;
+	--text-muted: #cbd5e1;
+}
+
+/* Tema Midnight - Modo Rendimiento */
+:root[data-theme='midnight'][data-perf-mode='true'],
+:root[data-theme='midnight'][data-perf-profile='lite'],
+:root[data-theme='midnight'][data-glass-blur='none'] {
+	--bg-surface: #081020;
+	--bg-surface-solid: #081020;
+	--bg-surface-hover: #0e1a32;
+	--bg-sidebar: #040914;
+	--bg-input: #060d1b;
+	--border-subtle: rgba(46, 180, 255, 0.24);
+	--border-glass: rgba(255, 255, 255, 0.14);
+	--text-primary: #ffffff;
+	--text-secondary: #f1f5f9;
+	--text-muted: #94a3b8;
+}
 
 /* Custom Icons Alignment */
 .material-icons-round {
@@ -558,18 +1118,6 @@ body.is-lightbox-open {
 	background: var(--scrollbar-thumb-hover) !important;
 }
 
-@keyframes fluidBg {
-	0% {
-		background-position: 0% 50%;
-	}
-	50% {
-		background-position: 100% 50%;
-	}
-	100% {
-		background-position: 0% 50%;
-	}
-}
-
 body {
 	min-height: 100vh;
 	overflow-x: clip;
@@ -577,6 +1125,10 @@ body {
 	transition: color var(--t-slow);
 	position: relative;
 	font-family: var(--font-sans);
+	/* Micro-detalles tipográficos: renderizado nítido + tracking sutil
+	   para sesiones de lectura prolongadas bajo poca luz. */
+	text-rendering: optimizeLegibility;
+	letter-spacing: 0.01em;
 }
 
 /* Ensure Noto Color Emoji is used for all emoji Unicode ranges, site-wide */
@@ -597,30 +1149,33 @@ a {
 /* ── Neo-Aero Glass Panel ───────────────────────────────────── */
 .aero-glass,
 .glass-panel,
-.glass-card {
+.glass-card,
+.aero-post-card {
 	position: relative;
 	background: var(--bg-surface);
 	backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
 	-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
 	border: 1px solid var(--border-glass);
-	box-shadow: var(--glass-shadow); /* Ahora es none/transparent, confía en el borde e insets */
-	border-radius: var(--radius-superellipse);
+	border-radius: var(--radius-lg);
 	transition:
-		box-shadow var(--t-base),
+		border-color var(--t-base),
+		background-color var(--t-base),
 		transform var(--t-spring);
 	overflow: hidden;
 	transform: translateZ(0);
-	contain: layout style paint;
+	contain: layout style;
 	will-change: auto;
 }
 
 /* Micro-texture noise overlay (eliminates gradient banding) */
 .aero-glass::before,
 .glass-panel::before,
-.glass-card::before {
+.glass-card::before,
+.aero-post-card::before {
 	content: '';
 	position: absolute;
 	inset: 0;
+	border-radius: inherit;
 	background: var(--noise-texture);
 	opacity: 0.02;
 	pointer-events: none;
@@ -630,26 +1185,53 @@ a {
 /* Top specular highlight (glass thickness refraction) */
 .aero-glass::after,
 .glass-panel::after,
-.glass-card::after {
+.glass-card::after,
+.aero-post-card::after {
 	content: '';
 	position: absolute;
 	top: 0;
 	left: 0;
 	right: 0;
 	height: 1px;
+	border-top-left-radius: inherit;
+	border-top-right-radius: inherit;
 	background: linear-gradient(
 		90deg,
 		transparent 0%,
-		rgba(255, 255, 255, 0.15) 50%,
+		rgba(255, 255, 255, 0.15) 30%,
+		rgba(255, 255, 255, 0.35) 50%,
+		rgba(255, 255, 255, 0.15) 70%,
 		transparent 100%
 	);
 	pointer-events: none;
 	z-index: 2;
 }
 
+/* Desactivar pseudo-elementos absolutos en contenedores con scroll horizontal para evitar desbordamiento y puntas afiladas */
+.overflow-x-auto.glass-panel::before,
+.overflow-x-auto.glass-card::before,
+.overflow-x-auto.aero-glass::before,
+.overflow-x-auto.aero-post-card::before,
+.overflow-x-auto.glass-panel::after,
+.overflow-x-auto.glass-card::after,
+.overflow-x-auto.aero-glass::after,
+.overflow-x-auto.aero-post-card::after,
+.stories-bar::before,
+.stories-bar::after {
+	display: none !important;
+}
+
+.overflow-x-auto.glass-panel,
+.overflow-x-auto.glass-card,
+.overflow-x-auto.aero-glass,
+.stories-bar {
+	background-color: var(--bg-surface);
+}
+
 .aero-glass:hover,
 .glass-panel:hover,
-.glass-card:hover {
+.glass-card:hover,
+.aero-post-card:hover {
 	box-shadow: var(--shadow-sm), var(--shadow-glow), var(--glass-inset-highlight);
 	will-change: transform;
 	transition:
@@ -665,75 +1247,101 @@ a {
 	z-index: 3;
 }
 
-/* Fallback for browsers without backdrop-filter support */
-@supports not (backdrop-filter: blur(16px)) {
-	.aero-glass,
-	.glass-panel,
-	.glass-card {
-		background: var(--bg-surface-solid, rgba(255, 255, 255, 0.98));
-	}
-	[data-theme='dark'] .aero-glass,
-	[data-theme='dark'] .glass-panel,
-	[data-theme='dark'] .glass-card,
-	[data-theme='midnight'] .aero-glass,
-	[data-theme='midnight'] .glass-panel,
-	[data-theme='midnight'] .glass-card {
-		background: var(--bg-surface-solid, rgba(26, 56, 100, 0.95));
-	}
+/* ── Foco fluido sin parpadeos ────────────────────────────
+   Anillo cyan estándar para todo lo interactivo; los componentes
+   con foco propio (outline personalizado) lo sobreescriben gracias
+   a la prioridad cero de :where(). Sin parpadeo: el outline no anima,
+   aparece y desaparece en el mismo frame. */
+:where(a, button, input, textarea, select, summary, [role='button'], [tabindex]):focus-visible {
+	outline: 2px solid var(--aero-sky);
+	outline-offset: 2px;
 }
 
-/* ── Modo Rendimiento & Accesibilidad (Low Power & Reduced Motion) ── */
-[data-perf-mode='true'] {
-	--glass-blur: none !important;
-	--lb-glass-blur: none !important;
-	--glass-shadow: none !important;
-	--shadow-glow: none !important;
+/* ── Estados interactivos globales para botones y enlaces ─────────────
+   Transiciones suaves (0.2s ease-in-out) en hover, active, focus-visible
+   para todos los componentes que usan .aero-pill-btn, .aero-icon-btn,
+   .btn-aero-primary, .btn-aero-secondary, .tool-btn, etc. */
+.aero-pill-btn,
+.aero-icon-btn,
+.btn-aero-primary,
+.btn-aero-secondary,
+.btn-aero-danger,
+.btn-aero-success,
+.btn-aero-ghost,
+.tool-btn,
+.tool-btn-advanced,
+.vs-nav-item,
+.qc-conv-item,
+.qc-msg-action-btn,
+.qc-send-btn,
+.qc-action-btn,
+.qc-back-btn,
+.qc-minimize-btn,
+.composer-publish-btn,
+.aqua-algo-btn,
+.feed-area-btn,
+.sug-follow-btn {
+	transition:
+		transform var(--t-spring, 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)),
+		box-shadow var(--t-base, 0.25s ease-out),
+		background var(--t-base, 0.25s ease-out),
+		border-color var(--t-base, 0.25s ease-out),
+		color var(--t-base, 0.25s ease-out);
 }
 
-[data-perf-mode='true'] .aero-glass,
-[data-perf-mode='true'] .glass-panel,
-[data-perf-mode='true'] .glass-card {
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
-	background: var(--bg-surface-solid, var(--bg-surface));
+.aero-pill-btn:hover,
+.aero-icon-btn:hover,
+.btn-aero-primary:hover,
+.btn-aero-secondary:hover,
+.btn-aero-danger:hover,
+.btn-aero-success:hover,
+.btn-aero-ghost:hover,
+.tool-btn:hover,
+.tool-btn-advanced:hover,
+.vs-nav-item:hover,
+.qc-conv-item:hover,
+.sug-follow-btn:hover,
+.feed-area-btn:hover,
+.aqua-algo-btn:hover,
+.composer-publish-btn:hover:not(:disabled),
+.qc-send-btn:hover:not(:disabled),
+.qc-action-btn:hover,
+.qc-back-btn:hover,
+.qc-minimize-btn:hover {
+	transform: translateY(-2px) scale(1.04);
 }
 
-[data-perf-mode='true'] .aero-glass::before,
-[data-perf-mode='true'] .glass-panel::before,
-[data-perf-mode='true'] .glass-card::before,
-[data-perf-mode='true'] .aero-glass::after,
-[data-perf-mode='true'] .glass-panel::after,
-[data-perf-mode='true'] .glass-card::after {
-	display: none !important;
+.aero-pill-btn:active,
+.aero-icon-btn:active,
+.btn-aero-primary:active,
+.btn-aero-secondary:active,
+.tool-btn:active,
+.vs-nav-item:active {
+	transform: scale(0.96);
 }
 
-[data-perf-mode='true'] .aurora-blobs,
-[data-perf-mode='true'] .aero-bg-wrapper::after {
-	display: none !important;
-}
-
-[data-reduced-motion='true'] {
-	--motion-ok: 0;
-	--t-fast: 0.01s !important;
-	--t-base: 0.01s !important;
-	--t-slow: 0.01s !important;
-	--t-spring: 0.01s !important;
-	--t-modal: 0.01s !important;
-}
-
-[data-reduced-motion='true'] .aurora-blobs,
-[data-reduced-motion='true'] .blob,
-[data-reduced-motion='true'] .aero-bg-wrapper::after,
-[data-reduced-motion='true'] .notif-pulse,
-[data-reduced-motion='true'] .animate-pulse {
-	animation: none !important;
-}
-
-/* ── Buttons ────────────────────────────────────────────────── */
-.btn-aero-wrap {
-	position: relative;
-	display: inline-flex;
-	border-radius: var(--radius-full);
+/* Focus visible consistente */
+.aero-pill-btn:focus-visible,
+.aero-icon-btn:focus-visible,
+.btn-aero-primary:focus-visible,
+.btn-aero-secondary:focus-visible,
+.btn-aero-danger:focus-visible,
+.btn-aero-success:focus-visible,
+.btn-aero-ghost:focus-visible,
+.tool-btn:focus-visible,
+.tool-btn-advanced:focus-visible,
+.vs-nav-item:focus-visible,
+.qc-conv-item:focus-visible,
+.sug-follow-btn:focus-visible,
+.feed-area-btn:focus-visible,
+.aqua-algo-btn:focus-visible,
+.composer-publish-btn:focus-visible,
+.qc-send-btn:focus-visible,
+.qc-action-btn:focus-visible,
+.qc-back-btn:focus-visible,
+.qc-minimize-btn:focus-visible {
+	outline: 2px solid var(--aero-sky);
+	outline-offset: 2px;
 }
 
 /* Primary */
@@ -765,7 +1373,7 @@ a {
 		inset 0 2px 4px rgba(255, 255, 255, 0.7),
 		inset 0 -4px 8px rgba(0, 0, 0, 0.15),
 		inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+	text-shadow: var(--btn-primary-text-shadow, none);
 	transform: translateZ(0);
 	will-change: auto;
 }
@@ -1040,7 +1648,9 @@ a {
 }
 .aero-pill-btn:active {
 	transform: translateY(1px) scale(0.96);
-	box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+	box-shadow:
+		inset 0 1px 3px rgba(0, 0, 0, 0.15),
+		var(--shadow-glow);
 }
 .aero-pill-btn:focus-visible {
 	outline: 2px solid var(--accent-blue-base);
@@ -1063,17 +1673,24 @@ a {
 	z-index: 2;
 }
 
-/* ── Hashtag Links (rendered via formatHashtags utility) ─────── */
-.hashtag-link {
-	color: var(--color-primary, #1b85f3);
+/* ── Hashtag, Mention & URL Links (rendered via formatHashtags utility) ─────── */
+.hashtag-link,
+.mention-link,
+.url-link {
+	color: var(--aero-blue, #1b85f3);
 	font-weight: 600;
 	text-decoration: none;
 	cursor: pointer;
-	transition: opacity 150ms ease;
+	transition:
+		opacity 150ms ease,
+		color 150ms ease;
 }
-.hashtag-link:hover {
+.hashtag-link:hover,
+.mention-link:hover,
+.url-link:hover {
 	text-decoration: underline;
 	opacity: 0.85;
+	color: var(--aero-sky, #2eb4ff);
 }
 /* When inside a hashtag-backdrop (editor), pointer-events are disabled on the
    parent div, so we don't need to worry about clicks firing on the backdrop copy. */
@@ -1374,7 +1991,11 @@ input[type='checkbox'].aero-toggle-switch:disabled {
 	background: var(--glass-bg);
 	border: 1px solid var(--glass-border);
 	color: var(--text-secondary);
-	backdrop-filter: blur(8px);
+	/* Token en vez de blur fijo: respeta los niveles none/subtle/full y así
+	   el Modo Rendimiento sí apaga estos desenfoques (listados con decenas
+	   de badges los pagaban siempre). */
+	backdrop-filter: var(--glass-blur, blur(8px));
+	-webkit-backdrop-filter: var(--glass-blur, blur(8px));
 }
 .aero-badge-verified {
 	background: rgba(0, 229, 255, 0.12);
@@ -1439,9 +2060,10 @@ input[type='checkbox'].aero-toggle-switch:disabled {
 	position: fixed;
 	inset: 0;
 	background: rgba(10, 20, 40, 0.45);
-	backdrop-filter: blur(10px) saturate(1.2);
-	-webkit-backdrop-filter: blur(10px) saturate(1.2);
-	z-index: 100;
+	backdrop-filter: var(--mp-blur, blur(10px) saturate(1.2));
+	-webkit-backdrop-filter: var(--mp-blur, blur(10px) saturate(1.2));
+	/* Por encima del nav móvil (200) y la TopBar (500) */
+	z-index: var(--z-modal-backdrop, 600);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -2280,10 +2902,12 @@ input[type='checkbox'].aero-toggle-switch:disabled {
 	object-fit: contain;
 }
 .backdrop-blur-md {
-	backdrop-filter: blur(12px);
+	/* Antes fijaba blur(12px) ignorando el nivel elegido en Ajustes; ahora
+	   sigue al motor de perfiles (Lite = sin desenfoque). */
+	backdrop-filter: var(--glass-blur-subtle, blur(4px));
 }
 .backdrop-blur-sm {
-	backdrop-filter: blur(4px);
+	backdrop-filter: var(--glass-blur-subtle, blur(4px));
 }
 .-translate-y-1\/2 {
 	transform: translateY(-50%);
@@ -2380,11 +3004,30 @@ input[type='checkbox'].aero-toggle-switch:disabled {
 	}
 }
 
+@keyframes dropdownPop {
+	from {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+.aero-dropdown-menu,
+.dropdown-menu,
+.autocomplete-dropdown {
+	animation: dropdownPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+	transform-origin: top right;
+	will-change: opacity, transform;
+}
+
 .animate-fade-in {
 	animation: fadeIn 0.4s var(--ease-out) both;
 }
 .animate-slide-in-up {
-	animation: slideInUp 0.45s var(--ease-out) both;
+	animation: slideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .animate-float {
 	animation: float 7s ease-in-out infinite;
@@ -2570,11 +3213,182 @@ input[type='checkbox'].aero-toggle-switch:disabled {
 	}
 }
 
-/* ── Sidebar container integration ────────────────────────────── */
-.sidebar-vs {
-	min-height: 100vh;
-	z-index: 40;
-	overflow: visible;
+/* ── Sidebar Drawer (Overlay flotante cuando está colapsado en <= 1280px) ── */
+.vs-sidebar-drawer {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-critical, 1000);
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+		visibility 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.vs-sidebar-drawer.open {
+	pointer-events: auto;
+	opacity: 1;
+	visibility: visible;
+}
+.vs-sidebar-drawer::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	backdrop-filter: var(--glass-blur-subtle, blur(6px));
+	-webkit-backdrop-filter: var(--glass-blur-subtle, blur(6px));
+	z-index: -1;
+	opacity: 0;
+	transition: opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.vs-sidebar-drawer.open::before {
+	opacity: 1;
+}
+.vs-sidebar-drawer__panel {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	width: 16rem;
+	background: var(--bg-sidebar);
+	backdrop-filter: var(--glass-blur, blur(14px) saturate(1.1));
+	-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.1));
+	border-right: 1px solid var(--border-subtle);
+	z-index: 1001;
+	display: flex;
+	flex-direction: column;
+	transform: translateX(-100%);
+	/* Spring con overshoot — feel táctil nativo */
+	transition: transform var(--t-spring, 0.45s cubic-bezier(0.34, 1.56, 0.64, 1));
+	box-shadow: var(--shadow-lg), var(--shadow-glow);
+	will-change: transform;
+}
+.vs-sidebar-drawer.open .vs-sidebar-drawer__panel {
+	transform: translateX(0);
+}
+
+/* Modo lite/perf: sin overshoot (economiza composición), pero con deslizamiento visible */
+:root[data-perf-mode='true'] .vs-sidebar-drawer__panel,
+:root[data-perf-profile='lite'] .vs-sidebar-drawer__panel {
+	transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+:root[data-perf-mode='true'] .vs-sidebar-drawer,
+:root[data-perf-profile='lite'] .vs-sidebar-drawer {
+	transition:
+		opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+		visibility 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (min-width: 1281px) {
+	.vs-sidebar-drawer {
+		display: none;
+	}
+}
+
+/* Responsive sidebar collapse at <= 1280px */
+@media (max-width: 1280px) {
+	/* Rail siempre compacto en laptops y tablets: icons-only */
+	.vs-shell__rail {
+		width: 5rem !important;
+		flex-basis: 5rem !important;
+	}
+	.vs-shell__rail .vs-sidenav,
+	.vs-shell--collapsed .vs-sidenav {
+		padding: 16px 8px 14px;
+		align-items: center;
+		overflow-y: auto;
+		overflow-x: hidden;
+		scrollbar-width: none;
+	}
+	.vs-shell__rail .vs-brand__text,
+	.vs-shell__rail .vs-nav-section__label,
+	.vs-shell__rail .vs-nav-item__label,
+	.vs-shell__rail .vs-nav-item__count,
+	.vs-shell__rail .vs-user-card__info,
+	.vs-shell__rail .vs-user-card__logout {
+		display: none !important;
+	}
+	.vs-shell__rail .vs-brand {
+		flex-direction: column;
+		gap: 8px;
+		padding-bottom: 12px;
+		width: 100%;
+		align-items: center;
+	}
+	.vs-shell__rail .vs-brand__logo {
+		padding: 4px;
+		gap: 0;
+		justify-content: center;
+	}
+	.vs-shell__rail .vs-nav-body {
+		width: 100%;
+		align-items: center;
+	}
+	.vs-shell__rail .vs-nav-section {
+		width: 100%;
+		align-items: center;
+	}
+	.vs-shell__rail .vs-nav-list {
+		width: 100%;
+		align-items: center;
+		gap: 14px;
+	}
+	.vs-shell__rail .vs-nav-item {
+		width: 44px;
+		height: 44px;
+		min-height: 44px;
+		padding: 0;
+		justify-content: center;
+		gap: 0;
+		margin: 0 auto;
+	}
+	.vs-shell__rail .vs-nav-item__icon {
+		width: 44px;
+		height: 44px;
+	}
+	.vs-shell__rail .vs-nav-item:hover {
+		transform: translateY(-2px);
+	}
+	.vs-shell__rail .vs-footer {
+		width: 100%;
+		align-items: center;
+	}
+	.vs-shell__rail .vs-footer__settings {
+		width: 44px;
+		height: 44px;
+		min-height: 44px;
+		padding: 0;
+		justify-content: center;
+		gap: 0;
+	}
+	.vs-shell__rail .vs-footer__settings .vs-nav-item__icon {
+		width: 44px;
+		height: 44px;
+	}
+	.vs-shell__rail .vs-user-card {
+		background: transparent;
+		border-color: transparent;
+		box-shadow: none;
+		padding: 4px 0;
+		justify-content: center;
+		gap: 0;
+	}
+	.vs-shell__rail .vs-user-card::before {
+		display: none;
+	}
+	.vs-shell__rail .vs-user-card:hover {
+		background: transparent;
+		border-color: transparent;
+		box-shadow: none;
+		transform: none;
+	}
+	.vs-shell__rail .vs-user-card__link {
+		flex: none;
+		gap: 0;
+	}
+	.vs-sidebar-drawer {
+		display: block;
+	}
 }
 
 /* ── Missing Utility Classes ────────────────────────────────── */
@@ -2776,6 +3590,8 @@ select,
 	--lb-self: var(--aero-sky); /* current user beacon */
 	--lb-streak: #ea580c; /* rachas / fire — más profundo para contraste en claro */
 	--lb-streak-glow: rgba(234, 88, 12, 0.45);
+	--lb-creator: var(--aero-coral); /* ranking de creadores / engagement */
+	--lb-creator-glow: rgba(244, 114, 182, 0.4);
 	--lb-medal-shadow: rgba(28, 28, 40, 0.5); /* profundidad metálica de la medalla */
 
 	--lb-card-bg: var(--glass-bg);
@@ -2802,7 +3618,7 @@ select,
 	);
 
 	--lb-pillar-w: 2px;
-	--lb-glass-blur: blur(16px) saturate(1.25);
+	--lb-glass-blur: var(--glass-blur);
 }
 
 [data-theme='dark'] {
@@ -2819,6 +3635,8 @@ select,
 	--lb-bronze-glow: rgba(255, 140, 56, 0.5);
 	--lb-streak: #f97316;
 	--lb-streak-glow: rgba(249, 115, 22, 0.55);
+	--lb-creator: #f472b6;
+	--lb-creator-glow: rgba(244, 114, 182, 0.5);
 	--lb-medal-shadow: rgba(15, 23, 42, 0.62);
 
 	--lb-card-bg: rgba(14, 34, 54, 0.65);
@@ -2857,6 +3675,8 @@ select,
 	--lb-bronze-glow: rgba(255, 157, 92, 0.55);
 	--lb-streak: #ff7a33;
 	--lb-streak-glow: rgba(255, 122, 51, 0.6);
+	--lb-creator: #f973b9;
+	--lb-creator-glow: rgba(249, 115, 185, 0.55);
 	--lb-medal-shadow: rgba(4, 10, 26, 0.72);
 
 	--lb-card-bg: rgba(18, 28, 45, 0.78);
@@ -2879,61 +3699,6 @@ select,
 		rgba(244, 114, 182, 0.25) 82%,
 		rgba(249, 115, 22, 0) 100%
 	);
-}
-
-/* Breathing ring around podium avatars */
-@keyframes lb-pulse-ring {
-	0%,
-	100% {
-		transform: scale(1);
-		opacity: 0.55;
-	}
-	50% {
-		transform: scale(1.06);
-		opacity: 1;
-	}
-}
-
-/* Current-user beacon sweep.
-   La barra mide el 40% del beacon; -120% la deja fuera por la izquierda y
-   220% la saca por completo por la derecha (120% solo llegaba al 88%). */
-@keyframes lb-beacon-sweep {
-	0% {
-		transform: translateX(-120%);
-	}
-	10% {
-		transform: translateX(-120%);
-	}
-	38% {
-		transform: translateX(220%);
-	}
-	100% {
-		transform: translateX(220%);
-	}
-}
-
-/* Confetti / spark burst on podium mount */
-@keyframes lb-particle-burst {
-	0% {
-		transform: translate(0, 0) scale(1);
-		opacity: 1;
-	}
-	100% {
-		transform: translate(var(--tx), var(--ty)) scale(0);
-		opacity: 0;
-	}
-}
-
-/* Row entry */
-@keyframes lb-slide-in {
-	from {
-		opacity: 0;
-		transform: translateY(14px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
 }
 
 /* [VSocial: reduced-motion override removido — lb-motion siempre animado] */
@@ -2971,6 +3736,184 @@ select,
 	animation: modeRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   APP LAYOUT CONTAINER & RESPONSIVE DESKTOP GRID (1024px - 4K)
+   ══════════════════════════════════════════════════════════════════════ */
+.app-layout-container {
+	--sidebar-width: 80px;
+	width: 100%;
+	min-height: 100vh;
+	box-sizing: border-box;
+	overflow-x: clip;
+	transition: all 0.25s ease-in-out;
+}
+
+.app-layout-container.sidebar-expanded,
+.sidebar-expanded {
+	--sidebar-width: 250px;
+}
+
+/* Grilla estructurada y adaptativa del Feed */
+.feed-grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	width: 100%;
+	box-sizing: border-box;
+	gap: 1.25rem;
+	transition:
+		grid-template-columns 0.25s ease-in-out,
+		gap 0.25s ease-in-out;
+}
+
+/* Previene desbordamiento en grid items y asegura fluidez */
+.feed-col-left,
+.feed-col-center,
+.feed-col-right,
+.quick-chat-column,
+.feed-main-column,
+.trends-suggestions-column {
+	box-sizing: border-box;
+	max-width: 100%;
+	min-width: 0;
+}
+
+/* ─── D. Móvil y Tablets (< 1024px) ─── */
+@media (max-width: 1023px) {
+	.feed-grid {
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+	.feed-col-left,
+	.quick-chat-column,
+	.feed-col-right,
+	.trends-suggestions-column {
+		display: none !important;
+	}
+	.feed-col-center,
+	.feed-main-column {
+		width: 100%;
+		min-width: 0;
+	}
+}
+
+/* ─── C. Pantallas Compactas de PC (1024px a 1279px) ─── */
+@media (min-width: 1024px) and (max-width: 1279px) {
+	.feed-grid {
+		grid-template-columns: 1fr 280px;
+		gap: 1.25rem;
+	}
+	.feed-col-left,
+	.quick-chat-column {
+		display: none !important;
+	}
+	.feed-col-center,
+	.feed-main-column {
+		min-width: 0;
+	}
+	.feed-col-right,
+	.trends-suggestions-column {
+		display: block;
+		width: 280px;
+		min-width: 280px;
+	}
+}
+
+/* ─── B. Pantallas Laptop Estándar (1280px a 1439px) ─── */
+@media (min-width: 1280px) and (max-width: 1439px) {
+	.feed-grid {
+		grid-template-columns: 260px 1fr 280px;
+		gap: 1.25rem;
+	}
+	/* Al estar el sidebar expandido (.sidebar-expanded), reducir anchos laterales para proteger el feed central */
+	.sidebar-expanded .feed-grid,
+	.vs-shell:not(.vs-shell--collapsed) .feed-grid {
+		grid-template-columns: 240px minmax(0, 1fr) 260px;
+		gap: 1rem;
+	}
+	.feed-col-left,
+	.quick-chat-column {
+		display: block;
+		width: 100%;
+	}
+	.feed-col-center,
+	.feed-main-column {
+		min-width: 0;
+	}
+	.feed-col-right,
+	.trends-suggestions-column {
+		display: block;
+		width: 100%;
+	}
+}
+
+/* ─── A. Pantallas Ultra-Wide / 1080p Grandes (>= 1440px) ─── */
+@media (min-width: 1440px) {
+	.feed-grid {
+		grid-template-columns: 280px 1fr 300px;
+		gap: 1.5rem;
+	}
+	.sidebar-expanded .feed-grid,
+	.vs-shell:not(.vs-shell--collapsed) .feed-grid {
+		grid-template-columns: 260px minmax(0, 1fr) 280px;
+		gap: 1.25rem;
+	}
+	.feed-col-left,
+	.quick-chat-column {
+		display: block;
+		width: 280px;
+	}
+	.feed-col-center,
+	.feed-main-column {
+		min-width: 0;
+	}
+	.feed-col-right,
+	.trends-suggestions-column {
+		display: block;
+		width: 300px;
+	}
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   TARJETAS DE USUARIO / SUGERENCIAS (FLEXBOX PROTEGIDO ANTI-TRUNCAMIENTO)
+   ══════════════════════════════════════════════════════════════════════ */
+.suggestion-user-card,
+.sug-creator-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.suggestion-user-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
+}
+
+.suggestion-username,
+.suggestion-handle,
+.sug-name,
+.sug-handle {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: block;
+	max-width: 100%;
+}
+
+.suggestion-btn-follow,
+.sug-follow-btn {
+	flex-shrink: 0;
+	padding: 0.35rem 0.75rem;
+	box-sizing: border-box;
+}
+
 /* Transiciones fluidas del shell al cambiar de modo (solo props seguras).
    Duraciones largas + curva líquida = morph premium tipo fluido. */
 .feed-shell {
@@ -2999,8 +3942,7 @@ select,
 	box-shadow:
 		var(--shadow-md),
 		var(--glass-inset),
-		0 0 0 1px var(--feed-accent-soft),
-		0 10px 34px -8px var(--feed-accent-soft);
+		0 0 20px var(--feed-accent-soft);
 }
 
 /* Animación de entrada en CASCADA al cambiar de modo.

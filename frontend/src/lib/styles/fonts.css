@@ -1,0 +1,97 @@
+/* Fuentes autoalojadas de VSocial.
+   Reemplaza las 3 hojas render-blocking de Google Fonts (app.html) por un
+   único recurso same-origin: elimina ~2 handshakes TLS a terceros y el bloqueo
+   de primer render en gama baja. Familias canónicas: Outfit (display),
+   Inter (texto), Material Icons Round (iconografía).
+   Solo se sirven los subconjuntos latin — el alcance real de la plataforma. */
+
+/* ── Outfit — variable 300..900 (un archivo sustituye 7 pesos estáticos) ── */
+@font-face {
+	font-family: 'Outfit';
+	font-style: normal;
+	font-weight: 300 900;
+	font-display: swap;
+	src: url('/fonts/outfit-var-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Inter — 400 y 600 (texto e interfaz) ── */
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/inter-400-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+	src: url('/fonts/inter-600-latin.woff2') format('woff2');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Material Icons Round — glifos por ligadura ──
+   font-display: block es intencional: durante la carga prefiere texto
+   invisible antes que mostrar el nombre del ícono en texto plano. */
+@font-face {
+	font-family: 'Material Icons Round';
+	font-style: normal;
+	font-weight: 400;
+	font-display: block;
+	src: url('/fonts/material-icons-round-latin.woff2') format('woff2');
+}
+
+/* ── Caras de reserva métrica (metric-compatible fallbacks) ──
+   Mismas métricas verticales que las fuentes web: mientras cargan, el
+   navegador compone con el fallback SIN cambiar alturas de línea → elimina
+   el reflujo de layout por font-swap (CLS) en toda la app. Las métricas del
+   archivo Outfit fueron ajustadas a asc 1.05em / desc 0.25em para este fin. */
+@font-face {
+	font-family: 'Outfit Fallback';
+	font-style: normal;
+	font-weight: 300 900;
+	src:
+		local('Arial'), local('Helvetica'), local('Segoe UI'), local('Roboto'), local('Liberation Sans');
+	ascent-override: 105%;
+	descent-override: 25%;
+	line-gap-override: 0%;
+	size-adjust: 100%;
+}
+
+@font-face {
+	font-family: 'Inter Fallback';
+	font-style: normal;
+	font-weight: 400 600;
+	src:
+		local('Arial'), local('Helvetica'), local('Segoe UI'), local('Roboto'), local('Liberation Sans');
+	ascent-override: 96.9%;
+	descent-override: 24.1%;
+	line-gap-override: 0%;
+	size-adjust: 100%;
+}
+
+/* Declaración de familia y ligaduras para la clase de iconos.
+   (Google Fonts la incluía en su hoja; layout.css aporta el resto del layout.) */
+.material-icons-round {
+	font-family: 'Material Icons Round';
+	font-weight: normal;
+	font-style: normal;
+	letter-spacing: normal;
+	text-transform: none;
+	white-space: nowrap;
+	word-wrap: normal;
+	direction: ltr;
+	font-feature-settings: 'liga';
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}

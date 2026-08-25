@@ -4,7 +4,12 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="/favicon.ico" />
 		<link rel="manifest" href="/manifest.json" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- interactive-widget=resizes-content: en móvil el viewport se encoge cuando abre el teclado,
+		     evitando que éste tape inputs/textarea (Chrome Android 108+). iOS usa visualViewport (layout). -->
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+		/>
 		<meta name="theme-color" content="#0f172a" />
 		<meta
 			name="description"
@@ -18,15 +23,17 @@
 		<meta property="og:site_name" content="VSocial" />
 		<meta property="og:image" content="/og-image.png" />
 		<meta name="twitter:card" content="summary_large_image" />
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<!-- Fuentes autohojadas (ver src/lib/styles/fonts.css, incluida vía layout.css).
+		     Se eliminaron las 3 hojas render-blocking de Google Fonts (~2 handshakes
+		     TLS a terceros menos). Solo se precarga la display (candidata a LCP);
+		     precargar también los iconos (169 KB) le roba ancho de banda al JS
+		     crítico bajo redes lentas y empeoró LCP/TBT medido con Lighthouse. -->
 		<link
-			href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
-			rel="stylesheet"
-		/>
-		<link
-			href="https://fonts.googleapis.com/icon?family=Material+Icons+Round&display=swap"
-			rel="stylesheet"
+			rel="preload"
+			href="/fonts/outfit-var-latin.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
 		/>
 		<link
 			rel="icon"
@@ -47,13 +54,74 @@
 					document.documentElement.setAttribute('data-theme', theme);
 
 					var storedPerf = localStorage.getItem('vsocial_perf_mode');
-					if (storedPerf === 'true') {
-						document.documentElement.setAttribute('data-perf-mode', 'true');
-					}
+					var storedProfile =
+						localStorage.getItem('vsocial_perf_profile') ||
+						(storedPerf === 'true' ? 'lite' : 'balanced');
+					var isLite = storedPerf === 'true' || storedProfile === 'lite';
+					document.documentElement.setAttribute('data-perf-mode', isLite ? 'true' : 'false');
+					document.documentElement.setAttribute('data-perf-profile', storedProfile);
+
+					var storedBlur =
+						localStorage.getItem('vsocial_glass_blur') || (isLite ? 'none' : 'subtle');
+					document.documentElement.setAttribute('data-glass-blur', storedBlur);
 
 					var storedMotion = localStorage.getItem('vsocial_reduce_motion');
 					if (storedMotion === 'true') {
 						document.documentElement.setAttribute('data-reduced-motion', 'true');
+					}
+
+					var storedBg = localStorage.getItem('vsocial_disable_liquid_bg');
+					if (storedBg === 'true' || isLite) {
+						document.documentElement.setAttribute('data-disable-liquid-bg', 'true');
+					}
+
+					var storedNoise = localStorage.getItem('vsocial_disable_noise');
+					if (storedNoise === 'true' || isLite) {
+						document.documentElement.setAttribute('data-disable-noise', 'true');
+					}
+
+					var storedShadows = localStorage.getItem('vsocial_simplify_shadows');
+					if (storedShadows === 'true' || isLite) {
+						document.documentElement.setAttribute('data-simplify-shadows', 'true');
+					}
+
+					var storedContentVis = localStorage.getItem('vsocial_content_visibility');
+					if (storedContentVis !== 'false') {
+						document.documentElement.setAttribute('data-content-visibility', 'true');
+					}
+
+					var storedTransitions = localStorage.getItem('vsocial_view_transitions');
+					if (storedTransitions) {
+						document.documentElement.setAttribute('data-view-transitions', storedTransitions);
+					} else {
+						document.documentElement.setAttribute('data-view-transitions', 'fast');
+					}
+
+					var storedAutoplay = localStorage.getItem('vsocial_video_autoplay');
+					if (storedAutoplay) {
+						document.documentElement.setAttribute('data-video-autoplay', storedAutoplay);
+					}
+
+					var storedDataSaver = localStorage.getItem('vsocial_data_saver');
+					if (storedDataSaver === 'true') {
+						document.documentElement.setAttribute('data-data-saver', 'true');
+					}
+
+					var storedGpu = localStorage.getItem('vsocial_gpu_acceleration');
+					if (storedGpu === 'false' || isLite) {
+						document.documentElement.setAttribute('data-gpu-acceleration', 'false');
+					} else {
+						document.documentElement.setAttribute('data-gpu-acceleration', 'true');
+					}
+
+					var storedHoverGlow = localStorage.getItem('vsocial_disable_hover_glow');
+					if (storedHoverGlow === 'true' || isLite) {
+						document.documentElement.setAttribute('data-disable-hover-glow', 'true');
+					}
+
+					var storedFpsHud = localStorage.getItem('vsocial_fps_hud');
+					if (storedFpsHud === 'true') {
+						document.documentElement.setAttribute('data-fps-hud', 'true');
 					}
 
 					// SSR Flash Fix: Add is-reels class synchronously for F5 reloads (only on reel feed, not creator)
