@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    theme VARCHAR(10) DEFAULT 'auto',
+    theme VARCHAR(10) DEFAULT 'light',
     language VARCHAR(10) DEFAULT 'es',
     notification_email BOOLEAN DEFAULT 1,
     notification_push BOOLEAN DEFAULT 1,
@@ -344,6 +344,8 @@ CREATE TABLE IF NOT EXISTS reels (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     video_url VARCHAR(512) NOT NULL,
     thumbnail_url VARCHAR(512),
+    video_width INTEGER,
+    video_height INTEGER,
     caption TEXT,
     duration_seconds INTEGER,
     view_count INTEGER DEFAULT 0,
@@ -556,6 +558,7 @@ CREATE TABLE IF NOT EXISTS listing_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
     media_url VARCHAR(512) NOT NULL,
+    thumb_url VARCHAR(512),
     position INTEGER DEFAULT 0
 );
 
