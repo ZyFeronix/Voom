@@ -2,6 +2,7 @@
 	import { fade } from 'svelte/transition';
 	import { users as usersApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import { goto } from '$app/navigation';
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import LevelBadge from '$lib/components/gamification/LevelBadge.svelte';
@@ -10,7 +11,7 @@
 	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
 	import { onDestroy } from 'svelte';
 
-	let { username, basicUser = null, children } = $props();
+	let { username, basicUser = null, align = 'auto', children } = $props();
 
 	let isHovered = $state(false);
 	let showCard = $state(false);
@@ -18,6 +19,7 @@
 	let hideTimer;
 	let triggerEl;
 	let positionClass = $state('position-bottom');
+	let alignClass = $state('align-left');
 
 	let fullUser = $state();
 
@@ -27,30 +29,102 @@
 		}
 	});
 
-	function cleanupZIndex() {
-		if (triggerEl) {
-			const postCard = triggerEl.closest('.aero-post-card');
-			if (postCard) postCard.classList.remove('has-active-hover-card');
+	let cardStyle = $state('');
+
+	function updatePosition() {
+		if (!triggerEl) return;
+		const rect = triggerEl.getBoundingClientRect();
+		const viewportHeight = window.innerHeight;
+		const viewportWidth = window.innerWidth;
+		const cardWidth = 290;
+		const estimatedHeight = 340;
+
+		const spaceBelow = viewportHeight - rect.bottom;
+		const spaceAbove = rect.top;
+
+		let posClass = 'position-bottom';
+		let verticalStyles = '';
+
+		if (spaceBelow < estimatedHeight && spaceAbove > 200) {
+			posClass = 'position-top';
+			const bottom = Math.round(viewportHeight - rect.top + 8);
+			verticalStyles = `bottom: ${bottom}px; top: auto; transform-origin: bottom center;`;
+		} else {
+			posClass = 'position-bottom';
+			const top = Math.round(rect.bottom + 8);
+			verticalStyles = `top: ${top}px; bottom: auto; transform-origin: top center;`;
 		}
+
+		let left = rect.left;
+		if (align === 'right' || (align === 'auto' && left + cardWidth > viewportWidth - 16)) {
+			left = Math.max(16, rect.right - cardWidth);
+		}
+		if (left < 16) {
+			left = 16;
+		}
+		if (left + cardWidth > viewportWidth - 16) {
+			left = Math.max(16, viewportWidth - cardWidth - 16);
+		}
+
+		positionClass = posClass;
+		cardStyle = `position: fixed; ${verticalStyles} left: ${Math.round(left)}px; width: ${cardWidth}px; z-index: 99999;`;
+	}
+
+	function portal(node) {
+		const target = document.body.firstElementChild || document.body;
+		target.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) {
+					node.parentNode.removeChild(node);
+				}
+			}
+		};
+	}
+
+	function hoverParentEl() {
+		return triggerEl?.closest('.aero-post-card, .reel-item') || null;
+	}
+
+	function cleanupZIndex() {
+		const parent = hoverParentEl();
+		if (parent) parent.classList.remove('has-active-hover-card');
 	}
 
 	onDestroy(() => {
 		cleanupZIndex();
 	});
 
+	function handleWindowClick(e) {
+		if (showCard && triggerEl && !triggerEl.contains(e.target)) {
+			showCard = false;
+			cleanupZIndex();
+		}
+	}
+
+	function handleWindowScroll() {
+		if (showCard) {
+			showCard = false;
+			cleanupZIndex();
+		}
+	}
+
+	function handleNavigate(e) {
+		e.stopPropagation();
+		showCard = false;
+		cleanupZIndex();
+	}
+
 	$effect(() => {
 		if (showCard && triggerEl) {
-			const rect = triggerEl.getBoundingClientRect();
-			const viewportHeight = window.innerHeight;
-			// The card is roughly 300px tall. Flip to top if no space below and there is space above.
-			if (viewportHeight - rect.bottom < 320 && rect.top > 320) {
-				positionClass = 'position-top';
-			} else {
-				positionClass = 'position-bottom';
-			}
+			updatePosition();
+			hoverParentEl()?.classList.add('has-active-hover-card');
 
-			const postCard = triggerEl.closest('.aero-post-card');
-			if (postCard) postCard.classList.add('has-active-hover-card');
+			return () => {
+				cleanupZIndex();
+			};
+		} else {
+			cleanupZIndex();
 		}
 	});
 
@@ -59,6 +133,8 @@
 		isHovered = true;
 		timer = setTimeout(async () => {
 			if (isHovered) {
+				uiStore.closeAllPopovers();
+				updatePosition();
 				showCard = true;
 				if (!fullUser || !fullUser.bio || typeof fullUser.follower_count === 'undefined') {
 					try {
@@ -120,6 +196,12 @@
 	}
 </script>
 
+<svelte:window
+	onclick={handleWindowClick}
+	onscroll={handleWindowScroll}
+	onresize={updatePosition}
+/>
+
 <div
 	bind:this={triggerEl}
 	class="hover-trigger-wrap"
@@ -131,7 +213,9 @@
 
 	{#if showCard}
 		<div
-			class="vs-hover-card glass-panel {positionClass}"
+			use:portal
+			class="vs-hover-card glass-panel {positionClass} {alignClass}"
+			style={cardStyle}
 			onmouseenter={handleCardEnter}
 			onmouseleave={handleCardLeave}
 			transition:fade={{ duration: 150 }}
@@ -142,7 +226,12 @@
 			onkeydown={(_e) => {}}
 		>
 			{#if fullUser}
-				<div class="hc-header" style="position: relative; z-index: 0;">
+				<a
+					href="/u/{username}"
+					class="hc-header"
+					style="position: relative; z-index: 0; display: block;"
+					onclick={handleNavigate}
+				>
 					{#if fullUser.cover_url}
 						<img
 							src={fullUser.cover_url}
@@ -157,19 +246,21 @@
 						<div class="hc-cover-fallback"></div>
 					{/if}
 					<div class="hc-overlay"></div>
-				</div>
+				</a>
 				<div class="hc-body" style="position: relative; z-index: 2;">
 					<div class="hc-top-row">
-						<AeroAvatar
-							src={fullUser.avatar_url}
-							alt={username}
-							size="lg"
-							className="hc-avatar-override"
-							online={fullUser.custom_status === 'online' || !fullUser.custom_status}
-							away={fullUser.custom_status === 'away'}
-							busy={fullUser.custom_status === 'busy'}
-							isVtuber={fullUser.is_virtual}
-						/>
+						<a href="/u/{username}" onclick={handleNavigate} class="hc-avatar-link">
+							<AeroAvatar
+								src={fullUser.avatar_url}
+								alt={username}
+								size="lg"
+								className="hc-avatar-override"
+								online={fullUser.custom_status === 'online' || !fullUser.custom_status}
+								away={fullUser.custom_status === 'away'}
+								busy={fullUser.custom_status === 'busy'}
+								isVtuber={fullUser.is_virtual}
+							/>
+						</a>
 
 						{#if fullUser.id !== authStore.user?.id && authStore.isAuthenticated}
 							<button
@@ -181,16 +272,21 @@
 						{/if}
 					</div>
 
-					<div class="hc-user-info">
+					<a
+						href="/u/{username}"
+						class="hc-user-info text-decoration-none"
+						onclick={handleNavigate}
+					>
 						<div class="hc-name-row">
 							<span class="hc-name">{fullUser.display_name || fullUser.username}</span>
 							<VerifiedBadge
 								role={fullUser.role}
 								isVerified={fullUser.is_verified == 1}
 								size="16px"
+								interactive={false}
 							/>
 							{#if fullUser.level}
-								<LevelBadge level={fullUser.level} size="sm" showText={false} />
+								<LevelBadge level={fullUser.level} size="sm" showText={false} interactive={false} />
 							{/if}
 							{#if fullUser.title_text}
 								<UserTitleBadge
@@ -201,19 +297,19 @@
 							{/if}
 						</div>
 						<span class="hc-handle">@{fullUser.username}</span>
-					</div>
+					</a>
 
 					{#if fullUser.bio}
 						<div class="hc-bio">{@html formatHashtags(fullUser.bio)}</div>
 					{/if}
 
 					<div class="hc-stats">
-						<div class="hc-stat">
+						<a href="/u/{username}" class="hc-stat text-decoration-none" onclick={handleNavigate}>
 							<strong>{fullUser.following_count || 0}</strong> Siguiendo
-						</div>
-						<div class="hc-stat">
+						</a>
+						<a href="/u/{username}" class="hc-stat text-decoration-none" onclick={handleNavigate}>
 							<strong>{fullUser.follower_count || 0}</strong> Seguidores
-						</div>
+						</a>
 					</div>
 
 					<div class="hc-level">
@@ -242,14 +338,10 @@
 	}
 
 	.vs-hover-card {
-		position: absolute;
-		left: 0;
-		width: 290px;
 		border-radius: var(--radius-md);
 		overflow: hidden;
-		z-index: 100;
 		box-shadow:
-			0 10px 40px rgba(0, 0, 0, 0.4),
+			0 12px 48px rgba(0, 0, 0, 0.5),
 			0 0 0 1px var(--glass-border);
 		background: color-mix(in srgb, var(--bg-surface-solid) 96%, transparent);
 		backdrop-filter: var(--glass-blur);
@@ -258,22 +350,16 @@
 		text-align: left;
 	}
 
-	.vs-hover-card.position-bottom {
-		top: 100%;
-		margin-top: 8px;
-	}
-
-	.vs-hover-card.position-top {
-		bottom: 100%;
-		margin-bottom: 8px;
-		transform-origin: bottom center;
-	}
-
 	.hc-header {
 		height: 90px;
 		position: relative;
 		background: var(--grad-primary);
 		overflow: hidden;
+		cursor: pointer;
+		display: block;
+	}
+	.hc-header:hover .hc-cover-img {
+		transform: scale(1.03);
 	}
 	.hc-cover-img {
 		width: 100%;
@@ -281,6 +367,7 @@
 		object-fit: cover;
 		object-position: center center;
 		display: block;
+		transition: transform var(--t-base);
 	}
 	.hc-cover-fallback {
 		width: 100%;
@@ -309,13 +396,24 @@
 		z-index: 10;
 	}
 
+	.hc-avatar-link {
+		display: inline-flex;
+		border-radius: var(--radius-squircle);
+		text-decoration: none;
+		cursor: pointer;
+		transition: transform var(--t-spring);
+	}
+	.hc-avatar-link:hover {
+		transform: scale(1.05);
+	}
+
 	:global(.hc-avatar-override) {
 		width: 68px !important;
 		height: 68px !important;
 		border: 3px solid var(--bg-surface) !important;
 		background: var(--bg-canvas) !important;
 		z-index: 2;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+		box-shadow: var(--shadow-sm), var(--shadow-glow) !important;
 	}
 
 	.hc-follow-btn {
@@ -342,6 +440,11 @@
 		display: flex;
 		flex-direction: column;
 		margin-bottom: 12px;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.hc-user-info:hover .hc-name {
+		color: var(--aero-blue);
 	}
 	.hc-name-row {
 		display: flex;
@@ -355,6 +458,7 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		transition: color var(--t-fast);
 	}
 	.hc-handle {
 		font-size: 0.9rem;
@@ -380,10 +484,20 @@
 	.hc-stat {
 		font-size: 0.9rem;
 		color: var(--text-muted);
+		text-decoration: none;
+		cursor: pointer;
+		transition: color var(--t-fast);
+	}
+	.hc-stat:hover {
+		color: var(--aero-blue);
+	}
+	.hc-stat:hover strong {
+		color: var(--aero-blue);
 	}
 	.hc-stat strong {
 		color: var(--text-primary);
 		font-weight: 800;
+		transition: color var(--t-fast);
 	}
 
 	.hc-level {
@@ -424,5 +538,26 @@
 		to {
 			transform: rotate(360deg);
 		}
+	}
+
+	/* ══ Adaptación a Tema Claro (Light Theme) ══ */
+	:global([data-theme='light']) .vs-hover-card {
+		background: rgba(255, 255, 255, 0.98);
+		border: 1px solid rgba(14, 165, 233, 0.25);
+		box-shadow:
+			0 16px 40px rgba(14, 165, 233, 0.15),
+			0 4px 16px rgba(0, 0, 0, 0.08);
+	}
+
+	:global([data-theme='light']) .hc-follow-btn.following {
+		background: rgba(14, 165, 233, 0.08);
+		color: var(--text-primary);
+		border-color: rgba(14, 165, 233, 0.25);
+	}
+
+	:global([data-theme='light']) .hc-follow-btn.following:hover {
+		background: rgba(236, 72, 153, 0.1);
+		color: var(--aero-rose);
+		border-color: rgba(236, 72, 153, 0.3);
 	}
 </style>

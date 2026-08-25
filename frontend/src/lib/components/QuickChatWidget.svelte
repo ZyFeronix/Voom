@@ -31,6 +31,13 @@
 	let typingTimeout = null; // apaga el indicador del peer tras inactividad
 	let selfTypingTimeout = null; // debounce del "dejé de escribir" propio
 
+	// Minimized state for Quick Chat
+	let minimized = $state(false);
+
+	function toggleMinimized() {
+		minimized = !minimized;
+	}
+
 	let activeConv = $derived(conversations.find((c) => Number(c.id) === Number(activeConvId)));
 
 	// Presencia en vivo: usa el store de presencia si el socket está conectado,
@@ -420,7 +427,29 @@
 	});
 </script>
 
-<div class="glass-panel quick-chat-widget">
+<div class="glass-panel quick-chat-widget" class:minimized>
+	<!-- Compact bar when minimized (always reachable) -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="qc-compact-bar" onclick={toggleMinimized}>
+		<span class="material-icons-round" style="font-size:15px;color:var(--aero-blue)"
+			>chat_bubble</span
+		>
+		<span class="qc-compact-label">Quick Chat</span>
+		<button
+			type="button"
+			class="qc-minimize-btn"
+			onclick={(e) => {
+				e.stopPropagation();
+				toggleMinimized();
+			}}
+			title="Expandir"
+			aria-label="Expandir chat"
+		>
+			<span class="material-icons-round" style="font-size:16px;">expand_more</span>
+		</button>
+	</div>
+
 	{#if !activeConvId}
 		<!-- ── Conversations List ── -->
 		<div class="qc-list-view" in:fade={{ duration: 180 }}>
@@ -431,80 +460,93 @@
 					>
 					Quick Chat
 				</h3>
-				<a href="/messages" class="qc-see-all" data-sveltekit-preload-data="hover">Ver todos</a>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="qc-minimize-btn"
+						onclick={toggleMinimized}
+						title="Minimizar"
+						aria-label="Minimizar chat"
+					>
+						<span class="material-icons-round" style="font-size:16px">expand_less</span>
+					</button>
+					<a href="/messages" class="qc-see-all" data-sveltekit-preload-data="hover">Ver todos</a>
+				</div>
 			</div>
 
-			<div
-				class="qc-conv-list"
-				style="overflow-y: scroll; scrollbar-width: thin; scrollbar-color: rgba(46,134,232,0.7) rgba(0,0,0,0.2);"
-			>
-				{#if loadingConvs}
-					<!-- Shimmer skeleton for conversations -->
-					{#each [1, 2, 3] as _}
-						<div class="qc-conv-skeleton">
-							<div class="skel-avatar"></div>
-							<div class="skel-text">
-								<div class="skel-line" style="width:55%"></div>
-								<div class="skel-line" style="width:75%;height:8px;margin-top:5px"></div>
+			{#if !minimized}
+				<div
+					class="qc-conv-list"
+					style="overflow-y: scroll; scrollbar-width: thin; scrollbar-color: rgba(46,134,232,0.7) rgba(0,0,0,0.2);"
+				>
+					{#if loadingConvs}
+						<!-- Shimmer skeleton for conversations -->
+						{#each [1, 2, 3] as _}
+							<div class="qc-conv-skeleton">
+								<div class="skel-avatar"></div>
+								<div class="skel-text">
+									<div class="skel-line" style="width:55%"></div>
+									<div class="skel-line" style="width:75%;height:8px;margin-top:5px"></div>
+								</div>
 							</div>
+						{/each}
+					{:else if conversations.length === 0}
+						<div class="qc-empty">
+							<span class="material-icons-round" style="font-size:28px;opacity:0.3">forum</span>
+							<p>No hay chats recientes</p>
 						</div>
-					{/each}
-				{:else if conversations.length === 0}
-					<div class="qc-empty">
-						<span class="material-icons-round" style="font-size:28px;opacity:0.3">forum</span>
-						<p>No hay chats recientes</p>
-					</div>
-				{:else}
-					{#each conversations as conv}
-						<button class="qc-conv-item" onclick={() => openChat(conv.id)}>
-							<div class="qc-conv-avatar-wrap">
-								{#if conv.peer_avatar}
-									<img
-										src={conv.peer_avatar}
-										alt="Avatar"
-										class="qc-conv-avatar-img"
-										width="36"
-										height="36"
-										loading="lazy"
-										decoding="async"
-									/>
-								{:else}
-									<div class="qc-conv-avatar-fallback">
-										{getInitials(conv.peer_display_name || conv.peer_username)}
-									</div>
-								{/if}
-								{#if peerOnline(conv)}
-									<span class="qc-online-dot"></span>
-								{/if}
-							</div>
-							<div class="qc-conv-info">
-								<div class="qc-conv-top">
-									<span class="qc-conv-name"
-										>{conv.name || conv.peer_display_name || conv.peer_username}</span
-									>
-									{#if conv.last_message_at}
-										<span class="qc-conv-time"
-											>{new Date(conv.last_message_at).toLocaleTimeString([], {
-												hour: '2-digit',
-												minute: '2-digit'
-											})}</span
-										>
+					{:else}
+						{#each conversations as conv}
+							<button class="qc-conv-item" onclick={() => openChat(conv.id)}>
+								<div class="qc-conv-avatar-wrap">
+									{#if conv.peer_avatar}
+										<img
+											src={conv.peer_avatar}
+											alt="Avatar"
+											class="qc-conv-avatar-img"
+											width="36"
+											height="36"
+											loading="lazy"
+											decoding="async"
+										/>
+									{:else}
+										<div class="qc-conv-avatar-fallback">
+											{getInitials(conv.peer_display_name || conv.peer_username)}
+										</div>
+									{/if}
+									{#if peerOnline(conv)}
+										<span class="qc-online-dot"></span>
 									{/if}
 								</div>
-								<p class="qc-conv-preview" class:unread={conv.unread_count > 0}>
-									{#if Number(conv.last_message_sender_id) === Number(authStore.user?.id)}
-										<span style="opacity:0.6">Tú: </span>
-									{/if}
-									{conv.last_message_body || 'Nueva conversación'}
-								</p>
-							</div>
-							{#if conv.unread_count > 0}
-								<span class="qc-badge">{conv.unread_count}</span>
-							{/if}
-						</button>
-					{/each}
-				{/if}
-			</div>
+								<div class="qc-conv-info">
+									<div class="qc-conv-top">
+										<span class="qc-conv-name"
+											>{conv.name || conv.peer_display_name || conv.peer_username}</span
+										>
+										{#if conv.last_message_at}
+											<span class="qc-conv-time"
+												>{new Date(conv.last_message_at).toLocaleTimeString([], {
+													hour: '2-digit',
+													minute: '2-digit'
+												})}</span
+											>
+										{/if}
+									</div>
+									<p class="qc-conv-preview" class:unread={conv.unread_count > 0}>
+										{#if Number(conv.last_message_sender_id) === Number(authStore.user?.id)}
+											<span style="opacity:0.6">Tú: </span>
+										{/if}
+										{conv.last_message_body || 'Nueva conversación'}
+									</p>
+								</div>
+								{#if conv.unread_count > 0}
+									<span class="qc-badge">{conv.unread_count}</span>
+								{/if}
+							</button>
+						{/each}
+					{/if}
+				</div>
+			{/if}
 		</div>
 	{:else}
 		<!-- ── Active Chat View ── -->
@@ -545,6 +587,15 @@
 				<a href="/messages" class="qc-open-full" title="Abrir chat completo">
 					<span class="material-icons-round" style="font-size:16px">open_in_full</span>
 				</a>
+				<button
+					type="button"
+					class="qc-minimize-btn"
+					onclick={toggleMinimized}
+					title="Minimizar"
+					aria-label="Minimizar chat"
+				>
+					<span class="material-icons-round" style="font-size:16px;">expand_less</span>
+				</button>
 			</div>
 
 			<!-- Messages -->
@@ -817,6 +868,7 @@
 		flex-direction: column;
 		padding: 0;
 		height: 400px;
+		transition: height var(--t-spring, 0.45s cubic-bezier(0.34, 1.56, 0.64, 1));
 	}
 
 	/* ── Conversations List ───────────────────────────────────── */
@@ -842,21 +894,87 @@
 		font-size: 0.7rem;
 		font-weight: 800;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.12em;
 		color: var(--text-muted);
 		margin: 0;
+		line-height: 1.4;
 	}
 
+	/* "Ver todos": píldora con realce sutil (acento cyan + brillo al hover) */
 	.qc-see-all {
-		font-size: 0.65rem;
+		font-size: 0.66rem;
 		font-weight: 700;
 		color: var(--aero-blue);
 		text-decoration: none;
-		opacity: 0.8;
-		transition: opacity 150ms;
+		padding: 3px 10px;
+		border-radius: var(--radius-full);
+		background: rgba(var(--accent-blue-rgb), 0.08);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.16);
+		line-height: 1.4;
+		letter-spacing: 0.02em;
+		white-space: nowrap;
+		transition:
+			background 150ms,
+			border-color 150ms,
+			box-shadow 150ms,
+			color 150ms;
 	}
 	.qc-see-all:hover {
-		opacity: 1;
+		color: var(--accent-blue-base);
+		background: rgba(var(--accent-blue-rgb), 0.16);
+		border-color: rgba(var(--accent-blue-rgb), 0.35);
+		box-shadow: 0 0 10px rgba(var(--accent-blue-rgb), 0.22);
+	}
+
+	/* Minimize button */
+	.qc-minimize-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
+		background: transparent;
+		border: 1px solid transparent;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all 150ms;
+		flex-shrink: 0;
+	}
+	.qc-minimize-btn:hover {
+		background: var(--bg-surface-hover);
+		border-color: var(--border-subtle);
+		color: var(--text-primary);
+	}
+
+	/* Compact bar (minimized state) — always reachable */
+	.qc-compact-bar {
+		display: none;
+		align-items: center;
+		gap: 8px;
+		padding: 14px 16px;
+		cursor: pointer;
+	}
+	.qc-compact-label {
+		flex: 1;
+		font-size: 0.7rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-muted);
+	}
+
+	/* Minimized state */
+	.quick-chat-widget.minimized {
+		height: 56px;
+	}
+	.quick-chat-widget.minimized .qc-compact-bar {
+		display: flex;
+	}
+	.quick-chat-widget.minimized .qc-list-view,
+	.quick-chat-widget.minimized .qc-chat-view {
+		display: none;
 	}
 
 	.qc-conv-list {
@@ -908,17 +1026,22 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 8px;
+		padding: 9px 8px;
 		border-radius: var(--radius-sm);
 		border: none;
 		background: transparent;
 		cursor: pointer;
 		text-align: left;
-		transition: background 150ms;
+		transition:
+			background 150ms,
+			transform 150ms var(--ease-spring);
 		color: inherit;
 	}
+	.qc-conv-item:active {
+		transform: scale(0.985);
+	}
 	.qc-conv-item:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--bg-surface-hover);
 	}
 
 	.qc-conv-avatar-wrap {
@@ -975,9 +1098,11 @@
 	}
 
 	.qc-conv-name {
-		font-size: 0.8rem;
-		font-weight: 600;
+		font-size: 0.82rem;
+		font-weight: 700;
 		color: var(--text-primary);
+		letter-spacing: -0.011em;
+		line-height: 1.35;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -987,14 +1112,18 @@
 	.qc-conv-time {
 		font-size: 0.6rem;
 		color: var(--text-muted);
+		letter-spacing: 0.02em;
+		line-height: 1.4;
 		white-space: nowrap;
 		flex-shrink: 0;
 	}
 
 	.qc-conv-preview {
 		font-size: 0.7rem;
-		color: var(--text-muted);
-		margin: 2px 0 0;
+		color: color-mix(in srgb, var(--text-primary) 52%, transparent);
+		margin: 3px 0 0;
+		letter-spacing: 0.008em;
+		line-height: 1.45;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -1351,6 +1480,12 @@
 		border-bottom-left-radius: 4px;
 	}
 
+	:global([data-theme='light']) .qc-bubble-row.peer .qc-bubble {
+		background: rgba(255, 255, 255, 0.95);
+		border-color: rgba(14, 165, 233, 0.22);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+	}
+
 	.qc-msg-action-btn {
 		position: absolute;
 		right: 100%;
@@ -1393,18 +1528,20 @@
 		box-shadow: none !important;
 	}
 	.delete-confirm-inline {
-		background: rgba(15, 23, 42, 0.95);
+		background: var(--bg-surface-solid, rgba(15, 23, 42, 0.95));
 		border: 1px solid var(--rose-500, #f43f5e);
 		border-radius: var(--radius-sm);
 		padding: 10px;
 		margin-top: 4px;
 		font-size: 0.8rem;
-		color: #fff;
+		color: var(--text-primary);
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 		z-index: 10;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		box-shadow:
+			var(--shadow-md),
+			0 0 12px rgba(244, 63, 94, 0.2);
 	}
 	.btn-confirm-del {
 		background: rgba(244, 63, 94, 0.2);
@@ -1433,8 +1570,8 @@
 		flex: 1;
 	}
 	.btn-cancel-del:hover {
-		background: rgba(255, 255, 255, 0.1);
-		color: #fff;
+		background: var(--bg-overlay);
+		color: var(--text-primary);
 	}
 
 	.qc-reactions-list {
@@ -1463,7 +1600,7 @@
 	/* ── Input Area ───────────────────────────────────────────── */
 	.qc-input-area {
 		padding: 10px 10px 12px;
-		border-top: 1px solid var(--glass-border);
+		border-top: 1px solid var(--border-subtle);
 		flex-shrink: 0;
 	}
 
@@ -1491,10 +1628,10 @@
 		flex-shrink: 0;
 	}
 	.qc-action-btn:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--bg-surface-hover);
 	}
 	.qc-action-btn:active {
-		background: rgba(255, 255, 255, 0.15);
+		background: var(--bg-overlay);
 	}
 
 	.qc-input {
@@ -1503,8 +1640,8 @@
 		height: 44px;
 		padding: 0 16px;
 		border-radius: var(--radius-xl);
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid var(--glass-border);
+		background: var(--bg-input, rgba(255, 255, 255, 0.06));
+		border: 1px solid var(--border-subtle);
 		color: var(--text-primary);
 		font-size: 0.75rem;
 		outline: none;
@@ -1516,8 +1653,8 @@
 		color: var(--text-muted);
 	}
 	.qc-input:focus {
-		border-color: rgba(46, 134, 232, 0.4);
-		background: rgba(255, 255, 255, 0.09);
+		border-color: var(--aero-sky);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.12);
 	}
 
 	.qc-send-btn {

@@ -116,3 +116,11 @@ frontend/data.db
 frontend/migrate_status.js
 frontend/old_page.svelte
 frontend/src/routes/fix_radii.py
+
+# ─── Herramientas y estado local de agentes (no van al repo oficial) ───
+/.graph-indexer/
+/.hermes/
+/.opencode/
+/.perch/
+/SOUL.md
+/tools/

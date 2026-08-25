@@ -2,7 +2,7 @@
 	import { onMount, onDestroy, tick, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { messages as messagesApi } from '$lib/api.js';
+	import { messages as messagesApi, marketplace as marketplaceApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { RTCManager } from '$lib/rtc.js';
@@ -27,8 +27,15 @@
 	let typingTimeout = null;
 	let joinedConvId = null;
 
+	// Producto de Marketplace vinculado desde /marketplace (?product=<id>)
+	let pendingProduct = $state(null);
+
 	let showNewDMModal = $state(false);
 	let showStatusConfig = $state(false);
+
+	function openStatusConfig() {
+		showStatusConfig = true;
+	}
 	let isShaking = $state(false);
 	let shakeTimeout = null;
 	let lastShakeTime = 0;
@@ -784,6 +791,43 @@
 			if (conv) selectConversation(conv.id);
 		}
 
+		// Enlace directo desde Marketplace: abrir la conversación con el vendedor
+		// y vincular el producto en el compositor (?product=<listingId>).
+		const productParam = page.url.searchParams.get('product');
+		if (productParam && /^\d+$/.test(productParam)) {
+			try {
+				const { listing } = await marketplaceApi.get(productParam);
+				if (listing) {
+					pendingProduct = {
+						id: listing.id,
+						title: listing.title,
+						price: listing.price,
+						image: listing.image_url || null,
+						url: `/marketplace?item=${listing.id}`
+					};
+					let conv = chatStore.conversations.find(
+						(c) => Number(c.peer_id) === Number(listing.user_id)
+					);
+					if (!conv) {
+						const res = await messagesApi.conversations.create({
+							user_id: listing.user_id
+						});
+						if (res.conversation_id) {
+							await loadConversations(true, true);
+							conv = chatStore.conversations.find(
+								(c) => Number(c.id) === Number(res.conversation_id)
+							);
+						}
+					}
+					if (conv) selectConversation(conv.id);
+				}
+			} catch (err) {
+				console.error('Failed to attach marketplace product:', err);
+			}
+			// Limpiar la query para no re-vincular el producto al recargar
+			goto('/messages', { replaceState: true });
+		}
+
 		// Typing event setup directly via socket. El servidor emite
 		// { convId, userId, isTyping } (ver lib/server/socket.js).
 		typingSocketHandler = (data) => {
@@ -854,7 +898,7 @@
 		<ConversationsSidebar
 			{chatStore}
 			{mobileView}
-			onStatusConfig={() => (showStatusConfig = true)}
+			onStatusConfig={openStatusConfig}
 			onNewDM={() => (showNewDMModal = true)}
 			onSelectConversation={selectConversation}
 			onPinConversation={handlePinConversation}
@@ -868,6 +912,7 @@
 			{mobileView}
 			{isPeerTyping}
 			{nudgeCooldown}
+			bind:pendingProduct
 			onBackMobile={() => (mobileView = 'list')}
 			onStartAudioCall={() => openDeviceSetup('audio')}
 			onStartVideoCall={() => openDeviceSetup('video')}
@@ -944,11 +989,24 @@
 
 	@media (max-width: 768px) {
 		.messages-container {
-			bottom: 0;
-			height: auto;
-			padding-bottom: 90px;
+			/* El contenedor se dimensiona contra el visual viewport: cuando el teclado
+			   abre, --vv-height se encoge y el composer queda visible por encima.
+			   --vv-top compensa el paneo que iOS aplica al enfocar un input. */
+			top: calc(var(--vv-top, 0px) + 58px);
+			height: calc(var(--vv-height, 100vh) - 58px);
+			bottom: auto;
+			box-sizing: border-box;
+			/* Deja espacio para el nav flotante (~96px) + margen, para que el
+			   composer no quede parcialmente detrás de él. */
+			padding-bottom: 112px;
 			border-radius: var(--radius-xs);
 			border: none;
+		}
+
+		/* Teclado abierto: la barra de navegación inferior se oculta, así que el
+		   padding extra ya no hace falta y el chat aprovecha todo el alto. */
+		:global(html.has-keyboard) .messages-container {
+			padding-bottom: 12px;
 		}
 	}
 
@@ -960,9 +1018,12 @@
 		height: 100%;
 		border-radius: var(--radius-xs);
 		overflow: visible;
-		background: transparent;
+		background:
+			radial-gradient(70% 100% at 0% 0%, rgba(var(--accent-blue-rgb), 0.04), transparent 50%),
+			var(--bg-surface);
 		border: none;
 		border-top: 1px solid var(--glass-border-t);
+		box-shadow: 0 -6px 24px rgba(15, 40, 80, 0.06);
 	}
 
 	@keyframes global-shake {

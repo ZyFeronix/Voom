@@ -213,3 +213,91 @@ export function extractVideoFrame(inputPath, outputPath, opts = {}) {
 		});
 	});
 }
+
+/**
+ * Genera un thumbnail JPEG reescalado de una imagen con ffmpeg (mismo binario
+ * estático que `extractVideoFrame`). Los grids de marketplace sirven así una
+ * copia liviana en lugar del upload original sin redimensionar.
+ * Degradación elegante: si falla resuelve `false` y el llamador usa el original.
+ * @param {string} inputPath ruta absoluta de la imagen original
+ * @param {string} outputPath ruta absoluta del JPEG de salida
+ * @param {{ width?: number, timeoutMs?: number }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export function generateImageThumbnail(inputPath, outputPath, opts = {}) {
+	return new Promise((resolve) => {
+		const ffmpegPath = ffmpegStatic;
+		if (!ffmpegPath) return resolve(false);
+
+		const width = opts.width ?? 540; // las celdas del grid rondan 300-400px CSS
+		const args = [
+			'-y',
+			'-i',
+			inputPath,
+			'-frames:v',
+			'1',
+			'-vf',
+			`scale='min(${width},iw)':-2`, // nunca ampliar imágenes pequeñas
+			'-q:v',
+			'4',
+			outputPath
+		];
+
+		const proc = spawn(ffmpegPath, args, { stdio: 'ignore' });
+		const timer = setTimeout(() => proc.kill('SIGKILL'), opts.timeoutMs ?? 15000);
+
+		proc.once('close', (code) => {
+			clearTimeout(timer);
+			resolve(code === 0);
+		});
+		proc.once('error', () => {
+			clearTimeout(timer);
+			resolve(false);
+		});
+	});
+}
+
+/**
+ * Lee las dimensiones reales (ancho x alto) de un video con ffprobe/ffmpeg.
+ * Permite a la BD conocer el aspect-ratio ANTES del primer render del cliente
+ * y eliminar el salto de layout al llegar `loadedmetadata`.
+ * @param {string} videoPath ruta absoluta del video
+ * @param {{ timeoutMs?: number }} [opts]
+ * @returns {Promise<{width: number, height: number}|null>} null si falla
+ */
+export function getVideoDimensions(videoPath, opts = {}) {
+	return new Promise((resolve) => {
+		const ffmpegPath = ffmpegStatic;
+		if (!ffmpegPath) return resolve(null);
+
+		// ffmpeg no expone dimensiones sin decodificar; el truco estándar es
+		// pedir un frame inexistente (-frames:v 0) y parsear el stderr.
+		const proc = spawn(
+			ffmpegPath,
+			['-hide_banner', '-i', videoPath, '-frames:v', '0', '-f', 'null', '-'],
+			{ stdio: ['ignore', 'ignore', 'pipe'] }
+		);
+		let stderr = '';
+		proc.stderr.on('data', (d) => {
+			if (stderr.length < 64_000) stderr += d.toString();
+		});
+
+		const timer = setTimeout(() => proc.kill('SIGKILL'), opts.timeoutMs ?? 10000);
+		const finish = () => {
+			clearTimeout(timer);
+			// "1080x1920" en la línea Stream del probe
+			const m = stderr.match(/(\d{2,5})x(\d{2,5})/);
+			if (m) {
+				const width = parseInt(m[1]);
+				const height = parseInt(m[2]);
+				if (width > 0 && height > 0) return resolve({ width, height });
+			}
+			resolve(null);
+		};
+		proc.once('close', finish);
+		proc.once('error', () => {
+			clearTimeout(timer);
+			resolve(null);
+		});
+	});
+}

@@ -305,13 +305,13 @@
 	}
 	.filter-btn.inactive {
 		background: var(--glass-bg);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-glass);
 		color: var(--text-primary);
 	}
 	.filter-btn.inactive:hover {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--bg-surface-hover);
 		border-color: var(--accent-cyan);
 		transform: translateY(-1px);
 	}

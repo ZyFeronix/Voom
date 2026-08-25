@@ -398,7 +398,8 @@
 		border-radius: var(--radius-lg);
 		padding: 20px;
 		box-shadow:
-			0 20px 50px rgba(0, 0, 0, 0.25),
+			var(--shadow-lg),
+			var(--shadow-glow),
 			inset 0 1px 0 var(--glass-border-t, rgba(255, 255, 255, 0.15));
 		display: flex;
 		flex-direction: column;
@@ -409,6 +410,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		border-radius: inherit;
 		background: var(--noise-texture);
 		opacity: 0.02;
 		pointer-events: none;
@@ -676,14 +678,14 @@
 		color: var(--text-main);
 		cursor: pointer;
 		z-index: var(--z-critical);
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		transition:
 			transform var(--t-spring),
 			box-shadow var(--t-base);
 	}
 	.rtc-minimized-badge:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 	.aero-icon-btn {
 		background: none;

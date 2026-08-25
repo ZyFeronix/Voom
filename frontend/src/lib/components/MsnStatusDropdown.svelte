@@ -1,8 +1,10 @@
 <script>
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import { clickOutside } from '$lib/actions/clickOutside.js';
 
-	let isOpen = $state(false);
+	const popoverId = Symbol('msn-status');
+	let isOpen = $derived(uiStore.isPopoverOpen(popoverId));
 
 	const statuses = [
 		{ id: 'online', label: 'En línea', icon: 'lens', color: 'var(--status-online)' },
@@ -25,12 +27,18 @@
 
 	let currentStatusObj = $derived(statuses.find((s) => s.id === authStore.status) || statuses[0]);
 
-	function toggle() {
-		isOpen = !isOpen;
+	function toggle(e) {
+		if (e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+		uiStore.togglePopover(popoverId);
 	}
 
 	function close() {
-		isOpen = false;
+		if (isOpen) {
+			uiStore.closePopover(popoverId);
+		}
 	}
 
 	function selectStatus(id) {
@@ -95,7 +103,7 @@
 		font-weight: 500;
 	}
 	.msn-status-toggle:hover {
-		background: rgba(0, 0, 0, 0.05);
+		background: var(--bg-surface-hover);
 	}
 
 	.status-icon {
@@ -116,7 +124,7 @@
 		top: calc(100% + 4px);
 		left: 0;
 		min-width: 280px;
-		background: var(--bg-surface);
+		background: var(--bg-surface-solid, var(--bg-surface));
 		backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-md);
@@ -152,10 +160,7 @@
 	}
 
 	.msn-status-option:hover {
-		background: rgba(0, 0, 0, 0.04);
-	}
-	:global([data-theme='dark']) .msn-status-option:hover {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--bg-surface-hover);
 	}
 
 	.status-text {

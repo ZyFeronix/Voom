@@ -241,10 +241,10 @@
 		padding: 4px;
 		border-radius: var(--radius-sm);
 		background: var(--bg-panel, rgba(15, 23, 42, 0.9));
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
+		backdrop-filter: var(--glass-blur, blur(12px));
+		-webkit-backdrop-filter: var(--glass-blur, blur(12px));
 		border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
-		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 
 	.autocomplete-item {

@@ -82,7 +82,12 @@ export const auth = {
 	login: (data) => post('/auth/login', data),
 	logout: () => post('/auth/logout', {}),
 	me: () => get('/auth/me'),
-	changePassword: (data) => put('/auth/change-password', data)
+	changePassword: (data) => put('/auth/change-password', data),
+	sessions: {
+		list: () => get('/auth/sessions'),
+		revoke: (id) => del(`/auth/sessions?id=${id}`),
+		revokeOthers: () => del('/auth/sessions?others=1')
+	}
 };
 
 // ---------------------------------------------------------------------------
@@ -145,6 +150,7 @@ export const posts = {
 // ---------------------------------------------------------------------------
 export const users = {
 	get: (username) => get(`/users/${username}`),
+	me: () => get('/users/me'),
 	posts: (username, params = {}) => {
 		const qs = new URLSearchParams(params).toString();
 		return get(`/users/${username}/posts${qs ? '?' + qs : ''}`);
@@ -183,6 +189,10 @@ export const users = {
 	},
 	// RGPD: borrado de cuenta (soft-delete con ventana de 30 días)
 	deleteAccount: (password) => post('/users/delete-account', { password }),
+	// Bloqueos de usuario
+	block: (username) => post(`/users/${username}/block`, {}),
+	unblock: (username) => del(`/users/${username}/block`),
+	blockedList: (q = '') => get(`/users/me/blocked${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 	// RGPD: exportación de datos — devuelve la Response cruda para .blob()
 	exportData: async () => {
 		const token = getToken();
@@ -222,6 +232,10 @@ export const reels = {
 		return get(`/reels/feed${qs ? '?' + qs : ''}`);
 	},
 	get: (id) => get(`/reels/${id}`),
+	byUser: (username, params = {}) => {
+		const qs = new URLSearchParams(params).toString();
+		return get(`/reels/user/${username}${qs ? '?' + qs : ''}`);
+	},
 	create: (fd) => upload('/reels', fd),
 	like: (id) => post(`/reels/${id}/like`, {}),
 	unlike: (id) => del(`/reels/${id}/like`),

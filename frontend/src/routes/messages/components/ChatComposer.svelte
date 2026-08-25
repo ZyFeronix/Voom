@@ -8,12 +8,13 @@
 	import VoiceRecorder from '$lib/components/VoiceRecorder.svelte';
 	import { EMOTICON_LIST } from '$lib/data/msnEmoticons.js';
 
-	let { sending, onSend, chatStore, onTyping } = $props();
+	let { sending, onSend, chatStore, onTyping, pendingProduct = $bindable(null) } = $props();
 
 	let messageText = $state('');
 	let showEmojiPicker = $state(false);
 	let emojiTab = $state('msn'); // 'msn' | 'emoji'
 	let showVoiceRecorder = $state(false);
+	let textInput = $state(null);
 
 	// Barra rápida: un subconjunto representativo del set MSN (con su imagen).
 	const QUICK_CODES = ['(H)', ':D', ':)', ';)', ':P', '(A)', '(6)', '(L)', '(Y)', '(B)'];
@@ -36,7 +37,6 @@
 	let attachedFile = $state(null);
 	let attachedFileUrl = $state(null);
 	let attachedFileType = $state(null);
-	let textInput = $state(null);
 
 	// Sincroniza el modo edición: al activar edición, precargamos el texto.
 	let lastEditId = null;
@@ -92,6 +92,10 @@
 		if (fileInput) fileInput.value = '';
 	}
 
+	function removePendingProduct() {
+		pendingProduct = null;
+	}
+
 	// Revocar cualquier blob URL pendiente al desmontar (evita fuga de memoria).
 	onDestroy(() => {
 		if (attachedFileUrl) URL.revokeObjectURL(attachedFileUrl);
@@ -110,16 +114,29 @@
 	}
 
 	function handleInput() {
+		autoGrow();
 		if (!chatStore?.editingMessage) {
 			// Emitir "escribiendo" mientras hay texto; emitir "detenido" al vaciar.
 			onTyping?.(messageText.trim().length > 0);
 		}
 	}
 
-	// Al perder el foco, dejar de mostrar "escribiendo…" al peer.
 	function handleBlur() {
+		// Al perder el foco, dejar de mostrar "escribiendo…" al peer.
 		if (!chatStore?.editingMessage) onTyping?.(false);
 	}
+
+	// Auto-crecimiento del textarea hasta ~5 líneas; luego scrollea.
+	function autoGrow() {
+		if (!textInput) return;
+		textInput.style.height = 'auto';
+		textInput.style.height = Math.min(textInput.scrollHeight, 110) + 'px';
+	}
+
+	// Resetear altura cuando se vacía el campo (envío / cancelación).
+	$effect(() => {
+		if (messageText === '') autoGrow();
+	});
 
 	function submitMessage() {
 		if (sending) return;
@@ -134,6 +151,15 @@
 			finalText = '⚡ ¡ZUMBIDO!';
 		}
 
+		// Producto vinculado desde Marketplace: se incrusta en el mensaje como
+		// texto + enlace (el chat no tiene tipo de mensaje estructurado).
+		if (pendingProduct) {
+			const productLine = `🛍️ ${pendingProduct.title} — ${pendingProduct.price} USD`;
+			finalText = finalText
+				? `${finalText}\n\n${productLine}\n${pendingProduct.url}`
+				: `${productLine}\n${pendingProduct.url}`;
+		}
+
 		onSend({
 			text: finalText,
 			file: attachedFile
@@ -142,6 +168,7 @@
 		// Reset composer
 		messageText = '';
 		removeAttachment();
+		pendingProduct = null;
 	}
 
 	function handleVoiceRecorded(blob) {
@@ -166,10 +193,9 @@
 </script>
 
 <div class="composer-container">
-	<!-- Chat Input Area -->
 	<div class="input-pane">
-		<!-- Barra de atajos de emoticonos (muesca / tab) -->
-		{#if !showVoiceRecorder}
+		<!-- Barra de atajos de emoticonos (muesca sobre el composer) -->
+		{#if !showVoiceRecorder && !showEmojiPicker}
 			<div class="emoticon-bar" transition:slide={{ duration: 200, easing: cubicOut }}>
 				{#each quickEmoticons as e (e.code)}
 					<button
@@ -182,6 +208,19 @@
 						<img src="/emoticons/{e.file}" alt={e.label} loading="lazy" decoding="async" />
 					</button>
 				{/each}
+				<span class="emoticon-bar-sep" aria-hidden="true"></span>
+				<button
+					type="button"
+					class="emoticon-more"
+					title="Abrir selector completo"
+					aria-label="Abrir selector completo de emoticonos"
+					onclick={() => {
+						showEmojiPicker = true;
+						emojiTab = 'msn';
+					}}
+				>
+					<span class="material-icons-round">add</span>
+				</button>
 			</div>
 		{/if}
 
@@ -212,12 +251,38 @@
 			</div>
 		{/if}
 
+		<!-- Producto de Marketplace vinculado -->
+		{#if pendingProduct}
+			<div class="attachment-preview-bar" transition:slide={{ duration: 300, easing: cubicOut }}>
+				<div class="product-preview-card">
+					{#if pendingProduct.image}
+						<img src={pendingProduct.image} alt={pendingProduct.title} loading="lazy" />
+					{:else}
+						<span class="material-icons-round">storefront</span>
+					{/if}
+					<div class="product-preview-info">
+						<span class="product-preview-label">Producto de Marketplace</span>
+						<span class="product-preview-title">{pendingProduct.title}</span>
+						<span class="product-preview-price">{pendingProduct.price} USD</span>
+					</div>
+					<button
+						type="button"
+						class="remove-attachment-btn product-remove"
+						onclick={removePendingProduct}
+						aria-label="Quitar producto"
+					>
+						<span class="material-icons-round">close</span>
+					</button>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Attachment Preview Bar -->
 		{#if attachedFileUrl}
 			<div class="attachment-preview-bar" transition:slide={{ duration: 300, easing: cubicOut }}>
 				<div class="attachment-preview-card">
 					{#if attachedFileType === 'video'}
-						<span class="material-icons-round">videocam</span>
+						<span class="material-icons-round preview-video-icon">videocam</span>
 					{:else}
 						<img
 							src={attachedFileUrl}
@@ -235,6 +300,14 @@
 						aria-label="Remover archivo"
 					>
 						<span class="material-icons-round">close</span>
+					</button>
+				</div>
+				<div class="attachment-file-meta">
+					<span class="attachment-file-label">
+						{attachedFileType === 'video' ? 'Video adjunto' : 'Imagen adjunta'}
+					</span>
+					<button type="button" class="attachment-remove-link" onclick={removeAttachment}>
+						Quitar
 					</button>
 				</div>
 			</div>
@@ -270,7 +343,7 @@
 				<div
 					class="composer-group"
 					transition:fade={{ duration: 150 }}
-					style="grid-area: composer; display: flex; gap: 10px; align-items: center; width: 100%;"
+					style="grid-area: composer; display: flex; gap: 8px; align-items: flex-end; width: 100%;"
 				>
 					<div class="chat-composer" class:has-attachment={attachedFileUrl}>
 						<button
@@ -282,26 +355,30 @@
 						>
 							<span class="material-icons-round">add</span>
 						</button>
-						<input
-							type="text"
-							placeholder="Escribe tu mensaje..."
-							bind:value={messageText}
+
+						<textarea
 							bind:this={textInput}
+							bind:value={messageText}
 							onkeydown={handleKeydown}
 							oninput={handleInput}
 							onblur={handleBlur}
+							placeholder="Escribe tu mensaje..."
+							rows="1"
 							class="composer-input"
 							autocomplete="off"
-						/>
+						></textarea>
+
 						<div
 							class="emoji-picker-wrapper"
-							style="position: relative;"
+							style="position: relative; align-self: end;"
 							use:clickOutside={() => (showEmojiPicker = false)}
 						>
 							<button
 								type="button"
 								class="composer-icon-btn composer-emoji-btn"
+								class:toggled={showEmojiPicker}
 								aria-label="Emojis"
+								aria-expanded={showEmojiPicker}
 								title="Emojis"
 								onclick={() => (showEmojiPicker = !showEmojiPicker)}
 							>
@@ -362,7 +439,7 @@
 							type="button"
 							class="composer-icon-btn voice-btn"
 							aria-label="Grabar audio"
-							title="Grabar audio"
+							title="Grabar nota de voz"
 							onclick={() => (showVoiceRecorder = true)}
 						>
 							<span class="material-icons-round">mic</span>
@@ -450,6 +527,35 @@
 		pointer-events: none;
 	}
 
+	.emoticon-bar-sep {
+		width: 1px;
+		height: 14px;
+		background: var(--border-subtle);
+		margin: 0 3px;
+	}
+
+	.emoticon-more {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 24px;
+		height: 24px;
+		background: rgba(var(--accent-blue-rgb), 0.08);
+		color: var(--accent-blue-base);
+		border: 1px dashed rgba(var(--accent-blue-rgb), 0.35);
+		border-radius: var(--radius-xs);
+		cursor: pointer;
+		flex-shrink: 0;
+		transition: all 0.18s var(--ease-spring);
+	}
+	.emoticon-more:hover {
+		background: rgba(var(--accent-blue-rgb), 0.16);
+		transform: scale(1.06);
+	}
+	.emoticon-more .material-icons-round {
+		font-size: 14px;
+	}
+
 	/* Panel del selector de emojis con pestañas MSN / Emoji */
 	.emoji-panel {
 		position: absolute;
@@ -457,7 +563,7 @@
 		right: 0;
 		z-index: 50;
 		width: 300px;
-		max-width: 90vw;
+		max-width: min(90vw, 340px);
 		background: var(--bg-surface-solid, #ffffff);
 		border: 1px solid var(--border-subtle);
 		border-top: 1px solid var(--glass-border-t);
@@ -498,7 +604,7 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		padding: 6px 10px;
+		padding: 7px 10px;
 		margin: 0 0 8px 0;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
@@ -506,6 +612,18 @@
 		border-radius: var(--radius-sm);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
+		animation: quote-in 0.25s var(--ease-spring);
+	}
+
+	@keyframes quote-in {
+		from {
+			opacity: 0;
+			transform: translateY(4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.quote-bar .quote-icon {
@@ -562,11 +680,13 @@
 	}
 
 	.attachment-preview-bar {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 		padding: 6px 10px;
 		margin: 0 0 8px 0;
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-sm);
-		display: flex;
 		background: var(--bg-surface);
 	}
 
@@ -574,6 +694,7 @@
 		position: relative;
 		width: 48px;
 		height: 48px;
+		flex-shrink: 0;
 		border-radius: var(--radius-sm);
 		overflow: hidden;
 		border: 1px solid var(--border-subtle);
@@ -589,9 +710,36 @@
 		object-fit: cover;
 	}
 
-	.attachment-preview-card .material-icons-round {
+	.preview-video-icon {
 		color: var(--text-primary);
 		font-size: 1.3rem;
+	}
+
+	.attachment-file-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.attachment-file-label {
+		font-size: 0.74rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+
+	.attachment-remove-link {
+		align-self: flex-start;
+		background: transparent;
+		border: none;
+		padding: 0;
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: var(--rose-500, #f43f5e);
+		cursor: pointer;
+	}
+	.attachment-remove-link:hover {
+		text-decoration: underline;
 	}
 
 	.remove-attachment-btn {
@@ -600,8 +748,7 @@
 		right: 2px;
 		background: rgba(15, 23, 42, 0.75);
 		border: none;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		border-radius: var(--radius-full);
 		width: 16px;
 		height: 16px;
 		display: flex;
@@ -610,18 +757,86 @@
 		cursor: pointer;
 		padding: 0;
 		z-index: 10;
+		transition:
+			transform 0.15s var(--ease-spring),
+			background 0.15s;
 	}
-
+	.remove-attachment-btn:hover {
+		transform: scale(1.12);
+		background: rgba(244, 63, 94, 0.85);
+	}
 	.remove-attachment-btn .material-icons-round {
 		font-size: 0.7rem;
 		color: #ffffff;
+	}
+	.remove-attachment-btn.product-remove {
+		position: static;
+		align-self: flex-start;
+	}
+
+	/* Producto de Marketplace vinculado al compositor */
+	.product-preview-card {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		min-width: 220px;
+		max-width: 320px;
+		padding: 8px;
+		padding-right: 26px;
+		border-radius: var(--radius-md);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.35);
+		background: rgba(var(--accent-blue-rgb), 0.08);
+	}
+	.product-preview-card img {
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-sm);
+		object-fit: cover;
+		flex-shrink: 0;
+		background: #000;
+	}
+	.product-preview-card > .material-icons-round {
+		font-size: 30px;
+		color: var(--aero-blue);
+		flex-shrink: 0;
+	}
+	.product-preview-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		flex: 1;
+	}
+	.product-preview-label {
+		font-size: 0.62rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--aero-blue);
+	}
+	.product-preview-title {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 200px;
+	}
+	.product-preview-price {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--aero-mint, #34d399);
 	}
 
 	.input-pane {
 		position: relative;
 		padding: 8px 12px 10px 12px;
 		border-top: 1px solid var(--border-subtle);
-		background: var(--bg-surface);
+		background:
+			radial-gradient(80% 120% at 50% 130%, rgba(var(--accent-blue-rgb), 0.05), transparent 70%),
+			var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 	}
@@ -637,13 +852,13 @@
 		flex: 1;
 		min-width: 0;
 		display: flex;
-		align-items: center;
+		align-items: flex-end;
 		gap: 4px;
 		background: var(--bg-input, var(--bg-surface));
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		padding: 2px 4px;
-		min-height: 38px;
+		border-radius: var(--radius-lg);
+		padding: 3px 4px;
+		min-height: 40px;
 		transition:
 			border-color 0.2s ease,
 			box-shadow 0.2s ease,
@@ -653,9 +868,9 @@
 	.chat-composer:focus-within {
 		border-color: var(--accent-blue-base);
 		box-shadow:
-			0 0 0 3px rgba(var(--accent-blue-rgb), 0.12),
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.13),
 			inset 0 1px 2px rgba(0, 0, 0, 0.02);
-		background: var(--bg-surface-hover);
+		background: var(--bg-input);
 	}
 	.chat-composer.has-attachment {
 		border-color: var(--aero-amber);
@@ -679,12 +894,17 @@
 		cursor: pointer;
 		transition: all 0.18s ease;
 		box-sizing: border-box;
+		align-self: flex-end;
 	}
 	.composer-icon-btn .material-icons-round {
 		font-size: 18px;
 	}
 	.composer-icon-btn:hover {
 		background: rgba(var(--accent-blue-rgb), 0.1);
+		color: var(--accent-blue-base);
+	}
+	.composer-icon-btn.toggled {
+		background: rgba(var(--accent-blue-rgb), 0.14);
 		color: var(--accent-blue-base);
 	}
 	.composer-attach-btn {
@@ -694,13 +914,14 @@
 	.composer-attach-btn:hover {
 		background: rgba(var(--accent-blue-rgb), 0.14);
 		color: var(--accent-blue-base);
+		transform: rotate(90deg);
 	}
 	.composer-emoji-btn:hover {
 		background: rgba(245, 166, 35, 0.14);
 		color: var(--aero-amber);
 	}
 	.voice-btn {
-		margin-left: 4px;
+		margin-left: 2px;
 		background: rgba(var(--accent-blue-rgb), 0.06);
 		border: 1px solid var(--border-subtle);
 		color: var(--accent-blue-base);
@@ -714,14 +935,19 @@
 	.composer-input {
 		flex: 1;
 		min-width: 0;
-		padding: 6px 4px;
-		background: transparent;
+		resize: none;
 		border: none;
 		outline: none;
+		background: transparent;
+		padding: 9px 4px;
+		max-height: 110px;
 		font-size: 0.85rem;
 		line-height: 1.35;
 		font-family: var(--font-sans);
 		color: var(--text-primary);
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) transparent;
 	}
 	.composer-input::placeholder {
 		color: var(--text-muted);
@@ -732,11 +958,13 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		align-self: flex-end;
 		width: 34px;
 		height: 34px;
 		flex: 0 0 34px;
 		min-width: 34px;
 		min-height: 34px;
+		margin-bottom: 2px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
 		background: linear-gradient(135deg, var(--aero-sky), var(--accent-blue-base));
@@ -780,6 +1008,15 @@
 	@keyframes spin {
 		to {
 			transform: rotate(360deg);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.emoticon-bar {
+			left: 10px;
+		}
+		.composer-input {
+			max-height: 92px;
 		}
 	}
 </style>

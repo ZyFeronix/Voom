@@ -1,5 +1,5 @@
 <script>
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { fade, fly, scale, slide } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { page } from '$app/stores';
@@ -7,6 +7,7 @@
 	import { reels as reelsApi, users as usersApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { generateLikeSparkles } from '$lib/utils/likeSparkles.js';
+	import ProfileHoverCard from '$lib/components/ProfileHoverCard.svelte';
 
 	// ── Feed State ─────────────────────────────────────────────────────────────
 	let reels = $state([]);
@@ -21,13 +22,13 @@
 	let activeDuration = $state(0);
 
 	// ── Audio & Volume Memory ──────────────────────────────────────────────────
-	let globalVolume = $state(0.7);
+	let globalVolume = $state(0.5);
 	let isMuted = $state(false);
 	let autoplayBlocked = $state(false);
 
 	// ── Playback Settings & Modals ─────────────────────────────────────────────
 	let playbackRate = $state(1.0);
-	let fitMode = $state('cover'); // 'cover' | 'contain'
+	let reelAspectRatios = $state({}); // reelId -> { isLandscape: boolean, ratio: number }
 	let ambientEnabled = $state(true);
 	let autoScrollNext = $state(false);
 	let isFastForwarding = $state(false);
@@ -94,21 +95,55 @@
 	let canvasElements = [];
 	let activeVideoFrameCallbacks = new Map();
 
-	function trackReel(node, idx) {
-		const video = node.querySelector('video.main-video');
-		const canvas = node.querySelector('canvas.ambient-canvas');
-		videoElements[idx] = video;
-		canvasElements[idx] = canvas;
+	// Libera de forma determinista el decoder y la conexión de red de un <video>.
+	// Sin esta limpieza, los elementos que salen de la ventana activa siguen
+	// bufferizando en segundo plano hasta que el GC los recoja: agotan el
+	// presupuesto de decodificadores del navegador (~4-6 concurrentes) y el pool
+	// de conexiones HTTP/1.1 (6 por host), y a partir del 4º/5º reel los vídeos
+	// nuevos quedan pegados sin cargar. removeAttribute('src') + load() aborta
+	// el fetch de media al instante.
+	function releaseVideo(el) {
+		if (!el) return;
+		try {
+			el.pause();
+		} catch (_e) {}
+		try {
+			el.removeAttribute('src');
+			el.load();
+		} catch (_e) {}
+		stopAmbientSync(el);
+	}
 
+	// Registro de media POR NODO. Los <video>/<canvas> se montan y desmontan
+	// dinámicamente según la ventana activa (±1 alrededor del reel visible):
+	// capturar la referencia una sola vez al montar el .reel-item dejaba slots
+	// `undefined` permanentes para todo reel que nació como placeholder, y el
+	// IntersectionObserver jamás encontraba el elemento para reproducirlo.
+	function registerVideo(node, i) {
+		videoElements[i] = node;
 		return {
-			update(newIdx) {
-				videoElements[newIdx] = video;
-				canvasElements[newIdx] = canvas;
+			update(ni) {
+				if (videoElements[i] === node) videoElements[i] = null;
+				videoElements[ni] = node;
+				i = ni;
 			},
 			destroy() {
-				videoElements[idx] = null;
-				canvasElements[idx] = null;
-				stopAmbientSync(video);
+				releaseVideo(node);
+				if (videoElements[i] === node) videoElements[i] = null;
+			}
+		};
+	}
+
+	function registerCanvas(node, i) {
+		canvasElements[i] = node;
+		return {
+			update(ni) {
+				if (canvasElements[i] === node) canvasElements[i] = null;
+				canvasElements[ni] = node;
+				i = ni;
+			},
+			destroy() {
+				if (canvasElements[i] === node) canvasElements[i] = null;
 			}
 		};
 	}
@@ -119,11 +154,13 @@
 		try {
 			if (typeof localStorage !== 'undefined') {
 				const savedVol = localStorage.getItem('vsocial_reel_volume');
-				if (savedVol !== null) globalVolume = parseFloat(savedVol);
+				if (savedVol !== null && !isNaN(parseFloat(savedVol))) {
+					globalVolume = Math.max(0, Math.min(1, parseFloat(savedVol)));
+				} else {
+					globalVolume = 0.5;
+				}
 				const savedMuted = localStorage.getItem('vsocial_reel_muted');
 				if (savedMuted !== null) isMuted = savedMuted === 'true';
-				const savedFit = localStorage.getItem('vsocial_reel_fit');
-				if (savedFit) fitMode = savedFit;
 				const savedAmbient = localStorage.getItem('vsocial_reel_ambient');
 				if (savedAmbient !== null) ambientEnabled = savedAmbient === 'true';
 				const savedAutoNext = localStorage.getItem('vsocial_reel_autonext');
@@ -133,6 +170,35 @@
 
 		// Load Initial Feed
 		await loadFeed();
+
+		// Autoplay del primer reel: el IntersectionObserver omite el índice ya
+		// activo (0) en su primer disparo, así que el video inicial nunca arrancaba
+		// solo. Se reproduce explícitamente tras montar los elementos.
+		setTimeout(() => {
+			const video = videoElements[activeReelIndex];
+			if (!video || video.ended || (!video.paused && !video.ended)) return;
+			if (isFloatingPiPActive) return;
+			video.currentTime = 0;
+			video.playbackRate = playbackRate;
+			video.volume = getEffectiveVolume();
+			video.muted = isMuted;
+			const playPromise = video.play();
+			if (playPromise !== undefined) {
+				playPromise
+					.then(() => {
+						isPlaying = true;
+						autoplayBlocked = false;
+						startAmbientSync(video, canvasElements[activeReelIndex]);
+						logView(reels[activeReelIndex]?.id);
+					})
+					.catch(() => {
+						// Autoplay con sonido bloqueado por el navegador: reintentar en mute.
+						autoplayBlocked = true;
+						video.muted = true;
+						video.play().catch(() => {});
+					});
+			}
+		}, 350);
 
 		// Start musical notes generator
 		noteInterval = setInterval(() => {
@@ -150,8 +216,13 @@
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('keydown', handleGlobalKeydown);
 		}
-		// Cleanup all ambient loops
-		videoElements.forEach((v) => stopAmbientSync(v));
+		if (pipWindow && !pipWindow.closed) {
+			try {
+				pipWindow.close();
+			} catch (_e) {}
+		}
+		// Cleanup: abortar descargas y liberar decoders de todos los vídeos
+		videoElements.forEach((v) => releaseVideo(v));
 	});
 
 	async function loadFeed(isNextPage = false) {
@@ -187,6 +258,22 @@
 			} else {
 				reels = [...feedData, ...filtered];
 			}
+
+			// Pre-sembrar ratios desde la BD (video_width/video_height capturados
+			// en el upload): el wrapper nace ya con su forma definitiva y los
+			// overlays no saltan al llegar `loadedmetadata` → CLS ≈ 0.
+			reels.forEach((r) => {
+				if (reelAspectRatios[r.id]) return;
+				if (r.video_width && r.video_height && r.video_height > 0) {
+					const ratio = r.video_width / r.video_height;
+					reelAspectRatios[r.id] = {
+						width: r.video_width,
+						height: r.video_height,
+						ratio,
+						isLandscape: r.video_width > r.video_height
+					};
+				}
+			});
 
 			// Pre-fill follow map
 			reels.forEach((r) => {
@@ -237,36 +324,43 @@
 							activeReelIndex = idx;
 							activeReelProgress = 0;
 
-							if (video) {
-								video.currentTime = 0;
-								video.playbackRate = playbackRate;
-								video.volume = isMuted ? 0 : globalVolume;
-								video.muted = isMuted;
-
-								if (!isFloatingPiPActive) {
-									const playPromise = video.play();
-									if (playPromise !== undefined) {
-										playPromise
-											.then(() => {
-												isPlaying = true;
-												autoplayBlocked = false;
-												startAmbientSync(video, canvasElements[idx]);
-												logView(reels[idx]?.id);
-											})
-											.catch((err) => {
-												if (err.name === 'NotAllowedError') {
-													autoplayBlocked = true;
-													// Try muted autoplay
-													video.muted = true;
-													video.play().catch(() => {});
-												}
-											});
-									}
-								} else {
-									video.pause();
+							// El vídeo del índice recién activado puede haber sido un
+							// placeholder fuera de la ventana y se acaba de montar con este
+							// cambio de estado: esperar al flush de Svelte para leer el
+							// elemento real. Sin esto, el callback leyó `null` y el reel
+							// queda montado sin recibir play() jamás (stuck en negro).
+							tick().then(() => {
+								const activeVideo = videoElements[idx];
+								if (!activeVideo || isFloatingPiPActive) {
+									if (activeVideo && !activeVideo.paused) activeVideo.pause();
 									logView(reels[idx]?.id);
+									return;
 								}
-							}
+
+								activeVideo.currentTime = 0;
+								activeVideo.playbackRate = playbackRate;
+								activeVideo.volume = getEffectiveVolume();
+								activeVideo.muted = isMuted;
+
+								const playPromise = activeVideo.play();
+								if (playPromise !== undefined) {
+									playPromise
+										.then(() => {
+											isPlaying = true;
+											autoplayBlocked = false;
+											startAmbientSync(activeVideo, canvasElements[idx]);
+											logView(reels[idx]?.id);
+										})
+										.catch((err) => {
+											if (err.name === 'NotAllowedError') {
+												autoplayBlocked = true;
+												// Try muted autoplay
+												activeVideo.muted = true;
+												activeVideo.play().catch(() => {});
+											}
+										});
+								}
+							});
 
 							// Auto-load next batch when near end
 							if (idx >= reels.length - 2 && hasMore && !loadingMore) {
@@ -274,10 +368,16 @@
 							}
 						}
 					} else {
-						// Video is offscreen: strictly pause and unload heavy memory
-						if (video && !video.paused) {
-							video.pause();
-							stopAmbientSync(video);
+						// Video offscreen: pausa estricta y, si ya salió de la ventana
+						// activa (±1), libera decoder + red para no acumular streams.
+						if (video) {
+							if (!video.paused) {
+								video.pause();
+								stopAmbientSync(video);
+							}
+							if (Math.abs(idx - activeReelIndex) > 1) {
+								releaseVideo(video);
+							}
 						}
 					}
 				});
@@ -303,12 +403,16 @@
 		if (!video || !canvas || !ambientEnabled) return;
 		stopAmbientSync(video);
 
-		if (canvas.width !== 64) {
-			canvas.width = 64;
-			canvas.height = 114;
+		if (canvas.width !== 32) {
+			canvas.width = 32;
+			canvas.height = 56;
 		}
 
-		const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: false });
+		const ctx = canvas.getContext('2d', {
+			alpha: false,
+			willReadFrequently: false,
+			desynchronized: true
+		});
 		if (!ctx) return;
 
 		let isRunning = true;
@@ -356,6 +460,18 @@
 	}
 
 	// ── Playback Controls & Video Time ─────────────────────────────────────────
+	function handleVideoLoadedMetadata(e, reel, _index) {
+		const video = e.currentTarget;
+		if (!video || !reel) return;
+		const isLandscape = video.videoWidth > video.videoHeight;
+		reelAspectRatios[reel.id] = {
+			width: video.videoWidth,
+			height: video.videoHeight,
+			ratio: video.videoWidth / (video.videoHeight || 1),
+			isLandscape
+		};
+	}
+
 	function handleTimeUpdate(e) {
 		const video = e.target;
 		if (video.duration && !isScrubbing) {
@@ -527,8 +643,7 @@
 			setTimeout(() => {
 				reel.is_animating_like = false;
 				reel.like_particles = [];
-			}, 650);
-			spawnFloatingHeart(180, 300);
+			}, 700);
 		} else {
 			reel.is_animating_like = false;
 			reel.is_animating_unlike = true;
@@ -601,45 +716,90 @@
 		}
 	}
 
-	// ── Scrubber & Progress Dragging ───────────────────────────────────────────
-	function handleScrubberMouseDown(e) {
-		isScrubbing = true;
-		seekToMousePos(e);
+	// ── Scrubber & Timeline Progress Dragging (Pointer Events + Capture) ────────
+	let activeScrubberBar = null;
+
+	function seekToPosition(e, targetBar = null) {
+		const bar =
+			targetBar || (e.currentTarget && e.currentTarget.closest('.progress-bar-interactive'));
+		if (!bar) return;
+		const rect = bar.getBoundingClientRect();
+		if (rect.width <= 0) return;
+		const clientX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
+		const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+		scrubHoverX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+
+		const video = videoElements[activeReelIndex];
+		if (video && video.duration) {
+			activeDuration = video.duration;
+			const targetTime = pct * video.duration;
+			video.currentTime = targetTime;
+			activeCurrentTime = targetTime;
+			activeReelProgress = pct * 100;
+			scrubPreviewTime = targetTime;
+		}
 	}
 
-	function handleScrubberMouseMove(e) {
-		const rect = e.currentTarget.getBoundingClientRect();
-		const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-		scrubHoverX = e.clientX - rect.left;
+	function handleScrubberPointerDown(e, index) {
+		if (e.button !== undefined && e.button !== 0) return; // solo click principal
+		e.stopPropagation();
+		isScrubbing = true;
+		isHoveringScrubber = true;
+		if (index !== undefined && index !== activeReelIndex) {
+			scrollToReel(index);
+		}
+		activeScrubberBar = e.currentTarget;
+		try {
+			if (e.currentTarget.setPointerCapture && e.pointerId !== undefined) {
+				e.currentTarget.setPointerCapture(e.pointerId);
+			}
+		} catch (_err) {}
+		seekToPosition(e, e.currentTarget);
+	}
+
+	function handleScrubberPointerMove(e) {
+		const bar =
+			activeScrubberBar ||
+			(e.currentTarget && e.currentTarget.closest('.progress-bar-interactive'));
+		if (!bar) return;
+		const rect = bar.getBoundingClientRect();
+		if (rect.width <= 0) return;
+		const clientX = e.clientX ?? (e.touches && e.touches[0]?.clientX) ?? 0;
+		const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+		scrubHoverX = Math.max(0, Math.min(rect.width, clientX - rect.left));
 		scrubPreviewTime = pct * (activeDuration || 1);
 
 		if (isScrubbing) {
-			seekToMousePos(e);
+			seekToPosition(e, bar);
 		}
 	}
 
-	function handleScrubberMouseUp() {
+	function handleScrubberPointerUp(e) {
 		if (isScrubbing) {
 			isScrubbing = false;
+			try {
+				if (
+					activeScrubberBar &&
+					activeScrubberBar.hasPointerCapture &&
+					activeScrubberBar.hasPointerCapture(e.pointerId)
+				) {
+					activeScrubberBar.releasePointerCapture(e.pointerId);
+				}
+			} catch (_err) {}
+			activeScrubberBar = null;
 			const video = videoElements[activeReelIndex];
-			if (video && isPlaying) video.play().catch(() => {});
-		}
-	}
-
-	function seekToMousePos(e) {
-		const bar = e.currentTarget.closest('.progress-bar-interactive');
-		if (!bar) return;
-		const rect = bar.getBoundingClientRect();
-		const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-		const video = videoElements[activeReelIndex];
-		if (video && video.duration) {
-			video.currentTime = pct * video.duration;
-			activeCurrentTime = video.currentTime;
-			activeReelProgress = pct * 100;
+			if (video && isPlaying && video.paused) {
+				video.play().catch(() => {});
+			}
 		}
 	}
 
 	// ── Volume & Mute ──────────────────────────────────────────────────────────
+	function getEffectiveVolume() {
+		// Curva perceptiva cuadrática: 0.5 en slider da 0.25 de potencia (-12dB = medio sonido real)
+		return isMuted ? 0 : Math.max(0, Math.min(1, Math.pow(globalVolume, 2)));
+	}
+
 	function toggleMute() {
 		isMuted = !isMuted;
 		if (!isMuted && globalVolume === 0) globalVolume = 0.5;
@@ -648,19 +808,32 @@
 	}
 
 	function handleVolumeChange(e) {
-		globalVolume = parseFloat(e.target.value);
+		globalVolume = Math.max(0, Math.min(1, parseFloat(e.target.value)));
 		isMuted = globalVolume === 0;
 		applyVolumeToAll();
 		saveVolumePrefs();
 	}
 
+	function adjustVolume(delta) {
+		globalVolume = Math.max(0, Math.min(1, Math.round((globalVolume + delta) * 100) / 100));
+		isMuted = globalVolume === 0;
+		applyVolumeToAll();
+		saveVolumePrefs();
+		showToast(`Volumen: ${Math.round(globalVolume * 100)}%`, 'info');
+	}
+
 	function applyVolumeToAll() {
+		const effVol = getEffectiveVolume();
 		videoElements.forEach((video) => {
 			if (video) {
-				video.volume = isMuted ? 0 : globalVolume;
+				video.volume = effVol;
 				video.muted = isMuted;
 			}
 		});
+		if (pipVideoEl) {
+			pipVideoEl.volume = effVol;
+			pipVideoEl.muted = isMuted;
+		}
 	}
 
 	function saveVolumePrefs() {
@@ -684,22 +857,24 @@
 		// Document PiP API — ventana OS real con HTML/CSS completo (Chrome / Edge 116+)
 		if ('documentPictureInPicture' in window) {
 			try {
+				const isLandscape =
+					video.videoWidth && video.videoHeight
+						? video.videoWidth > video.videoHeight
+						: !!reelAspectRatios[reel.id]?.isLandscape;
+				const pipWidth = isLandscape ? 560 : 360;
+				const pipHeight = isLandscape ? 315 : 640;
 				pipWindow = await window.documentPictureInPicture.requestWindow({
-					width: 360,
-					height: 640
+					width: pipWidth,
+					height: pipHeight
 				});
 				if (pipAbortController) pipAbortController.abort();
 				pipAbortController = new AbortController();
 				_pipInjectContent(pipWindow, reel, video, pipAbortController.signal);
 				video.pause();
 				isFloatingPiPActive = true;
-				pipWindow.addEventListener(
-					'pagehide',
-					() => {
-						_pipRestoreMain();
-					},
-					{ signal: pipAbortController.signal }
-				);
+				pipWindow.addEventListener('pagehide', () => {
+					_pipRestoreMain();
+				});
 				showToast('Reproductor flotante activado', 'info');
 				return;
 			} catch (_e) {
@@ -715,7 +890,7 @@
 				video.addEventListener(
 					'leavepictureinpicture',
 					() => {
-						isFloatingPiPActive = false;
+						_pipRestoreMain();
 					},
 					{ once: true }
 				);
@@ -729,39 +904,58 @@
 	}
 
 	async function disableFloatingPiP() {
+		if (typeof document !== 'undefined' && document.pictureInPictureElement) {
+			try {
+				await document.exitPictureInPicture();
+			} catch (_e) {}
+		}
+		_pipRestoreMain();
+		showToast('Reproductor restaurado', 'info');
+	}
+
+	function _pipRestoreMain() {
+		const currentPiPTime = pipVideoEl ? pipVideoEl.currentTime : null;
+		const wasPiPPaused = pipVideoEl ? pipVideoEl.paused : false;
+
 		if (pipAbortController) {
 			pipAbortController.abort();
 			pipAbortController = null;
 		}
 		if (pipWindow) {
 			try {
-				pipWindow.close();
+				if (!pipWindow.closed) {
+					pipWindow.close();
+				}
 			} catch (_e) {}
-			return;
-		}
-		try {
-			if (document.pictureInPictureElement) await document.exitPictureInPicture();
-		} catch (_e) {}
-		isFloatingPiPActive = false;
-	}
-
-	function _pipRestoreMain() {
-		if (pipAbortController) {
-			pipAbortController.abort();
-			pipAbortController = null;
+			pipWindow = null;
 		}
 		isFloatingPiPActive = false;
 		lastPipReelId = null;
+		pipVideoEl = null;
+
 		const mainVideo = videoElements[activeReelIndex];
 		if (mainVideo) {
-			if (pipVideoEl) mainVideo.currentTime = pipVideoEl.currentTime;
-			mainVideo.volume = isMuted ? 0 : globalVolume;
+			if (currentPiPTime !== null && !isNaN(currentPiPTime)) {
+				mainVideo.currentTime = currentPiPTime;
+				activeCurrentTime = currentPiPTime;
+				if (mainVideo.duration) {
+					activeReelProgress = (currentPiPTime / mainVideo.duration) * 100;
+				}
+			}
+			mainVideo.volume = getEffectiveVolume();
 			mainVideo.muted = isMuted;
 			mainVideo.playbackRate = playbackRate;
-			if (isPlaying) mainVideo.play().catch(() => {});
+			if (isPlaying && !wasPiPPaused) {
+				const playPromise = mainVideo.play();
+				if (playPromise !== undefined) {
+					playPromise
+						.then(() => {
+							startAmbientSync(mainVideo, canvasElements[activeReelIndex]);
+						})
+						.catch(() => {});
+				}
+			}
 		}
-		pipWindow = null;
-		pipVideoEl = null;
 	}
 
 	function _pipInjectContent(win, reel, sourceVideo, signal) {
@@ -803,9 +997,23 @@
 		lastPipReelId = reel.id;
 		pipVideoEl.src = sourceVideo.src;
 		pipVideoEl.currentTime = sourceVideo.currentTime;
-		pipVideoEl.volume = isMuted ? 0 : globalVolume;
+		pipVideoEl.volume = getEffectiveVolume();
 		pipVideoEl.muted = isMuted;
 		pipVideoEl.playbackRate = playbackRate;
+
+		// Adaptar aspect ratio automático en video PiP
+		const isLandscape =
+			sourceVideo.videoWidth && sourceVideo.videoHeight
+				? sourceVideo.videoWidth > sourceVideo.videoHeight
+				: !!reelAspectRatios[reel.id]?.isLandscape;
+		if (isLandscape) {
+			pipVideoEl.classList.add('is-landscape');
+			pipVideoEl.classList.remove('is-portrait');
+		} else {
+			pipVideoEl.classList.remove('is-landscape');
+			pipVideoEl.classList.add('is-portrait');
+		}
+
 		if (isPlaying) pipVideoEl.play().catch(() => {});
 
 		_pipBindControls(win, reel, signal);
@@ -816,7 +1024,9 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Inter','Outfit',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;}
 .pip-root{position:relative;width:100%;height:100dvh;background:#000;user-select:none;overflow:hidden;cursor:pointer;}
-.pip-v{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#000;}
+.pip-v{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:transparent;}
+.pip-v.is-landscape{object-fit:cover;}
+.pip-v.is-portrait{object-fit:cover;}
 
 /* Degradados cinematográficos para máxima legibilidad */
 .pip-grad-top{position:absolute;top:0;left:0;right:0;height:120px;background:linear-gradient(to bottom,rgba(0,0,0,.75) 0%,rgba(0,0,0,.35) 60%,transparent 100%);z-index:2;pointer-events:none;}
@@ -892,7 +1102,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 .pip-scrubber-track:hover .pip-time-tooltip{opacity:1;}
 
 /* Toast Feedback */
-.pip-toast{position:absolute;top:54px;left:50%;transform:translateX(-50%) translateY(-10px);background:rgba(0,0,0,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:999px;font-size:0.75rem;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s cubic-bezier(.34,1.56,.64,1);}
+.pip-toast{position:absolute;top:54px;left:50%;transform:translateX(-50%) translateY(-10px);background:rgba(0,0,0,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.2);color:#fff;padding:5px 14px;border-radius:999px;font-size:0.75rem;font-weight:800;box-shadow:0 4px 18px rgba(14,165,233,.25);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s cubic-bezier(.34,1.56,.64,1);}
 .pip-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 `;
 	}
@@ -1163,9 +1373,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				e.stopPropagation();
 				toggleMute();
 				video.muted = isMuted;
-				video.volume = isMuted ? 0 : globalVolume;
+				video.volume = getEffectiveVolume();
 				muteIc.textContent = isMuted ? 'volume_off' : 'volume_up';
-				showPipToast(isMuted ? '🔇 Silenciado' : '🔊 Sonido activado');
+				showPipToast(isMuted ? '🔇 Silenciado' : `🔊 Sonido: ${Math.round(globalVolume * 100)}%`);
 			},
 			opts
 		);
@@ -1364,6 +1574,38 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		const next = d.getElementById('pip-next-btn');
 		if (prev) prev.disabled = activeReelIndex === 0;
 		if (next) next.disabled = activeReelIndex >= reels.length - 1;
+
+		// Adaptar aspect-ratio dinámicamente en el video flotante
+		function updatePipFit() {
+			if (!pipVideoEl) return;
+			const isLandscape =
+				pipVideoEl.videoWidth && pipVideoEl.videoHeight
+					? pipVideoEl.videoWidth > pipVideoEl.videoHeight
+					: !!reelAspectRatios[reel.id]?.isLandscape;
+			if (isLandscape) {
+				pipVideoEl.classList.add('is-landscape');
+				pipVideoEl.classList.remove('is-portrait');
+			} else {
+				pipVideoEl.classList.remove('is-landscape');
+				pipVideoEl.classList.add('is-portrait');
+			}
+		}
+
+		if (pipVideoEl.videoWidth > 0) {
+			updatePipFit();
+		} else {
+			pipVideoEl.onloadedmetadata = updatePipFit;
+		}
+	});
+
+	// ── Real-Time Comments Sync on Active Reel Change ─────────────────────────
+	$effect(() => {
+		if (showCommentsModal && reels[activeReelIndex]) {
+			const currentReel = reels[activeReelIndex];
+			if (activeCommentReelId !== currentReel.id) {
+				loadCommentsForReel(currentReel.id);
+			}
+		}
 	});
 
 	function handleContextMenu(e, reel, i) {
@@ -1388,32 +1630,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		contextMenuPos = { x, y };
 		showContextMenu = true;
 		showOptionsMenu = false;
-	}
-
-	function toggleFitMode() {
-		fitMode = fitMode === 'cover' ? 'contain' : 'cover';
-		try {
-			localStorage.setItem('vsocial_reel_fit', fitMode);
-		} catch (_e) {}
-		showToast(`Ajuste: ${fitMode === 'cover' ? 'Rellenar pantalla' : 'Ajustar completo'}`, 'info');
-	}
-
-	function toggleAmbientMode() {
-		ambientEnabled = !ambientEnabled;
-		try {
-			localStorage.setItem('vsocial_reel_ambient', ambientEnabled.toString());
-		} catch (_e) {}
-		if (ambientEnabled) {
-			const video = videoElements[activeReelIndex];
-			const canvas = canvasElements[activeReelIndex];
-			if (video && canvas) {
-				startAmbientSync(video, canvas);
-			}
-			showToast('Iluminación ambiental activada', 'info');
-		} else {
-			stopAmbientSync(videoElements[activeReelIndex]);
-			showToast('Iluminación ambiental desactivada', 'info');
-		}
 	}
 
 	function toggleAutoScrollNext() {
@@ -1511,6 +1727,18 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 			case 'M':
 				e.preventDefault();
 				toggleMute();
+				break;
+			case '+':
+			case '=':
+			case ']':
+				e.preventDefault();
+				adjustVolume(0.05);
+				break;
+			case '-':
+			case '_':
+			case '[':
+				e.preventDefault();
+				adjustVolume(-0.05);
 				break;
 			case 'l':
 			case 'L':
@@ -1640,6 +1868,41 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	}
 
 	// ── Comments Drawer & Real-Time Sync ───────────────────────────────────────
+	function loadCommentsForReel(reelId) {
+		const reel = reels.find((r) => r.id === reelId);
+		if (!reel) return;
+
+		activeCommentReel = reel;
+		activeCommentReelId = reelId;
+		loadingComments = true;
+		replyTo = null;
+		commentText = '';
+
+		reelsApi.comments
+			.list(reelId)
+			.then((res) => {
+				if (activeCommentReelId === reelId) {
+					commentsList = res.comments || [];
+					// Auto-heal delta
+					const actual = commentsList.length;
+					const dbCount = reel.comment_count ?? 0;
+					commentCountDeltas[reelId] = actual - dbCount;
+				}
+			})
+			.catch((err) => {
+				console.error(err);
+				if (activeCommentReelId === reelId) {
+					showToast('Error al cargar comentarios', 'error');
+					commentsList = [];
+				}
+			})
+			.finally(() => {
+				if (activeCommentReelId === reelId) {
+					loadingComments = false;
+				}
+			});
+	}
+
 	function toggleComments(reelId, e) {
 		if (e) e.stopPropagation();
 
@@ -1648,38 +1911,17 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 			return;
 		}
 
-		const reel = reels.find((r) => r.id === reelId);
-		activeCommentReel = reel;
-		activeCommentReelId = reelId;
 		showCommentsModal = true;
-		loadingComments = true;
-		replyTo = null;
-		commentText = '';
-
-		reelsApi.comments
-			.list(reelId)
-			.then((res) => {
-				commentsList = res.comments || [];
-				// Auto-heal delta
-				const actual = commentsList.length;
-				const dbCount = reel.comment_count ?? 0;
-				commentCountDeltas[reelId] = actual - dbCount;
-			})
-			.catch((err) => {
-				console.error(err);
-				showToast('Error al cargar comentarios', 'error');
-				commentsList = [];
-			})
-			.finally(() => {
-				loadingComments = false;
-			});
+		loadCommentsForReel(reelId);
 	}
 
 	function closeComments() {
 		showCommentsModal = false;
 		activeCommentReelId = null;
+		activeCommentReel = null;
 		commentText = '';
 		replyTo = null;
+		commentsList = [];
 	}
 
 	function appendEmoji(emoji) {
@@ -1901,13 +2143,18 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 					class="vol-icon-btn"
 					onclick={toggleMute}
 					aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
+					title={isMuted
+						? 'Activar sonido (M)'
+						: `Silenciar (M) - ${Math.round(globalVolume * 100)}%`}
 				>
 					<span class="material-icons-round">
 						{isMuted || globalVolume === 0
 							? 'volume_off'
-							: globalVolume > 0.5
-								? 'volume_up'
-								: 'volume_down'}
+							: globalVolume < 0.35
+								? 'volume_mute'
+								: globalVolume < 0.7
+									? 'volume_down'
+									: 'volume_up'}
 					</span>
 				</button>
 
@@ -1920,7 +2167,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 						value={isMuted ? 0 : globalVolume}
 						oninput={handleVolumeChange}
 						class="aero-vol-slider"
+						style="--vol-pct: {isMuted ? 0 : Math.round(globalVolume * 100)}%;"
 						aria-label="Control de volumen"
+						title="Volumen: {Math.round((isMuted ? 0 : globalVolume) * 100)}%"
 					/>
 				</div>
 			</div>
@@ -1934,35 +2183,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				<span class="material-icons-round">keyboard</span>
 			</button>
 		</div>
-
-		<!-- Right Controls: Create Reel Button -->
-		<div class="top-actions-cluster">
-			<a href="/reels/create" class="btn-create-pill" title="Crear Reel">
-				<span class="material-icons-round">add_circle</span>
-				<span class="create-text">Crear</span>
-			</a>
-		</div>
 	</header>
-
-	<!-- Desktop Navigation Floating Chevrons -->
-	<div class="desktop-reel-nav">
-		<button
-			class="nav-chevron-btn"
-			disabled={activeReelIndex === 0}
-			onclick={() => scrollToReel(activeReelIndex - 1)}
-			title="Reel anterior (↑)"
-		>
-			<span class="material-icons-round">keyboard_arrow_up</span>
-		</button>
-		<button
-			class="nav-chevron-btn"
-			disabled={activeReelIndex >= reels.length - 1}
-			onclick={() => scrollToReel(activeReelIndex + 1)}
-			title="Siguiente reel (↓)"
-		>
-			<span class="material-icons-round">keyboard_arrow_down</span>
-		</button>
-	</div>
 
 	<!-- Main Feed Container -->
 	{#if loading}
@@ -1983,26 +2204,63 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		</div>
 	{:else}
 		<div class="reels-feed-column">
+			<!-- Desktop Navigation Floating Chevrons (Inside feed column) -->
+			<div class="desktop-reel-nav">
+				<a href="/reels/create" class="nav-create-btn" title="Crear Reel" aria-label="Crear Reel">
+					<span class="material-icons-round">add</span>
+				</a>
+				<button
+					class="nav-chevron-btn"
+					disabled={activeReelIndex === 0}
+					onclick={() => scrollToReel(activeReelIndex - 1)}
+					title="Reel anterior (↑)"
+				>
+					<span class="material-icons-round">keyboard_arrow_up</span>
+				</button>
+				<button
+					class="nav-chevron-btn"
+					disabled={activeReelIndex >= reels.length - 1}
+					onclick={() => scrollToReel(activeReelIndex + 1)}
+					title="Siguiente reel (↓)"
+				>
+					<span class="material-icons-round">keyboard_arrow_down</span>
+				</button>
+			</div>
+
 			<div class="reels-snap-viewport" bind:this={reelContainerEl}>
 				{#each reels as reel, i (reel.id)}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="reel-item"
 						class:active={i === activeReelIndex}
+						class:is-landscape={reelAspectRatios[reel.id]?.isLandscape}
+						class:is-portrait={!reelAspectRatios[reel.id]?.isLandscape}
 						data-index={i}
-						use:trackReel={i}
 						oncontextmenu={(e) => handleContextMenu(e, reel, i)}
 					>
-						{#if Math.abs(i - activeReelIndex) <= 2}
+						{#if Math.abs(i - activeReelIndex) <= 1}
 							<!-- YouTube Shorts Style Ambient Glow Canvas -->
-							<canvas class="ambient-canvas" class:ambient-hidden={!ambientEnabled}></canvas>
+							<canvas
+								class="ambient-canvas"
+								class:ambient-hidden={!ambientEnabled}
+								use:registerCanvas={i}
+							></canvas>
 						{/if}
 
 						<div class="vignette-overlay-top"></div>
 						<div class="vignette-overlay-bottom"></div>
 
 						<!-- Core Video Card Frame -->
-						<div class="reel-frame-wrapper" class:contain-mode={fitMode === 'contain'}>
+						<div
+							class="reel-frame-wrapper"
+							class:is-landscape={reelAspectRatios[reel.id]?.isLandscape}
+							class:is-portrait={!reelAspectRatios[reel.id]?.isLandscape}
+							style="--video-ratio: {reelAspectRatios[reel.id]?.ratio
+								? reelAspectRatios[reel.id].ratio
+								: reelAspectRatios[reel.id]?.isLandscape
+									? '16/9'
+									: '9/16'};"
+						>
 							<!-- Touch / Pointer Gesture Layer -->
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<div
@@ -2012,18 +2270,20 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 								onpointercancel={(e) => handlePointerCancel(e, reel, i)}
 								oncontextmenu={(e) => e.preventDefault()}
 							>
-								{#if Math.abs(i - activeReelIndex) <= 2}
+								{#if Math.abs(i - activeReelIndex) <= 1}
 									<video
 										src={reel.video_url}
 										class="main-video"
-										class:fit-cover={fitMode === 'cover'}
-										class:fit-contain={fitMode === 'contain'}
+										class:is-landscape={reelAspectRatios[reel.id]?.isLandscape}
+										class:is-portrait={!reelAspectRatios[reel.id]?.isLandscape}
 										class:video-disabled-blur={isFloatingPiPActive && i === activeReelIndex}
 										loop={!autoScrollNext}
 										playsinline
 										preload={Math.abs(i - activeReelIndex) <= 1 ? 'auto' : 'none'}
+										onloadedmetadata={(e) => handleVideoLoadedMetadata(e, reel, i)}
 										ontimeupdate={i === activeReelIndex ? handleTimeUpdate : null}
 										onended={() => handleVideoEnded(reel, i)}
+										use:registerVideo={i}
 									>
 										<track kind="captions" />
 									</video>
@@ -2093,9 +2353,19 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 								<!-- Bottom Info Overlay (Creator, Caption, Audio Track) -->
 								<div class="bottom-creator-overlay" onclick={(e) => e.stopPropagation()}>
 									<div class="creator-meta-line">
-										<a href="/u/{reel.username}" class="creator-name-link">
-											@{reel.username}
-										</a>
+										<ProfileHoverCard
+											username={reel.username}
+											basicUser={{
+												username: reel.username,
+												display_name: reel.display_name,
+												avatar_url: reel.avatar_url,
+												is_verified: reel.is_verified
+											}}
+										>
+											<a href="/u/{reel.username}" class="creator-name-link">
+												@{reel.username}
+											</a>
+										</ProfileHoverCard>
 										{#if reel.is_verified}
 											<span class="material-icons-round verified-icon" title="Verificado"
 												>verified</span
@@ -2160,13 +2430,23 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 							<aside class="right-action-sidebar" onclick={(e) => e.stopPropagation()}>
 								<!-- Creator Avatar with Follow Badge -->
 								<div class="avatar-action-wrapper">
-									<a href="/u/{reel.username}" class="creator-avatar-bubble">
-										{#if reel.avatar_url}
-											<img src={reel.avatar_url} alt={reel.username} loading="lazy" />
-										{:else}
-											<span class="avatar-letter">{(reel.username || '?')[0].toUpperCase()}</span>
-										{/if}
-									</a>
+									<ProfileHoverCard
+										username={reel.username}
+										basicUser={{
+											username: reel.username,
+											display_name: reel.display_name,
+											avatar_url: reel.avatar_url,
+											is_verified: reel.is_verified
+										}}
+									>
+										<a href="/u/{reel.username}" class="creator-avatar-bubble">
+											{#if reel.avatar_url}
+												<img src={reel.avatar_url} alt={reel.username} loading="lazy" />
+											{:else}
+												<span class="avatar-letter">{(reel.username || '?')[0].toUpperCase()}</span>
+											{/if}
+										</a>
+									</ProfileHoverCard>
 									{#if authStore.user?.username !== reel.username && !followStatusMap[reel.username]}
 										<button
 											class="avatar-follow-plus"
@@ -2278,10 +2558,13 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 							class="progress-bar-interactive"
 							class:hovered={isHoveringScrubber || isScrubbing}
 							onmouseenter={() => (isHoveringScrubber = true)}
-							onmouseleave={() => (isHoveringScrubber = false)}
-							onmousedown={handleScrubberMouseDown}
-							onmousemove={handleScrubberMouseMove}
-							onmouseup={handleScrubberMouseUp}
+							onmouseleave={() => {
+								if (!isScrubbing) isHoveringScrubber = false;
+							}}
+							onpointerdown={(e) => handleScrubberPointerDown(e, i)}
+							onpointermove={handleScrubberPointerMove}
+							onpointerup={handleScrubberPointerUp}
+							onpointercancel={handleScrubberPointerUp}
 						>
 							{#if (isHoveringScrubber || isScrubbing) && i === activeReelIndex}
 								<div class="time-preview-tooltip" style="left: {scrubHoverX}px;">
@@ -2592,40 +2875,21 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				<button
 					class="tt-menu-item"
 					onclick={() => {
-						enableFloatingPiP();
+						if (isFloatingPiPActive) {
+							disableFloatingPiP();
+						} else {
+							enableFloatingPiP();
+						}
 						showOptionsMenu = false;
 					}}
 				>
 					<div class="tt-item-left">
 						<span class="material-icons-round">picture_in_picture_alt</span>
-						<span>Reproductor flotante</span>
-					</div>
-				</button>
-
-				<!-- Ajuste de Video -->
-				<button class="tt-menu-item" onclick={toggleFitMode}>
-					<div class="tt-item-left">
-						<span class="material-icons-round">
-							{fitMode === 'cover' ? 'crop_free' : 'aspect_ratio'}
-						</span>
-						<span>Ajuste de pantalla</span>
-					</div>
-					<div class="tt-item-right">
-						<span>{fitMode === 'cover' ? 'Rellenar' : 'Ajustar'}</span>
-						<span class="material-icons-round arrow-icon">chevron_right</span>
-					</div>
-				</button>
-
-				<!-- Iluminación Ambiental -->
-				<button class="tt-menu-item" onclick={toggleAmbientMode}>
-					<div class="tt-item-left">
-						<span class="material-icons-round">
-							{ambientEnabled ? 'blur_on' : 'blur_off'}
-						</span>
-						<span>Iluminación ambiental</span>
-					</div>
-					<div class="tt-item-right">
-						<span>{ambientEnabled ? 'Activada' : 'Desactivada'}</span>
+						<span
+							>{isFloatingPiPActive
+								? 'Desactivar reproductor flotante'
+								: 'Reproductor flotante'}</span
+						>
 					</div>
 				</button>
 
@@ -2729,51 +2993,21 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				<button
 					class="tt-menu-item"
 					onclick={() => {
-						enableFloatingPiP();
+						if (isFloatingPiPActive) {
+							disableFloatingPiP();
+						} else {
+							enableFloatingPiP();
+						}
 						showContextMenu = false;
 					}}
 				>
 					<div class="tt-item-left">
 						<span class="material-icons-round">picture_in_picture_alt</span>
-						<span>Reproductor flotante</span>
-					</div>
-				</button>
-
-				<!-- Ajuste de Video -->
-				<button
-					class="tt-menu-item"
-					onclick={() => {
-						toggleFitMode();
-						showContextMenu = false;
-					}}
-				>
-					<div class="tt-item-left">
-						<span class="material-icons-round">
-							{fitMode === 'cover' ? 'crop_free' : 'aspect_ratio'}
-						</span>
-						<span>Ajuste de pantalla</span>
-					</div>
-					<div class="tt-item-right">
-						<span>{fitMode === 'cover' ? 'Rellenar' : 'Ajustar'}</span>
-					</div>
-				</button>
-
-				<!-- Iluminación Ambiental -->
-				<button
-					class="tt-menu-item"
-					onclick={() => {
-						toggleAmbientMode();
-						showContextMenu = false;
-					}}
-				>
-					<div class="tt-item-left">
-						<span class="material-icons-round">
-							{ambientEnabled ? 'blur_on' : 'blur_off'}
-						</span>
-						<span>Iluminación ambiental</span>
-					</div>
-					<div class="tt-item-right">
-						<span>{ambientEnabled ? 'Activada' : 'Desactivada'}</span>
+						<span
+							>{isFloatingPiPActive
+								? 'Desactivar reproductor flotante'
+								: 'Reproductor flotante'}</span
+						>
 					</div>
 				</button>
 
@@ -2872,6 +3106,10 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 						<span>Silenciar / Activar sonido</span>
 					</div>
 					<div class="shortcut-item">
+						<kbd>+</kbd> / <kbd>-</kbd>
+						<span>Ajustar volumen (±5%)</span>
+					</div>
+					<div class="shortcut-item">
 						<kbd>L</kbd>
 						<span>Me gusta (Like)</span>
 					</div>
@@ -2954,6 +3192,15 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		.reels-master-viewport {
 			position: fixed;
 			z-index: 50;
+			/* Se dimensiona contra el visual viewport: al abrir el teclado (p.ej.
+			   comentarios) la vista se encoge y el input queda visible. */
+			top: var(--vv-top, 0px);
+			height: var(--vv-height, 100vh);
+			bottom: auto;
+			/* Clearance del MobileNav global (fixed bottom, z-index 200, ~92px de alto).
+			   Toda superficie interactiva de /reels (scrubber, overlays, drawer de
+			   comentarios) debe anclarse por encima de esta altura o quedará tapada. */
+			--mnav-clearance: 96px;
 		}
 	}
 
@@ -3059,38 +3306,43 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	@media (min-width: 769px) {
 		.reels-master-viewport.comments-open .reels-top-bar {
 			right: 464px;
+			justify-content: flex-start;
+			gap: 14px;
 		}
 	}
 
 	/* ── Volume Pill Capsule (Aero Style) ────────────────────────────────── */
+	/* Vidrio oscuro translúcido (misma receta que .nav-chevron-btn): la barra
+	   flota sobre el reel y una superficie opaca del tema choca con cualquier
+	   video cálido/brillante detrás. El vidrio se funde con el contenido. */
 	.volume-pill-capsule {
 		display: flex;
 		align-items: center;
-		height: 44px;
-		background: var(--bg-surface-solid);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid var(--border-subtle);
-		border-top: 1px solid var(--glass-border-t);
+		height: 42px;
+		background: rgba(15, 23, 42, 0.72);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-top: 1px solid rgba(255, 255, 255, 0.38);
 		border-radius: var(--radius-full);
-		padding: 4px 14px 4px 4px;
-		gap: 10px;
-		box-shadow: var(--shadow-sm), var(--glass-inset-highlight);
+		padding: 3px 12px 3px 4px;
+		gap: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 		transition: all 0.25s var(--ease-spring);
 	}
 	.volume-pill-capsule:hover {
-		background: var(--bg-surface-hover);
-		border-color: rgba(var(--accent-blue-rgb), 0.35);
+		background: rgba(15, 23, 42, 0.88);
+		border-color: rgba(var(--accent-blue-rgb), 0.45);
 		box-shadow:
-			0 6px 20px rgba(0, 0, 0, 0.2),
-			var(--glass-inset-highlight);
+			0 6px 20px rgba(0, 0, 0, 0.45),
+			0 0 14px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.vol-icon-btn {
-		width: 36px;
-		height: 36px;
-		flex: 0 0 36px;
-		min-width: 36px;
-		min-height: 36px;
+		width: 38px;
+		height: 38px;
+		flex: 0 0 38px;
+		min-width: 38px;
+		min-height: 38px;
 		border-radius: 50%;
 		background: rgba(var(--accent-blue-rgb), 0.12);
 		border: none;
@@ -3109,54 +3361,99 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		color: var(--accent-blue-light);
 		transform: scale(1.08);
 	}
+	.vol-icon-btn .material-icons-round {
+		font-size: 26px;
+	}
 	.vol-slider-wrap {
 		display: flex;
 		align-items: center;
-		width: 85px;
+		width: 90px;
+		transition: width 0.25s var(--ease-spring);
+	}
+	.volume-pill-capsule:hover .vol-slider-wrap {
+		width: 100px;
 	}
 	.aero-vol-slider {
 		-webkit-appearance: none;
 		appearance: none;
 		width: 100%;
-		height: 5px;
-		background: rgba(128, 128, 128, 0.25);
+		height: 6px;
+		background: linear-gradient(
+			to right,
+			var(--aero-sky, #2eb4ff) 0%,
+			var(--accent-blue-base, #1b85f3) var(--vol-pct, 50%),
+			rgba(255, 255, 255, 0.18) var(--vol-pct, 50%),
+			rgba(255, 255, 255, 0.18) 100%
+		);
 		border-radius: 999px;
 		outline: none;
 		cursor: pointer;
+		transition: background 0.1s linear;
 	}
 	.aero-vol-slider::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 16px;
-		height: 18px;
-		border-radius: 6px;
-		background: var(--aero-sky, #2eb4ff);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: #ffffff;
+		border: 2px solid var(--accent-blue-base, #1b85f3);
+		box-shadow:
+			0 2px 6px rgba(0, 0, 0, 0.35),
+			0 0 6px rgba(46, 180, 255, 0.5);
 		cursor: pointer;
-		transition: transform 0.15s ease;
+		transition:
+			transform 0.15s ease,
+			box-shadow 0.15s ease;
+		margin-top: 0;
 	}
 	.aero-vol-slider::-webkit-slider-thumb:hover {
-		transform: scale(1.15);
+		transform: scale(1.25);
+		box-shadow:
+			0 2px 10px rgba(0, 0, 0, 0.5),
+			0 0 10px rgba(46, 180, 255, 0.8);
+	}
+	.aero-vol-slider::-moz-range-thumb {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		background: #ffffff;
+		border: 2px solid var(--accent-blue-base, #1b85f3);
+		box-shadow:
+			0 2px 6px rgba(0, 0, 0, 0.35),
+			0 0 6px rgba(46, 180, 255, 0.5);
+		cursor: pointer;
+		transition:
+			transform 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+	.aero-vol-slider::-moz-range-thumb:hover {
+		transform: scale(1.25);
+		box-shadow:
+			0 2px 10px rgba(0, 0, 0, 0.5),
+			0 0 10px rgba(46, 180, 255, 0.8);
 	}
 
 	/* ── Top Clusters & Aero Pill Buttons ────────────────────────────────── */
-	.top-left-cluster,
-	.top-actions-cluster {
+	.top-left-cluster {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 	}
+	/* Vidrio oscuro translúcido sobre video (receta .nav-chevron-btn): los
+	   tokens opacos del tema (--bg-surface-solid) renderizan una pastilla
+	   sólida que choca con reels cálidos/brillantes detrás. */
 	.aero-pill-btn {
 		height: 44px;
 		min-height: 44px;
 		padding: 0 18px;
 		border-radius: var(--radius-full);
-		background: var(--bg-surface-solid);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid var(--border-subtle);
-		border-top: 1px solid var(--glass-border-t);
-		color: var(--text-primary);
+		background: rgba(15, 23, 42, 0.72);
+		backdrop-filter: blur(14px);
+		-webkit-backdrop-filter: blur(14px);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-top: 1px solid rgba(255, 255, 255, 0.38);
+		color: #ffffff;
 		font-family: var(--font-display);
 		font-weight: 700;
 		font-size: 0.9rem;
@@ -3186,8 +3483,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		height: 45%;
 		background: linear-gradient(
 			180deg,
-			rgba(255, 255, 255, 0.35) 0%,
-			rgba(255, 255, 255, 0.02) 100%
+			rgba(255, 255, 255, 0.16) 0%,
+			rgba(255, 255, 255, 0.01) 100%
 		);
 		border-radius: var(--radius-full) var(--radius-full) 0 0;
 		pointer-events: none;
@@ -3195,12 +3492,12 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	}
 	.aero-pill-btn:hover {
 		transform: translateY(-2px) scale(1.06);
-		background: var(--bg-surface-hover);
+		background: rgba(15, 23, 42, 0.9);
 		color: var(--accent-blue-light);
 		border-color: rgba(var(--accent-blue-rgb), 0.45);
 		box-shadow:
-			0 6px 20px rgba(var(--accent-blue-rgb), 0.35),
-			var(--glass-inset-highlight);
+			0 6px 20px rgba(0, 0, 0, 0.45),
+			0 0 14px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.aero-pill-btn:active {
 		transform: translateY(1px) scale(0.96);
@@ -3218,7 +3515,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		min-height: 44px;
 	}
 	.aero-pill-btn.icon-only .material-icons-round {
-		font-size: 1.35rem;
+		font-size: 1.7rem;
 		line-height: 1;
 		display: flex;
 		align-items: center;
@@ -3227,92 +3524,133 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		z-index: 2;
 	}
 
-	.btn-create-pill {
-		height: 44px;
-		padding: 0 18px;
-		border-radius: var(--radius-full);
-		background: linear-gradient(135deg, var(--aero-blue), var(--aero-sky));
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		color: #ffffff;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-weight: 800;
-		font-size: 0.9rem;
-		text-decoration: none;
-		box-shadow: 0 6px 20px rgba(27, 133, 243, 0.4);
-		transition: all 0.25s var(--ease-spring);
-	}
-	.btn-create-pill:hover {
-		transform: translateY(-2px) scale(1.04);
-		box-shadow: 0 8px 25px rgba(27, 133, 243, 0.6);
+	@media (max-width: 768px) {
+		/* En móvil la barra superior se descongestiona: el slider de volumen se
+		   sustituye por el toggle de mute (el volumen se ajusta con las teclas
+		   físicas) y los atajos de teclado no aplican en táctil. "Crear" vive en
+		   el MobileNav global (botón central acentuado → /posts/create). */
+		.vol-slider-wrap {
+			display: none;
+		}
+		.top-left-cluster .aero-pill-btn {
+			display: none;
+		}
 	}
 
 	/* ── Desktop Chevrons ─────────────────────────────────────────────────── */
 	.desktop-reel-nav {
 		position: absolute;
-		right: 32px;
+		right: 20px;
 		top: 50%;
 		transform: translateY(-50%);
 		z-index: 90;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 12px;
 		transition:
 			right 0.4s var(--ease-spring),
+			bottom 0.4s var(--ease-spring),
 			opacity 0.3s ease,
 			transform 0.4s var(--ease-spring);
 	}
-	@media (max-width: 960px) {
+	@media (max-width: 768px) {
 		.desktop-reel-nav {
 			display: none;
 		}
 	}
-	@media (min-width: 961px) {
+	@media (min-width: 769px) and (max-width: 1399px) {
 		.reels-master-viewport.comments-open .desktop-reel-nav {
-			right: 464px;
+			top: auto;
+			bottom: 24px;
+			right: 20px;
+			transform: none;
+			flex-direction: row;
+			gap: 10px;
 		}
 	}
-	@media (max-width: 1100px) {
+	/* Con los comentarios abiertos el cluster se recoge junto al video y,
+	   según el formato del reel, el botón terminaría montado sobre su
+	   contenido: se oculta — crear no aporta durante la lectura. */
+	.reels-master-viewport.comments-open .desktop-reel-nav .nav-create-btn {
+		display: none;
+	}
+	@media (min-width: 1400px) {
 		.reels-master-viewport.comments-open .desktop-reel-nav {
-			opacity: 0;
-			pointer-events: none;
+			right: 24px;
+			top: 50%;
+			transform: translateY(-50%);
+			flex-direction: column;
 		}
 	}
 	.nav-chevron-btn {
-		width: 48px;
-		height: 48px;
-		flex: 0 0 48px;
-		min-width: 48px;
-		min-height: 48px;
-		border-radius: var(--radius-squircle);
-		background: var(--bg-surface-solid);
-		border: 1px solid var(--border-subtle);
-		border-top: 1px solid var(--glass-border-t);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		color: var(--text-primary);
+		width: 42px;
+		height: 42px;
+		flex: 0 0 42px;
+		min-width: 42px;
+		min-height: 42px;
+		border-radius: 50%;
+		background: rgba(15, 23, 42, 0.75);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-top: 1px solid rgba(255, 255, 255, 0.4);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		color: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
 		transition: all 0.25s var(--ease-spring);
-		box-shadow: var(--shadow-sm), var(--glass-inset-highlight);
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 	}
 	.nav-chevron-btn:not(:disabled):hover {
-		background: var(--bg-surface-hover);
+		background: rgba(255, 255, 255, 0.2);
 		color: var(--accent-blue-light);
-		border-color: rgba(var(--accent-blue-rgb), 0.4);
-		transform: scale(1.1);
-		box-shadow: 0 6px 20px rgba(var(--accent-blue-rgb), 0.35);
+		border-color: rgba(var(--accent-blue-rgb), 0.5);
+		transform: scale(1.12);
+		box-shadow: 0 6px 20px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.nav-chevron-btn:disabled {
-		opacity: 0.45;
+		opacity: 0.35;
 		cursor: not-allowed;
 		color: var(--text-muted);
-		background: var(--glass-bg);
-		border-color: var(--border-subtle);
+		background: rgba(15, 23, 42, 0.4);
+		border-color: rgba(255, 255, 255, 0.08);
 		box-shadow: none;
+	}
+	/* Crear Reel: acción global del feed, anclada arriba en la columna de
+	   navegación (con las flechas ↑/↓) en vez de la barra superior. */
+	.nav-create-btn {
+		width: 42px;
+		height: 42px;
+		flex: 0 0 42px;
+		min-width: 42px;
+		min-height: 44px;
+		border-radius: var(--radius-squircle, 14px);
+		background: linear-gradient(135deg, var(--aero-blue), var(--aero-sky));
+		border: 1px solid rgba(255, 255, 255, 0.35);
+		color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-decoration: none;
+		box-shadow:
+			0 4px 16px rgba(27, 133, 243, 0.45),
+			inset 0 1px 0 rgba(255, 255, 255, 0.35);
+		transition: all 0.25s var(--ease-spring);
+		margin-bottom: 10px;
+	}
+	.nav-create-btn .material-icons-round {
+		font-size: 26px;
+	}
+	.nav-create-btn:hover {
+		transform: translateY(-2px) scale(1.1);
+		box-shadow:
+			0 8px 26px rgba(27, 133, 243, 0.65),
+			inset 0 1px 0 rgba(255, 255, 255, 0.35);
+	}
+	.nav-create-btn:focus-visible {
+		outline: 2px solid #ffffff;
+		outline-offset: 2px;
 	}
 
 	/* ── Loading & Empty Screens ──────────────────────────────────────────── */
@@ -3370,6 +3708,12 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		display: flex;
 		justify-content: center;
 		background: #000000;
+		transition: margin-right 0.35s var(--ease-spring);
+	}
+	@media (min-width: 769px) {
+		.reels-master-viewport.comments-open .reels-feed-column {
+			margin-right: 440px;
+		}
 	}
 
 	.reels-snap-viewport {
@@ -3400,6 +3744,16 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		position: relative;
 		overflow: hidden;
 	}
+	.reel-item.has-active-hover-card {
+		z-index: 300;
+		overflow: visible;
+	}
+	.reel-item:global(.has-active-hover-card) .ambient-canvas {
+		opacity: 0;
+	}
+	.reel-item:global(.has-active-hover-card) .ambient-canvas.ambient-hidden {
+		display: none;
+	}
 
 	/* Ambient Lighting Glow Canvas */
 	.ambient-canvas {
@@ -3408,15 +3762,21 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		width: 130%;
 		height: 130%;
 		object-fit: cover;
-		filter: blur(45px) brightness(0.4) saturate(1.4);
+		filter: blur(28px) brightness(0.65) saturate(1.4);
 		z-index: 1;
 		pointer-events: none;
-		transform: scale(1.1);
+		transform: scale(1.1) translateZ(0);
+		will-change: transform;
+		contain: strict;
 		transition: opacity 0.3s ease;
 	}
 	.ambient-canvas.ambient-hidden {
 		display: none;
 		opacity: 0;
+	}
+
+	:global([data-perf-mode='true']) .ambient-canvas {
+		filter: blur(16px) brightness(0.65) saturate(1.4);
 	}
 
 	/* Vignettes */
@@ -3450,18 +3810,106 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		justify-content: center;
 		align-items: center;
 		z-index: 3;
-		transition: transform 0.4s var(--ease-spring);
+		transition:
+			width 0.35s var(--ease-spring),
+			transform 0.4s var(--ease-spring);
+	}
+
+	@media (max-width: 768px) {
+		/* En móvil, los videos 16:9 (horizontales) se muestran completos en
+		   aspect-ratio nativo, centrados verticalmente, con el canvas ambiental
+		   llenando el fondo. CLAVE: es el WRAPPER quien adopta la forma de la banda
+		   del vídeo (no un hijo). Así los overlays absolutos (creador, rail de
+		   acciones) se anclan al borde inferior DEL VÍDEO en vez de flotar a media
+		   pantalla encima de la obra. */
+		.reel-frame-wrapper.is-landscape {
+			width: 100%;
+			height: auto;
+			aspect-ratio: var(--video-ratio, 16 / 9);
+			max-height: calc(100% - 170px);
+		}
+		.reel-frame-wrapper.is-landscape .gesture-interaction-area {
+			width: 100%;
+			height: 100%;
+			border-radius: var(--radius-sm);
+			overflow: hidden;
+			box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7);
+		}
+		.reel-frame-wrapper.is-landscape .main-video {
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			background: transparent;
+		}
+
+		/* Overlays anclados DENTRO de la banda del video (estilo TikTok horizontal):
+		   offsets pequeños, no los de pantalla completa. */
+		.reel-frame-wrapper.is-landscape .bottom-creator-overlay {
+			left: 14px;
+			right: 76px;
+			bottom: 10px;
+		}
+		/* Rail compacto centrado sobre la banda 16:9: los contadores de texto
+		   saturan una banda de ~210px, así que en horizontal móvil se muestran solo
+		   iconos (escudos de 44px intactos). Avatar y vinilo se omiten: el nombre y
+		   la pista ya viven en el overlay inferior izquierdo. */
+		.reel-frame-wrapper.is-landscape .right-action-sidebar {
+			right: 8px;
+			top: 50%;
+			bottom: auto;
+			transform: translateY(-50%);
+			gap: 14px;
+		}
+		.reel-frame-wrapper.is-landscape .right-action-sidebar .action-count,
+		.reel-frame-wrapper.is-landscape .right-action-sidebar .action-label {
+			display: none;
+		}
+		.reel-frame-wrapper.is-landscape .right-action-sidebar .avatar-action-wrapper,
+		.reel-frame-wrapper.is-landscape .right-action-sidebar .spinning-disc-container {
+			display: none;
+		}
 	}
 
 	@media (min-width: 769px) {
-		.reel-frame-wrapper {
-			width: 420px;
+		.reel-frame-wrapper,
+		.reel-frame-wrapper.is-portrait {
+			width: auto;
 			height: calc(100% - 40px);
 			max-height: 860px;
+			aspect-ratio: 9 / 16;
+			max-width: min(calc(100vw - 200px), 440px);
+			transform: translateX(-30px);
 		}
-		.reels-master-viewport.comments-open .reel-frame-wrapper {
-			transform: translateX(-180px);
+		.reels-master-viewport.comments-open .reel-frame-wrapper,
+		.reels-master-viewport.comments-open .reel-frame-wrapper.is-portrait {
+			width: auto;
+			height: min(calc(100% - 40px), 800px);
+			max-height: 800px;
+			aspect-ratio: 9 / 16;
+			max-width: min(calc(100% - 180px), 380px);
+			transform: translateX(-30px);
 		}
+
+		/* ── Douyin / TikTok 16:9 Widescreen Adaptive Layout ── */
+		.reel-frame-wrapper.is-landscape {
+			width: min(calc(100vw - 360px), 980px);
+			max-width: 1040px;
+			height: auto;
+			aspect-ratio: var(--video-ratio, 16 / 9);
+			max-height: calc(100vh - 130px);
+			margin-top: 18px;
+			transform: translateX(-30px);
+		}
+		.reels-master-viewport.comments-open .reel-frame-wrapper.is-landscape {
+			width: min(calc(100% - 180px), 680px);
+			max-width: 680px;
+			height: auto;
+			aspect-ratio: var(--video-ratio, 16 / 9);
+			max-height: calc(100vh - 130px);
+			margin-top: 18px;
+			transform: translateX(-30px);
+		}
+
 		.gesture-interaction-area {
 			border-radius: var(--radius-lg);
 			overflow: hidden;
@@ -3477,7 +3925,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		background: #000000;
+		background: transparent;
 		cursor: pointer;
 	}
 
@@ -3486,16 +3934,17 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		width: 100%;
 		height: 100%;
 		display: block;
-		background: #000000;
+		background: transparent;
+		object-fit: cover;
 		transition:
 			filter 0.3s ease,
 			transform 0.3s ease;
 	}
-	.main-video.fit-cover {
+	.main-video.is-landscape {
 		object-fit: cover;
 	}
-	.main-video.fit-contain {
-		object-fit: contain;
+	.main-video.is-portrait {
+		object-fit: cover;
 	}
 	.main-video.video-disabled-blur {
 		filter: blur(18px) brightness(0.35);
@@ -3628,12 +4077,29 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	}
 	.floating-heart-halo {
 		position: absolute;
-		width: 110px;
-		height: 110px;
+		width: 98px;
+		height: 98px;
 		border-radius: 50%;
-		border: 4px solid var(--aero-rose, #ec4899);
-		animation: vsRingBurst 0.6s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+		border: 3px solid rgba(244, 63, 94, 0.85);
+		animation: reelsRingBurst 0.55s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 		pointer-events: none;
+	}
+	@keyframes reelsRingBurst {
+		0% {
+			transform: scale(0.2);
+			border-color: #ec4899;
+			opacity: 0.9;
+		}
+		45% {
+			transform: scale(1.08);
+			border-color: #f43f5e;
+			opacity: 0.65;
+		}
+		100% {
+			transform: scale(1.55);
+			border-color: #38bdf8;
+			opacity: 0;
+		}
 	}
 	.floating-heart-sparks {
 		position: absolute;
@@ -3655,9 +4121,12 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		animation: vsSparkleFly 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 	}
 	.floating-heart .material-icons-round {
-		font-size: 96px;
-		filter: drop-shadow(0 0 28px rgba(244, 63, 94, 0.9))
-			drop-shadow(0 0 6px rgba(236, 72, 153, 0.8));
+		font-size: 88px;
+		filter: drop-shadow(0 0 22px rgba(244, 63, 94, 0.75))
+			drop-shadow(0 0 5px rgba(236, 72, 153, 0.7));
+	}
+	.floating-heart {
+		will-change: transform, opacity;
 	}
 	@keyframes vsHeartExplode {
 		0% {
@@ -3696,10 +4165,34 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
 		pointer-events: none;
 	}
+	@media (max-width: 768px) {
+		/* En móvil la barra de navegación inferior (MobileNav) flota sobre el
+		   viewport; subimos el overlay del creador para que no quede tapado. */
+		.bottom-creator-overlay {
+			bottom: calc(var(--mnav-clearance, 96px) + 22px);
+		}
+	}
 	@media (min-width: 769px) {
 		.bottom-creator-overlay {
 			right: 16px;
 			bottom: 18px;
+		}
+		.reel-frame-wrapper.is-landscape .bottom-creator-overlay {
+			left: 24px;
+			right: 90px;
+			bottom: 22px;
+			max-width: 680px;
+		}
+		.reels-master-viewport.comments-open .reel-frame-wrapper.is-landscape .bottom-creator-overlay {
+			max-width: 480px;
+		}
+		.reel-frame-wrapper.is-landscape .caption-text {
+			font-size: 0.96rem;
+			line-height: 1.45;
+			-webkit-line-clamp: 3;
+		}
+		.reel-frame-wrapper.is-landscape .sound-track-ticker {
+			max-width: 380px;
 		}
 	}
 	.bottom-creator-overlay > * {
@@ -3723,7 +4216,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		text-decoration: underline;
 	}
 	.verified-icon {
-		font-size: 16px;
+		font-size: 19px;
 		color: var(--aero-sky);
 	}
 	.btn-inline-follow {
@@ -3800,7 +4293,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		max-width: 260px;
 	}
 	.music-icon {
-		font-size: 16px;
+		font-size: 19px;
 		color: var(--aero-sky);
 	}
 	.marquee-track {
@@ -3833,9 +4326,20 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		gap: 18px;
 		pointer-events: auto;
 	}
+	@media (max-width: 768px) {
+		/* Igual que el overlay del creador: subir las acciones por encima de la
+		   barra de navegación inferior en móvil. */
+		.right-action-sidebar {
+			bottom: calc(var(--mnav-clearance, 96px) + 22px);
+		}
+	}
 	@media (min-width: 769px) {
 		.right-action-sidebar {
-			right: -72px;
+			right: -66px;
+			bottom: 12px;
+		}
+		.reel-frame-wrapper.is-landscape .right-action-sidebar {
+			right: -64px;
 			bottom: 12px;
 		}
 	}
@@ -3896,7 +4400,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		transform: translateX(-50%) scale(1.2);
 	}
 	.avatar-follow-plus .material-icons-round {
-		font-size: 14px;
+		font-size: 16px;
 		font-weight: 900;
 	}
 
@@ -3919,6 +4423,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		transform: scale(0.9);
 	}
 	.action-bubble-btn .icon-wrap {
+		position: relative;
 		width: 44px;
 		height: 44px;
 		flex: 0 0 44px;
@@ -3934,8 +4439,42 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 		transition: all 0.2s;
 	}
+
+	/* Like feedback refinado: ancla anillo/destellos al centro del icono y
+	   pule el “pop” del corazón con un spring más suave y luminoso. */
+	.action-bubble-btn .icon-wrap .material-icons-round {
+		will-change: transform;
+	}
+	.action-bubble-btn .icon-wrap .heart-pop {
+		animation: reelsHeartPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	}
+	.action-bubble-btn .icon-wrap .like-ring,
+	.action-bubble-btn .icon-wrap .like-ring-glow,
+	.action-bubble-btn .icon-wrap .like-sparkles {
+		will-change: transform, opacity;
+	}
+	@keyframes reelsHeartPop {
+		0% {
+			transform: scale(1);
+		}
+		35% {
+			transform: scale(1.4);
+			filter: drop-shadow(0 0 12px rgba(244, 63, 94, 0.8));
+		}
+		60% {
+			transform: scale(0.86);
+			filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.45));
+		}
+		78% {
+			transform: scale(1.12);
+		}
+		100% {
+			transform: scale(1);
+			filter: drop-shadow(0 0 3px rgba(236, 72, 153, 0.35));
+		}
+	}
 	.action-bubble-btn .material-icons-round {
-		font-size: 26px;
+		font-size: 32px;
 	}
 	.action-bubble-btn.active .icon-wrap {
 		background: rgba(244, 63, 94, 0.2);
@@ -3945,7 +4484,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	}
 	.action-count,
 	.action-label {
-		font-size: 0.75rem;
+		font-size: 0.8rem;
 		font-weight: 800;
 		color: #ffffff;
 		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
@@ -4017,11 +4556,23 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		bottom: 0;
 		left: 0;
 		width: 100%;
-		height: 12px;
+		height: 18px;
 		z-index: 30;
 		cursor: pointer;
 		display: flex;
 		align-items: flex-end;
+		touch-action: none;
+		user-select: none;
+	}
+	@media (max-width: 768px) {
+		/* El scrubber vive DENTRO de .reels-master-viewport (z 50) y el MobileNav
+		   global flota por encima (z 200, ~92px): con bottom:64px quedaba oculto
+		   bajo la barra y era imposible verlo o arrastrarlo. Se ancla sobre el nav
+		   y se amplía la zona táctil. */
+		.progress-bar-interactive {
+			bottom: calc(var(--mnav-clearance, 96px) + 6px);
+			height: 26px;
+		}
 	}
 	.track-bg {
 		width: 100%;
@@ -4076,7 +4627,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		height: 100%;
 		background: var(--bg-surface-solid, #0f172a);
 		border-left: 1px solid var(--border-subtle);
-		box-shadow: -10px 0 40px rgba(0, 0, 0, 0.35);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 		z-index: 150;
 		display: flex;
 		flex-direction: column;
@@ -4086,14 +4637,17 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		color: var(--text-primary);
 	}
 	@media (max-width: 768px) {
+		/* Bottom-sheet flotando POR ENCIMA del MobileNav global: con bottom:0 el
+		   composer (emojis rápidos + input) quedaba oculto tras la barra. La altura
+		   usa --vv-height (visual viewport) para encogerse cuando abre el teclado. */
 		.reels-comments-drawer {
 			width: 100%;
-			height: 75vh;
+			height: min(calc(var(--vv-height, 100vh) * 0.72), calc(100% - 130px));
 			top: auto;
-			bottom: 0;
-			border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-			border-top: 1px solid var(--border-subtle);
-			border-left: none;
+			bottom: var(--mnav-clearance, 96px);
+			border-radius: var(--radius-lg);
+			border: 1px solid var(--border-subtle);
+			box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.6);
 		}
 	}
 
@@ -4324,7 +4878,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		padding: 14px 18px 18px;
 		border-top: 1px solid var(--border-subtle);
 		background: var(--bg-surface-solid);
-		box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+		box-shadow: 0 -4px 18px rgba(14, 165, 233, 0.08);
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
@@ -4756,9 +5310,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		color: var(--aero-sky);
 		font-size: 0.82rem;
 		font-weight: 700;
-	}
-	.tt-item-right .arrow-icon {
-		font-size: 16px;
 	}
 	.tt-menu-divider {
 		border: none;

@@ -762,7 +762,7 @@
 			transform 0.18s,
 			box-shadow 0.18s,
 			border-color 0.18s;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-xs), var(--shadow-glow);
 	}
 	.sc-color-swatch:hover {
 		transform: scale(1.15);
@@ -771,7 +771,7 @@
 		border-color: #fff;
 		box-shadow:
 			0 0 0 2px var(--aero-blue),
-			0 4px 12px rgba(0, 0, 0, 0.3);
+			0 0 12px rgba(var(--accent-blue-rgb), 0.5);
 		transform: scale(1.1);
 	}
 
@@ -785,7 +785,7 @@
 		transition:
 			transform 0.18s,
 			box-shadow 0.18s;
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-xs), var(--shadow-glow);
 	}
 	.sc-color-dot:hover {
 		transform: scale(1.2);

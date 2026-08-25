@@ -363,8 +363,14 @@
 						<div class="glass-card market-item-card">
 							<!-- Thumbnail -->
 							<div class="item-thumbnail">
-								{#if item.media_url || item.image_url}
-									<img src={item.media_url || item.image_url} alt={item.title} class="item-img" />
+								{#if item.thumbnail_url || item.media_url || item.image_url}
+									<img
+										src={item.thumbnail_url || item.media_url || item.image_url}
+										alt={item.title}
+										class="item-img"
+										loading="lazy"
+										decoding="async"
+									/>
 								{:else}
 									<div class="item-placeholder">
 										<span class="material-icons-round">design_services</span>
@@ -621,7 +627,7 @@
 					{/if}
 
 					<a
-						href={`/messages?user=${selectedItem.seller_username || selectedItem.username}`}
+						href={`/messages?peer=${encodeURIComponent(selectedItem.seller_username || selectedItem.username)}&product=${selectedItem.id}`}
 						class={selectedItem.payment_link
 							? 'btn-aero-secondary contact-btn'
 							: 'btn-aero-primary contact-btn'}

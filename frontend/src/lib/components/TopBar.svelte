@@ -1,22 +1,12 @@
 <script>
 	import { goto } from '$app/navigation';
-	import { authStore } from '$lib/stores/auth.svelte.js';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
-	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 
 	let searchQuery = $state('');
 	let searchFocused = $state(false);
-	let dropdownOpen = $state(false);
-	let dropdownRef = $state(null);
 	let searchWrapRef = $state(null);
-
-	// Presencia → variante del anillo aero (mismo mapeo que en el SideNav)
-	const _avatarPresence = $derived.by(() => {
-		const s = authStore.user?.custom_status || 'online';
-		return s === 'invisible' || s === 'offline' ? 'is-offline' : `is-${s}`;
-	});
 	let recentSearches = $state([]);
 	let searchResults = $state({ users: [], posts: [] });
 	let isSearching = $state(false);
@@ -98,10 +88,6 @@
 		searchFocused = false;
 	}
 
-	function toggleDropdown() {
-		dropdownOpen = !dropdownOpen;
-	}
-
 	onMount(() => {
 		try {
 			const saved = localStorage.getItem('vs_recent_searches');
@@ -109,9 +95,6 @@
 		} catch (_e) {}
 
 		function handleClickOutside(e) {
-			if (dropdownRef && !dropdownRef.contains(e.target)) {
-				dropdownOpen = false;
-			}
 			if (searchWrapRef && !searchWrapRef.contains(e.target)) {
 				searchFocused = false;
 			}
@@ -133,7 +116,7 @@
 				bind:value={searchQuery}
 				onfocus={() => (searchFocused = true)}
 				onkeydown={handleSearch}
-				placeholder={searchFocused ? 'Buscar' : 'Buscar creadores, posts…'}
+				placeholder={searchFocused ? 'Buscar' : 'Buscar creadores, posts, hashtags…'}
 				class="vs-search-input"
 				autocomplete="off"
 			/>
@@ -297,73 +280,6 @@
 	<div class="vs-actions">
 		<!-- Theme toggle -->
 		<ThemeSelector compact={true} align="right" />
-
-		<!-- Avatar + Dropdown -->
-		{#if authStore.user}
-			<div class="vs-avatar-wrap" bind:this={dropdownRef}>
-				<button class="vs-avatar-btn" onclick={toggleDropdown} aria-expanded={dropdownOpen}>
-					<AeroAvatar
-						src={authStore.user.avatar_url}
-						alt={authStore.user.username}
-						size="sm"
-						online={authStore.user?.custom_status === 'online' || !authStore.user?.custom_status}
-						away={authStore.user?.custom_status === 'away'}
-						busy={authStore.user?.custom_status === 'busy'}
-					/>
-				</button>
-
-				{#if dropdownOpen}
-					<div class="vs-dropdown">
-						<div class="vs-dropdown-inner">
-							<div class="vs-dropdown-header">
-								<p class="vs-dd-name">{authStore.user.display_name || authStore.user.username}</p>
-								<p class="vs-dd-handle">@{authStore.user.username}</p>
-							</div>
-							<div class="vs-dropdown-divider"></div>
-							<a
-								href={authStore.user?.username ? `/u/${authStore.user.username}` : '/settings'}
-								class="vs-dd-item"
-							>
-								<span class="material-icons-round" style="font-size:20px">person</span>
-								Mi Perfil
-							</a>
-							<a href="/settings" class="vs-dd-item">
-								<span class="material-icons-round" style="font-size:20px">settings</span>
-								Ajustes
-							</a>
-							{#if authStore.isTeamOrHigher}
-								<a href="/studio/emotes" class="vs-dd-item vs-dd-team">
-									<span
-										class="material-icons-round"
-										style="font-size:20px; color: var(--aero-mint);">military_tech</span
-									>
-									Estudio Emotes (EXP)
-								</a>
-							{/if}
-							{#if authStore.isAdmin}
-								<a href="/admin" class="vs-dd-item vs-dd-admin">
-									<span class="material-icons-round" style="font-size:20px"
-										>admin_panel_settings</span
-									>
-									Admin Panel
-								</a>
-							{/if}
-							<div class="vs-dropdown-divider"></div>
-							<button
-								onclick={() => {
-									dropdownOpen = false;
-									authStore.logout().then(() => goto('/'));
-								}}
-								class="vs-dd-item vs-dd-logout"
-							>
-								<span class="material-icons-round" style="font-size:20px">logout</span>
-								Cerrar sesión
-							</button>
-						</div>
-					</div>
-				{/if}
-			</div>
-		{/if}
 	</div>
 </header>
 
@@ -374,58 +290,70 @@
 		top: 0;
 		z-index: 500;
 		height: 58px;
-		display: flex;
+		/* Grid de 3 columnas: la del centro (buscador) queda centrada como el
+		   boceto y es generosa (520px), con la columna izquierda de balance y
+		   las acciones pegadas a la derecha. */
+		display: grid;
+		grid-template-columns: 1fr minmax(0, 520px) 1fr;
 		align-items: center;
 		gap: 12px;
 		padding: 0 18px;
-		transition: border-color var(--t-base);
-	}
-	.vs-topbar::before {
-		content: '';
-		position: absolute;
-		inset: 0;
 		background: var(--bg-sidebar);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		will-change: transform;
+		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		border-bottom: 1px solid var(--border-subtle);
 		transform: translateZ(0);
-		border-bottom: 1px solid var(--glass-border-t);
-		box-shadow: 0 4px 16px rgba(46, 134, 232, 0.06);
-		z-index: -1;
+		transition:
+			border-color var(--t-base),
+			background-color var(--t-base);
 	}
 
-	:global([data-theme='light']) .vs-topbar::before {
-		/* Cristal skyblue saturado con esmeralda predominante, manteniendo translucidez */
-		background: linear-gradient(90deg, rgba(16, 185, 129, 0.25) 0%, rgba(14, 165, 233, 0.35) 100%);
-		box-shadow:
-			0 4px 16px rgba(16, 185, 129, 0.12),
-			0 1px 0 rgba(255, 255, 255, 0.6) inset;
+	:global([data-theme='light']) .vs-topbar {
+		background: rgba(240, 252, 255, 0.75);
+	}
+
+	:global([data-theme='dark']) .vs-topbar {
+		background: rgba(8, 28, 44, 0.65);
+	}
+
+	:global([data-theme='midnight']) .vs-topbar {
+		background: rgba(4, 10, 20, 0.75);
 	}
 
 	/* ─── Search ────────────────────────────────── */
 	.vs-search-wrap {
 		position: relative;
-		flex: 1;
-		max-width: 380px;
+		grid-column: 2;
+		width: 100%;
+		justify-self: center;
+		max-width: 520px;
 		transition: flex 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 	.vs-search-inner {
 		position: relative;
 		display: flex;
 		align-items: center;
-		background: var(--bg-input);
-		border: 1px solid var(--border-subtle);
+		/* Cristal esmerilado: capa translúcida + desenfoque multi-capa */
+		background: color-mix(in srgb, var(--bg-input) 85%, transparent);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		border: 1px solid var(--glass-border-t);
+		border-top-color: color-mix(in srgb, var(--glass-border-t) 75%, #fff);
 		border-radius: var(--radius-full);
-		box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+		box-shadow:
+			var(--glass-inset-highlight),
+			inset 0 1px 3px rgba(0, 0, 0, 0.04);
 		transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 		overflow: hidden;
 		height: 40px;
+		will-change: transform;
+		transform: translateZ(0);
 	}
 	.vs-search-inner.focused {
 		border-color: var(--aero-sky);
 		background: var(--bg-surface);
 		box-shadow:
-			0 0 0 3px rgba(74, 171, 223, 0.16),
+			0 0 0 3px rgba(74, 171, 223, 0.2),
+			var(--glass-inset-highlight),
 			inset 0 1px 3px rgba(0, 0, 0, 0.03);
 	}
 	.vs-search-icon {
@@ -449,10 +377,13 @@
 		color: var(--text-primary);
 		font-family: var(--font-sans);
 		font-size: 0.88rem;
+		font-weight: 450;
+		letter-spacing: 0.011em;
 		transition: opacity 0.3s;
 	}
 	.vs-search-input::placeholder {
 		color: var(--text-muted);
+		opacity: 0.85;
 	}
 
 	/* Search Dropdown */
@@ -466,7 +397,7 @@
 		-webkit-backdrop-filter: blur(16px);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-lg);
-		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 		padding: 8px 0;
 		z-index: var(--z-dropdown, 100);
 		overflow: hidden;
@@ -520,7 +451,7 @@
 	}
 	.vs-search-recent-item:hover,
 	.vs-search-recent-item:focus {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--bg-surface-hover);
 		outline: none;
 	}
 	.vs-search-user-info {
@@ -572,7 +503,7 @@
 	.vs-search-footer {
 		padding: 4px;
 		margin-top: 8px;
-		border-top: 1px solid var(--glass-border-t);
+		border-top: 1px solid var(--border-subtle);
 	}
 	.vs-search-view-all {
 		width: 100%;
@@ -593,6 +524,9 @@
 
 	/* Mobile Search Expandable */
 	@media (max-width: 639px) {
+		.vs-topbar {
+			display: flex;
+		}
 		.vs-search-wrap {
 			flex: 0 0 40px;
 		}
@@ -623,122 +557,41 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		margin-left: auto;
-	}
-	/* ─── Avatar ────────────────────────────────── */
-	.vs-avatar-wrap {
-		position: relative;
-	}
-	.vs-avatar-btn {
-		background: none;
-		border: none;
-		cursor: pointer;
-		padding: 0;
-		position: relative;
-		display: flex;
+		margin-left: auto; /* en móvil (flex) empuja las acciones a la derecha */
+		grid-column: 3;
+		justify-self: end;
 	}
 
-	/* ─── Dropdown ──────────────────────────────── */
-	.vs-dropdown {
-		position: absolute;
-		top: calc(100% + 10px);
-		right: 0;
-		z-index: 1000;
-		min-width: 210px;
-		animation: slideInUp 0.22s var(--ease-out) both;
-
+	/* Iconos de acción derecha: tile de 38px con cristal, radio y borde iguales
+	   para la luna (:global porque el botón de tema vive en ThemeSelector). */
+	:global(.vs-topbar .aero-icon-btn) {
+		flex: 0 0 38px;
+		width: 38px;
+		height: 38px;
+		min-width: 38px;
+		min-height: 38px;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
 		background: var(--bg-surface-solid);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-lg);
-		box-shadow:
-			0 16px 40px rgba(0, 0, 0, 0.25),
-			0 2px 8px rgba(0, 0, 0, 0.08);
-		will-change: transform, opacity;
-	}
-	.vs-dropdown-inner {
-		padding: 10px;
-		border-radius: var(--radius-lg);
-		color: var(--text-primary);
-	}
-	.vs-dropdown-header {
-		padding: 6px 12px 12px;
-	}
-	.vs-dd-name {
-		font-size: 0.98rem;
-		font-weight: 700;
-		color: var(--text-primary);
-	}
-	.vs-dd-handle {
-		font-size: 0.84rem;
-		color: var(--text-muted);
-		margin-top: 2px;
-	}
-	.vs-dropdown-divider {
-		height: 1px;
-		background: var(--border-subtle);
-		margin: 6px 0;
-	}
-	.vs-dd-item {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
-		gap: 12px;
-		padding: 10px 12px;
-		border-radius: var(--radius-sm);
-		font-size: 0.94rem;
-		line-height: 1;
-		color: var(--text-primary);
-		text-decoration: none;
+		justify-content: center;
 		transition:
-			background var(--t-fast),
-			color var(--t-fast),
-			transform 0.15s var(--ease-spring);
-		cursor: pointer;
-		width: 100%;
-		border: none;
-		background: none;
-		text-align: left;
-		font-family: var(--font-sans);
+			background var(--t-base),
+			border-color var(--t-base),
+			box-shadow var(--t-base),
+			transform var(--t-spring);
 	}
-	.vs-dd-item:hover {
+	:global(.vs-topbar .aero-icon-theme) {
+		color: var(--aero-blue);
+	}
+	:global(.vs-topbar .aero-icon-theme:hover),
+	:global(.vs-topbar .aero-icon-theme.is-active) {
 		background: var(--bg-surface-hover);
 		color: var(--accent-blue-base);
-		transform: translateX(2px);
-	}
-	.vs-dd-admin {
-		color: var(--aero-amber);
-	}
-	.vs-dd-admin:hover {
-		background: rgba(232, 160, 35, 0.12);
-		color: var(--aero-amber);
-	}
-	.vs-dd-logout {
-		color: var(--aero-rose);
-	}
-	.vs-dd-logout:hover {
-		background: rgba(232, 74, 114, 0.12);
-		color: var(--aero-rose);
-	}
-
-	@keyframes glowPulse {
-		0%,
-		100% {
-			opacity: 0.35;
-		}
-		50% {
-			opacity: 1;
-		}
-	}
-
-	@keyframes slideInUp {
-		from {
-			opacity: 0;
-			transform: translateY(-8px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+		border-color: rgba(var(--accent-blue-rgb), 0.45);
+		box-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.25);
+		transform: scale(1.06);
 	}
 </style>

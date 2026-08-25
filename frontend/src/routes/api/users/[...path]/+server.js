@@ -1,10 +1,10 @@
 /**
  * VSocial — Users API
  * GET    /api/users/me, /api/users/suggested, /api/users/search, /api/users/settings
- * GET    /api/users/:username, /api/users/:username/followers, /api/users/:username/following, /api/users/:username/posts, /api/users/:username/reposts
- * POST   /api/users/:username/follow, /api/users/avatar, /api/users/cover
- * DELETE /api/users/:username/follow
- * PUT    /api/users/profile, /api/users/me, /api/users/settings
+ * GET    /api/users/me/blocked, /api/users/:username, /api/users/:username/followers, /api/users/:username/following, /api/users/:username/posts, /api/users/:username/reposts
+ * POST   /api/users/:username/follow, /api/users/:username/block, /api/users/avatar, /api/users/cover
+ * DELETE /api/users/:username/follow, /api/users/:username/block
+ * PUT    /api/users/profile, /api/users/me, /api/users/settings, /api/users/me/customization
  * PATCH  /api/users/notifications/read-all, /api/users/notifications/:id/read
  */
 import { json } from '@sveltejs/kit';
@@ -12,7 +12,11 @@ import bcrypt from 'bcryptjs';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
 import { requireAuth, optionalAuth } from '$lib/server/auth.js';
 import { awardXP } from '$lib/server/gamification.js';
+import { createNotification } from '$lib/server/notifications.js';
+import { getProfileAccess } from '$lib/server/visibility.js';
+import { buildSettingsUpdate } from '$lib/server/user-settings.js';
 import { anonymizePost } from '$lib/server/security.js';
+import { validateCustomization } from '$lib/design/sanitize.js';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -31,6 +35,9 @@ function parsePostMetadata(post) {
 			}
 			if (meta.location) {
 				post.location = meta.location;
+			}
+			if (meta.quote) {
+				post.quoted_post = meta.quote;
 			}
 		} catch (e) {
 			console.error('Failed to parse post metadata:', e);
@@ -77,6 +84,11 @@ export async function GET({ request, url, params }) {
 
 		// Ajustes y preferencias
 		data.settings = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
+
+		// Personalización estética del perfil (diseño, bloques, CSS custom)
+		data.customization = await db
+			.prepare('SELECT * FROM profile_customizations WHERE user_id = ?')
+			.get(userId);
 
 		// Publicaciones + multimedia asociada
 		data.posts = await db
@@ -298,9 +310,29 @@ export async function GET({ request, url, params }) {
 		let settings = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
 		if (!settings) {
 			await db.prepare('INSERT INTO user_settings (user_id) VALUES (?)').run(userId);
-			settings = { user_id: userId, theme: 'light', language: 'es' };
+			settings = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
 		}
 		return json({ settings });
+	}
+
+	// ── GET /api/users/me/blocked — lista de usuarios bloqueados ──
+	if (action === 'me' && parts[1] === 'blocked') {
+		const userId = await requireAuth(request);
+		const q = (url.searchParams.get('q') || '').trim();
+		const blocked = await db
+			.prepare(
+				`SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_verified,
+					COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') as role,
+					b.created_at AS blocked_at
+				FROM blocked_users b
+				JOIN users u ON u.id = b.blocked_id
+				WHERE b.blocker_id = ?
+				  ${q ? 'AND (u.username LIKE ? OR u.display_name LIKE ?)' : ''}
+				ORDER BY b.created_at DESC
+				LIMIT 200`
+			)
+			.all(...(q ? [userId, `%${q}%`, `%${q}%`] : [userId]));
+		return json({ blocked });
 	}
 
 	// ── /api/users/notifications ──
@@ -389,6 +421,16 @@ export async function GET({ request, url, params }) {
 		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 10));
 		const offset = (page - 1) * limit;
 
+		const targetUser = await db
+			.prepare('SELECT id FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
+			.get(action, action);
+
+		// Enforcement de visibilidad del dueño del perfil
+		if (targetUser) {
+			const access = await getProfileAccess(db, userId, targetUser.id);
+			if (!access.allowed) return json({ posts: [], is_restricted: true });
+		}
+
 		const status = url.searchParams.get('status') || 'active';
 		let statusClause = 'AND p.deleted_at IS NULL';
 		if (status === 'deleted') {
@@ -449,6 +491,9 @@ export async function GET({ request, url, params }) {
 		if (!targetUser) {
 			return json({ reposts: [], posts: [] });
 		}
+
+		const access = await getProfileAccess(db, userId, targetUser.id);
+		if (!access.allowed) return json({ reposts: [], posts: [], is_restricted: true });
 
 		const isOwner = Boolean(userId && targetUser.id === userId);
 		const privacyClause = isOwner ? '' : "AND (p.privacy = 'public' OR p.user_id = ?)";
@@ -552,6 +597,24 @@ export async function GET({ request, url, params }) {
 				.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?')
 				.get(currentUserId, user.id);
 			user.is_following = !!f;
+		}
+
+		// Enforcement de profile_visibility: a viewers sin acceso se les oculta
+		// la información personal (bio/ubicación/web/enlace de pago/xp).
+		const access = await getProfileAccess(db, currentUserId, user.id);
+		if (access.restricted) {
+			user.is_restricted = true;
+			delete user.bio;
+			delete user.location;
+			delete user.website;
+			delete user.payment_link;
+			delete user.xp_points;
+			delete user.checkin_streak;
+			if (customization) {
+				user.customization = { ...customization, custom_css: null };
+			}
+		} else {
+			user.is_restricted = false;
 		}
 
 		if (user.is_virtual) {
@@ -661,6 +724,43 @@ export async function POST({ request, _url, params }) {
 		});
 	}
 
+	// ── POST /api/users/:username/block ──
+	if (action && subaction === 'block') {
+		const target = await db
+			.prepare('SELECT id, username FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
+			.get(action, action);
+		if (!target) return json({ error: 'User not found' }, { status: 404 });
+		if (target.id === userId)
+			return json({ error: 'No puedes bloquearte a ti mismo' }, { status: 400 });
+
+		const alreadyBlocked = await db
+			.prepare('SELECT 1 FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?')
+			.get(userId, target.id);
+		if (!alreadyBlocked) {
+			await db
+				.prepare('INSERT OR IGNORE INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?)')
+				.run(userId, target.id);
+
+			// Bloquear rompe la relación de seguimiento en ambas direcciones
+			await db
+				.prepare('DELETE FROM follows WHERE (follower_id = ? AND following_id = ?)')
+				.run(userId, target.id);
+			await db
+				.prepare('DELETE FROM follows WHERE (follower_id = ? AND following_id = ?)')
+				.run(target.id, userId);
+			await db
+				.prepare(
+					'UPDATE users SET follower_count = MAX(follower_count - 1, 0), following_count = MAX(following_count - 1, 0) WHERE id IN (?, ?)'
+				)
+				.run(userId, target.id);
+		}
+		return json({
+			success: true,
+			message: `Has bloqueado a @${target.username}`,
+			blocked: true
+		});
+	}
+
 	// ── POST /api/users/:username/follow ──
 	if (action && subaction === 'follow') {
 		const target = await db
@@ -668,6 +768,15 @@ export async function POST({ request, _url, params }) {
 			.get(action, action);
 		if (!target) return json({ error: 'User not found' }, { status: 404 });
 		if (target.id === userId) return json({ error: 'Cannot follow yourself' }, { status: 400 });
+
+		// Bloqueo en cualquiera de las dos direcciones impide seguir
+		const blockRow = await db
+			.prepare(
+				`SELECT 1 FROM blocked_users
+				 WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`
+			)
+			.get(userId, target.id, target.id, userId);
+		if (blockRow) return json({ error: 'No puedes seguir a este usuario' }, { status: 403 });
 
 		const existing = await db
 			.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?')
@@ -688,11 +797,14 @@ export async function POST({ request, _url, params }) {
 			.prepare('SELECT display_name, username FROM users WHERE id = ?')
 			.get(userId);
 		const followerName = follower?.display_name || follower?.username || 'Alguien';
-		await db
-			.prepare(
-				"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'follow', 'user', ?, ?)"
-			)
-			.run(target.id, userId, userId, `${followerName} te ha comenzado a seguir.`);
+		await createNotification(db, {
+			recipientId: target.id,
+			actorId: userId,
+			type: 'follow',
+			entityType: 'user',
+			entityId: userId,
+			message: `${followerName} te ha comenzado a seguir.`
+		});
 
 		// Gamification: Follow
 		setTimeout(async () => {
@@ -783,6 +895,25 @@ export async function DELETE({ request, _url, params }) {
 		}, 0);
 
 		return json({ success: true, message: 'Unfollowed successfully' });
+	}
+
+	// DELETE /api/users/:username/block
+	if (action && subaction === 'block') {
+		const target = await db
+			.prepare('SELECT id, username FROM users WHERE username = ? OR CAST(id AS TEXT) = ?')
+			.get(action, action);
+		if (!target) return json({ error: 'User not found' }, { status: 404 });
+
+		const result = await db
+			.prepare('DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?')
+			.run(userId, target.id);
+
+		return json({
+			success: true,
+			message:
+				result.changes > 0 ? `Has desbloqueado a @${target.username}` : 'No estaba bloqueado',
+			blocked: false
+		});
 	}
 
 	return json({ error: 'Endpoint not found' }, { status: 404 });
@@ -894,26 +1025,15 @@ export async function PUT({ request, _url, params }) {
 
 	// PUT /api/users/me/customization
 	if (action === 'me' && parts[1] === 'customization') {
-		const allowedFields = [
-			'primary_color',
-			'bg_color',
-			'bg_image_url',
-			'glass_blur',
-			'glass_opacity',
-			'font_family',
-			'custom_font_url',
-			'custom_css',
-			'blocks_layout'
-		];
+		const result = validateCustomization(body);
+		if (!result.ok) return json({ error: result.error }, { status: 400 });
+
 		const updates = [];
 		const vals = [];
-		for (const f of allowedFields) {
-			if (body[f] !== undefined) {
-				updates.push(`${f} = ?`);
-				vals.push(typeof body[f] === 'object' ? JSON.stringify(body[f]) : body[f]);
-			}
+		for (const [field, value] of Object.entries(result.values)) {
+			updates.push(`${field} = ?`);
+			vals.push(value);
 		}
-		if (!updates.length) return json({ error: 'No valid fields provided' }, { status: 400 });
 
 		const exists = await db
 			.prepare('SELECT 1 FROM profile_customizations WHERE user_id = ?')
@@ -928,27 +1048,28 @@ export async function PUT({ request, _url, params }) {
 				`UPDATE profile_customizations SET ${updates.join(', ')}, updated_at = datetime('now') WHERE user_id = ?`
 			)
 			.run(...vals);
-		return json({ success: true, message: 'Customization updated' });
+
+		const customization = await db
+			.prepare('SELECT * FROM profile_customizations WHERE user_id = ?')
+			.get(userId);
+		return json({
+			success: true,
+			message: 'Customization updated',
+			customization,
+			warnings: result.warnings
+		});
 	}
 
 	// PUT /api/users/settings
 	if (action === 'settings') {
-		const allowedFields = [
-			'theme',
-			'language',
-			'notification_email',
-			'notification_push',
-			'notification_dms',
-			'show_online_status'
-		];
-		const updates = [];
-		const vals = [];
-		for (const f of allowedFields) {
-			if (body[f] !== undefined) {
-				updates.push(`${f} = ?`);
-				vals.push(body[f]);
-			}
+		let updates;
+		let vals;
+		try {
+			({ updates, vals } = buildSettingsUpdate(body));
+		} catch (err) {
+			return json({ error: err.message }, { status: err.statusCode ?? 400 });
 		}
+
 		if (!updates.length) return json({ error: 'No valid settings provided' }, { status: 400 });
 		vals.push(userId);
 		await db
@@ -956,7 +1077,9 @@ export async function PUT({ request, _url, params }) {
 				`UPDATE user_settings SET ${updates.join(', ')}, updated_at = datetime('now') WHERE user_id = ?`
 			)
 			.run(...vals);
-		return json({ success: true, message: 'Settings updated' });
+
+		const settings = await db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
+		return json({ success: true, message: 'Settings updated', settings });
 	}
 
 	return json({ error: 'Endpoint not found' }, { status: 404 });

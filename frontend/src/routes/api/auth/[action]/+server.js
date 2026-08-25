@@ -1,14 +1,34 @@
 /**
  * VSocial — Auth API
  * POST /api/auth/register, login, logout
- * GET  /api/auth/me
+ * GET  /api/auth/me, /api/auth/sessions
  * PUT  /api/auth/change-password
+ * DEL  /api/auth/sessions (?id= revoca una | ?others=1 cierra todas las demás)
  */
 import { json } from '@sveltejs/kit';
 import bcrypt from 'bcryptjs';
 import { getDb } from '$lib/server/db.js';
 import { requireAuth, createSession } from '$lib/server/auth.js';
 import crypto from 'crypto';
+
+function describeUserAgent(ua) {
+	if (!ua || ua === 'unknown') return { device: 'Dispositivo desconocido', browser: '' };
+	const browser = /Edg\//.test(ua)
+		? 'Edge'
+		: /OPR\/|Opera/.test(ua)
+			? 'Opera'
+			: /Chrome\//.test(ua)
+				? 'Chrome'
+				: /Safari\//.test(ua)
+					? 'Safari'
+					: /Firefox\//.test(ua)
+						? 'Firefox'
+						: 'Navegador';
+	let device = 'Escritorio';
+	if (/iPhone|Android.*Mobile/.test(ua)) device = 'Móvil';
+	else if (/iPad|Tablet/.test(ua)) device = 'Tablet';
+	return { device, browser };
+}
 
 export async function POST({ request, url }) {
 	const action = url.pathname.split('/').pop();
@@ -149,7 +169,8 @@ export async function GET({ request, url, params }) {
 			SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url, u.bio, u.category,
 				COALESCE(ur.role, u.role, 'user') AS role,
 				u.is_verified, u.payment_link, u.follower_count, u.following_count, u.created_at,
-				u.level, u.xp_points, u.custom_status, u.custom_status_text, u.custom_status_expires_at
+				u.level, u.xp_points, u.custom_status, u.custom_status_text, u.custom_status_expires_at,
+				(SELECT theme FROM user_settings WHERE user_id = u.id) AS preferred_theme
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
 			WHERE u.id = ? LIMIT 1
 		`
@@ -159,7 +180,82 @@ export async function GET({ request, url, params }) {
 		return json({ user });
 	}
 
+	// ── GET /api/auth/sessions — lista de sesiones activas del usuario ──
+	if (action === 'sessions') {
+		const userId = await requireAuth(request);
+		const db = getDb();
+
+		// Identificar la sesión actual por el hash del Bearer token
+		const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+		const currentHash = bearer ? crypto.createHash('sha256').update(bearer).digest('hex') : null;
+
+		const sessions = await db
+			.prepare(
+				`SELECT id, ip_address, user_agent, created_at, expires_at, token_hash
+				 FROM user_sessions
+				 WHERE user_id = ? AND expires_at > datetime('now')
+				 ORDER BY (token_hash = ?) DESC, created_at DESC`
+			)
+			.all(userId, currentHash);
+
+		return json({
+			sessions: sessions.map((s) => ({
+				id: s.id,
+				ip_address: s.ip_address,
+				device: describeUserAgent(s.user_agent),
+				user_agent: s.user_agent,
+				created_at: s.created_at,
+				expires_at: s.expires_at,
+				is_current: currentHash != null && s.token_hash === currentHash
+			}))
+		});
+	}
+
 	return json({ error: 'Endpoint no encontrado' }, { status: 404 });
+}
+
+export async function DELETE({ request, url }) {
+	const action = params_action(url);
+
+	if (action !== 'sessions') return json({ error: 'Endpoint no encontrado' }, { status: 404 });
+
+	const userId = await requireAuth(request);
+	const db = getDb();
+
+	const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+	const currentHash = bearer ? crypto.createHash('sha256').update(bearer).digest('hex') : null;
+
+	// Cerrar todas las demás sesiones
+	if (url.searchParams.get('others') === '1') {
+		if (!currentHash)
+			return json({ error: 'No se pudo identificar la sesión actual' }, { status: 400 });
+		const result = await db
+			.prepare(`DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?`)
+			.run(userId, currentHash);
+		return json({ success: true, revoked: result.changes });
+	}
+
+	// Revocar una sesión concreta (nunca la actual desde aquí)
+	const sessionId = parseInt(url.searchParams.get('id'));
+	if (!sessionId) return json({ error: 'Falta el parámetro id' }, { status: 400 });
+
+	const target = await db
+		.prepare('SELECT id, token_hash FROM user_sessions WHERE id = ? AND user_id = ?')
+		.get(sessionId, userId);
+	if (!target) return json({ error: 'Sesión no encontrada' }, { status: 404 });
+	if (currentHash && target.token_hash === currentHash) {
+		return json(
+			{ error: 'No puedes cerrar la sesión actual desde aquí; usa "Cerrar sesión"' },
+			{ status: 400 }
+		);
+	}
+
+	await db.prepare('DELETE FROM user_sessions WHERE id = ?').run(sessionId);
+	return json({ success: true });
+}
+
+function params_action(url) {
+	return url.pathname.replace(/\/+$/, '').split('/').pop();
 }
 
 export async function PUT({ request, url }) {
@@ -185,6 +281,16 @@ export async function PUT({ request, url }) {
 
 		const newHash = await bcrypt.hash(newPassword, 10);
 		await db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+
+		// Seguridad: tras cambiar la contraseña se cierran todas las demás sesiones
+		const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+		if (bearer) {
+			const currentHash = crypto.createHash('sha256').update(bearer).digest('hex');
+			await db
+				.prepare('DELETE FROM user_sessions WHERE user_id = ? AND token_hash != ?')
+				.run(userId, currentHash);
+		}
+
 		return json({ success: true, message: 'Contraseña actualizada' });
 	}
 

@@ -57,6 +57,14 @@ export async function POST({ request }) {
 	writeFileSync(resolve(uploadDir, newName), buffer);
 
 	const url = `/uploads/${subfolder}/${newName}`;
-	const type = mimeType.startsWith('image/') ? 'image' : 'audio';
+	const type = mimeType.startsWith('image/')
+		? 'image'
+		: mimeType.startsWith('font/') ||
+			  mimeType.startsWith('application/x-font') ||
+			  mimeType.startsWith('application/font')
+			? 'font'
+			: mimeType.startsWith('video/')
+				? 'video'
+				: 'audio';
 	return json({ success: true, url, type, mime: mimeType, size: file.size });
 }

@@ -1,4 +1,5 @@
 <script>
+	import { fly } from 'svelte/transition';
 	import { clickOutside } from '$lib/actions/clickOutside.js';
 
 	let {
@@ -217,6 +218,7 @@
 		<div
 			class="custom-select-menu drop-{dropDirection} {menuClass}"
 			bind:this={menuEl}
+			transition:fly={{ y: dropDirection === 'up' ? 8 : -8, duration: 200 }}
 			role="listbox"
 			tabindex="-1"
 		>
@@ -410,7 +412,10 @@
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		z-index: var(--z-dropdown, 100);
-		background: var(--bg-surface, #0f172a);
+		/* Fondo sólido: el glass translúcido (--bg-surface al 55%) dejaba ver el
+		   contenido de detrás (encabezados de tarjetas, texto…) mezclado con las
+		   opciones, rompiendo la legibilidad del menú. */
+		background: var(--bg-surface-solid, var(--bg-surface, #0f172a));
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));

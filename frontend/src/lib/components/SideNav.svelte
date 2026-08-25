@@ -76,12 +76,45 @@
 
 	const xpForLevel = (lv) => (lv <= 1 ? 0 : Math.pow(lv - 1, 2) * 100);
 	const levelProgress = $derived.by(() => {
-		const lv = authStore.user?.level || 1;
+		const lv = authStore.userLevel || authStore.user?.level || 1;
 		const xp = authStore.user?.xp_points || 0;
 		const cur = xpForLevel(lv);
 		const next = xpForLevel(lv + 1);
 		return next > cur ? Math.min(1, Math.max(0, (xp - cur) / (next - cur))) : 1;
 	});
+
+	let activeTooltip = $state(null);
+
+	function isSidebarCollapsed() {
+		if (!uiStore.sidebarExpanded) return true;
+		if (typeof window !== 'undefined' && window.innerWidth < 1024) return true;
+		return false;
+	}
+
+	function showTooltip(e, label) {
+		if (!isSidebarCollapsed()) return;
+		const rect = e.currentTarget.getBoundingClientRect();
+		activeTooltip = {
+			label,
+			top: rect.top + rect.height / 2,
+			left: rect.right + 12
+		};
+	}
+
+	function hideTooltip() {
+		activeTooltip = null;
+	}
+
+	function tooltipPortal(node) {
+		document.body.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) {
+					node.parentNode.removeChild(node);
+				}
+			}
+		};
+	}
 
 	async function handleLogout() {
 		await authStore.logout();
@@ -100,7 +133,7 @@
 	}
 </script>
 
-<nav class="vs-sidenav" aria-label="Navegación principal">
+<nav class="vs-sidenav" aria-label="Navegación principal" onscroll={hideTooltip}>
 	<!-- ══ MARCA ══ -->
 	<div class="vs-brand">
 		<a href="/feed" class="vs-brand__logo" title="VSocial">
@@ -139,8 +172,16 @@
 							href={item.href}
 							class="vs-nav-item"
 							class:vs-nav-item--active={isActive(item.href)}
-							title={item.label}
 							aria-current={isActive(item.href) ? 'page' : undefined}
+							aria-label={item.label}
+							onmouseenter={(e) => showTooltip(e, item.label)}
+							onmouseleave={hideTooltip}
+							onfocus={(e) => showTooltip(e, item.label)}
+							onblur={hideTooltip}
+							onclick={() => {
+								hideTooltip();
+								if (uiStore.drawerOpen) uiStore.drawerOpen = false;
+							}}
 						>
 							<div class="vs-nav-item__icon">
 								<span class="material-icons-round">{item.icon}</span>
@@ -170,7 +211,15 @@
 							href={item.href}
 							class="vs-nav-item"
 							class:vs-nav-item--active={page.url.pathname === item.href}
-							title={item.label}
+							aria-label={item.label}
+							onmouseenter={(e) => showTooltip(e, item.label)}
+							onmouseleave={hideTooltip}
+							onfocus={(e) => showTooltip(e, item.label)}
+							onblur={hideTooltip}
+							onclick={() => {
+								hideTooltip();
+								if (uiStore.drawerOpen) uiStore.drawerOpen = false;
+							}}
 						>
 							<div class="vs-nav-item__icon">
 								<span class="material-icons-round">{item.icon}</span>
@@ -192,7 +241,16 @@
 							href="/studio/emotes"
 							class="vs-nav-item"
 							class:vs-nav-item--active={page.url.pathname === '/studio/emotes'}
+							aria-label="Estudio Emotes"
 							title="Estudio de Emotes y Stickers (Experimental)"
+							onmouseenter={(e) => showTooltip(e, 'Estudio Emotes')}
+							onmouseleave={hideTooltip}
+							onfocus={(e) => showTooltip(e, 'Estudio Emotes')}
+							onblur={hideTooltip}
+							onclick={() => {
+								hideTooltip();
+								if (uiStore.drawerOpen) uiStore.drawerOpen = false;
+							}}
 						>
 							<div class="vs-nav-item__icon" style="color: var(--aero-mint);">
 								<span class="material-icons-round">military_tech</span>
@@ -214,7 +272,16 @@
 							href="/admin"
 							class="vs-nav-item"
 							class:vs-nav-item--active={page.url.pathname.startsWith('/admin')}
+							aria-label="Panel Admin"
 							title="Panel de Administración"
+							onmouseenter={(e) => showTooltip(e, 'Panel Admin')}
+							onmouseleave={hideTooltip}
+							onfocus={(e) => showTooltip(e, 'Panel Admin')}
+							onblur={hideTooltip}
+							onclick={() => {
+								hideTooltip();
+								if (uiStore.drawerOpen) uiStore.drawerOpen = false;
+							}}
 						>
 							<div class="vs-nav-item__icon">
 								<span class="material-icons-round">admin_panel_settings</span>
@@ -233,7 +300,15 @@
 			href="/settings"
 			class="vs-nav-item vs-footer__settings"
 			class:vs-nav-item--active={page.url.pathname === '/settings'}
-			title="Ajustes"
+			aria-label="Ajustes"
+			onmouseenter={(e) => showTooltip(e, 'Ajustes')}
+			onmouseleave={hideTooltip}
+			onfocus={(e) => showTooltip(e, 'Ajustes')}
+			onblur={hideTooltip}
+			onclick={() => {
+				hideTooltip();
+				if (uiStore.drawerOpen) uiStore.drawerOpen = false;
+			}}
 		>
 			<div class="vs-nav-item__icon">
 				<span class="material-icons-round">settings</span>
@@ -258,17 +333,16 @@
 							<span class="vs-user-card__name"
 								>{authStore.user.display_name || authStore.user.username}</span
 							>
-							{#if authStore.user.level != null}
-								<LevelBadge level={authStore.user.level} size="sm" showText={false} />
+							{#if authStore.userLevel}
+								<LevelBadge level={authStore.userLevel} size="sm" showText={false} />
 							{/if}
 						</div>
 						<span class="vs-user-card__handle">@{authStore.user.username}</span>
-						{#if authStore.user.level != null}
+						{#if authStore.userLevel}
 							<div
 								class="vs-user-card__xp"
 								aria-hidden="true"
-								title="{Math.round(levelProgress * 100)}% hacia el nivel {(authStore.user.level ||
-									1) + 1}"
+								title="{Math.round(levelProgress * 100)}% hacia el nivel {authStore.userLevel + 1}"
 							>
 								<div class="vs-user-card__xp-fill" style="width: {levelProgress * 100}%"></div>
 							</div>
@@ -288,6 +362,17 @@
 	</div>
 </nav>
 
+{#if activeTooltip}
+	<div
+		use:tooltipPortal
+		class="vs-floating-tooltip"
+		style="top: {activeTooltip.top}px; left: {activeTooltip.left}px;"
+		role="tooltip"
+	>
+		{activeTooltip.label}
+	</div>
+{/if}
+
 <style>
 	/* ═══════════════════════════════════════════════════════
 	   SIDENAV — Glassmorphism 2.0 + Neo-Aero
@@ -305,20 +390,21 @@
 		gap: 0;
 		/* Superficie de cristal */
 		background: var(--bg-sidebar);
-		backdrop-filter: blur(14px) saturate(1.1);
-		-webkit-backdrop-filter: blur(14px) saturate(1.1);
+		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.1));
+		-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.1));
 		/* Borde separador derecho */
 		border-right: 1px solid var(--border-subtle);
-		/* Aceleración GPU */
-		will-change: transform;
+		/* Aceleración GPU y contención de layout */
+		will-change: width, transform;
 		transform: translateZ(0);
-		contain: layout style;
+		contain: layout style paint;
 		position: relative;
 		box-sizing: border-box;
 		user-select: none;
 		overflow-y: auto;
 		overflow-x: hidden;
 		scrollbar-width: none;
+		transition: padding 0.2s cubic-bezier(0.2, 0, 0, 1);
 	}
 	.vs-sidenav::-webkit-scrollbar {
 		display: none;
@@ -329,6 +415,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		border-radius: inherit;
 		background: var(--noise-texture);
 		opacity: 0.025;
 		pointer-events: none;
@@ -435,8 +522,10 @@
 		flex-direction: column;
 		min-width: 0;
 		transition:
-			opacity var(--t-fast),
-			max-width var(--t-spring);
+			opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+			transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+			max-width 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: opacity, transform;
 		overflow: hidden;
 	}
 	.vs-brand__name {
@@ -474,10 +563,10 @@
 		color: var(--text-muted);
 		cursor: pointer;
 		transition:
-			background var(--t-base),
-			border-color var(--t-base),
-			color var(--t-base),
-			transform var(--t-spring);
+			background 0.2s ease,
+			border-color 0.2s ease,
+			color 0.2s ease,
+			transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 	.vs-brand__toggle .material-icons-round {
 		font-size: 18px;
@@ -516,18 +605,20 @@
 
 	.vs-nav-section__label {
 		font-size: 0.65rem;
-		font-weight: 700;
+		font-weight: 800;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--text-muted);
-		opacity: 0.6;
+		letter-spacing: 0.12em;
+		color: var(--text-secondary);
+		opacity: 0.95;
 		padding: 0 12px;
 		margin-bottom: 2px;
 		white-space: nowrap;
 		overflow: hidden;
 		transition:
-			opacity var(--t-fast),
-			max-height var(--t-spring);
+			opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+			transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+			max-height 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: opacity, transform;
 	}
 
 	.vs-nav-list {
@@ -554,11 +645,14 @@
 		position: relative;
 		box-sizing: border-box;
 		transition:
-			color var(--t-base),
-			background var(--t-base),
-			border-color var(--t-base),
-			transform var(--t-spring),
-			box-shadow var(--t-base);
+			color 0.2s ease,
+			background 0.2s ease,
+			border-color 0.2s ease,
+			transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+			width 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+			padding 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 0.2s ease;
+		will-change: transform;
 	}
 
 	/* Ícono contenedor */
@@ -574,8 +668,8 @@
 	.vs-nav-item__icon .material-icons-round {
 		font-size: 20px;
 		transition:
-			transform var(--t-spring),
-			color var(--t-base);
+			transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+			color 0.15s ease;
 	}
 
 	.vs-nav-item__label {
@@ -584,8 +678,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		transition:
-			opacity var(--t-fast),
-			max-width var(--t-spring);
+			opacity 0.15s ease,
+			max-width 0.18s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	/* Contador de notificaciones inline (expandido) */
@@ -601,8 +695,8 @@
 		line-height: 1.5;
 		letter-spacing: 0;
 		transition:
-			opacity var(--t-fast),
-			max-width var(--t-spring);
+			opacity 0.15s ease,
+			max-width 0.18s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	/* Burbuja de badge sobre el ícono (modo colapsado / siempre visible) */
@@ -778,6 +872,11 @@
 		border-radius: var(--radius-sm);
 		transition: transform 0.2s var(--ease-out);
 	}
+	.vs-user-card :global(.avatar-ring),
+	.vs-user-card :global(.avatar-ring:hover),
+	.vs-user-card:hover :global(.avatar-ring) {
+		transform: none !important;
+	}
 	.vs-user-card__link:active {
 		transform: scale(0.97);
 	}
@@ -907,14 +1006,27 @@
 		align-items: center;
 	}
 
-	/* Ocultar todo lo textual */
+	/* Ocultar todo lo textual con transición orgánica sin snap */
 	:global(.vs-shell--collapsed) .vs-brand__text,
 	:global(.vs-shell--collapsed) .vs-nav-section__label,
 	:global(.vs-shell--collapsed) .vs-nav-item__label,
 	:global(.vs-shell--collapsed) .vs-nav-item__count,
 	:global(.vs-shell--collapsed) .vs-user-card__info,
 	:global(.vs-shell--collapsed) .vs-user-card__logout {
-		display: none !important;
+		opacity: 0;
+		transform: translateX(-10px);
+		max-width: 0;
+		max-height: 0;
+		padding: 0;
+		margin: 0;
+		overflow: hidden;
+		pointer-events: none;
+		visibility: hidden;
+		transition:
+			opacity 0.12s ease,
+			transform 0.16s ease,
+			max-width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+			visibility 0s 0.16s;
 	}
 
 	/* Logo centrado */
@@ -1012,6 +1124,63 @@
 		.vs-sidenav {
 			backdrop-filter: blur(10px);
 			-webkit-backdrop-filter: blur(10px);
+		}
+	}
+
+	/* ── Floating Tooltip Portaled to document.body (Immune to overflow clipping) ── */
+	:global(.vs-floating-tooltip) {
+		position: fixed;
+		transform: translateY(-50%);
+		background: var(--bg-surface-solid);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-sm);
+		padding: 6px 12px;
+		font-size: 0.78rem;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		color: var(--text-primary);
+		white-space: nowrap;
+		pointer-events: none;
+		z-index: 10000;
+		box-shadow:
+			0 8px 24px rgba(0, 0, 0, 0.35),
+			var(--glass-inset-highlight);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		animation: vsTooltipEnter 0.15s var(--ease-out) both;
+	}
+
+	:global(.vs-floating-tooltip::before) {
+		content: '';
+		position: absolute;
+		right: 100%;
+		top: 50%;
+		transform: translateY(-50%);
+		border: 5px solid transparent;
+		border-right-color: var(--border-subtle);
+		z-index: 1;
+	}
+
+	:global(.vs-floating-tooltip::after) {
+		content: '';
+		position: absolute;
+		right: 100%;
+		top: 50%;
+		transform: translateY(-50%);
+		border: 4px solid transparent;
+		border-right-color: var(--bg-surface-solid);
+		margin-right: -1px;
+		z-index: 2;
+	}
+
+	@keyframes vsTooltipEnter {
+		from {
+			opacity: 0;
+			transform: translateY(-50%) translateX(-4px) scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(-50%) translateX(0) scale(1);
 		}
 	}
 </style>

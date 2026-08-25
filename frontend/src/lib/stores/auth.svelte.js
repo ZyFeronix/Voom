@@ -11,6 +11,20 @@ let _token = $state(null);
 let _loading = $state(true);
 let _initialized = $state(false);
 
+// Restaurar sesión de forma síncrona en cliente para evitar saltos visuales en recargas
+if (typeof localStorage !== 'undefined') {
+	try {
+		const storedToken = localStorage.getItem('vsocial_token');
+		const storedUser = localStorage.getItem('vsocial_user');
+		if (storedToken) {
+			_token = storedToken;
+			if (storedUser) {
+				_user = JSON.parse(storedUser);
+			}
+		}
+	} catch {}
+}
+
 // ---- Derived ----
 const isAuthenticated = $derived(!!_user && !!_token);
 const isAdmin = $derived(
@@ -21,6 +35,21 @@ const isTeamOrHigher = $derived(
 	['team', 'support', 'moderator', 'admin', 'super_admin', 'staff'].includes(_user?.role) ||
 		!!_user?.is_admin
 );
+
+// Level computed from xp_points (sync with backend formula in gamification.js)
+function computeLevel(xp) {
+	if (!xp || xp < 100) return 1;
+	// Formula: xpForLevel(lv) = (lv - 1)^2 * 100
+	// Inverse: lv = floor(sqrt(xp / 100)) + 1
+	return Math.floor(Math.sqrt(xp / 100)) + 1;
+}
+
+const VALID_THEMES = ['light', 'dark', 'midnight'];
+function isValidThemeValue(value) {
+	return VALID_THEMES.includes(value);
+}
+
+const userLevel = $derived(_user ? _user.level || computeLevel(_user.xp_points || 0) : 1);
 
 let _initPromise = null;
 
@@ -40,12 +69,25 @@ async function initialize() {
 					document.cookie = `vsocial_token=${stored}; path=/; max-age=31536000; SameSite=Strict; Secure`;
 					const { user } = await authApi.me();
 					_user = user;
+					localStorage.setItem('vsocial_user', JSON.stringify(user));
+					// La preferencia de tema de la cuenta manda sobre la caché local
+					if (user?.preferred_theme && isValidThemeValue(user.preferred_theme)) {
+						const { setTheme, themeStore } = await import('./theme.svelte.js');
+						if (themeStore.value !== user.preferred_theme) {
+							setTheme(user.preferred_theme);
+						}
+					}
+				} else {
+					_token = null;
+					_user = null;
+					localStorage.removeItem('vsocial_user');
 				}
 			}
 		} catch (_err) {
 			if (_err?.status === 401 || _err?.status === 403 || _err?.status === 404) {
 				if (typeof localStorage !== 'undefined') {
 					localStorage.removeItem('vsocial_token');
+					localStorage.removeItem('vsocial_user');
 					document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict; Secure';
 				}
 				_token = null;
@@ -71,6 +113,7 @@ async function login(loginId, password) {
 	_initPromise = Promise.resolve();
 	if (typeof localStorage !== 'undefined') {
 		localStorage.setItem('vsocial_token', token);
+		localStorage.setItem('vsocial_user', JSON.stringify(user));
 		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
 	}
 	return user;
@@ -87,6 +130,7 @@ async function register(data) {
 	_initPromise = Promise.resolve();
 	if (typeof localStorage !== 'undefined') {
 		localStorage.setItem('vsocial_token', token);
+		localStorage.setItem('vsocial_user', JSON.stringify(user));
 		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
 	}
 	return user;
@@ -105,6 +149,7 @@ async function logout() {
 	_initPromise = null;
 	if (typeof localStorage !== 'undefined') {
 		localStorage.removeItem('vsocial_token');
+		localStorage.removeItem('vsocial_user');
 		document.cookie = 'vsocial_token=; path=/; max-age=0; SameSite=Strict; Secure';
 	}
 }
@@ -115,6 +160,9 @@ async function logout() {
 function updateUser(data) {
 	if (_user) {
 		_user = { ..._user, ...data };
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('vsocial_user', JSON.stringify(_user));
+		}
 	}
 }
 
@@ -125,6 +173,9 @@ async function refresh() {
 	try {
 		const { user } = await authApi.me();
 		_user = user;
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('vsocial_user', JSON.stringify(user));
+		}
 		return user;
 	} catch (err) {
 		if (err.status === 401) {
@@ -159,6 +210,9 @@ export const authStore = {
 	},
 	get isTeamOrHigher() {
 		return isTeamOrHigher;
+	},
+	get userLevel() {
+		return userLevel;
 	},
 	initialize,
 	login,

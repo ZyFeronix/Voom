@@ -2,19 +2,31 @@
  * VSocial — Marketplace API
  */
 import { json } from '@sveltejs/kit';
-import { getDb } from '$lib/server/db.js';
+import { existsSync, unlinkSync } from 'fs';
+import { resolve } from 'path';
+import { getDb, getUploadsDir } from '$lib/server/db.js';
 import { requireAuth } from '$lib/server/auth.js';
+import { createNotification } from '$lib/server/notifications.js';
+import { generateImageThumbnail } from '$lib/server/media.js';
+
+// Convierte "/uploads/<sub>/<archivo>" en su ruta absoluta bajo /uploads.
+function uploadsPath(url) {
+	if (!url || !url.startsWith('/uploads/')) return null;
+	return resolve(getUploadsDir(), url.slice('/uploads/'.length));
+}
 
 async function fetchListingMedia(db, listIds) {
 	if (!listIds.length) return {};
 	const ph = listIds.map(() => '?').join(',');
 	const rows = await db
-		.prepare(`SELECT listing_id, media_url FROM listing_media WHERE listing_id IN (${ph})`)
+		.prepare(
+			`SELECT listing_id, media_url, thumb_url FROM listing_media WHERE listing_id IN (${ph})`
+		)
 		.all(...listIds);
 	const map = {};
 	for (const m of rows) {
 		if (!map[m.listing_id]) map[m.listing_id] = [];
-		map[m.listing_id].push(m.media_url);
+		map[m.listing_id].push({ url: m.media_url, thumb: m.thumb_url });
 	}
 	return map;
 }
@@ -75,8 +87,11 @@ export async function GET({ _request, url, params }) {
 			listings.map((l) => l.id)
 		);
 		listings.forEach((item) => {
-			item.media = mediaMap[item.id] || [];
+			item.media = (mediaMap[item.id] || []).map((m) => m.url);
+			// Primer thumbnail disponible para el grid; fallback al original
+			const firstWithThumb = (mediaMap[item.id] || []).find((m) => m.thumb);
 			item.image_url = item.media[0] || null;
+			item.thumbnail_url = firstWithThumb?.thumb || null;
 			item.ratings_avg = Number(ratingMap[item.id]?.avg || 0);
 			item.ratings_count = ratingMap[item.id]?.count || 0;
 		});
@@ -170,9 +185,35 @@ export async function POST({ request, _url, params }) {
 				: [];
 		for (let i = 0; i < mediaUrls.length; i++) {
 			if (!mediaUrls[i]) continue;
+			// Thumbnail automático (máx. 540px) para que el grid no sirva los
+			// originales sin redimensionar. Solo para medios locales; si falla,
+			// degradación elegante: se guarda null y el grid usa el original.
+			let thumbUrl = null;
+			const srcPath = uploadsPath(mediaUrls[i]);
+			const isImage = /\.(jpe?g|png|webp|gif|avif)$/i.test(mediaUrls[i]);
+			if (srcPath && existsSync(srcPath) && isImage) {
+				try {
+					const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+					const thumbPath = resolve(getUploadsDir('listingthumbs'), thumbName);
+					const ok = await generateImageThumbnail(srcPath, thumbPath);
+					if (ok && existsSync(thumbPath)) {
+						thumbUrl = `/uploads/listingthumbs/${thumbName}`;
+					} else {
+						try {
+							unlinkSync(thumbPath);
+						} catch {
+							// archivo parcial inexistente: nada que limpiar
+						}
+					}
+				} catch (_thumbErr) {
+					thumbUrl = null;
+				}
+			}
 			await db
-				.prepare('INSERT INTO listing_media (listing_id, media_url, position) VALUES (?, ?, ?)')
-				.run(listingId, mediaUrls[i], i);
+				.prepare(
+					'INSERT INTO listing_media (listing_id, media_url, thumb_url, position) VALUES (?, ?, ?, ?)'
+				)
+				.run(listingId, mediaUrls[i], thumbUrl, i);
 		}
 		return json({ success: true, listing_id: listingId }, { status: 201 });
 	}
@@ -201,16 +242,14 @@ export async function POST({ request, _url, params }) {
 			)
 			.run(listingId, userId, listing.user_id, offerPrice, (body.message || '').slice(0, 500));
 
-		await db
-			.prepare(
-				"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'offer', 'listing', ?, ?)"
-			)
-			.run(
-				listing.user_id,
-				userId,
-				listingId,
-				`${userName} te ha ofrecido $${offerPrice} por tu artículo '${listing.title}'.`
-			);
+		await createNotification(db, {
+			recipientId: listing.user_id,
+			actorId: userId,
+			type: 'offer',
+			entityType: 'listing',
+			entityId: listingId,
+			message: `${userName} te ha ofrecido $${offerPrice} por tu artículo '${listing.title}'.`
+		});
 		return json({ success: true, message: 'Oferta enviada al vendedor' });
 	}
 

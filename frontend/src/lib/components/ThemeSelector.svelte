@@ -15,8 +15,8 @@
 
 	function handleSelect(themeId, e) {
 		e?.stopPropagation();
-		setTheme(themeId);
 		isOpen = false;
+		setTheme(themeId);
 	}
 
 	onMount(() => {
@@ -48,7 +48,7 @@
 		<button
 			type="button"
 			onclick={toggleDropdown}
-			class="aero-icon-btn vs-theme-trigger-compact"
+			class="aero-icon-btn aero-icon-theme vs-theme-trigger-compact"
 			class:is-active={isOpen}
 			title={themeStore.label}
 			aria-label={themeStore.label}
@@ -140,8 +140,8 @@
 		font-family: var(--font-sans);
 		font-size: 0.875rem;
 		font-weight: 600;
-		cursor: pointer;
-		backdrop-filter: var(--glass-blur, blur(14px));
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
 		box-shadow: var(--shadow-xs);
 		transition:
 			transform var(--t-spring, 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)),

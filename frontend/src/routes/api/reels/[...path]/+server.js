@@ -8,8 +8,9 @@ import { awardXP } from '$lib/server/gamification.js';
 import { existsSync, unlinkSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { logActivity } from '$lib/server/activity.js';
+import { getProfileAccess } from '$lib/server/visibility.js';
 import { queueReelProgress } from '$lib/server/batch-writer.js';
-import { extractVideoFrame } from '$lib/server/media.js';
+import { extractVideoFrame, getVideoDimensions } from '$lib/server/media.js';
 
 export async function GET({ request, url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
@@ -43,6 +44,38 @@ export async function GET({ request, url, params }) {
 		`
 			)
 			.all(userId, userId, limit, offset);
+		return json({ data: reels, page, limit, has_more: reels.length === limit });
+	}
+
+	// GET /api/reels/user/:username — reels de un creador (perfil)
+	if (action === 'user' && subaction) {
+		const userId = (await optionalAuth(request)) || 0;
+		const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
+		const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit')) || 12));
+		const offset = (page - 1) * limit;
+
+		const profile = await db
+			.prepare('SELECT id, username FROM users WHERE username = ?')
+			.get(subaction);
+		if (!profile) return json({ error: 'User not found' }, { status: 404 });
+
+		// Enforcement de visibilidad del dueño del perfil
+		const access = await getProfileAccess(db, userId || null, profile.id);
+		if (!access.allowed)
+			return json({ data: [], page, limit, has_more: false, is_restricted: true });
+
+		const reels = await db
+			.prepare(
+				`
+			SELECT r.*, u.username, u.display_name, u.avatar_url, u.is_verified,
+				(SELECT COUNT(*) FROM reel_likes pl WHERE pl.reel_id = r.id AND pl.user_id = ?) > 0 as user_liked,
+				(SELECT COUNT(*) FROM follows f WHERE f.follower_id = ? AND f.following_id = u.id) > 0 as is_following
+			FROM reels r JOIN users u ON r.user_id = u.id
+			WHERE r.user_id = ? AND r.is_active = 1
+			ORDER BY r.created_at DESC LIMIT ? OFFSET ?
+		`
+			)
+			.all(userId, userId, profile.id, limit, offset);
 		return json({ data: reels, page, limit, has_more: reels.length === limit });
 	}
 
@@ -151,11 +184,29 @@ export async function POST({ request, _url, params }) {
 				}
 			}
 
+			// Dimensiones del video para la BD: el cliente fija así el aspect-ratio en
+			// el primer render (sin esperar `loadedmetadata`), eliminando el CLS de
+			// overlays. Degradación elegante: null → el cliente usa su heurística.
+			let dims = null;
+			try {
+				dims = await getVideoDimensions(resolve(uploadDir, newName));
+			} catch (_dimsErr) {
+				dims = null;
+			}
+
 			const result = await db
 				.prepare(
-					'INSERT INTO reels (user_id, video_url, thumbnail_url, caption, duration_seconds) VALUES (?, ?, ?, ?, ?)'
+					'INSERT INTO reels (user_id, video_url, thumbnail_url, video_width, video_height, caption, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)'
 				)
-				.run(userId, videoUrl, thumbnailUrl, caption, durationSeconds);
+				.run(
+					userId,
+					videoUrl,
+					thumbnailUrl,
+					dims?.width ?? null,
+					dims?.height ?? null,
+					caption,
+					durationSeconds
+				);
 
 			// Gamification: Create Reel
 			setTimeout(async () => {

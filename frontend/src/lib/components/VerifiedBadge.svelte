@@ -3,8 +3,12 @@
 	import { quintOut } from 'svelte/easing';
 
 	import { goto } from '$app/navigation';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 
 	let { role = 'user', isVerified = false, size = '16px', interactive = false } = $props();
+
+	const popoverId = Symbol('verified-badge');
+	let showPopup = $derived(uiStore.isPopoverOpen(popoverId));
 
 	let isVerifiedBool = $derived(isVerified === true || isVerified === 1 || isVerified === '1');
 
@@ -83,8 +87,6 @@
 		return { icon: '', color: '', title: '', desc: '', linkText: '' };
 	});
 
-	let showPopup = $state(false);
-
 	let badgeEl = $state(null);
 
 	function togglePopup(e) {
@@ -94,13 +96,14 @@
 			e.preventDefault();
 			e.stopPropagation();
 		}
-		showPopup = !showPopup;
+		uiStore.togglePopover(popoverId);
 	}
 
 	function closePopup(e) {
 		// Si el clic fue dentro del popup (el badge o su wrapper), no cerrar
-		if (badgeEl && badgeEl.contains(e.target)) return;
-		showPopup = false;
+		if (showPopup && badgeEl && !badgeEl.contains(e.target)) {
+			uiStore.closePopover(popoverId);
+		}
 	}
 
 	function handleKeyDown(e) {
@@ -112,14 +115,14 @@
 		} else if (e.key === 'Escape' && showPopup) {
 			e.preventDefault();
 			e.stopPropagation();
-			showPopup = false;
+			uiStore.closePopover(popoverId);
 		}
 	}
 
 	function handleLinkClick(e) {
 		e.preventDefault();
 		e.stopPropagation();
-		showPopup = false;
+		uiStore.closePopover(popoverId);
 		goto('/about/verified');
 	}
 </script>
@@ -144,9 +147,12 @@
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				class="badge-popup glass-panel aero-modal"
+				class="badge-popup"
 				transition:scale={{ duration: 300, start: 0.9, easing: quintOut }}
 				onclick={(e) => e.stopPropagation()}
+				onmouseenter={(e) => e.stopPropagation()}
+				onmouseleave={(e) => e.stopPropagation()}
+				onpointerenter={(e) => e.stopPropagation()}
 			>
 				<div class="popup-header">
 					<span class="popup-title">{badgeData.title}</span>
@@ -296,5 +302,40 @@
 	.popup-link:hover {
 		color: #fff;
 		text-decoration: underline;
+	}
+
+	/* ══ Adaptación a Tema Claro (Light Theme) con Alto Contraste ══ */
+	:global([data-theme='light']) .badge-popup {
+		background: rgba(255, 255, 255, 0.98);
+		border-color: rgba(14, 165, 233, 0.25);
+		box-shadow:
+			0 16px 36px rgba(0, 0, 0, 0.12),
+			0 0 20px color-mix(in srgb, var(--badge-color, #1b85f3) 20%, transparent),
+			inset 0 1px 0 rgba(255, 255, 255, 0.9);
+		color: #0f172a;
+	}
+
+	:global([data-theme='light']) .badge-popup::after {
+		background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6) 0%, transparent 100%);
+	}
+
+	:global([data-theme='light']) .badge-popup::before {
+		border-color: transparent transparent rgba(255, 255, 255, 0.98) transparent;
+	}
+
+	:global([data-theme='light']) .popup-title {
+		color: #0f172a;
+	}
+
+	:global([data-theme='light']) .popup-desc {
+		color: #334155;
+	}
+
+	:global([data-theme='light']) .popup-link {
+		color: var(--accent-blue-base, #1b85f3);
+	}
+
+	:global([data-theme='light']) .popup-link:hover {
+		color: var(--accent-blue-dark, #1265c2);
 	}
 </style>

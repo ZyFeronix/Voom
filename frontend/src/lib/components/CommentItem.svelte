@@ -1,11 +1,12 @@
 <script>
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import { posts as postsApi } from '$lib/api.js';
 	import CommentItem from './CommentItem.svelte';
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
 	import KlipyPicker from '$lib/components/KlipyPicker.svelte';
-	import { slide } from 'svelte/transition';
+	import { slide, fly } from 'svelte/transition';
 	import { expoOut } from 'svelte/easing';
 	import { compressImage } from '$lib/utils/imageCompression.js';
 	import { formatHashtags } from '$lib/utils/textFormatting.js';
@@ -92,7 +93,8 @@
 		likeCount = comment.like_count || 0;
 	});
 
-	let showMenu = $state(false);
+	const menuId = Symbol('comment-menu');
+	let showMenu = $derived(uiStore.isPopoverOpen(menuId));
 
 	// Relative time formatter
 	function relativeTime(dateStr) {
@@ -265,15 +267,22 @@
 
 				{#if comment.is_owner || (comment.user_id && Number(comment.user_id) === Number(authStore.user?.id))}
 					<div class="options-wrapper" style="position: relative; margin-left: auto;">
-						<button class="menu-btn" onclick={() => (showMenu = !showMenu)}>
+						<button
+							class="menu-btn"
+							onclick={(e) => {
+								e.stopPropagation();
+								uiStore.togglePopover(menuId);
+							}}
+							aria-label="Opciones del comentario"
+						>
 							<span class="material-icons-round text-[18px]">more_vert</span>
 						</button>
 						{#if showMenu}
-							<div class="dropdown-menu">
+							<div class="dropdown-menu" transition:fly={{ y: -6, duration: 180 }}>
 								<button
 									onclick={() => {
 										isEditing = true;
-										showMenu = false;
+										uiStore.closePopover(menuId);
 									}}
 									class="dropdown-item"
 								>
@@ -282,7 +291,7 @@
 								<button
 									onclick={() => {
 										handleDelete();
-										showMenu = false;
+										uiStore.closePopover(menuId);
 									}}
 									class="dropdown-item danger"
 								>
@@ -718,6 +727,14 @@
 	/>
 </div>
 
+<svelte:window
+	onclick={(e) => {
+		if (showMenu && !e.target.closest('.options-wrapper')) {
+			uiStore.closePopover(menuId);
+		}
+	}}
+/>
+
 <style>
 	/* ── Container ── */
 	.comment-item-container {
@@ -844,7 +861,7 @@
 		gap: 2px;
 		margin-top: 8px;
 		padding-top: 8px;
-		border-top: 1px solid rgba(255, 255, 255, 0.04);
+		border-top: 1px solid var(--border-subtle);
 		font-size: 0.75rem;
 	}
 
@@ -1136,9 +1153,9 @@
 		overflow: hidden;
 		max-width: 100%;
 		width: fit-content;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-		background: rgba(0, 0, 0, 0.15);
+		border: 1px solid var(--border-subtle);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
+		background: var(--bg-surface);
 		transition:
 			filter 0.2s ease,
 			border-color 0.2s ease;
@@ -1199,7 +1216,7 @@
 	.dropzone-text {
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.5);
+		color: var(--text-muted);
 		text-align: center;
 	}
 

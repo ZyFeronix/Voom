@@ -2531,7 +2531,7 @@
 	.preview-tab.active {
 		background: var(--bg-surface);
 		color: var(--text-primary);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+		box-shadow: var(--shadow-xs), var(--shadow-glow);
 	}
 
 	.preview-live-indicator {
@@ -2567,7 +2567,7 @@
 		overflow: hidden;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 
 	.sim-profile-banner {
@@ -2589,7 +2589,7 @@
 		border-radius: var(--radius-full);
 		border: 3px solid var(--bg-surface);
 		overflow: hidden;
-		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 	}
 
 	.sim-avatar {
@@ -2929,7 +2929,8 @@
 	:global([data-theme='midnight']) .role-card {
 		background: linear-gradient(145deg, rgba(10, 16, 28, 0.75) 0%, rgba(4, 8, 16, 0.55) 100%);
 		box-shadow:
-			0 14px 35px rgba(0, 0, 0, 0.6),
+			var(--shadow-lg),
+			var(--shadow-glow),
 			inset 0 1px 1px rgba(255, 255, 255, 0.1);
 	}
 
@@ -2938,6 +2939,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		border-radius: inherit;
 		pointer-events: none;
 		opacity: 0;
 		transition: opacity 0.5s ease;

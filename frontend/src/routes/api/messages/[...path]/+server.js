@@ -18,13 +18,24 @@
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
 import { requireAuth, checkUserNotMuted } from '$lib/server/auth.js';
+import { createNotification } from '$lib/server/notifications.js';
 import { getSocketIO, isUserOnline } from '$lib/server/socket.js';
 
 async function getOrCreateDm(db, user1, user2) {
 	// Validar peer: debe existir y no ser uno mismo (evita colisión de PK y filas huérfanas)
-	if (!Number.isInteger(user2) || user2 <= 0 || user1 === user2) return null;
+	if (!Number.isInteger(user2) || user2 <= 0 || user1 === user2)
+		return { error: 'Usuario no válido' };
 	const peerExists = await db.prepare('SELECT 1 FROM users WHERE id = ?').get(user2);
-	if (!peerExists) return null;
+	if (!peerExists) return { error: 'Usuario no válido' };
+
+	// El bloqueo en cualquier dirección impide iniciar/conversar por DM
+	const blockRow = await db
+		.prepare(
+			`SELECT 1 FROM blocked_users
+			 WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`
+		)
+		.get(user1, user2, user2, user1);
+	if (blockRow) return { error: 'No puedes enviar mensajes a este usuario' };
 
 	const conv = await db
 		.prepare(
@@ -36,7 +47,23 @@ async function getOrCreateDm(db, user1, user2) {
 	`
 		)
 		.get(user1, user2);
-	if (conv) return conv.id;
+	if (conv) return { id: conv.id };
+
+	// Preferencias de DM del DESTINATARIO: solo limitan CONVERSACIONES NUEVAS,
+	// nunca cortan chats ya existentes.
+	const pref = await db.prepare('SELECT allow_dms FROM user_settings WHERE user_id = ?').get(user2);
+	if (pref?.allow_dms === 'none') {
+		return { error: 'Este usuario no acepta mensajes directos nuevos' };
+	}
+	if (pref?.allow_dms === 'followers') {
+		// "Solo creadores que sigo": el destinatario debe seguir al remitente
+		const followed = await db
+			.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?')
+			.get(user2, user1);
+		if (!followed) {
+			return { error: 'Este usuario solo acepta DMs de creadores que sigue' };
+		}
+	}
 
 	const result = await db.prepare("INSERT INTO conversations (type) VALUES ('dm')").run();
 	const convId = Number(result.lastInsertRowid);
@@ -46,7 +73,7 @@ async function getOrCreateDm(db, user1, user2) {
 	await db
 		.prepare('INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)')
 		.run(convId, user2);
-	return convId;
+	return { id: convId };
 }
 
 export async function GET({ request, url, params }) {
@@ -86,6 +113,7 @@ export async function GET({ request, url, params }) {
 			SELECT c.id, c.type, c.group_name, c.group_avatar_url, c.last_message_at,
 				cp.is_pinned, cp.is_muted,
 				m.body as last_message_body, m.created_at as last_message_time, m.sender_id as last_message_sender_id,
+				m.media_type as last_message_media_type, m.is_deleted as last_message_is_deleted,
 				(SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) as participant_count,
 				(SELECT COUNT(*) FROM messages_new mn 
 				 WHERE mn.conversation_id = c.id AND mn.sender_id != ? 
@@ -147,9 +175,14 @@ export async function GET({ request, url, params }) {
 	// GET /api/messages/conversations/user/:peerId
 	if (parts[0] === 'conversations' && parts[1] === 'user' && parts[2]) {
 		const peerId = parseInt(parts[2]);
-		const convId = await getOrCreateDm(db, userId, peerId);
-		if (!convId) return json({ error: 'Usuario no válido' }, { status: 400 });
-		return json({ conversation_id: convId });
+		const dmResult = await getOrCreateDm(db, userId, peerId);
+		if (dmResult.error) {
+			return json(
+				{ error: dmResult.error },
+				{ status: dmResult.error.includes('no válido') ? 400 : 403 }
+			);
+		}
+		return json({ conversation_id: dmResult.id });
 	}
 
 	// GET /api/messages/conversations/:convId/messages
@@ -341,9 +374,6 @@ export async function POST({ request, _url, params }) {
 				'SELECT user_id, is_muted FROM conversation_participants WHERE conversation_id = ? AND user_id != ?'
 			)
 			.all(convId, userId);
-		const insertNotif = db.prepare(
-			"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'message', 'message', ?, ?)"
-		);
 
 		const io = getSocketIO();
 		const fullMsg = await db
@@ -372,19 +402,21 @@ export async function POST({ request, _url, params }) {
 		for (const peer of peers) {
 			// Respetar silencio de conversación: no generar notificación persistente
 			if (!peer.is_muted) {
-				const notifRes = await insertNotif.run(
-					peer.user_id,
-					userId,
-					msgId,
-					isZumbido
+				const notifId = await createNotification(db, {
+					recipientId: peer.user_id,
+					actorId: userId,
+					type: 'message',
+					entityType: 'message',
+					entityId: msgId,
+					message: isZumbido
 						? `${userName} te ha enviado un ZUMBIDO.`
 						: `${userName} te ha enviado un mensaje.`
-				);
+				});
 
-				if (io) {
+				if (io && notifId) {
 					const latestNotif = await db
 						.prepare('SELECT * FROM notifications WHERE id = ?')
-						.get(notifRes.lastInsertRowid);
+						.get(notifId);
 					if (latestNotif) {
 						io.to(`user_${peer.user_id}`).emit('new_notification', {
 							notifications: [latestNotif]
@@ -580,21 +612,19 @@ export async function POST({ request, _url, params }) {
 							.prepare('SELECT display_name, username FROM users WHERE id = ?')
 							.get(userId);
 						const userName = user?.display_name || user?.username || 'Alguien';
-						const notifRes = await db
-							.prepare(
-								"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'message_reaction', 'message', ?, ?)"
-							)
-							.run(
-								msg.sender_id,
-								userId,
-								msgId,
-								`${userName} reaccionó a tu mensaje con ${body.emoji}`
-							);
+						const notifId = await createNotification(db, {
+							recipientId: msg.sender_id,
+							actorId: userId,
+							type: 'message_reaction',
+							entityType: 'message',
+							entityId: msgId,
+							message: `${userName} reaccionó a tu mensaje con ${body.emoji}`
+						});
 
-						if (io) {
+						if (io && notifId) {
 							const latestNotif = await db
 								.prepare('SELECT * FROM notifications WHERE id = ?')
-								.get(notifRes.lastInsertRowid);
+								.get(notifId);
 							if (latestNotif) {
 								io.to(`user_${msg.sender_id}`).emit('new_notification', {
 									notifications: [latestNotif]

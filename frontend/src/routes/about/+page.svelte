@@ -1219,7 +1219,7 @@
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-subtle);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 	}
 
 	.nav-link {
@@ -1274,7 +1274,8 @@
 		background: var(--bg-surface);
 		backdrop-filter: blur(24px) saturate(1.2);
 		box-shadow:
-			0 24px 60px rgba(0, 0, 0, 0.12),
+			var(--shadow-lg),
+			var(--shadow-glow),
 			inset 0 1px 2px rgba(255, 255, 255, 0.4);
 	}
 
@@ -1340,11 +1341,28 @@
 		}
 	}
 
+	.hero-badge-pill {
+		position: relative;
+		z-index: 1;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.5rem 1.2rem;
+		border-radius: var(--radius-full);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.3);
+		color: var(--accent-blue-base);
+		font-size: 0.88rem;
+		font-weight: 700;
+		margin-bottom: 1.8rem;
+		backdrop-filter: blur(8px);
+	}
+
 	.hero-headline {
 		position: relative;
 		z-index: 1;
 		font-family: var(--font-display);
-		font-size: clamp(2.4rem, 5.5vw, 4.4rem);
+		font-size: clamp(2.4rem, 5.5vw, 4.2rem);
 		font-weight: 900;
 		line-height: 1.12;
 		letter-spacing: -0.03em;
@@ -1458,61 +1476,23 @@
 	}
 
 	.btn-hero-main:hover {
-		transform: translateY(-3px) scale(1.02);
+		transform: translateY(-3px) scale(1.03);
 		box-shadow: 0 10px 28px rgba(var(--accent-blue-rgb), 0.5);
 	}
 
-	/* ══════════════════════════════════════════════════════════════════
-	   SECTION HEADERS (GENÉRICO)
-	   ══════════════════════════════════════════════════════════════════ */
-	.section-header {
-		text-align: center;
-		margin-bottom: 2.8rem;
-	}
-
-	.section-eyebrow {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding: 0.35rem 0.85rem;
-		border-radius: var(--radius-full);
-		font-size: 0.8rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		color: var(--accent-blue-light);
-		background: rgba(var(--accent-blue-rgb), 0.1);
-		border: 1px solid rgba(var(--accent-blue-rgb), 0.25);
-		margin-bottom: 1rem;
-	}
-
-	.section-eyebrow span.material-icons-round {
-		font-size: 1.1rem;
-	}
-
-	.section-title {
-		font-family: var(--font-display);
-		font-size: clamp(2rem, 3.8vw, 3rem);
-		font-weight: 900;
-		color: var(--text-primary);
-		letter-spacing: -0.02em;
-		margin-bottom: 0.8rem;
-	}
-
-	.section-subtitle {
-		font-size: 1.1rem;
-		color: var(--text-secondary);
-		max-width: 680px;
-		margin: 0 auto;
-		line-height: 1.6;
+	.btn-hero-sub:hover,
+	.btn-hero-demo:hover {
+		transform: translateY(-2px);
+		background: var(--bg-surface-hover);
+		border-color: rgba(var(--accent-blue-rgb), 0.4);
 	}
 
 	/* ══════════════════════════════════════════════════════════════════
-	   2. MANIFIESTO / PILARES
+	   2. PILARES ARQUITECTÓNICOS
 	   ══════════════════════════════════════════════════════════════════ */
 	.manifesto-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 		gap: 1.8rem;
 	}
 
@@ -1531,7 +1511,7 @@
 
 	.pillar-card:hover {
 		transform: translateY(-8px);
-		box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 		border-color: rgba(var(--accent-blue-rgb), 0.4);
 	}
 
@@ -1689,7 +1669,7 @@
 		border-radius: var(--radius-lg);
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
-		box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 
 	.mock-post-header {
@@ -2272,7 +2252,7 @@
 	.arch-card:hover {
 		transform: translateY(-6px);
 		border-color: rgba(var(--accent-blue-rgb), 0.4);
-		box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 
 	.arch-header {
@@ -2354,7 +2334,7 @@
 
 	.audience-card:hover {
 		transform: translateY(-6px);
-		box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
 
 	.audience-icon {
@@ -2395,7 +2375,9 @@
 		border-radius: var(--radius-xl);
 		background: var(--bg-surface);
 		border: 1px solid rgba(0, 212, 170, 0.3);
-		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+		box-shadow:
+			var(--shadow-lg),
+			0 0 24px rgba(0, 212, 170, 0.18);
 	}
 
 	.privacy-header-content {
@@ -2575,7 +2557,8 @@
 		border: 1px solid rgba(var(--accent-blue-rgb), 0.35);
 		background: var(--bg-surface);
 		box-shadow:
-			0 24px 60px rgba(0, 0, 0, 0.2),
+			var(--shadow-lg),
+			var(--shadow-glow),
 			inset 0 1px 2px rgba(255, 255, 255, 0.4);
 	}
 

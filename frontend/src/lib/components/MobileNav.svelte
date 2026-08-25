@@ -87,6 +87,10 @@
 		padding: 6px 4px;
 
 		background: var(--glass-bg);
+		/* Fondo casi opaco: evita que el contenido al pasar por debajo (tabs de
+		   perfil, posts, etc.) se lea a través del nav y choque visualmente con
+		   sus etiquetas (antes el glass al 55% dejaba ver los textos mezclados). */
+		background: color-mix(in srgb, var(--bg-surface-solid) 90%, transparent);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 		will-change: transform;
@@ -235,6 +239,11 @@
 		.vs-mobile-nav {
 			display: none;
 		}
+	}
+
+	/* ─── Teclado abierto: ocultar la barra para que no tape el input ────── */
+	:global(html.has-keyboard) .vs-mobile-nav {
+		display: none !important;
 	}
 
 	/* ─── Dark mode refinements ──────────────────── */

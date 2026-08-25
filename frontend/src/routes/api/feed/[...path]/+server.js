@@ -30,6 +30,9 @@ function parsePostMetadata(post) {
 			if (meta.location) {
 				post.location = meta.location;
 			}
+			if (meta.quote) {
+				post.quoted_post = meta.quote;
+			}
 		} catch (e) {
 			console.error('Failed to parse post metadata:', e);
 		}
@@ -293,13 +296,20 @@ export async function GET({ request, url, params }) {
 	}
 
 	// ── TRENDING TAGS ──
+	// Las tendencias se calculan desde posts reales (post_hashtags JOIN posts):
+	// un hashtag solo es tendencia si tiene publicaciones visibles, así nunca
+	// quedan tendencias con contenido inexistente (posts eliminados o tags que
+	// solo aparecieron en comentarios).
 	if (action === 'trending-tags') {
 		const tags = await db
 			.prepare(
 				`
-			SELECT tag_name as name, post_count
-			FROM hashtags
-			ORDER BY post_count DESC, created_at DESC LIMIT 5
+			SELECT ph.tag_name AS name, COUNT(DISTINCT ph.post_id) AS post_count
+			FROM post_hashtags ph
+			JOIN posts p ON p.id = ph.post_id AND p.deleted_at IS NULL AND (p.status = 'published' OR p.status IS NULL) AND p.privacy = 'public'
+			JOIN users u ON u.id = p.user_id AND u.is_active = 1 AND u.is_banned = 0
+			GROUP BY ph.tag_name
+			ORDER BY post_count DESC, MAX(p.created_at) DESC LIMIT 5
 		`
 			)
 			.all();

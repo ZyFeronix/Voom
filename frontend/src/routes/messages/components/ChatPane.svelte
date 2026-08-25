@@ -4,6 +4,7 @@
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { isSoundEnabled, setSoundEnabled } from '$lib/utils/sound.js';
+	import { formatDayLabel, isDifferentDay, lastSeenLabel } from '$lib/utils/datetime.js';
 	import MessageBubble from './MessageBubble.svelte';
 	import ChatComposer from './ChatComposer.svelte';
 	import MsnContactCard from '$lib/components/MsnContactCard.svelte';
@@ -15,7 +16,6 @@
 		onBackMobile,
 		onStartAudioCall,
 		onStartVideoCall,
-		onStartScreenShare,
 		onEndCall,
 		onLoadMore,
 		onSendMessage,
@@ -29,7 +29,8 @@
 		onNewDM,
 		onTyping,
 		onRetrySend,
-		onDiscardMessage
+		onDiscardMessage,
+		pendingProduct = $bindable(null)
 	} = $props();
 
 	let scrollContainer = $state(null);
@@ -108,20 +109,6 @@
 		return !!conv.peer_online;
 	}
 
-	function lastSeenLabel(conv) {
-		const ts = conv?.peer_last_seen;
-		if (!ts) return 'Desconectado';
-		const then = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T') + 'Z').getTime();
-		if (isNaN(then)) return 'Desconectado';
-		const diffMin = Math.floor((Date.now() - then) / 60000);
-		if (diffMin < 1) return 'Visto hace un momento';
-		if (diffMin < 60) return `Visto hace ${diffMin} min`;
-		const diffH = Math.floor(diffMin / 60);
-		if (diffH < 24) return `Visto hace ${diffH} h`;
-		const diffD = Math.floor(diffH / 24);
-		return `Visto hace ${diffD} d`;
-	}
-
 	function handleScroll() {
 		if (!scrollContainer) return;
 		// Si nos acercamos al top, cargamos más
@@ -186,7 +173,8 @@
 <div class="chat-pane" class:hidden-mobile={mobileView === 'list'}>
 	{#if chatStore.activeConvId && chatStore.activeConv}
 		<div class="chat-header-container">
-			<div class="chat-header">
+			<!-- Fila principal: identidad del peer + acciones -->
+			<header class="chat-header">
 				<div class="peer-profile-info">
 					<!-- Back button -->
 					<button
@@ -195,7 +183,7 @@
 							onBackMobile();
 						}}
 						class="back-mobile-btn"
-						aria-label="Volver"
+						aria-label="Volver a la lista de conversaciones"
 					>
 						<span class="material-icons-round">arrow_back</span>
 					</button>
@@ -204,19 +192,19 @@
 					<div class="conv-avatar-wrapper">
 						<div
 							class="conv-avatar"
-							style="width: 34px; height: 34px; flex: 0 0 34px; min-width: 34px; min-height: 34px;"
+							style="width: 38px; height: 38px; flex: 0 0 38px; min-width: 38px; min-height: 38px;"
 						>
 							{#if chatStore.activeConv.peer_avatar}
 								<img
 									src={chatStore.activeConv.peer_avatar}
 									alt={chatStore.activeConv.name || chatStore.activeConv.peer_display_name}
-									width="34"
-									height="34"
+									width="38"
+									height="38"
 									loading="lazy"
 									decoding="async"
 								/>
 							{:else}
-								<span style="font-size: 0.78rem;"
+								<span style="font-size: 0.82rem;"
 									>{getInitials(
 										chatStore.activeConv.name ||
 											chatStore.activeConv.peer_display_name ||
@@ -225,27 +213,37 @@
 								>
 							{/if}
 						</div>
-						{#if peerOnline(chatStore.activeConv)}
-							<span class="online-indicator"></span>
-						{/if}
+						<span
+							class="presence-dot"
+							class:on={peerOnline(chatStore.activeConv)}
+							title={peerOnline(chatStore.activeConv) ? 'En línea' : 'Desconectado'}
+						></span>
 					</div>
 
 					<div style="min-width: 0;">
 						<h2 class="peer-name">
-							{chatStore.activeConv.name ||
-								chatStore.activeConv.peer_display_name ||
-								chatStore.activeConv.peer_username}
+							<span class="peer-name-text">
+								{chatStore.activeConv.name ||
+									chatStore.activeConv.peer_display_name ||
+									chatStore.activeConv.peer_username}
+							</span>
+							{#if chatStore.activeConv.is_verified}
+								<span class="material-icons-round verified-check" title="Cuenta verificada"
+									>verified</span
+								>
+							{/if}
 						</h2>
 						<p class="peer-status" class:typing-status={isPeerTyping}>
 							{#if isPeerTyping}
-								Escribiendo...
+								<span class="typing-inline-dots" aria-hidden="true">
+									<span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+								</span>
+								Escribiendo…
 							{:else if peerOnline(chatStore.activeConv)}
+								<span class="status-live-dot" aria-hidden="true"></span>
 								Activo ahora
 							{:else}
-								<span class="material-icons-round" style="font-size: 9px; margin-right: 2px;"
-									>circle</span
-								>
-								{lastSeenLabel(chatStore.activeConv)}
+								{lastSeenLabel(chatStore.activeConv.peer_last_seen)}
 							{/if}
 						</p>
 					</div>
@@ -275,20 +273,13 @@
 					<!-- Juegos / Actividades (próximamente) -->
 					<button
 						class="aero-icon-btn header-tool-btn"
+						class:toggled={showGamesSoon}
 						title="Juegos y actividades (próximamente)"
 						aria-label="Juegos y actividades"
+						aria-expanded={showGamesSoon}
 						onclick={() => (showGamesSoon = !showGamesSoon)}
 					>
 						<span class="material-icons-round">sports_esports</span>
-					</button>
-					<!-- Guiño: envía un guiño rápido -->
-					<button
-						class="aero-icon-btn header-tool-btn"
-						title="Enviar un guiño"
-						aria-label="Enviar un guiño"
-						onclick={() => onSendMessage?.({ text: '😉' })}
-					>
-						<span class="material-icons-round">sentiment_very_satisfied</span>
 					</button>
 
 					{#if rtcStore.inCall}
@@ -310,18 +301,11 @@
 						>
 							<span class="material-icons-round">videocam</span>
 						</button>
-						<button
-							class="aero-icon-btn header-tool-btn"
-							title="Compartir pantalla"
-							onclick={onStartScreenShare}
-						>
-							<span class="material-icons-round">present_to_all</span>
-						</button>
 					{/if}
 
 					{#if chatStore.activeConv.peer_username}
 						<button
-							class="aero-icon-btn header-tool-btn"
+							class="aero-icon-btn header-tool-btn profile-btn"
 							aria-label="Ver Ficha de Contacto"
 							title="Ver Ficha de Contacto"
 							onclick={() => (showMsnContactCard = !showMsnContactCard)}
@@ -330,29 +314,42 @@
 						</button>
 					{/if}
 				</div>
-			</div>
+			</header>
 
+			<!-- Sub-header: estado LiveChat + sonidos + búsqueda + menú secundario -->
 			<div class="chat-sub-header">
 				<div class="sub-header-info">
 					<span class="livechat-dot"></span>
 					<span class="livechat-label">LiveChat</span>
-					<span class="sub-header-sep">•</span>
-					<span class="material-icons-round zumbido-hint-icon">bolt</span>
-					<span>Envía un Zumbido para llamar la atención</span>
+					<span class="sub-header-sep" aria-hidden="true">•</span>
+					<span>Mensajería instantánea</span>
 				</div>
-				<button
-					type="button"
-					class="sounds-toggle"
-					class:sounds-off={!soundOn}
-					onclick={toggleSound}
-					title={soundOn ? 'Sonidos activados' : 'Sonidos silenciados'}
-					aria-label={soundOn ? 'Silenciar sonidos' : 'Activar sonidos'}
-				>
-					<span class="material-icons-round" style="font-size: 13px;"
-						>{soundOn ? 'volume_up' : 'volume_off'}</span
+				<div class="sub-header-tools">
+					<button
+						type="button"
+						class="sounds-toggle"
+						class:sounds-off={!soundOn}
+						onclick={toggleSound}
+						title={soundOn ? 'Sonidos activados' : 'Sonidos silenciados'}
+						aria-label={soundOn ? 'Silenciar sonidos' : 'Activar sonidos'}
 					>
-					<span>Sonidos</span>
-				</button>
+						<span class="material-icons-round" style="font-size: 13px;"
+							>{soundOn ? 'volume_up' : 'volume_off'}</span
+						>
+						<span>Sonidos</span>
+					</button>
+					<span class="tool-sep" aria-hidden="true"></span>
+					<button
+						type="button"
+						class="search-toggle"
+						class:active={showSearch}
+						onclick={toggleSearch}
+						title="Buscar en la conversación"
+						aria-label="Buscar en la conversación"
+					>
+						<span class="material-icons-round" style="font-size: 14px;">search</span>
+					</button>
+				</div>
 			</div>
 
 			{#if showGamesSoon}
@@ -412,7 +409,6 @@
 		<div
 			bind:this={scrollContainer}
 			class="messages-area"
-			style="overflow-y: scroll; scrollbar-width: thin; scrollbar-color: rgba(46,134,232,0.7) rgba(0,0,0,0.2);"
 			onscroll={handleScroll}
 			onclick={() => {
 				activeReactionMsgId = null;
@@ -466,6 +462,14 @@
 								{@const animated = posFromEnd < ANIM_WINDOW}
 								{@const animIndex = animated ? ANIM_WINDOW - 1 - posFromEnd : -1}
 								{@const staggerDelay = animated ? animIndex * 90 : 0}
+								{@const newDay =
+									i === 0 || isDifferentDay(chatStore.messages[i - 1]?.created_at, msg.created_at)}
+
+								{#if newDay}
+									<div class="date-chip" in:fade={{ duration: 200 }}>
+										<span>{formatDayLabel(msg.created_at)}</span>
+									</div>
+								{/if}
 
 								<MessageBubble
 									{msg}
@@ -572,17 +576,19 @@
 			onSend={onSendMessage}
 			{chatStore}
 			{onTyping}
+			bind:pendingProduct
 		/>
 	{:else}
 		<!-- No Active Conversation Select -->
 		<div class="no-chat-selected">
-			<span class="material-icons-round no-chat-icon">chat_bubble_outline</span>
-			<h2 class="sidebar-title" style="font-size: 1.5rem; margin-bottom: 8px;">Tus Mensajes</h2>
-			<p class="peer-status" style="max-width: 280px; margin: 0 auto 16px auto;">
-				Selecciona un chat de la lista izquierda o crea uno nuevo para empezar a hablar en tiempo
-				real.
+			<div class="empty-icon-glow big">
+				<span class="material-icons-round floating-icon">forum</span>
+			</div>
+			<h2 class="no-chat-title">Tus Mensajes</h2>
+			<p class="no-chat-sub">
+				Selecciona un chat de la lista o crea uno nuevo para empezar a hablar en tiempo real.
 			</p>
-			<button onclick={() => onNewDM?.()} class="btn-aero-primary" style="padding: 10px 24px;">
+			<button onclick={() => onNewDM?.()} class="btn-aero-primary no-chat-cta">
 				Nuevo mensaje
 			</button>
 		</div>
@@ -596,17 +602,22 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		background: var(--bg-surface);
+		background:
+			radial-gradient(90% 60% at 100% 0%, rgba(var(--accent-blue-rgb), 0.05), transparent 55%),
+			var(--bg-surface);
 		position: relative;
 		overflow-x: hidden;
 	}
 
+	/* ── Header ─────────────────────────────────────────────── */
 	.chat-header-container {
 		position: relative;
 		display: flex;
 		flex-direction: column;
 		border-bottom: 1px solid var(--border-subtle);
-		background: var(--bg-surface);
+		background:
+			radial-gradient(120% 100% at 100% -40%, rgba(var(--accent-blue-rgb), 0.08), transparent 60%),
+			var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 		z-index: 10;
@@ -649,8 +660,8 @@
 	}
 
 	.conv-avatar {
-		width: 34px;
-		height: 34px;
+		width: 38px;
+		height: 38px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
 		background: var(--grad-primary);
@@ -660,6 +671,9 @@
 		color: #fff;
 		font-weight: 700;
 		overflow: hidden;
+		box-shadow:
+			inset 0 1px 1px rgba(255, 255, 255, 0.3),
+			0 1px 3px rgba(0, 0, 0, 0.12);
 	}
 
 	.conv-avatar img {
@@ -668,26 +682,52 @@
 		object-fit: cover;
 	}
 
-	.online-indicator {
+	/* Punto de presencia junto al avatar */
+	.presence-dot {
 		position: absolute;
 		bottom: -1px;
 		right: -1px;
-		width: 9px;
-		height: 9px;
-		background: var(--aero-mint);
+		width: 11px;
+		height: 11px;
+		border-radius: var(--radius-full);
+		background: var(--text-muted);
 		border: 2px solid var(--bg-surface-solid, #ffffff);
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		opacity: 0.6;
+		transition:
+			background 0.25s,
+			box-shadow 0.25s,
+			opacity 0.25s;
+	}
+
+	.presence-dot.on {
+		background: var(--aero-mint);
+		opacity: 1;
+		box-shadow: 0 0 7px rgba(0, 212, 170, 0.6);
 	}
 
 	.peer-name {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		font-weight: 700;
-		font-size: 0.9rem;
+		font-size: 0.94rem;
 		color: var(--text-primary);
 		margin: 0;
+		max-width: 100%;
+	}
+
+	.peer-name-text {
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		min-width: 0;
+	}
+
+	.verified-check {
+		font-size: 0.9rem !important;
+		color: var(--badge-verified, var(--aero-sky));
+		flex-shrink: 0;
+		filter: drop-shadow(0 0 3px rgba(var(--accent-blue-rgb), 0.4));
 	}
 
 	.peer-status {
@@ -696,23 +736,52 @@
 		margin: 1px 0 0 0;
 		display: flex;
 		align-items: center;
+		gap: 4px;
+	}
+
+	.status-live-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--aero-mint);
+		box-shadow: 0 0 5px rgba(0, 212, 170, 0.6);
+		flex-shrink: 0;
 	}
 
 	.typing-status {
 		color: var(--accent-blue-base);
 		font-weight: 600;
-		animation: status-pulse 1.5s infinite;
 	}
 
-	@keyframes status-pulse {
-		0% {
-			opacity: 0.6;
-		}
-		50% {
-			opacity: 1;
-		}
+	/* Puntos de "escribiendo…" inline en el header */
+	.typing-inline-dots {
+		display: inline-flex;
+		gap: 2px;
+		align-items: center;
+	}
+	.tdot {
+		width: 3.5px;
+		height: 3.5px;
+		border-radius: 50%;
+		background: var(--accent-blue-base);
+		animation: tdot-bounce 1.2s ease-in-out infinite;
+	}
+	.tdot:nth-child(2) {
+		animation-delay: 0.15s;
+	}
+	.tdot:nth-child(3) {
+		animation-delay: 0.3s;
+	}
+	@keyframes tdot-bounce {
+		0%,
+		60%,
 		100% {
-			opacity: 0.6;
+			transform: translateY(0);
+			opacity: 0.55;
+		}
+		30% {
+			transform: translateY(-3px);
+			opacity: 1;
 		}
 	}
 
@@ -754,6 +823,33 @@
 		background: rgba(var(--accent-blue-rgb), 0.12);
 		color: var(--accent-blue-base);
 		border-color: var(--accent-blue-base);
+		transform: translateY(-1px);
+	}
+	.header-tool-btn.toggled {
+		background: rgba(var(--accent-blue-rgb), 0.14);
+		border-color: var(--accent-blue-base);
+		color: var(--accent-blue-base);
+	}
+
+	@media (max-width: 768px) {
+		.header-actions-row {
+			max-width: 56%;
+			overflow-x: auto;
+			scrollbar-width: none;
+			-webkit-overflow-scrolling: touch;
+		}
+		.header-actions-row::-webkit-scrollbar {
+			display: none;
+		}
+		.chat-header {
+			padding: 8px 12px;
+		}
+		.chat-sub-header {
+			padding: 2px 12px;
+		}
+		.messages-area {
+			padding: 10px 12px;
+		}
 	}
 
 	/* Botón de Zumbido resaltado en ámbar */
@@ -793,7 +889,7 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 4px 14px;
+		padding: 3px 14px;
 		background: rgba(var(--accent-blue-rgb), 0.04);
 		font-size: 0.72rem;
 		color: var(--text-muted);
@@ -804,6 +900,8 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		min-width: 0;
+		overflow: hidden;
 	}
 
 	.livechat-dot {
@@ -812,6 +910,7 @@
 		height: 6px;
 		border-radius: 50%;
 		background: var(--aero-mint);
+		box-shadow: 0 0 5px rgba(0, 212, 170, 0.6);
 		flex-shrink: 0;
 	}
 
@@ -824,27 +923,26 @@
 		opacity: 0.5;
 	}
 
-	.zumbido-hint-icon {
-		color: var(--aero-amber);
-		font-size: 13px;
+	@media (max-width: 768px) {
+		.sub-header-info > span:last-child {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 
-	.games-soon-note {
-		position: absolute;
-		right: 12px;
-		top: 100%;
-		margin-top: 6px;
-		z-index: 40;
+	.sub-header-tools {
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		padding: 6px 12px;
-		font-size: 0.72rem;
-		color: var(--text-primary);
-		background: var(--bg-surface-solid, #ffffff);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+		flex-shrink: 0;
+	}
+
+	.tool-sep {
+		width: 1px;
+		height: 12px;
+		background: var(--border-subtle);
 	}
 
 	.sounds-toggle {
@@ -865,6 +963,44 @@
 	}
 	.sounds-toggle.sounds-off {
 		opacity: 0.5;
+	}
+
+	.search-toggle {
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		padding: 2px;
+		border-radius: var(--radius-squircle);
+		corner-shape: squircle;
+		transition:
+			background 0.18s,
+			color 0.18s;
+	}
+	.search-toggle:hover,
+	.search-toggle.active {
+		background: rgba(var(--accent-blue-rgb), 0.12);
+		color: var(--accent-blue-base);
+	}
+
+	.games-soon-note {
+		position: absolute;
+		right: 12px;
+		top: 100%;
+		margin-top: 6px;
+		z-index: 40;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 12px;
+		font-size: 0.72rem;
+		color: var(--text-primary);
+		background: var(--bg-surface-solid, #ffffff);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 	}
 
 	.in-chat-search {
@@ -955,13 +1091,15 @@
 	.messages-area {
 		flex: 1;
 		min-height: 0;
-		overflow-y: scroll;
+		overflow-y: auto;
+		overscroll-behavior: contain;
 		padding: 14px 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--scrollbar-thumb) transparent;
+		scroll-behavior: smooth;
 	}
 
 	.load-more-btn {
@@ -969,7 +1107,7 @@
 		margin: 0 auto 6px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-full);
 		color: var(--accent-blue-base);
 		font-size: 0.78rem;
 		font-weight: 600;
@@ -981,6 +1119,7 @@
 		background: var(--accent-blue-base);
 		color: white;
 		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.3);
 	}
 
 	.loading-more {
@@ -1034,6 +1173,10 @@
 		box-shadow:
 			0 0 20px rgba(var(--accent-blue-rgb), 0.08),
 			inset 0 1px 3px rgba(255, 255, 255, 0.1);
+	}
+	.empty-icon-glow.big {
+		width: 76px;
+		height: 76px;
 	}
 
 	.empty-icon-glow::before {
@@ -1141,6 +1284,30 @@
 		margin-top: auto;
 	}
 
+	/* ── Separadores de fecha ───────────────────────────────── */
+	.date-chip {
+		align-self: center;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 6px 0 2px;
+		user-select: none;
+	}
+	.date-chip span {
+		font-size: 0.64rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		background: rgba(var(--accent-blue-rgb), 0.07);
+		border: 1px solid var(--border-subtle);
+		padding: 2px 10px;
+		border-radius: var(--radius-full);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+	}
+
 	.typing-bubble {
 		display: flex;
 		gap: 4px;
@@ -1148,8 +1315,9 @@
 		padding: 6px 12px;
 		border-radius: var(--radius-md);
 		border-bottom-left-radius: 2px;
-		background: var(--glass-bg);
-		border: 1px solid var(--glass-border);
+		background: var(--bg-surface-solid, #ffffff);
+		border: 1px solid var(--border-subtle);
+		border-top: 1px solid var(--glass-border-t);
 	}
 
 	.dot {
@@ -1188,11 +1356,24 @@
 		text-align: center;
 	}
 
-	.no-chat-icon {
-		font-size: 3.5rem;
-		color: var(--border-subtle);
-		margin-bottom: 12px;
-		animation: float 3s ease-in-out infinite;
+	.no-chat-title {
+		font-family: var(--font-display);
+		font-size: 1.5rem;
+		font-weight: 800;
+		color: var(--text-primary);
+		margin: 0 0 8px 0;
+		letter-spacing: -0.02em;
+	}
+
+	.no-chat-sub {
+		font-size: 0.8rem;
+		color: var(--text-muted);
+		max-width: 280px;
+		margin: 0 auto 16px auto;
+	}
+
+	.no-chat-cta {
+		padding: 10px 24px;
 	}
 
 	@keyframes float {
@@ -1208,6 +1389,15 @@
 	@media (max-width: 768px) {
 		.chat-pane.hidden-mobile {
 			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.floating-icon,
+		.empty-icon-glow::before,
+		.dot,
+		.tdot {
+			animation: none !important;
 		}
 	}
 

@@ -15,7 +15,7 @@
 	import { fade, scale as svelteScale, slide } from 'svelte/transition';
 	import { cubicOut, expoOut } from 'svelte/easing';
 	import { untrack } from 'svelte';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { mediaViewer } from '$lib/stores/mediaViewer.svelte.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { posts as postsApi } from '$lib/api.js';
@@ -27,6 +27,7 @@
 	import KlipyPicker from '$lib/components/KlipyPicker.svelte';
 	import HashtagTextarea from '$lib/components/HashtagTextarea.svelte';
 	import AnonIdentityModal from '$lib/components/AnonIdentityModal.svelte';
+	import QuoteCard from '$lib/components/QuoteCard.svelte';
 	import MediaPlayer from '$lib/components/MediaPlayer.svelte';
 	import { getAnonIdentity } from '$lib/stores/anonIdentity.svelte.js';
 	import { compressImage } from '$lib/utils/imageCompression.js';
@@ -61,6 +62,30 @@
 	let commentFileInput = $state(null);
 	let commentPollInterval = null;
 	let mobileCommentsOpen = $state(false);
+	let mobileShareOpen = $state(false);
+	let desktopShareOpen = $state(false);
+	let moreMenuOpen = $state(false);
+	let shareBtnEl = $state(null);
+	let desktopShareMenuStyle = $state({});
+
+	// Abre/cierra el menú de compartir de escritorio anclado al botón (fijo al viewport
+	// para que no se desplace con el contenido del sidebar). Siempre abre hacia ARRIBA:
+	// debajo del botón está el compositor de comentarios y abrirlo ahí lo taparía.
+	function toggleDesktopShare() {
+		desktopShareOpen = !desktopShareOpen;
+		if (desktopShareOpen && shareBtnEl) {
+			const r = shareBtnEl.getBoundingClientRect();
+			const menuHeight = 150;
+			const left = `${Math.max(8, r.right - 260)}px`;
+			// El borde inferior del menú queda 6px por encima del botón; si no cabe
+			// entero, se clampa para que el menú siga visible dentro del viewport.
+			const bottom = Math.min(window.innerHeight - r.top + 6, window.innerHeight - menuHeight - 8);
+			desktopShareMenuStyle = {
+				bottom: `${Math.max(8, bottom)}px`,
+				left
+			};
+		}
+	}
 
 	// ── Anon Identity ────────────────────────────────────────────────────────
 	let myAnonUsername = $state(null);
@@ -340,6 +365,7 @@
 				shared = Boolean(currentPost.user_shared);
 				shareCount = currentPost.share_count || 0;
 				saved = Boolean(currentPost.user_saved);
+				desktopShareOpen = false;
 
 				if (currentPost.is_anonymous) {
 					getAnonIdentity().then((ident) => {
@@ -556,7 +582,13 @@
 
 		if (e.key === 'Escape') {
 			e.preventDefault();
-			if (showCommentEmojis || showCommentGifs || showCommentMedia) {
+			if (mobileShareOpen) {
+				mobileShareOpen = false;
+			} else if (mobileCommentsOpen) {
+				mobileCommentsOpen = false;
+			} else if (desktopShareOpen) {
+				desktopShareOpen = false;
+			} else if (showCommentEmojis || showCommentGifs || showCommentMedia) {
 				showCommentEmojis = false;
 				showCommentGifs = false;
 				showCommentMedia = false;
@@ -620,6 +652,14 @@
 		}, 2000);
 	}
 
+	// Citar el post: abre el compositor con el post original referenciado.
+	function quotePost() {
+		if (!mediaViewer.activePost?.id) return;
+		const id = mediaViewer.activePost.id;
+		mediaViewer.close();
+		goto(`/posts/create?quote=${id}`);
+	}
+
 	function downloadCurrentMedia() {
 		if (!mediaViewer.currentItem?.url) return;
 		const a = document.createElement('a');
@@ -662,13 +702,49 @@
 		<!-- Botón de Cerrar Superior Izquierdo [✕] -->
 		<button
 			type="button"
-			class="vs-lightbox-close-btn btn-aero-icon"
+			class="vs-lightbox-close-btn"
 			onclick={() => mediaViewer.close()}
 			title="Cerrar (Esc)"
 			aria-label="Cerrar"
 		>
 			<span class="material-icons-round">close</span>
 		</button>
+
+		<!-- Menú "..." Superior Derecho (visible solo en móvil) -->
+		{#if mediaViewer.contextType === 'post' && post}
+			<div class="vs-lightbox-more-wrap">
+				<button
+					type="button"
+					class="vs-lightbox-more-btn"
+					onclick={() => (moreMenuOpen = !moreMenuOpen)}
+					title="Más opciones"
+					aria-label="Más opciones"
+					aria-expanded={moreMenuOpen}
+				>
+					<span class="material-icons-round">more_horiz</span>
+				</button>
+				{#if moreMenuOpen}
+					<div
+						class="vs-lightbox-more-menu glass-panel"
+						transition:fade={{ duration: 120 }}
+						role="menu"
+					>
+						<button type="button" role="menuitem" onclick={toggleSave}>
+							<span class="material-icons-round">{saved ? 'bookmark' : 'bookmark_border'}</span>
+							{saved ? 'Quitar guardado' : 'Guardar'}
+						</button>
+						<button type="button" role="menuitem" onclick={copyPostLink}>
+							<span class="material-icons-round">{copySuccess ? 'check' : 'link'}</span>
+							{copySuccess ? 'Enlace copiado' : 'Copiar enlace'}
+						</button>
+						<button type="button" role="menuitem" onclick={downloadCurrentMedia}>
+							<span class="material-icons-round">file_download</span>
+							Descargar original
+						</button>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Layout Split Container -->
 		<div class="vs-lightbox-content" class:has-sidebar={mediaViewer.contextType === 'post' && post}>
@@ -721,6 +797,10 @@
 										type="video"
 										class="vs-lightbox-video"
 										autoplay={true}
+										aspectRatio={mediaViewer.currentItem.aspect_ratio ||
+											(mediaViewer.currentItem.width && mediaViewer.currentItem.height
+												? `${mediaViewer.currentItem.width} / ${mediaViewer.currentItem.height}`
+												: null)}
 									/>
 								{:else}
 									<img
@@ -793,7 +873,8 @@
 						<button
 							type="button"
 							class="vs-mobile-btn {shared ? 'is-shared' : ''}"
-							onclick={toggleShare}
+							onclick={() => (mobileShareOpen = true)}
+							aria-label="Compartir"
 						>
 							<span class="material-icons-round">repeat</span>
 							<span>{shareCount}</span>
@@ -836,41 +917,57 @@
 								</div>
 							</div>
 						{:else}
-							<a
-								href="/u/{post.username}"
-								class="flex items-center gap-3 group text-decoration-none"
-								style="flex: 1; min-width: 0;"
-								onclick={() => mediaViewer.close()}
-							>
-								<AeroAvatar
-									src={post.avatar_url}
-									alt={post.username}
-									size="md"
-									isVtuber={post.is_virtual}
-								/>
-								<div class="user-meta" style="flex: 1; min-width: 0;">
+							<div class="flex items-center gap-3 min-w-0 flex-1" style="flex: 1; min-width: 0;">
+								<a
+									href="/u/{post.username}"
+									class="block text-decoration-none flex-shrink-0"
+									onclick={() => mediaViewer.close()}
+									tabindex="-1"
+								>
+									<AeroAvatar
+										src={post.avatar_url}
+										alt={post.username}
+										size="md"
+										isVtuber={post.is_virtual}
+									/>
+								</a>
+								<div class="user-meta min-w-0 flex-1" style="flex: 1; min-width: 0;">
 									<div class="flex items-center gap-1.5 flex-wrap">
-										<span
-											class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors truncate"
+										<a
+											href="/u/{post.username}"
+											class="font-semibold text-sm text-main hover:text-blue-500 transition-colors truncate text-decoration-none"
+											onclick={() => mediaViewer.close()}
 										>
 											{post.display_name || post.username}
-										</span>
+										</a>
 										<VerifiedBadge
 											role={post.role}
 											isVerified={post.is_verified == 1}
 											size="16px"
+											interactive={true}
 										/>
 										{#if post.level}
-											<LevelBadge level={post.level} size="sm" showText={false} />
+											<LevelBadge
+												level={post.level}
+												size="sm"
+												showText={false}
+												interactive={true}
+											/>
 										{/if}
 									</div>
 									<div class="flex items-center gap-1 text-xs text-muted truncate">
-										<span>@{post.username}</span>
+										<a
+											href="/u/{post.username}"
+											class="text-muted hover:text-main transition-colors text-decoration-none"
+											onclick={() => mediaViewer.close()}
+										>
+											@{post.username}
+										</a>
 										<span>·</span>
 										<time datetime={post.created_at}>{formatTimestamp(post.created_at)}</time>
 									</div>
 								</div>
-							</a>
+							</div>
 						{/if}
 					</div>
 
@@ -884,6 +981,11 @@
 							<div class="vs-post-text-content">
 								{@html formatHashtags(post.content)}
 							</div>
+						{/if}
+
+						<!-- Post citado (estilo X / Bluesky) -->
+						{#if post.quoted_post}
+							<QuoteCard quote={post.quoted_post} />
 						{/if}
 
 						<!-- Barra de Acciones (Exacta a PostCard) -->
@@ -937,16 +1039,72 @@
 									>
 								</button>
 
-								<!-- Share / Repost -->
-								<button
-									onclick={toggleShare}
-									class="action-btn {shared ? 'shared' : ''}"
-									title="Repostear"
-									aria-label="Repostear"
-								>
-									<span class="material-icons-round text-[18px] icon">repeat</span>
-									<span class="count">{shareCount > 0 ? shareCount.toLocaleString() : ''}</span>
-								</button>
+								<!-- Share / Repost (menú desktop: Repostear o Citar) -->
+								<div class="vs-share-wrap">
+									{#if desktopShareOpen}
+										<!-- svelte-ignore a11y_click_events_have_key_events -->
+										<!-- svelte-ignore a11y_no_static_element_interactions -->
+										<div
+											class="vs-share-dismiss-layer"
+											onclick={() => (desktopShareOpen = false)}
+										></div>
+									{/if}
+									<button
+										bind:this={shareBtnEl}
+										onclick={toggleDesktopShare}
+										class="action-btn {shared ? 'shared' : ''}"
+										title="Compartir"
+										aria-label="Compartir"
+										aria-haspopup="menu"
+										aria-expanded={desktopShareOpen}
+									>
+										<span class="material-icons-round text-[18px] icon">repeat</span>
+										<span class="count">{shareCount > 0 ? shareCount.toLocaleString() : ''}</span>
+									</button>
+									{#if desktopShareOpen}
+										<div
+											class="vs-desktop-share-menu glass-panel"
+											style={desktopShareMenuStyle}
+											transition:fade={{ duration: 120 }}
+											role="menu"
+										>
+											<button
+												type="button"
+												role="menuitem"
+												onclick={() => {
+													desktopShareOpen = false;
+													toggleShare();
+												}}
+											>
+												<span class="material-icons-round"
+													>{shared ? 'check_circle' : 'repeat'}</span
+												>
+												<span class="vs-share-menu-text">
+													<strong>Repostear</strong>
+													<small
+														>{shared
+															? 'Ya reposteado — toca para deshacer'
+															: 'Comparte este post en tu perfil'}</small
+													>
+												</span>
+											</button>
+											<button
+												type="button"
+												role="menuitem"
+												onclick={() => {
+													desktopShareOpen = false;
+													quotePost();
+												}}
+											>
+												<span class="material-icons-round">format_quote</span>
+												<span class="vs-share-menu-text">
+													<strong>Citar</strong>
+													<small>Añade tu comentario sobre este post</small>
+												</span>
+											</button>
+										</div>
+									{/if}
+								</div>
 
 								<!-- Bookmark / Save -->
 								<button
@@ -1266,32 +1424,140 @@
 			{/if}
 		</div>
 
-		<!-- Mobile Comments Drawer -->
+		<!-- Mobile Comments Sheet (estilo X: post citado + "Respondiendo a" + compositor) -->
 		{#if mobileCommentsOpen && mediaViewer.contextType === 'post' && post}
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="vs-mobile-sheet-backdrop" onclick={() => (mobileCommentsOpen = false)}></div>
-			<div
-				class="vs-mobile-sheet-drawer glass-panel"
-				transition:slide={{ axis: 'y', duration: 250 }}
-			>
+			<div class="vs-mobile-sheet-drawer" transition:slide={{ axis: 'y', duration: 250 }}>
 				<div class="vs-mobile-sheet-top">
 					<div class="vs-mobile-sheet-pill"></div>
 					<div class="vs-mobile-sheet-title-row">
-						<h3>Comentarios ({post.comment_count || comments.length})</h3>
+						<h3>Respondiendo a @{post.username || post.display_name}</h3>
+						<div class="vs-mobile-sheet-title-actions">
+							{#if (post.comment_count || 0) > 0}
+								<span class="vs-mobile-sheet-count">{post.comment_count}</span>
+							{/if}
+							<button
+								type="button"
+								class="aero-icon-btn"
+								onclick={() => (mobileCommentsOpen = false)}
+								aria-label="Cerrar"
+							>
+								<span class="material-icons-round">close</span>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Post original citado (contexto de la respuesta) -->
+				<div class="vs-reply-original-post">
+					<div class="vs-reply-original-avatar">
+						{#if post.is_anonymous}
+							<div class="vs-anon-avatar-circle">
+								<span class="material-icons-round">visibility_off</span>
+							</div>
+						{:else if post.avatar_url}
+							<img src={post.avatar_url} alt={post.username} loading="lazy" />
+						{:else}
+							<div class="vs-avatar-letter avatar-sm">
+								{(post.display_name || post.username || '?').charAt(0).toUpperCase()}
+							</div>
+						{/if}
+					</div>
+					<div class="vs-reply-original-meta">
+						<span class="vs-reply-original-name">{post.display_name || post.username}</span>
+						<span class="vs-reply-original-user">@{post.username}</span>
+						<span class="vs-reply-original-sep">·</span>
+						<time datetime={post.created_at}>{formatTimestamp(post.created_at)}</time>
+					</div>
+					{#if post.body || post.content}
+						<p class="vs-reply-original-text">
+							{@html formatHashtags(post.body || post.content || '')}
+						</p>
+					{/if}
+					{#if post.quoted_post}
+						<QuoteCard quote={post.quoted_post} />
+					{/if}
+					{#if post.media && post.media.length > 0}
+						<div class="vs-reply-original-media">
+							{#if post.media[0].media_type === 'video' || post.media[0].media_type === 'audio'}
+								<video
+									src={getProxiedMediaUrl(post.media[0].media_url)}
+									muted
+									playsinline
+									preload="metadata"
+								></video>
+								<span class="vs-reply-original-media-badge">
+									<span class="material-icons-round">play_circle_fill</span>
+								</span>
+							{:else}
+								<img
+									src={getProxiedMediaUrl(post.media[0].media_url)}
+									alt="Multimedia de @{post.username}"
+									loading="lazy"
+									decoding="async"
+								/>
+							{/if}
+						</div>
+					{/if}
+
+					<!-- Mini barra de acciones del post original -->
+					<div class="vs-reply-actions">
 						<button
 							type="button"
-							class="btn-aero-icon"
-							onclick={() => (mobileCommentsOpen = false)}
+							class="vs-reply-action-btn {liked ? 'is-liked' : ''}"
+							onclick={toggleLike}
+							aria-label="Me gusta"
 						>
-							<span class="material-icons-round">close</span>
+							<span class="material-icons-round">{liked ? 'favorite' : 'favorite_border'}</span>
+							<span>{likeCount}</span>
+						</button>
+						<button
+							type="button"
+							class="vs-reply-action-btn {shared ? 'is-shared' : ''}"
+							onclick={() => {
+								mobileShareOpen = true;
+							}}
+							aria-label="Compartir"
+						>
+							<span class="material-icons-round">repeat</span>
+							<span>{shareCount}</span>
+						</button>
+						<button
+							type="button"
+							class="vs-reply-action-btn {saved ? 'is-saved' : ''}"
+							onclick={toggleSave}
+							aria-label="Guardar"
+						>
+							<span class="material-icons-round">{saved ? 'bookmark' : 'bookmark_border'}</span>
+							<span>{saved ? 'Guardado' : 'Guardar'}</span>
+						</button>
+						<button
+							type="button"
+							class="vs-reply-action-btn"
+							onclick={copyPostLink}
+							aria-label="Copiar enlace"
+						>
+							<span class="material-icons-round">{copySuccess ? 'check' : 'ios_share'}</span>
+							<span>{copySuccess ? 'Copiado' : 'Copiar'}</span>
 						</button>
 					</div>
 				</div>
 
 				<div class="vs-mobile-sheet-body">
-					{#if comments.length === 0}
-						<p class="vs-empty-comments-box">No hay comentarios aún.</p>
+					{#if commentsLoading && comments.length === 0}
+						<div class="vs-comments-skeleton">
+							<div class="vs-skeleton-bar"></div>
+							<div class="vs-skeleton-bar short"></div>
+						</div>
+					{:else if comments.length === 0}
+						<div class="vs-mobile-sheet-empty">
+							<span class="material-icons-round vs-mobile-sheet-empty-icon"
+								>chat_bubble_outline</span
+							>
+							<p>Sé el primero en responder a esta publicación.</p>
+						</div>
 					{:else}
 						{#each comments as c (c.id)}
 							<CommentItem
@@ -1305,13 +1571,13 @@
 				</div>
 
 				<div class="vs-mobile-sheet-footer">
-					<input
-						type="text"
+					<textarea
 						bind:value={commentText}
-						placeholder="Escribe un comentario..."
+						placeholder="Postea tu respuesta"
 						onkeydown={handleCommentKeydown}
-						class="vs-mobile-sheet-input"
-					/>
+						class="vs-mobile-sheet-input vs-mobile-sheet-textarea"
+						rows="1"
+					></textarea>
 					<button
 						type="button"
 						class="btn-aero-primary"
@@ -1321,6 +1587,51 @@
 						Responder
 					</button>
 				</div>
+			</div>
+		{/if}
+
+		<!-- Mobile Share Sheet: elegir entre Repostear o Citar -->
+		{#if mobileShareOpen && mediaViewer.contextType === 'post' && post}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="vs-mobile-sheet-backdrop" onclick={() => (mobileShareOpen = false)}></div>
+			<div
+				class="vs-mobile-share-sheet"
+				transition:slide={{ axis: 'y', duration: 220 }}
+				role="menu"
+			>
+				<div class="vs-mobile-sheet-pill"></div>
+				<h3 class="vs-mobile-share-title">Compartir publicación</h3>
+				<button
+					type="button"
+					class="vs-share-option"
+					role="menuitem"
+					onclick={() => {
+						toggleShare();
+						mobileShareOpen = false;
+					}}
+				>
+					<span class="vs-share-option-icon">
+						<span class="material-icons-round">{shared ? 'check_circle' : 'repeat'}</span>
+					</span>
+					<span class="vs-share-option-text">
+						<strong>Repostear</strong>
+						<small
+							>{shared
+								? 'Ya reposteado — toca para deshacer'
+								: 'Comparte este post en tu perfil'}</small
+						>
+					</span>
+				</button>
+				<button type="button" class="vs-share-option" role="menuitem" onclick={quotePost}>
+					<span class="vs-share-option-icon">
+						<span class="material-icons-round">format_quote</span>
+					</span>
+					<span class="vs-share-option-text">
+						<strong>Citar</strong>
+						<small>Añade tu comentario sobre este post</small>
+					</span>
+				</button>
 			</div>
 		{/if}
 	</div>
@@ -1372,8 +1683,8 @@
 		position: absolute;
 		inset: 0;
 		background: rgba(2, 6, 12, 0.88);
-		backdrop-filter: blur(24px) saturate(1.3);
-		-webkit-backdrop-filter: blur(24px) saturate(1.3);
+		backdrop-filter: var(--glass-blur, blur(24px) saturate(1.3));
+		-webkit-backdrop-filter: var(--glass-blur, blur(24px) saturate(1.3));
 		z-index: 1;
 	}
 
@@ -1396,15 +1707,15 @@
 		height: 42px;
 		border-radius: var(--radius-full, 9999px);
 		background: rgba(15, 23, 42, 0.75);
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
+		backdrop-filter: var(--glass-blur, blur(16px));
+		-webkit-backdrop-filter: var(--glass-blur, blur(16px));
 		border: 1px solid rgba(255, 255, 255, 0.18);
 		color: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		transition:
 			border-color 0.2s ease,
 			box-shadow 0.2s ease,
@@ -1471,7 +1782,9 @@
 		max-height: 92vh;
 		object-fit: contain;
 		border-radius: var(--radius-md, 16px);
-		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+		box-shadow:
+			0 10px 36px rgba(0, 0, 0, 0.35),
+			0 0 30px rgba(56, 189, 248, 0.15);
 		cursor: grab;
 		touch-action: none;
 		user-select: none;
@@ -1498,8 +1811,8 @@
 		height: 46px;
 		border-radius: 50%;
 		background: rgba(15, 23, 42, 0.75);
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
+		backdrop-filter: var(--glass-blur, blur(16px));
+		-webkit-backdrop-filter: var(--glass-blur, blur(16px));
 		border: 1px solid rgba(255, 255, 255, 0.18);
 		color: #ffffff;
 		display: flex;
@@ -1507,7 +1820,7 @@
 		justify-content: center;
 		cursor: pointer;
 		z-index: 30;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		transition:
 			border-color 0.2s ease,
 			box-shadow 0.2s ease,
@@ -1529,6 +1842,11 @@
 
 	.vs-canvas-nav-arrow.next {
 		right: 24px;
+	}
+
+	/* Menú "..." superior derecho: oculto en desktop, visible en móvil */
+	.vs-lightbox-more-wrap {
+		display: none;
 	}
 
 	/* Mobile Bar: OCULTA POR DEFECTO EN DESKTOP */
@@ -1558,7 +1876,7 @@
 	:global([data-theme='light']) .vs-sidebar-panel {
 		background: #f8fafc;
 		border-left: 1px solid rgba(14, 165, 233, 0.25);
-		box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 
 	:global([data-theme='dark']) .vs-sidebar-panel {
@@ -1708,6 +2026,92 @@
 
 	.action-btn.saved {
 		color: var(--accent-blue-base, #1b85f3);
+	}
+
+	/* Menú de compartir en desktop: Repostear / Citar */
+	.vs-share-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+
+	.vs-share-dismiss-layer {
+		position: fixed;
+		inset: 0;
+		/* Por encima de los iconos del compositor (z-index 10/20) para que un clic
+		   en la textarea cierre el menú; el menú queda aún por encima (z-index 60). */
+		z-index: 50;
+		background: transparent;
+		cursor: default;
+	}
+
+	.vs-share-wrap .action-btn {
+		position: relative;
+		/* Por encima de la capa de cierre para poder seguir pulsando el botón */
+		z-index: 51;
+	}
+
+	.vs-desktop-share-menu {
+		position: fixed;
+		min-width: 250px;
+		/* Sobre los iconos de la textarea (10/20): el menú nunca queda detrás */
+		z-index: 60;
+		padding: 6px;
+		border-radius: var(--radius-lg, 14px);
+		background: var(--bg-surface-solid, #0f172a);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		max-height: 70vh;
+		overflow-y: auto;
+	}
+
+	:global([data-theme='light']) .vs-desktop-share-menu {
+		background: #ffffff;
+		border: 1px solid rgba(14, 165, 233, 0.2);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
+	}
+
+	.vs-desktop-share-menu button {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 10px 12px;
+		border: none;
+		background: none;
+		color: var(--text-primary, #e2e8f0);
+		font-size: 0.85rem;
+		font-weight: 600;
+		border-radius: var(--radius-md, 10px);
+		cursor: pointer;
+		text-align: left;
+		font-family: var(--font-sans);
+	}
+
+	.vs-desktop-share-menu button:hover {
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12);
+	}
+
+	.vs-desktop-share-menu button .material-icons-round {
+		font-size: 18px;
+		color: var(--accent-blue-base, #1b85f3);
+	}
+
+	.vs-share-menu-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.vs-share-menu-text strong {
+		font-size: 0.85rem;
+	}
+
+	.vs-share-menu-text small {
+		font-size: 0.72rem;
+		font-weight: 500;
+		color: var(--text-muted, #94a3b8);
 	}
 
 	/* Composer Row (Exacto a PostCard) */
@@ -1869,7 +2273,7 @@
 	:global([data-theme='light']) .vs-sidebar-panel .comment-input-wrapper {
 		background: #ffffff;
 		border: 1.5px solid rgba(14, 165, 233, 0.28);
-		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+		box-shadow: var(--input-shadow-inner);
 	}
 
 	:global([data-theme='light']) .vs-sidebar-panel .comment-gif-btn:hover,
@@ -1882,7 +2286,7 @@
 	:global([data-theme='light']) .vs-sidebar-panel .post-nested-panel {
 		background: #ffffff;
 		border: 1px solid rgba(14, 165, 233, 0.2);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+		box-shadow: var(--shadow-sm);
 	}
 
 	.media-dropzone {
@@ -1984,50 +2388,148 @@
 	.vs-profile-floating-card {
 		position: absolute;
 		bottom: 24px;
-		left: 50%;
-		transform: translateX(-50%);
+		left: 0;
+		right: 0;
+		margin-inline: auto;
+		width: fit-content;
+		max-width: min(calc(100vw - 32px), 520px);
+		box-sizing: border-box;
 		z-index: 25;
-		padding: 16px 24px;
+		padding: 14px 20px;
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		border-radius: var(--radius-lg, 20px);
 		border: 1px solid var(--border-subtle);
 		display: flex;
 		align-items: center;
-		gap: 20px;
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
+		pointer-events: auto;
+		transform: none;
 	}
 
 	.vs-profile-card-content {
 		display: flex;
 		align-items: center;
-		gap: 20px;
+		gap: 16px;
+		width: 100%;
+		justify-content: space-between;
+	}
+
+	.vs-profile-text-meta {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		max-width: 280px;
 	}
 
 	.vs-profile-text-meta h3 {
 		font-family: var(--font-display);
-		font-size: 1rem;
+		font-size: 0.95rem;
 		font-weight: 700;
 		color: var(--text-primary);
 		margin: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.vs-profile-text-meta p {
 		font-size: 0.8rem;
 		color: var(--text-muted);
 		margin: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.vs-profile-download-btn {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		flex-shrink: 0;
+		padding: 8px 16px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	@media (max-width: 640px) {
+		.vs-profile-floating-card {
+			bottom: 16px;
+			padding: 10px 14px;
+			max-width: calc(100vw - 24px);
+		}
+
+		.vs-profile-card-content {
+			gap: 10px;
+		}
+
+		.vs-profile-text-meta {
+			max-width: 160px;
+		}
+
+		.vs-profile-download-btn {
+			padding: 6px 10px;
+			font-size: 0.78rem;
+		}
 	}
 
 	/* Responsive Mobile */
 	@media (max-width: 1024px) {
 		.vs-sidebar-panel {
 			display: none;
+		}
+
+		.vs-lightbox-more-wrap {
+			display: block;
+			position: absolute;
+			top: 18px;
+			right: 18px;
+			z-index: 60;
+		}
+
+		.vs-lightbox-more-btn {
+			width: 42px;
+			height: 42px;
+			border-radius: var(--radius-full, 9999px);
+			background: rgba(15, 23, 42, 0.75);
+			backdrop-filter: var(--glass-blur, blur(16px));
+			-webkit-backdrop-filter: var(--glass-blur, blur(16px));
+			border: 1px solid rgba(255, 255, 255, 0.12);
+			color: #fff;
+		}
+
+		.vs-lightbox-more-menu {
+			position: absolute;
+			top: calc(100% + 8px);
+			right: 0;
+			min-width: 190px;
+			padding: 6px;
+			border-radius: var(--radius-lg, 14px);
+			background: var(--bg-surface-solid, #0f172a);
+			box-shadow: var(--shadow-lg), var(--shadow-glow);
+			display: flex;
+			flex-direction: column;
+		}
+		.vs-lightbox-more-menu button {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			padding: 10px 12px;
+			border: none;
+			background: none;
+			color: var(--text-primary, #e2e8f0);
+			font-size: 0.85rem;
+			font-weight: 600;
+			border-radius: var(--radius-md, 10px);
+			cursor: pointer;
+			text-align: left;
+		}
+		.vs-lightbox-more-menu button:hover {
+			background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12);
+		}
+		.vs-lightbox-more-menu button .material-icons-round {
+			font-size: 18px;
 		}
 
 		.vs-mobile-action-bar {
@@ -2083,27 +2585,25 @@
 
 	.vs-mobile-sheet-drawer {
 		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		height: 75vh;
-		background: var(--bg-surface);
-		backdrop-filter: var(--glass-blur);
-		border-top: 1px solid var(--border-subtle);
-		border-top-left-radius: 20px;
-		border-top-right-radius: 20px;
+		inset: 0;
+		height: 100dvh;
+		height: 100vh;
+		background: var(--bg-surface-solid, #0f172a);
 		z-index: 201;
 		display: flex;
 		flex-direction: column;
+		color: var(--text-primary);
 	}
 
 	.vs-mobile-sheet-top {
+		flex-shrink: 0;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border-subtle);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 8px;
+		background: var(--bg-surface-solid, #0f172a);
 	}
 
 	.vs-mobile-sheet-pill {
@@ -2125,22 +2625,67 @@
 		font-size: 1rem;
 		color: var(--text-primary);
 		margin: 0;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.vs-mobile-sheet-title-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+
+	.vs-mobile-sheet-count {
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12);
+		border: 1px solid rgba(var(--accent-blue-rgb, 46, 134, 232), 0.2);
+		padding: 2px 9px;
+		border-radius: var(--radius-full, 9999px);
+		font-size: 0.75rem;
+		font-weight: 800;
+		color: var(--accent-blue-base, #1b85f3);
 	}
 
 	.vs-mobile-sheet-body {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
-		padding: 14px;
+		-webkit-overflow-scrolling: touch;
+		padding: 14px 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
 	}
 
+	.vs-mobile-sheet-empty {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 40px 24px;
+		color: var(--text-muted);
+		text-align: center;
+	}
+	.vs-mobile-sheet-empty-icon {
+		font-size: 2.4rem;
+		opacity: 0.35;
+	}
+	.vs-mobile-sheet-empty p {
+		margin: 0;
+		font-size: 0.9rem;
+	}
+
 	.vs-mobile-sheet-footer {
+		flex-shrink: 0;
 		display: flex;
 		gap: 8px;
-		padding: 12px 16px;
+		padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
 		border-top: 1px solid var(--border-subtle);
+		background: var(--bg-surface-solid, #0f172a);
 	}
 
 	.vs-mobile-sheet-input {
@@ -2156,5 +2701,212 @@
 	.vs-mobile-sheet-input:focus {
 		outline: none;
 		border-color: var(--accent-blue-base, #1b85f3);
+	}
+
+	.vs-mobile-sheet-textarea {
+		resize: none;
+		min-height: 40px;
+		max-height: 120px;
+		line-height: 1.4;
+	}
+
+	/* Post original citado en el compositor de respuesta */
+	.vs-reply-original-post {
+		flex-shrink: 0;
+		max-height: 42vh;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 16px;
+		border-bottom: 1px solid var(--border-subtle);
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.04);
+	}
+	.vs-reply-original-avatar {
+		flex: 0 0 32px;
+		width: 32px;
+		height: 32px;
+		border-radius: var(--radius-squircle, 10px);
+		overflow: hidden;
+		background: var(--grad-primary, linear-gradient(135deg, #2e86e8, #1b85f3));
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+	}
+	.vs-reply-original-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.vs-reply-original-avatar .material-icons-round {
+		font-size: 16px;
+	}
+	.vs-reply-original-meta {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 6px;
+		min-width: 0;
+		font-size: 0.8rem;
+	}
+	.vs-reply-original-name {
+		font-weight: 700;
+		color: var(--text-primary, #fff);
+	}
+	.vs-reply-original-user,
+	.vs-reply-original-sep,
+	.vs-reply-original-meta time {
+		color: var(--text-muted, #94a3b8);
+	}
+	.vs-reply-original-text {
+		width: 100%;
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--text-secondary, #cbd5e1);
+	}
+	.vs-reply-original-media {
+		position: relative;
+		width: 100%;
+		margin-top: 2px;
+		max-height: 220px;
+		border-radius: var(--radius-lg, 14px);
+		overflow: hidden;
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-surface-hover, rgba(255, 255, 255, 0.06));
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.vs-reply-original-media img,
+	.vs-reply-original-media video {
+		width: 100%;
+		max-height: 220px;
+		object-fit: cover;
+		display: block;
+	}
+	.vs-reply-original-media-badge {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+		color: rgba(255, 255, 255, 0.92);
+	}
+	.vs-reply-original-media-badge .material-icons-round {
+		font-size: 44px;
+		filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+	}
+	/* Mini barra de acciones del post original */
+	.vs-reply-actions {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 2px;
+		width: 100%;
+		margin-top: 2px;
+	}
+	.vs-reply-action-btn {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		background: none;
+		border: none;
+		color: var(--text-muted, #94a3b8);
+		font-size: 0.78rem;
+		font-weight: 600;
+		cursor: pointer;
+		padding: 6px 10px;
+		border-radius: var(--radius-full, 9999px);
+		transition:
+			background-color 0.15s ease,
+			color 0.15s ease;
+	}
+	.vs-reply-action-btn:hover {
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.1);
+		color: var(--text-primary);
+	}
+	.vs-reply-action-btn .material-icons-round {
+		font-size: 17px;
+	}
+	.vs-reply-action-btn.is-liked {
+		color: #f43f5e;
+	}
+	.vs-reply-action-btn.is-shared {
+		color: #10b981;
+	}
+	.vs-reply-action-btn.is-saved {
+		color: var(--accent-blue-base, #1b85f3);
+	}
+
+	/* Hoja de compartir: Repostear / Citar */
+	.vs-mobile-share-sheet {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background: var(--bg-surface-solid, #0f172a);
+		border-top: 1px solid var(--border-subtle);
+		border-top-left-radius: 20px;
+		border-top-right-radius: 20px;
+		z-index: 201;
+		display: flex;
+		flex-direction: column;
+		padding: 12px 12px calc(20px + env(safe-area-inset-bottom, 0px));
+		gap: 4px;
+		color: var(--text-primary);
+	}
+	.vs-mobile-share-title {
+		margin: 2px 6px 8px;
+		font-size: 0.95rem;
+		font-weight: 800;
+		color: var(--text-primary);
+		font-family: var(--font-display);
+		text-align: center;
+	}
+	.vs-share-option {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 12px;
+		border: none;
+		background: none;
+		color: var(--text-primary, #fff);
+		border-radius: var(--radius-md, 10px);
+		cursor: pointer;
+		text-align: left;
+		font-family: var(--font-sans);
+	}
+	.vs-share-option:hover {
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.1);
+	}
+	.vs-share-option-icon {
+		width: 42px;
+		height: 42px;
+		flex: 0 0 42px;
+		border-radius: var(--radius-full, 9999px);
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accent-blue-base, #1b85f3);
+	}
+	.vs-share-option-icon .material-icons-round {
+		font-size: 20px;
+	}
+	.vs-share-option-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.vs-share-option-text strong {
+		font-size: 0.92rem;
+	}
+	.vs-share-option-text small {
+		font-size: 0.75rem;
+		color: var(--text-muted, #94a3b8);
 	}
 </style>

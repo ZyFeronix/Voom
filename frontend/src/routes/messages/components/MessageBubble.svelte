@@ -72,6 +72,8 @@
 				(msg.body || '').trim().toLowerCase() === '/zumbido' ||
 				(msg.content || '').trim().toLowerCase() === '/zumbido')
 	);
+
+	const reactionsList = $derived(Object.entries(msg.reactions || {}));
 </script>
 
 <div
@@ -84,20 +86,25 @@
 >
 	<div class="message-bubble-row">
 		{#if !isMe && !isZumbido}
-			<div class="peer-mini-avatar">
-				{#if activeConv?.peer_avatar}
-					<img
-						src={activeConv.peer_avatar}
-						alt={activeConv.peer_display_name}
-						width="24"
-						height="24"
-						loading="lazy"
-						decoding="async"
-					/>
-				{:else}
-					<span>{getInitials(activeConv?.peer_display_name || activeConv?.peer_username)}</span>
-				{/if}
-			</div>
+			<!-- Avatar solo en el último mensaje de una racha del peer -->
+			{#if msg.is_group_end !== false}
+				<div class="peer-mini-avatar" style="flex: 0 0 26px; min-width: 26px; min-height: 26px;">
+					{#if activeConv?.peer_avatar}
+						<img
+							src={activeConv.peer_avatar}
+							alt={activeConv.peer_display_name}
+							width="24"
+							height="24"
+							loading="lazy"
+							decoding="async"
+						/>
+					{:else}
+						<span>{getInitials(activeConv?.peer_display_name || activeConv?.peer_username)}</span>
+					{/if}
+				</div>
+			{:else}
+				<div class="peer-mini-avatar ghost" aria-hidden="true"></div>
+			{/if}
 		{/if}
 
 		<div class="bubble-wrapper">
@@ -168,70 +175,6 @@
 						</div>
 					{/if}
 
-					<!-- Message Actions (Responder, Editar, Eliminar & Reaccionar) -->
-					<div class="message-actions-wrapper {isMe ? 'actions-right' : 'actions-left'}">
-						<button
-							class="action-btn-mini reply-btn"
-							onclick={(e) => {
-								e.stopPropagation();
-								onReply?.(msg);
-							}}
-							aria-label="Responder"
-							title="Responder"
-						>
-							<span class="material-icons-round">reply</span>
-						</button>
-
-						{#if isMe && (msg.body || msg.content) && !isZumbido}
-							<button
-								class="action-btn-mini edit-btn"
-								onclick={(e) => {
-									e.stopPropagation();
-									onEdit?.(msg);
-								}}
-								aria-label="Editar"
-								title="Editar mensaje"
-							>
-								<span class="material-icons-round">edit</span>
-							</button>
-						{/if}
-
-						{#if isMe}
-							<button
-								class="action-btn-mini delete-btn"
-								onclick={() => onDeleteClick(msg.id)}
-								aria-label="Eliminar"
-								title="Eliminar mensaje"
-							>
-								<span class="material-icons-round">delete</span>
-							</button>
-						{/if}
-
-						<div style="position: relative;">
-							<button
-								class="action-btn-mini react-btn"
-								onclick={(e) => onReactionMenuClick(e, msg.id)}
-								aria-label="Reaccionar"
-							>
-								<span class="material-icons-round">add_reaction</span>
-							</button>
-
-							{#if activeReactionMsgId === msg.id}
-								<div
-									class="floating-picker-wrapper {isMe
-										? 'picker-right'
-										: 'picker-left'} picker-{reactionPickerDirection}"
-								>
-									<TwemojiPicker
-										variant="inline"
-										onSelect={(emoji) => onReact(msg.id, emoji)}
-										onClose={() => onCloseReactionPicker()}
-									/>
-								</div>
-							{/if}
-						</div>
-					</div>
-
 					{#if msg.body || msg.content}
 						{#if isZumbido}
 							<div class="zumbido-content">
@@ -262,6 +205,89 @@
 							</p>
 						{/if}
 					{/if}
+
+					<!-- Reacciones flotando sobre el borde inferior de la burbuja -->
+					{#if reactionsList.length > 0}
+						<div class="reactions-list">
+							{#each reactionsList as [emoji, data] (emoji)}
+								<button
+									class="reaction-tag {data.reacted ? 'user-reacted' : ''}"
+									onclick={() => onReact(msg.id, emoji)}
+									aria-label="{data.reacted ? 'Quitar reacción' : 'Reaccionar con'} {emoji}"
+								>
+									<span>{emoji}</span>
+									{#if data.count > 1}<span class="reaction-count">{data.count}</span>{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Acciones flotantes al hover: reaccionar / responder / editar / eliminar -->
+					<div class="message-actions-wrapper {isMe ? 'actions-right' : 'actions-left'}">
+						<button
+							class="action-btn-mini react-btn"
+							onclick={(e) => onReactionMenuClick(e, msg.id)}
+							aria-label="Reaccionar"
+							title="Reaccionar"
+						>
+							<span class="material-icons-round">add_reaction</span>
+						</button>
+						<button
+							class="action-btn-mini reply-btn"
+							onclick={(e) => {
+								e.stopPropagation();
+								onReply?.(msg);
+							}}
+							aria-label="Responder"
+							title="Responder"
+						>
+							<span class="material-icons-round">reply</span>
+						</button>
+
+						{#if isMe && (msg.body || msg.content) && !isZumbido}
+							<button
+								class="action-btn-mini edit-btn"
+								onclick={(e) => {
+									e.stopPropagation();
+									onEdit?.(msg);
+								}}
+								aria-label="Editar"
+								title="Editar mensaje"
+							>
+								<span class="material-icons-round">edit</span>
+							</button>
+						{/if}
+
+						{#if isMe}
+							<button
+								class="action-btn-mini delete-btn"
+								onclick={(e) => {
+									e.stopPropagation();
+									onDeleteClick(msg.id);
+								}}
+								aria-label="Eliminar"
+								title="Eliminar mensaje"
+							>
+								<span class="material-icons-round">delete</span>
+							</button>
+						{/if}
+
+						<div style="position: relative;">
+							{#if activeReactionMsgId === msg.id}
+								<div
+									class="floating-picker-wrapper {isMe
+										? 'picker-right'
+										: 'picker-left'} picker-{reactionPickerDirection}"
+								>
+									<TwemojiPicker
+										variant="inline"
+										onSelect={(emoji) => onReact(msg.id, emoji)}
+										onClose={() => onCloseReactionPicker()}
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
 				{/if}
 			</div>
 
@@ -277,22 +303,7 @@
 				</div>
 			{/if}
 
-			<!-- Reactions show below bubble -->
-			{#if msg.reactions && Object.keys(msg.reactions).length > 0}
-				<div class="reactions-list">
-					{#each Object.entries(msg.reactions) as [emoji, data]}
-						<button
-							class="reaction-tag {data.reacted ? 'user-reacted' : ''}"
-							onclick={() => onReact(msg.id, emoji)}
-							aria-label="{data.reacted ? 'Quitar reacción' : 'Reaccionar con'} {emoji}"
-						>
-							<span>{emoji}</span>
-							<span style="opacity: 0.7;">{data.count}</span>
-						</button>
-					{/each}
-				</div>
-			{/if}
-
+			<!-- Hora + estado de entrega bajo la burbuja -->
 			<span class="msg-time">
 				{formatTime(msg.created_at)}
 				{#if msg.edited_at}
@@ -307,7 +318,7 @@
 						<span class="material-icons-round">schedule</span>
 					</span>
 				{:else if isMe && msg.read_at}
-					<span class="read-indicator" title="Visto {formatTime(msg.read_at)}">
+					<span class="read-indicator read" title="Visto {formatTime(msg.read_at)}">
 						<span class="material-icons-round">done_all</span>
 					</span>
 				{:else if isMe}
@@ -357,7 +368,7 @@
 	.message-group {
 		display: flex;
 		flex-direction: column;
-		max-width: 72%;
+		max-width: min(72%, 560px);
 		animation-fill-mode: both;
 		animation-duration: 350ms;
 		animation-timing-function: var(--ease-spring);
@@ -388,8 +399,8 @@
 	}
 
 	.peer-mini-avatar {
-		width: 24px;
-		height: 24px;
+		width: 26px;
+		height: 26px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
 		background: var(--grad-primary);
@@ -402,6 +413,9 @@
 		overflow: hidden;
 		flex-shrink: 0;
 		margin-bottom: 2px;
+		box-shadow:
+			inset 0 1px 1px rgba(255, 255, 255, 0.3),
+			0 1px 2px rgba(0, 0, 0, 0.1);
 	}
 
 	.peer-mini-avatar img {
@@ -410,10 +424,17 @@
 		object-fit: cover;
 	}
 
+	/* Hueco invisible que mantiene la sangría en las rachas */
+	.peer-mini-avatar.ghost {
+		background: none;
+		box-shadow: none;
+	}
+
 	.bubble-wrapper {
 		position: relative;
 		display: flex;
 		flex-direction: column;
+		min-width: 0;
 	}
 
 	.message-group.me .bubble-wrapper {
@@ -428,27 +449,40 @@
 		padding: 7px 12px;
 		border-radius: var(--radius-md);
 		font-size: 0.82rem;
-		line-height: 1.4;
+		line-height: 1.45;
 		word-break: break-word;
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+		transition: box-shadow 0.2s ease;
 	}
 
+	/* Burbuja propia: gradiente azul con borde interior luminoso */
 	.message-group.me .message-bubble {
-		background: linear-gradient(135deg, var(--accent-blue-base) 0%, var(--accent-blue-dark) 100%);
+		background: linear-gradient(
+			135deg,
+			var(--accent-blue-light) -20%,
+			var(--accent-blue-base) 45%,
+			var(--accent-blue-dark) 130%
+		);
 		color: #ffffff;
-		border-bottom-right-radius: 2px;
+		border-bottom-right-radius: 4px;
+		border-top-right-radius: 6px;
 		box-shadow:
-			0 2px 8px rgba(var(--accent-blue-rgb), 0.25),
-			inset 0 1px 1px rgba(255, 255, 255, 0.35);
+			0 2px 10px rgba(var(--accent-blue-rgb), 0.28),
+			inset 0 1px 1px rgba(255, 255, 255, 0.38),
+			inset 0 -1px 2px rgba(0, 40, 90, 0.18);
+		text-shadow: 0 1px 1px rgba(0, 30, 70, 0.15);
 	}
 
+	/* Burbuja del peer: cristal sólido legible */
 	.message-group.peer .message-bubble {
 		background: var(--bg-surface-solid, #ffffff);
 		color: var(--text-primary);
-		border-bottom-left-radius: 2px;
+		border-bottom-left-radius: 4px;
+		border-top-left-radius: 6px;
 		border: 1px solid var(--border-subtle);
 		border-top: 1px solid var(--glass-border-t);
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+		box-shadow:
+			0 1px 4px rgba(0, 0, 0, 0.05),
+			inset 0 1px 0 rgba(255, 255, 255, 0.5);
 	}
 
 	/* Zumbido: se muestra centrado como aviso de sistema, sin alinear a un lado */
@@ -498,10 +532,6 @@
 		transform-origin: center center;
 		min-width: 220px;
 		text-align: center;
-	}
-
-	:global(.bubble-wrapper .zumbido-bubble::before) {
-		display: none !important;
 	}
 
 	@keyframes zumbido-shake {
@@ -575,7 +605,7 @@
 
 	.message-text-p {
 		margin: 0;
-		line-height: 1.4;
+		line-height: 1.45;
 	}
 
 	.msn-emoji-render {
@@ -590,7 +620,7 @@
 		font-size: 0.65rem;
 		color: var(--text-muted);
 		margin-top: 3px;
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		gap: 3px;
 	}
@@ -598,18 +628,14 @@
 	.read-indicator {
 		display: inline-flex;
 		align-items: center;
-		color: var(--accent-blue-base);
-		opacity: 0.85;
-	}
-
-	.read-indicator.sent {
 		color: var(--text-muted);
 		opacity: 0.6;
 	}
 
-	.read-indicator.pending {
-		color: var(--text-muted);
-		opacity: 0.6;
+	.read-indicator.read {
+		color: var(--aero-mint);
+		opacity: 1;
+		filter: drop-shadow(0 0 3px rgba(0, 212, 170, 0.5));
 	}
 
 	.read-indicator.failed {
@@ -692,31 +718,45 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1px;
-		padding: 3px 6px;
-		margin-bottom: 4px;
-		border-left: 3px solid var(--accent-blue-base);
+		padding: 4px 8px;
+		margin-bottom: 5px;
+		border-left: 3px solid #fff;
 		border-radius: var(--radius-xs);
-		background: rgba(var(--accent-blue-rgb), 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.14);
 		cursor: pointer;
 		max-width: 100%;
+		transition: background 0.15s;
+	}
+	.reply-quote:hover {
+		background: rgba(var(--accent-blue-rgb), 0.22);
 	}
 	.message-group.me .reply-quote {
-		background: rgba(255, 255, 255, 0.2);
+		background: rgba(255, 255, 255, 0.18);
 		border-left-color: #ffffff;
 	}
-	.message-group.me .reply-quote .reply-quote-author {
-		color: #ffffff;
+	.message-group.me .reply-quote:hover {
+		background: rgba(255, 255, 255, 0.28);
 	}
-	.message-group.me .reply-quote .reply-quote-text {
-		color: rgba(255, 255, 255, 0.85);
+	.message-group.peer .reply-quote {
+		border-left-color: var(--accent-blue-base);
+		background: rgba(var(--accent-blue-rgb), 0.08);
+	}
+	.message-group.peer .reply-quote:hover {
+		background: rgba(var(--accent-blue-rgb), 0.14);
 	}
 	.reply-quote-author {
 		font-size: 0.65rem;
 		font-weight: 700;
-		color: var(--accent-blue-dark);
+		color: inherit;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.message-group.me .reply-quote-author {
+		color: #ffffff;
+	}
+	.message-group.peer .reply-quote-author {
+		color: var(--accent-blue-dark);
 	}
 	.reply-quote-text {
 		font-size: 0.7rem;
@@ -726,69 +766,102 @@
 		text-overflow: ellipsis;
 		max-width: 220px;
 	}
+	.message-group.me .reply-quote-text {
+		color: rgba(255, 255, 255, 0.85);
+	}
 
 	/* Resaltado del resultado de búsqueda actual */
 	.message-group.search-match .message-bubble {
 		outline: 2px solid var(--aero-amber);
 		outline-offset: 2px;
-		transition: outline 0.2s ease;
+		box-shadow: 0 0 16px rgba(245, 166, 35, 0.35);
+		transition:
+			outline 0.2s ease,
+			box-shadow 0.2s ease;
 	}
 
+	/* Reacciones superpuestas sobre el borde inferior externo de la burbuja */
 	.reactions-list {
+		position: absolute;
+		bottom: -11px;
+		z-index: 5;
 		display: flex;
 		gap: 3px;
-		margin-top: 3px;
+	}
+	.message-group.me .reactions-list {
+		right: 8px;
+	}
+	.message-group.peer .reactions-list {
+		left: 8px;
+	}
+	.message-group.zumbido-group .reactions-list {
+		left: 50%;
+		transform: translateX(-50%);
+		right: auto;
 	}
 
 	.reaction-tag {
-		padding: 1px 5px;
-		border-radius: var(--radius-sm);
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 1px 6px;
+		border-radius: var(--radius-full);
 		background: var(--bg-surface-solid, #ffffff);
 		border: 1px solid var(--border-subtle);
-		font-size: 0.68rem;
+		font-size: 0.72rem;
+		line-height: 1.3;
 		color: var(--text-primary);
-		display: flex;
-		align-items: center;
-		gap: 2px;
 		cursor: pointer;
-		transition: all var(--t-fast);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+		transition:
+			transform 0.15s var(--ease-spring),
+			box-shadow 0.15s,
+			border-color 0.15s;
 	}
-
 	.reaction-tag:hover {
-		background: rgba(var(--accent-blue-rgb), 0.1);
+		transform: translateY(-1px) scale(1.08);
+		border-color: var(--accent-blue-base);
+		box-shadow: 0 3px 8px rgba(var(--accent-blue-rgb), 0.25);
+	}
+	.reaction-tag.user-reacted {
+		background: rgba(var(--accent-blue-rgb), 0.14);
 		border-color: var(--accent-blue-base);
 	}
-
-	.reaction-tag.user-reacted {
-		background: rgba(var(--accent-blue-rgb), 0.15);
-		border-color: var(--accent-blue-base);
-		color: var(--accent-blue-base);
+	.reaction-count {
+		font-size: 0.64rem;
+		font-weight: 700;
+		color: var(--text-secondary);
 	}
 
 	.message-actions-wrapper {
 		position: absolute;
 		top: 50%;
-		transform: translateY(-50%);
+		transform: translateY(-50%) translateX(2px);
 		display: flex;
-		gap: 2px;
+		gap: 3px;
 		opacity: 0;
-		transition: opacity 0.18s ease;
+		pointer-events: none;
+		transition:
+			opacity 0.18s ease,
+			transform 0.18s var(--ease-spring);
 		z-index: 20;
 		user-select: none;
 		-webkit-user-select: none;
 	}
-	.bubble-wrapper:hover .message-actions-wrapper {
+	.bubble-wrapper:hover .message-actions-wrapper,
+	.bubble-wrapper:focus-within .message-actions-wrapper {
 		opacity: 1;
+		pointer-events: auto;
+		transform: translateY(-50%) translateX(0);
 	}
 	.actions-right {
 		right: 100%;
 		margin-right: 6px;
-		flex-direction: row;
+		flex-direction: row-reverse;
 	}
 	.actions-left {
 		left: 100%;
 		margin-left: 6px;
-		flex-direction: row-reverse;
 	}
 
 	.action-btn-mini {
@@ -797,17 +870,20 @@
 		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 3px;
-		width: 24px;
-		height: 24px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		padding: 0;
+		width: 25px;
+		height: 25px;
+		border-radius: var(--radius-full);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		transition:
 			background 0.18s,
-			color 0.18s;
+			color 0.18s,
+			transform 0.15s var(--ease-spring);
+	}
+	.action-btn-mini:hover {
+		transform: translateY(-1px);
 	}
 	.action-btn-mini .material-icons-round {
 		font-size: 14px;
@@ -905,5 +981,14 @@
 	}
 	.btn-cancel-del:hover {
 		background: rgba(0, 0, 0, 0.1);
+	}
+
+	@media (max-width: 768px) {
+		.message-group {
+			max-width: 85%;
+		}
+		.message-actions-wrapper {
+			display: none; /* En táctil no hay hover: quedan las reacciones por tap largo (pendiente backend) */
+		}
 	}
 </style>

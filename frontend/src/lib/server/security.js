@@ -1,36 +1,9 @@
 /**
  * VSocial Security Module
- * Rate limiting, input validation, and security helpers
+ * Input validation and security helpers.
+ * NOTA: El rate limiting centralizado vive en hooks.server.js (sliding window por IP/usuario).
+ * Esta función ha sido eliminada aquí para evitar contadores duplicados desincronizados.
  */
-import { error } from '@sveltejs/kit';
-
-// Simple in-memory rate limiter
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const MAX_REQUESTS = 1000; // per window
-
-export function checkRateLimit(ident) {
-	const now = Date.now();
-	const record = rateLimitMap.get(ident);
-
-	if (!record) {
-		rateLimitMap.set(ident, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-		return true;
-	}
-
-	if (now > record.resetAt) {
-		record.count = 1;
-		record.resetAt = now + RATE_LIMIT_WINDOW;
-		return true;
-	}
-
-	if (record.count >= MAX_REQUESTS) {
-		throw error(429, 'Too Many Requests');
-	}
-
-	record.count++;
-	return true;
-}
 
 export function validateEmail(email) {
 	const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -12,10 +12,12 @@
 	import { goto } from '$app/navigation';
 	import { posts as postsApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import CommentItem from '$lib/components/CommentItem.svelte';
 	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
 	import KlipyPicker from '$lib/components/KlipyPicker.svelte';
 	import ProfileHoverCard from '$lib/components/ProfileHoverCard.svelte';
+	import QuoteCard from '$lib/components/QuoteCard.svelte';
 	import AnonIdentityModal from '$lib/components/AnonIdentityModal.svelte';
 	import { getAnonIdentity } from '$lib/stores/anonIdentity.svelte.js';
 	import { compressImage } from '$lib/utils/imageCompression.js';
@@ -31,6 +33,11 @@
 	let liked = $state(post.user_liked || false);
 	// svelte-ignore state_referenced_locally
 	let likeCount = $state(post.like_count || 0);
+	let authorLevel = $derived(
+		Number(post.user_id) === Number(authStore.user?.id)
+			? authStore.userLevel || post.level || 1
+			: post.level
+	);
 	let isAnimatingLike = $state(false);
 	let isAnimatingUnlike = $state(false);
 	let likeParticles = $state([]);
@@ -43,6 +50,12 @@
 	// svelte-ignore state_referenced_locally
 	let saved = $state(post.user_saved || false);
 	let showComments = $state(false);
+
+	const shareMenuId = Symbol('post-share-menu');
+	let shareMenuOpen = $derived(uiStore.isPopoverOpen(shareMenuId));
+
+	const menuId = Symbol('post-menu');
+	let showMenu = $derived(uiStore.isPopoverOpen(menuId));
 
 	function isEmojiOnly(text) {
 		if (!text) return false;
@@ -60,7 +73,6 @@
 
 	let commentText = $state('');
 	let submittingComment = $state(false);
-	let showMenu = $state(false);
 	let comments = $state([]);
 	let commentsLoading = $state(false);
 	let commentPollInterval = null;
@@ -235,6 +247,12 @@
 		}
 	}
 
+	function quotePost() {
+		if (!post?.id) return;
+		uiStore.closePopover(shareMenuId);
+		goto(`/posts/create?quote=${post.id}`);
+	}
+
 	async function toggleShare() {
 		if (!authStore.isAuthenticated) {
 			goto('/login');
@@ -350,7 +368,7 @@
 	}
 
 	function promptDelete() {
-		showMenu = false;
+		uiStore.closePopover(menuId);
 		showDeleteModal = true;
 	}
 
@@ -396,7 +414,11 @@
 <article
 	bind:this={cardRef}
 	class="aero-post-card animate-slide-in-up"
-	style="position: relative; z-index: {showCommentEmojis || showCommentGifs || showMenu ? 40 : 2};"
+	style="position: relative; z-index: {showDeleteModal
+		? 50
+		: showCommentEmojis || showCommentGifs || showMenu
+			? 40
+			: 2}; min-height: {showDeleteModal ? '240px' : 'auto'};"
 >
 	<!-- Repost Banner -->
 	{#if post.reposted_by}
@@ -429,7 +451,7 @@
 				<!-- Name & meta -->
 				<div class="user-meta">
 					<div class="flex items-center gap-1.5 flex-wrap">
-						<span class="font-semibold text-sm text-main tracking-wide">
+						<span class="post-author-name font-bold text-[0.95rem] text-main tracking-wide">
 							{post.display_name === 'Usuario Anónimo'
 								? 'Usuario Anónimo'
 								: `@${post.display_name}`}
@@ -462,7 +484,7 @@
 							</span>
 						{/if}
 					</div>
-					<div class="flex items-center gap-1 text-xs text-muted flex-wrap">
+					<div class="meta-row flex items-center gap-1 text-xs text-muted flex-wrap">
 						<span>Identidad Oculta</span>
 						<span>·</span>
 						<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
@@ -470,88 +492,125 @@
 				</div>
 			</div>
 		{:else}
-			<ProfileHoverCard
-				username={post.username}
-				basicUser={{
-					id: post.user_id,
-					username: post.username,
-					display_name: post.display_name,
-					avatar_url: post.avatar_url,
-					is_verified: post.is_verified,
-					level: post.level
-				}}
-			>
-				<a href={`/u/${post.username}`} class="flex items-center gap-3 group text-decoration-none">
-					<!-- Avatar -->
-					<AeroAvatar
-						src={post.avatar_url}
-						alt={post.username}
-						size="md"
-						isVtuber={post.is_virtual}
-					/>
+			<div class="flex items-center gap-3 min-w-0 flex-1">
+				<!-- Avatar con ProfileHoverCard -->
+				<ProfileHoverCard
+					username={post.username}
+					basicUser={{
+						id: post.user_id,
+						username: post.username,
+						display_name: post.display_name,
+						avatar_url: post.avatar_url,
+						is_verified: post.is_verified,
+						level: post.level
+					}}
+				>
+					<a
+						href={`/u/${post.username}`}
+						class="block text-decoration-none flex-shrink-0"
+						tabindex="-1"
+					>
+						<AeroAvatar
+							src={post.avatar_url}
+							alt={post.username}
+							size="md"
+							isVtuber={post.is_virtual}
+						/>
+					</a>
+				</ProfileHoverCard>
 
-					<!-- Name & meta -->
-					<div class="user-meta">
-						<div class="flex items-center gap-1">
-							<span
-								class="font-semibold text-sm text-main group-hover:text-blue-500 transition-colors"
+				<!-- Name & meta -->
+				<div class="user-meta min-w-0 flex-1">
+					<div class="flex items-center gap-1.5 flex-wrap">
+						<ProfileHoverCard
+							username={post.username}
+							basicUser={{
+								id: post.user_id,
+								username: post.username,
+								display_name: post.display_name,
+								avatar_url: post.avatar_url,
+								is_verified: post.is_verified,
+								level: post.level
+							}}
+						>
+							<a
+								href={`/u/${post.username}`}
+								class="post-author-name font-bold text-[0.95rem] text-main hover:text-blue-500 transition-colors text-decoration-none inline-block"
 							>
 								{post.display_name || post.username}
+							</a>
+						</ProfileHoverCard>
+
+						<VerifiedBadge
+							role={post.role}
+							isVerified={post.is_verified == 1}
+							size="16px"
+							interactive={true}
+						/>
+						{#if authorLevel}
+							<LevelBadge level={authorLevel} size="sm" showText={false} interactive={true} />
+						{/if}
+						{#if post.title_text}
+							<UserTitleBadge title={post.title_text} color={post.title_color} size="sm" />
+						{/if}
+						{#if post.mood}
+							<span class="post-mood-badge">
+								{#if post.mood === 'happy'}😊 Feliz
+								{:else if post.mood === 'creative'}🎨 Creativo
+								{:else if post.mood === 'gaming'}🎮 Jugando
+								{:else if post.mood === 'music'}🎵 Escuchando Musica
+								{:else if post.mood === 'thinking'}🤔 Pensando
+								{:else if post.mood === 'excited'}🔥 Emocionado
+								{:else if post.mood === 'traveling'}✈️ Viajando
+								{:else if post.mood === 'celebrating'}🥂 Celebrando
+								{:else if post.mood === 'working'}💻 Trabajando
+								{:else if post.mood === 'eating'}🍔 Comiendo
+								{/if}
 							</span>
-							<VerifiedBadge role={post.role} isVerified={post.is_verified == 1} size="16px" />
-							{#if post.level}
-								<LevelBadge level={post.level} size="sm" showText={false} />
-							{/if}
-							{#if post.title_text}
-								<UserTitleBadge title={post.title_text} color={post.title_color} size="sm" />
-							{/if}
-							{#if post.mood}
-								<span class="post-mood-badge">
-									{#if post.mood === 'happy'}😊 Feliz
-									{:else if post.mood === 'creative'}🎨 Creativo
-									{:else if post.mood === 'gaming'}🎮 Jugando
-									{:else if post.mood === 'music'}🎵 Escuchando Musica
-									{:else if post.mood === 'thinking'}🤔 Pensando
-									{:else if post.mood === 'excited'}🔥 Emocionado
-									{:else if post.mood === 'traveling'}✈️ Viajando
-									{:else if post.mood === 'celebrating'}🥂 Celebrando
-									{:else if post.mood === 'working'}💻 Trabajando
-									{:else if post.mood === 'eating'}🍔 Comiendo
-									{/if}
-								</span>
-							{/if}
-						</div>
-						<div class="flex items-center gap-1 text-xs text-muted flex-wrap">
-							<span>@{post.username}</span>
-							<span>·</span>
-							<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
-							{#if post.location}
-								<span>·</span>
-								<span
-									class="flex items-center gap-0.5 text-blue-500 font-semibold"
-									title="Ubicación de check-in"
-								>
-									<span class="material-icons-round text-xs">location_on</span>
-									{post.location}
-								</span>
-							{/if}
-						</div>
+						{/if}
 					</div>
-				</a>
-			</ProfileHoverCard>
+					<div class="meta-row flex items-center gap-1 text-xs text-tertiary flex-wrap">
+						<a
+							href={`/u/${post.username}`}
+							class="text-muted hover:text-main transition-colors text-decoration-none font-medium"
+						>
+							@{post.username}
+						</a>
+						<span>·</span>
+						<time datetime={post.created_at}>{relativeTime(post.created_at)}</time>
+						{#if post.location}
+							<span>·</span>
+							<span
+								class="flex items-center gap-0.5 text-blue-500 font-semibold"
+								title="Ubicación de check-in"
+							>
+								<span class="material-icons-round text-xs">location_on</span>
+								{post.location}
+							</span>
+						{/if}
+					</div>
+				</div>
+			</div>
 		{/if}
 
 		<!-- Post menu -->
-		<div class="relative">
-			<button onclick={() => (showMenu = !showMenu)} class="aero-icon-btn btn-small">
+		<div class="relative post-menu-container">
+			<button
+				onclick={(e) => {
+					e.stopPropagation();
+					uiStore.togglePopover(menuId);
+				}}
+				class="aero-icon-btn btn-small"
+				aria-label="Opciones del post"
+			>
 				<span class="material-icons-round text-[18px]">more_horiz</span>
 			</button>
 			{#if showMenu}
-				<div class="aero-dropdown-menu animate-slide-in-up">
+				<div class="aero-dropdown-menu" transition:fly={{ y: -8, duration: 200 }}>
 					{#if post.is_author || (post.user_id && post.user_id === authStore.user?.id)}
 						<button
 							onclick={() => {
-								showMenu = false;
+								uiStore.closePopover(menuId);
 								goto(`/posts/${post.id}/edit`);
 							}}
 							class="aero-dropdown-item"
@@ -564,7 +623,7 @@
 					{:else}
 						<button
 							onclick={() => {
-								showMenu = false;
+								uiStore.closePopover(menuId);
 							}}
 							class="aero-dropdown-item"
 						>
@@ -573,7 +632,7 @@
 					{/if}
 					<button
 						onclick={() => {
-							showMenu = false;
+							uiStore.closePopover(menuId);
 						}}
 						class="aero-dropdown-item"
 					>
@@ -589,6 +648,11 @@
 		<p class="post-body" class:emoji-only-text={isEmojiOnly(post.body)}>
 			{@html formatHashtags(post.body)}
 		</p>
+	{/if}
+
+	<!-- Quoted Post Card (estilo X / Bluesky) -->
+	{#if post.quoted_post}
+		<QuoteCard quote={post.quoted_post} />
 	{/if}
 
 	<!-- Poll Widget -->
@@ -652,6 +716,9 @@
 					<MediaPlayer
 						type={media.media_type}
 						src={media.media_url}
+						poster={media.thumbnail_url || media.poster_url || null}
+						aspectRatio={media.aspect_ratio ||
+							(media.width && media.height ? `${media.width} / ${media.height}` : null)}
 						class="media-item video-media {post.media.length === 1 ? 'video-solo' : 'video-grid'}"
 						entityId={post.id}
 						entityType="video"
@@ -755,19 +822,58 @@
 				>
 			</button>
 
-			<!-- Share / Repost -->
-			<button
-				onclick={toggleShare}
-				class="action-btn action-btn-share {shared ? 'shared' : ''} {shareAnim
-					? 'share-bounce'
-					: ''}"
-				aria-label="{shared ? 'Deshacer repost' : 'Repostear'}{shareCount > 0
-					? ' ' + shareCount.toLocaleString()
-					: ''}"
-			>
-				<span class="material-icons-round text-[18px] icon">repeat</span>
-				<span class="count">{shareCount > 0 ? shareCount.toLocaleString() : ''}</span>
-			</button>
+			<!-- Share / Repost (menú: Repostear o Citar) -->
+			<div class="relative postcard-share-wrap">
+				<button
+					onclick={(e) => {
+						e.stopPropagation();
+						uiStore.togglePopover(shareMenuId);
+					}}
+					class="action-btn action-btn-share {shared ? 'shared' : ''} {shareAnim
+						? 'share-bounce'
+						: ''}"
+					aria-label="Compartir"
+					aria-haspopup="menu"
+					aria-expanded={uiStore.isPopoverOpen(shareMenuId)}
+				>
+					<span class="material-icons-round text-[18px] icon">repeat</span>
+					<span class="count">{shareCount > 0 ? shareCount.toLocaleString() : ''}</span>
+				</button>
+				{#if uiStore.isPopoverOpen(shareMenuId)}
+					<div
+						class="aero-dropdown-menu aero-dropdown-menu-up"
+						transition:fly={{ x: 8, duration: 200 }}
+						role="menu"
+					>
+						<button
+							type="button"
+							class="aero-dropdown-item"
+							role="menuitem"
+							onclick={() => {
+								uiStore.closePopover(shareMenuId);
+								toggleShare();
+							}}
+						>
+							<span class="material-icons-round text-[16px]"
+								>{shared ? 'check_circle' : 'repeat'}</span
+							>
+							{shared ? 'Deshacer repost' : 'Repostear'}
+						</button>
+						<button
+							type="button"
+							class="aero-dropdown-item"
+							role="menuitem"
+							onclick={() => {
+								uiStore.closePopover(shareMenuId);
+								quotePost();
+							}}
+						>
+							<span class="material-icons-round text-[16px]">format_quote</span>
+							Citar publicación
+						</button>
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Save -->
@@ -1101,58 +1207,60 @@
 			{/if}
 		</div>
 	{/if}
-</article>
 
-{#if showDeleteModal}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="aero-modal-backdrop"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) showDeleteModal = false;
-		}}
-		transition:fade={{ duration: 150 }}
-	>
+	{#if showDeleteModal}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="aero-modal-content"
-			transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
-			style="padding: 24px;"
+			class="postcard-delete-backdrop"
+			onclick={(e) => {
+				if (e.target === e.currentTarget) {
+					showDeleteModal = false;
+					deleteError = '';
+				}
+			}}
+			transition:fade={{ duration: 150 }}
 		>
-			<div class="flex items-center gap-3 mb-3">
-				<div
-					class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0"
-					style="background: rgba(232, 74, 114, 0.15); color: #e84a72;"
-				>
-					<span class="material-icons-round">warning</span>
+			<div
+				class="postcard-delete-card"
+				transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
+				style="padding: 24px;"
+			>
+				<div class="flex items-center gap-3 mb-3">
+					<div
+						class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0"
+						style="background: rgba(232, 74, 114, 0.15); color: #e84a72;"
+					>
+						<span class="material-icons-round">warning</span>
+					</div>
+					<h3 class="font-bold text-lg text-main m-0">¿Eliminar post?</h3>
 				</div>
-				<h3 class="font-bold text-lg text-main m-0">¿Eliminar post?</h3>
-			</div>
-			<p class="text-sm text-muted mb-6 leading-relaxed">
-				¿Estás seguro que quieres eliminar este post? Al aceptar la eliminación, recuerda que puedes
-				reestablecerlo en un plazo máximo de 30 días.
-			</p>
-			{#if deleteError}
-				<p class="text-xs text-red-400 mb-4 bg-red-500/10 p-2 rounded-md">{deleteError}</p>
-			{/if}
-			<div class="flex gap-3 justify-end">
-				<button
-					onclick={() => {
-						showDeleteModal = false;
-						deleteError = '';
-					}}
-					class="btn-aero-secondary"
-					style="padding: 8px 16px; font-size: 0.85rem;">Cancelar</button
-				>
-				<button
-					onclick={executeDelete}
-					class="btn-aero-danger"
-					style="padding: 8px 16px; font-size: 0.85rem;">Eliminar</button
-				>
+				<p class="text-sm text-muted mb-6 leading-relaxed">
+					¿Estás seguro que quieres eliminar este post? Al aceptar la eliminación, recuerda que
+					puedes reestablecerlo en un plazo máximo de 30 días.
+				</p>
+				{#if deleteError}
+					<p class="text-xs text-red-400 mb-4 bg-red-500/10 p-2 rounded-md">{deleteError}</p>
+				{/if}
+				<div class="flex gap-3 justify-end">
+					<button
+						onclick={() => {
+							showDeleteModal = false;
+							deleteError = '';
+						}}
+						class="btn-aero-secondary"
+						style="padding: 8px 16px; font-size: 0.85rem;">Cancelar</button
+					>
+					<button
+						onclick={executeDelete}
+						class="btn-aero-danger"
+						style="padding: 8px 16px; font-size: 0.85rem;">Eliminar</button
+					>
+				</div>
 			</div>
 		</div>
-	</div>
-{/if}
-
+	{/if}
+</article>
 <AnonIdentityModal
 	open={showAnonIdentityModal}
 	onClose={() => {
@@ -1170,22 +1278,79 @@
 	}}
 />
 
+<svelte:window
+	onclick={(e) => {
+		if (shareMenuOpen && !e.target.closest('.postcard-share-wrap')) {
+			uiStore.closePopover(shareMenuId);
+		}
+		if (showMenu && !e.target.closest('.post-menu-container')) {
+			uiStore.closePopover(menuId);
+		}
+	}}
+/>
+
 <style>
 	/* PostCard overrides to match topbar effect & prevent overlap */
 	.aero-post-card {
 		position: relative;
 		z-index: 2;
 		background: var(--bg-surface);
+		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
 		isolation: isolate;
 		border-radius: var(--radius-lg);
-		padding: 1.5rem;
-		border: 1px solid var(--glass-border);
-		border-top-color: var(--glass-border-t);
-		box-shadow: var(--glass-shadow), var(--glass-inset);
-		margin-bottom: 2rem;
+		/* Padding interno ampliado: las tarjetas respiran y el scroll gana ritmo */
+		padding: 1.7rem 1.6rem;
+		border: 1px solid var(--border-glass, var(--glass-border));
+		margin-bottom: 1.5rem;
 		transition:
 			border-color 0.25s ease,
-			box-shadow 0.25s ease;
+			background-color 0.25s ease;
+	}
+
+	/* In-card scoped delete overlay with Glassmorphism blur */
+	.postcard-delete-backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: 50;
+		background: rgba(10, 20, 40, 0.72);
+		backdrop-filter: blur(12px) saturate(1.2);
+		-webkit-backdrop-filter: blur(12px) saturate(1.2);
+		border-radius: inherit;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 20px;
+	}
+
+	:global([data-theme='light']) .postcard-delete-backdrop {
+		background: rgba(240, 248, 255, 0.8);
+	}
+
+	.postcard-delete-card {
+		background: var(--bg-surface-solid, var(--bg-surface));
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		border: 1px solid var(--border-glass, var(--glass-border));
+		box-shadow: var(--shadow-lg), var(--glass-inset-highlight);
+		border-radius: var(--radius-xl);
+		width: 100%;
+		max-width: 480px;
+		overflow: hidden;
+		z-index: 51;
+	}
+
+	:global([data-theme='light'][data-perf-mode='true']) .aero-post-card,
+	:global([data-theme='light'][data-perf-profile='lite']) .aero-post-card,
+	:global([data-theme='light'][data-glass-blur='none']) .aero-post-card {
+		background: linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.95) 0%,
+			rgba(224, 246, 252, 0.9) 100%
+		) !important;
+		border: 1px solid rgba(14, 165, 233, 0.28) !important;
+		border-top: 1px solid #ffffff !important;
+		box-shadow: inset 0 1.5px 2px #ffffff !important;
 	}
 
 	.post-nested-panel {
@@ -1194,11 +1359,31 @@
 		border-radius: var(--radius-md);
 	}
 
+	:global([data-theme='light'][data-perf-mode='true']) .post-nested-panel,
+	:global([data-theme='light'][data-perf-profile='lite']) .post-nested-panel,
+	:global([data-theme='light'][data-glass-blur='none']) .post-nested-panel {
+		background: rgba(220, 246, 252, 0.55) !important;
+		border: 1px solid rgba(14, 165, 233, 0.2) !important;
+	}
+
 	.emoji-only-text {
 		font-size: 3rem !important;
 		line-height: 1.2;
 		text-align: center;
 		padding: 1rem 0;
+	}
+
+	/* Jerarquía: Usuario > Handle > Contenido.
+	   El nombre gana peso visual; el handle sube de contraste sin robar
+	   protagonismo; el cuerpo mantiene leading cómodo para lectura larga. */
+	.post-author-name {
+		letter-spacing: -0.013em;
+		line-height: 1.3;
+	}
+	.meta-row {
+		color: color-mix(in srgb, var(--text-primary) 56%, transparent) !important;
+		letter-spacing: 0.008em;
+		margin-top: 2px;
 	}
 
 	.aero-post-card:hover {
@@ -1215,7 +1400,7 @@
 		color: var(--text-muted);
 	}
 
-	.group:hover .text-main {
+	.post-author-name:hover {
 		color: var(--aero-blue);
 	}
 
@@ -1250,12 +1435,32 @@
 		margin-top: 4px;
 		background: var(--bg-surface-solid, var(--bg-surface));
 		border: 1px solid var(--glass-border);
-		border-top-color: var(--glass-border-t);
 		border-radius: var(--radius-sm);
 		padding: 4px;
 		box-shadow: var(--shadow-md), var(--glass-inset);
 		min-width: 140px;
 		z-index: 100;
+	}
+
+	/* Menú de compartir: flyout HACIA LA DERECHA del botón, alineado verticalmente
+	   con él. Así no tapa ni la imagen/media de la cita (arriba) ni el contenido
+	   inferior, como hace X con su menú de repost. */
+	.aero-dropdown-menu-up {
+		top: 50%;
+		bottom: auto;
+		right: auto;
+		left: calc(100% + 4px);
+		margin-top: 0;
+		transform: translateY(-50%);
+	}
+
+	/* En móvil el botón está cerca del borde derecho de la tarjeta: si el flyout
+	   desborda la pantalla se ancla al borde derecho del botón y crece a la izquierda. */
+	@media (max-width: 640px) {
+		.aero-dropdown-menu-up {
+			left: auto;
+			right: 0;
+		}
 	}
 
 	.aero-dropdown-item {
@@ -1284,8 +1489,10 @@
 	.post-body {
 		font-size: 0.95rem;
 		color: var(--text-primary);
-		line-height: 1.5;
-		margin-bottom: 12px;
+		font-weight: 450;
+		line-height: 1.6;
+		letter-spacing: 0.011em;
+		margin-bottom: 14px;
 		white-space: pre-wrap;
 	}
 
@@ -1336,13 +1543,12 @@
 	}
 
 	/* ── Videos: sin wrapper forzado, el player define su propio tamaño ── */
-	/* Video solo: ocupa el ancho completo, el MediaPlayer respeta el aspect-ratio nativo */
+	/* Video solo: ancho completo; la geometría completa (ratio nativo dinámico
+	   + contención de altura) la gobierna el MediaPlayer con sus tokens
+	   internos (--mp-aspect / --mp-max-h). Nada que recorte desde fuera. */
 	:global(.video-solo) {
 		width: 100% !important;
 		height: auto !important;
-		max-height: 560px !important;
-		min-height: 200px !important;
-		aspect-ratio: unset !important;
 	}
 	/* Video en grid: altura fija cómoda, sin recorte horizontal */
 	:global(.video-grid) {
@@ -1776,7 +1982,7 @@
 	.dropzone-text {
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.5);
+		color: var(--text-muted);
 		text-align: center;
 	}
 
@@ -1995,6 +2201,17 @@
 		100% {
 			background-position: -200% 0;
 		}
+	}
+
+	:global([data-theme='light']) .skeleton-avatar,
+	:global([data-theme='light']) .skeleton-line {
+		background-color: rgba(0, 0, 0, 0.06);
+		background-image: linear-gradient(
+			90deg,
+			rgba(0, 0, 0, 0.04) 0%,
+			rgba(0, 0, 0, 0.1) 40%,
+			rgba(0, 0, 0, 0.04) 80%
+		);
 	}
 
 	/* ── Comentarios en posts anónimos ── */

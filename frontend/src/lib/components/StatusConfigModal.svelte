@@ -5,6 +5,21 @@
 	import { backOut } from 'svelte/easing';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
 
+	// UX: cierre con Escape y bloqueo del scroll de fondo mientras el modal está abierto.
+	function handleEscape(e) {
+		if (e.key === 'Escape') onClose?.();
+	}
+
+	$effect(() => {
+		window.addEventListener('keydown', handleEscape);
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			window.removeEventListener('keydown', handleEscape);
+			document.body.style.overflow = prev;
+		};
+	});
+
 	let { onClose } = $props();
 
 	let selectedStatus = $state(authStore.user?.custom_status || 'online');
@@ -212,9 +227,13 @@
 	.vs-modal-backdrop {
 		position: fixed;
 		inset: 0;
-		background: rgba(4, 10, 20, 0.5);
-		backdrop-filter: blur(10px) saturate(1.1);
-		-webkit-backdrop-filter: blur(10px) saturate(1.1);
+		background: radial-gradient(
+			130% 130% at 50% 42%,
+			rgba(9, 17, 33, 0.42) 0%,
+			rgba(3, 8, 18, 0.66) 100%
+		);
+		backdrop-filter: blur(14px) saturate(1.15);
+		-webkit-backdrop-filter: blur(14px) saturate(1.15);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -226,14 +245,19 @@
 		background: var(--bg-surface);
 		border: 1px solid var(--glass-border-t);
 		border-radius: var(--radius-xl);
-		box-shadow: var(--glass-inset), var(--glass-inset-highlight);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 		width: 100%;
 		max-width: 440px;
+		max-height: min(720px, calc(100dvh - 32px));
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		box-shadow:
+			var(--glass-inset),
+			var(--glass-inset-highlight),
+			0 24px 70px color-mix(in srgb, var(--sc, #1b85f3) 16%, rgba(2, 8, 20, 0.5));
+		transition: box-shadow 0.4s var(--ease-smooth);
 	}
 	/* Halo superior teñido por el estado activo (--sc): da vida al modal sin sombra */
 	.vs-modal-content::before {
@@ -241,6 +265,8 @@
 		position: absolute;
 		inset: 0 0 auto 0;
 		height: 140px;
+		border-top-left-radius: inherit;
+		border-top-right-radius: inherit;
 		background: linear-gradient(
 			180deg,
 			color-mix(in srgb, var(--sc) 16%, transparent) 0%,
@@ -308,8 +334,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: 20px;
-		max-height: 68vh;
+		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 	.avatar-preview {
 		display: flex;

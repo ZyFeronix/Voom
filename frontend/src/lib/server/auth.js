@@ -88,6 +88,65 @@ export async function optionalAuth(request) {
 }
 
 /**
+ * Valida la sesión a partir del token (mismo pipeline que requireAuth).
+ * Devuelve la fila de user_sessions o null. No lanza.
+ */
+async function validateSessionByToken(token) {
+	if (!token) return null;
+	const decoded = decodeToken(token);
+	if (!decoded || !decoded.user_id) return null;
+
+	const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+	const db = getDb();
+
+	const session = await db
+		.prepare('SELECT id, user_id, expires_at FROM user_sessions WHERE token_hash = ? LIMIT 1')
+		.get(tokenHash);
+	if (!session) return null;
+
+	const rawExp = String(session.expires_at || '').trim();
+	const isoExp = (rawExp.includes('T') ? rawExp : rawExp.replace(' ', 'T')).replace(/Z?$/, 'Z');
+	const expiresAt = new Date(isoExp).getTime();
+	if (!isNaN(expiresAt) && expiresAt < Date.now()) {
+		await db.prepare('DELETE FROM user_sessions WHERE id = ?').run(session.id);
+		return null;
+	}
+	return session;
+}
+
+/**
+ * Autenticación para loads server-side de SvelteKit: las navegaciones de página
+ * no envían el header Authorization, así que se lee del mirror cookie
+ * `vsocial_token` (se sincroniza en login/logout desde auth.svelte.js).
+ * Devuelve userId o null — no lanza (el layout decide si redirigir).
+ */
+export async function getUserIdFromCookies(cookies) {
+	try {
+		const session = await validateSessionByToken(cookies?.get('vsocial_token'));
+		return session?.user_id ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Igual que requireAuth pero basado en cookies. Lanza error(401) si no hay sesión válida.
+ */
+export async function requireAuthCookie(cookies) {
+	const session = await validateSessionByToken(cookies?.get('vsocial_token'));
+	if (!session) throw error(401, 'No autorizado');
+	return session.user_id;
+}
+
+/**
+ * Devuelve { id, user_id } de la sesión correspondiente al Bearer token de la
+ * petición, para poder identificar la "sesión actual" en la gestión de sesiones.
+ */
+export async function getSessionFromRequest(request) {
+	return validateSessionByToken(getBearerToken(request));
+}
+
+/**
  * Create a session token and store in DB. Returns token string.
  */
 export async function createSession(userId, request) {

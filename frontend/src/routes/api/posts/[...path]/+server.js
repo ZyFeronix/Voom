@@ -17,6 +17,7 @@
 import { json } from '@sveltejs/kit';
 import { getDb, getUploadsDir } from '$lib/server/db.js';
 import { requireAuth, optionalAuth, checkUserNotMuted } from '$lib/server/auth.js';
+import { createNotification } from '$lib/server/notifications.js';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { randomBytes } from 'crypto';
@@ -40,6 +41,9 @@ function parsePostMetadata(post) {
 			}
 			if (meta.location) {
 				post.location = meta.location;
+			}
+			if (meta.quote) {
+				post.quoted_post = meta.quote;
 			}
 		} catch (e) {
 			console.error('Failed to parse post metadata:', e);
@@ -73,7 +77,9 @@ export async function GET({ request, _url, params }) {
 		parsePostMetadata(post);
 		anonymizePost(post, userId);
 		post.media = await db
-			.prepare('SELECT id, media_type, media_url FROM post_media WHERE post_id = ?')
+			.prepare(
+				'SELECT id, media_type, media_url FROM post_media WHERE post_id = ? ORDER BY position ASC, id ASC'
+			)
 			.all(postId);
 		return json({ post });
 	}
@@ -139,35 +145,48 @@ export async function POST({ request, _url, params }) {
 	const userId = await requireAuth(request);
 	const db = getDb();
 
-	// POST /api/posts/media — upload media file
+	// POST /api/posts/media — upload media file(s) (multiupload)
 	if (parts.length === 1 && parts[0] === 'media') {
 		await checkUserNotMuted(userId);
 		const formData = await request.formData();
-		const file = formData.get('media');
-		if (!file) return json({ error: 'No media file provided' }, { status: 400 });
+		const files = formData.getAll('media');
+		if (!files.length) return json({ error: 'No media file provided' }, { status: 400 });
 
-		const buffer = Buffer.from(await file.arrayBuffer());
-		const validation = validateMediaUpload({
-			buffer,
-			filename: file.name,
-			declaredMime: file.type,
-			allowedCategories: ['image', 'video', 'audio'],
-			maxSizeMB: 50
-		});
-
-		if (!validation.valid) {
-			return json({ error: validation.error || 'Archivo inválido o corrupto' }, { status: 400 });
+		const MAX_FILES = 10;
+		if (files.length > MAX_FILES) {
+			return json({ error: `Máximo ${MAX_FILES} archivos por publicación` }, { status: 400 });
 		}
 
 		const uploadDir = getUploadsDir('posts');
-		const ext = file.name.split('.').pop() || 'bin';
-		const newName = `${Date.now()}_${randomBytes(4).toString('hex')}.${ext}`;
-		const destPath = resolve(uploadDir, newName);
-		writeFileSync(destPath, buffer);
+		const uploaded = [];
 
-		const mediaType = validation.mimeType?.startsWith('video/') ? 'video' : 'image';
-		const mediaUrl = `/uploads/posts/${newName}`;
-		return json({ success: true, media: [{ url: mediaUrl, type: mediaType }] });
+		for (const file of files) {
+			const buffer = Buffer.from(await file.arrayBuffer());
+			const validation = validateMediaUpload({
+				buffer,
+				filename: file.name,
+				declaredMime: file.type,
+				allowedCategories: ['image', 'video', 'audio'],
+				maxSizeMB: 50
+			});
+
+			if (!validation.valid) {
+				return json({ error: validation.error || 'Archivo inválido o corrupto' }, { status: 400 });
+			}
+
+			const ext = file.name.split('.').pop() || 'bin';
+			const newName = `${Date.now()}_${randomBytes(4).toString('hex')}.${ext}`;
+			writeFileSync(resolve(uploadDir, newName), buffer);
+
+			const mediaType = validation.mimeType?.startsWith('video/') ? 'video' : 'image';
+			if (validation.mimeType?.startsWith('audio/')) {
+				uploaded.push({ url: `/uploads/posts/${newName}`, type: 'audio' });
+			} else {
+				uploaded.push({ url: `/uploads/posts/${newName}`, type: mediaType });
+			}
+		}
+
+		return json({ success: true, media: uploaded });
 	}
 
 	// POST /api/posts — create post
@@ -180,6 +199,7 @@ export async function POST({ request, _url, params }) {
 			scheduledAt = null,
 			locationName = null,
 			pollObj = null,
+			quoteId = null,
 			isAnonymous = 0;
 		const contentType = request.headers.get('content-type') || '';
 
@@ -198,6 +218,8 @@ export async function POST({ request, _url, params }) {
 					pollObj = JSON.parse(pollStr);
 				} catch (_e) {}
 			}
+			const quoteVal = formData.get('quote_id');
+			quoteId = quoteVal ? parseInt(quoteVal) || null : null;
 		} else {
 			const body = await request.json().catch(() => ({}));
 			bodyText = body.body || body.content || '';
@@ -207,6 +229,7 @@ export async function POST({ request, _url, params }) {
 			scheduledAt = body.scheduled_at || null;
 			locationName = body.location_name || null;
 			pollObj = body.poll || null;
+			quoteId = body.quote_id ? parseInt(body.quote_id) || null : null;
 			isAnonymous =
 				body.is_anonymous === true ||
 				body.is_anonymous === 1 ||
@@ -236,6 +259,51 @@ export async function POST({ request, _url, params }) {
 		}
 
 		try {
+			// Post citado: capturar un snapshot del post original (estilo X/Bluesky)
+			let quoteSnapshot = null;
+			if (quoteId) {
+				const quoted = await db
+					.prepare(
+						`
+				SELECT p.id, p.body, p.user_id, p.is_anonymous, p.created_at,
+					u.username, u.display_name, u.avatar_url, u.is_verified, u.level,
+					COALESCE(ur.role, u.role, 'user') AS role,
+					(SELECT media_url FROM post_media WHERE post_id = p.id ORDER BY id ASC LIMIT 1) AS media_url
+				FROM posts p JOIN users u ON p.user_id = u.id
+				LEFT JOIN user_roles ur ON ur.user_id = u.id
+				WHERE p.id = ? AND p.deleted_at IS NULL
+			`
+					)
+					.get(quoteId);
+				if (quoted) {
+					let quotedBody = quoted.body || '';
+					const metaIdx = quotedBody.indexOf('\n[METADATA]');
+					if (metaIdx !== -1) quotedBody = quotedBody.slice(0, metaIdx).trim();
+					quoteSnapshot = {
+						id: quoted.id,
+						body: quotedBody,
+						is_anonymous: quoted.is_anonymous == 1 || quoted.is_anonymous === true ? 1 : 0,
+						username: quoted.username,
+						display_name: quoted.display_name || quoted.username,
+						avatar_url: quoted.avatar_url,
+						is_verified: quoted.is_verified,
+						level: quoted.level,
+						role: quoted.role,
+						created_at: quoted.created_at,
+						media_url: quoted.media_url
+					};
+					// Los posts anónimos citados nunca revelan la identidad real del autor
+					if (quoteSnapshot.is_anonymous) {
+						quoteSnapshot.username = 'anonimo';
+						quoteSnapshot.display_name = 'Usuario Anónimo';
+						quoteSnapshot.avatar_url = null;
+						quoteSnapshot.is_verified = 0;
+						quoteSnapshot.level = null;
+						quoteSnapshot.role = 'user';
+					}
+				}
+			}
+
 			let statusVal = 'published';
 			if (scheduledAt) {
 				const schedTime = new Date(scheduledAt).getTime();
@@ -247,7 +315,7 @@ export async function POST({ request, _url, params }) {
 			}
 
 			let finalBody = bodyText;
-			if (pollObj || locationName) {
+			if (pollObj || locationName || quoteSnapshot) {
 				const meta = {};
 				if (pollObj) {
 					meta.poll = {
@@ -267,6 +335,9 @@ export async function POST({ request, _url, params }) {
 					} catch (e) {
 						console.error('Error inserting check-in:', e);
 					}
+				}
+				if (quoteSnapshot) {
+					meta.quote = quoteSnapshot;
 				}
 				finalBody = bodyText + '\n[METADATA]' + JSON.stringify(meta);
 			}
@@ -296,10 +367,13 @@ export async function POST({ request, _url, params }) {
 				await logActivity(userId, 'create', 'post', postId);
 			}
 
-			for (const med of mediaUrls) {
+			for (let mi = 0; mi < mediaUrls.length; mi++) {
+				const med = mediaUrls[mi];
 				await db
-					.prepare('INSERT INTO post_media (post_id, media_type, media_url) VALUES (?, ?, ?)')
-					.run(postId, med.type || 'image', med.url);
+					.prepare(
+						'INSERT INTO post_media (post_id, media_type, media_url, position) VALUES (?, ?, ?, ?)'
+					)
+					.run(postId, med.type || 'image', med.url, mi);
 			}
 
 			// Parse and save hashtags
@@ -333,16 +407,15 @@ export async function POST({ request, _url, params }) {
 					.prepare('SELECT display_name, username FROM users WHERE id = ?')
 					.get(userId);
 				const authorName = author?.display_name || author?.username || 'Alguien';
-				const insertNotif = await db.prepare(
-					"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'new_post', 'post', ?, ?)"
-				);
 				for (const f of followers) {
-					await insertNotif.run(
-						f.follower_id,
-						userId,
-						postId,
-						`${authorName} ha creado una nueva publicación.`
-					);
+					await createNotification(db, {
+						recipientId: f.follower_id,
+						actorId: userId,
+						type: 'new_post',
+						entityType: 'post',
+						entityId: postId,
+						message: `${authorName} ha creado una nueva publicación.`
+					});
 				}
 			}
 
@@ -448,11 +521,14 @@ export async function POST({ request, _url, params }) {
 					const likerName = anonLikerName
 						? '@' + anonLikerName
 						: liker?.display_name || liker?.username || 'Alguien';
-					await db
-						.prepare(
-							"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'like', 'post', ?, ?)"
-						)
-						.run(ownerId, userId, postId, `${likerName} le ha gustado tu publicación.`);
+					await createNotification(db, {
+						recipientId: ownerId,
+						actorId: userId,
+						type: 'like',
+						entityType: 'post',
+						entityId: postId,
+						message: `${likerName} le ha gustado tu publicación.`
+					});
 
 					// Gamification: Award 2 XP to the post owner for receiving a like
 					await awardXP(db, ownerId, 2).catch(() => {});
@@ -506,11 +582,14 @@ export async function POST({ request, _url, params }) {
 						const reposterName = anonReposter
 							? '@' + anonReposter
 							: reposter?.display_name || reposter?.username || 'Alguien';
-						await db
-							.prepare(
-								"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'share', 'post', ?, ?)"
-							)
-							.run(ownerId, userId, postId, `${reposterName} reposteó tu publicación.`);
+						await createNotification(db, {
+							recipientId: ownerId,
+							actorId: userId,
+							type: 'share',
+							entityType: 'post',
+							entityId: postId,
+							message: `${reposterName} reposteó tu publicación.`
+						});
 
 						// Gamification: Award 2 XP to post owner for receiving a repost
 						await awardXP(db, ownerId, 2).catch(() => {});
@@ -618,11 +697,14 @@ export async function POST({ request, _url, params }) {
 			const commenterName = anonName
 				? `@${anonName}`
 				: commenter?.display_name || commenter?.username || 'Alguien';
-			await db
-				.prepare(
-					"INSERT INTO notifications (recipient_id, actor_id, type, entity_type, entity_id, message) VALUES (?, ?, 'comment', 'post', ?, ?)"
-				)
-				.run(ownerId, userId, postId, `${commenterName} ha comentado en tu publicación.`);
+			await createNotification(db, {
+				recipientId: ownerId,
+				actorId: userId,
+				type: 'comment',
+				entityType: 'post',
+				entityId: postId,
+				message: `${commenterName} ha comentado en tu publicación.`
+			});
 		} else if (ownerId && ownerId === userId && parentId) {
 			// Author response in their own post comments: only count if replying to another user's comment (anti-gaming)
 			const parentComment = await db
@@ -714,12 +796,37 @@ export async function PUT({ request, _url, params }) {
 		const bodyText = body.body || body.content || '';
 		if (!bodyText) return json({ error: 'Content cannot be empty' }, { status: 400 });
 
-		const oldPost = db.prepare('SELECT body FROM posts WHERE id = ?').get(postId);
-		const result = db
+		const oldPost = await db.prepare('SELECT body FROM posts WHERE id = ?').get(postId);
+
+		// Preservar la estructura del post citado (y cualquier otro metadato:
+		// encuesta, ubicación…) que vive en el bloque "\n[METADATA]" del body.
+		// El editor envía solo el texto limpio; sin este paso la cita se destruía
+		// y el post se guardaba como texto plano.
+		let finalBody = bodyText;
+		if (oldPost?.body) {
+			const metaIdx = oldPost.body.indexOf('\n[METADATA]');
+			if (metaIdx !== -1) {
+				finalBody = bodyText + oldPost.body.slice(metaIdx);
+			}
+		}
+
+		const result = await db
 			.prepare(
 				"UPDATE posts SET body = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
 			)
-			.run(bodyText, postId, userId);
+			.run(finalBody, postId, userId);
+
+		// Reordenar medios adjuntos (portada/primera imagen) si llega media_order
+		if (result.changes > 0 && Array.isArray(body.media_order) && body.media_order.length > 0) {
+			const reorder = db.prepare('UPDATE post_media SET position = ? WHERE id = ? AND post_id = ?');
+			for (let idx = 0; idx < body.media_order.length; idx++) {
+				const mediaId = parseInt(body.media_order[idx]);
+				if (Number.isInteger(mediaId) && mediaId > 0) {
+					await reorder.run(idx, mediaId, postId);
+				}
+			}
+		}
+
 		if (result.changes > 0) {
 			await logActivity(userId, 'update', 'post', postId, { previous_body: oldPost?.body });
 			return json({ success: true, message: 'Post updated successfully' });
@@ -733,8 +840,8 @@ export async function PUT({ request, _url, params }) {
 		const bodyText = body.body || body.content || '';
 		if (!bodyText) return json({ error: 'Content cannot be empty' }, { status: 400 });
 
-		const oldComment = db.prepare('SELECT body FROM comments WHERE id = ?').get(commentId);
-		const result = db
+		const oldComment = await db.prepare('SELECT body FROM comments WHERE id = ?').get(commentId);
+		const result = await db
 			.prepare('UPDATE comments SET body = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL')
 			.run(bodyText, commentId, userId);
 		if (result.changes > 0) {
@@ -917,7 +1024,7 @@ export async function DELETE({ request, _url, params }) {
 
 	// DELETE /api/posts/:id — delete post
 	if (!subaction) {
-		const oldPost = db.prepare('SELECT body FROM posts WHERE id = ?').get(postId);
+		const oldPost = await db.prepare('SELECT body FROM posts WHERE id = ?').get(postId);
 		const result = await db
 			.prepare("UPDATE posts SET deleted_at = datetime('now') WHERE id = ? AND user_id = ?")
 			.run(postId, userId);

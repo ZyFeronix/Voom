@@ -1,4 +1,5 @@
 <script>
+	import '$lib/styles/fonts.css';
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
@@ -14,27 +15,65 @@
 	import TopBar from '$lib/components/TopBar.svelte';
 	import MobileNav from '$lib/components/MobileNav.svelte';
 	import LiquidBackground from '$lib/components/LiquidBackground.svelte';
+	import FpsHud from '$lib/components/FpsHud.svelte';
+	import RouteProgress from '$lib/components/RouteProgress.svelte';
 	import PwaPrompt from '$lib/components/PwaPrompt.svelte';
 	import CookieBanner from '$lib/components/CookieBanner.svelte';
 	import MediaLightbox from '$lib/components/MediaLightbox.svelte';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import LevelUpModal from '$lib/components/gamification/LevelUpModal.svelte';
+	import { perfStore } from '$lib/stores/perf.svelte.js';
 
 	onNavigate((navigation) => {
+		// La View Transitions API es el único requisito. Ningún perfil de
+		// rendimiento la bloquea: cada perfil tiene sus propias duraciones
+		// CSS calibradas (enabled=0.32s, fast=0.26s, lite=0.22s, disabled=0.16s).
 		if (!document.startViewTransition) return;
-		// En móvil las view transitions snapshot+crossfadeean la página entera (incluido glass con blur),
-		// lo que es costoso por navegación en低端. Navegación instantánea en móvil; PC mantiene la transición.
-		if (window.matchMedia('(max-width: 768px)').matches) return;
-		if (navigation.to?.url.href === navigation.from?.url.href) return;
+
+		// Solo transiciones entre rutas distintas: los cambios de query/hash en
+		// la misma ruta (p. ej. filtros ?filter=) no disparan snapshot global —
+		// eran los que dejaban el overlay ::view-transition pegado.
 		if (
-			navigation.to?.url.pathname === navigation.from?.url.pathname &&
-			navigation.to?.url.hash !== navigation.from?.url.hash
+			navigation.to?.url.href === navigation.from?.url.href ||
+			navigation.to?.url.pathname === navigation.from?.url.pathname
 		)
 			return;
 
+		// Congela transiciones CSS de entrada mientras dura el snapshot de la
+		// View Transition: evita que animaciones propias de cada página (stagger,
+		// fades) compitan con el crossfade y ensucien el fundido.
+		document.documentElement.classList.add('is-vt-active');
+
 		return new Promise((resolve) => {
-			const transition = document.startViewTransition(async () => {
+			let transition;
+			try {
+				transition = document.startViewTransition(async () => {
+					resolve();
+					await navigation.complete;
+				});
+			} catch (_e) {
+				// Sin transición no hay nada que congelar: restaurar y continuar.
+				document.documentElement.classList.remove('is-vt-active');
 				resolve();
-				await navigation.complete;
+				return;
+			}
+
+			// El crossfade no debe esperar al decodificado de imágenes de la
+			// página nueva: en cuanto el callback del DOM termina, arrancamos
+			// la animación (updateCallbackDone) y dejamos que las imágenes
+			// aparezcan dentro del canvas ya fundido. Evita frames vacíos.
+			transition.updateCallbackDone.finally(() => {
+				document.documentElement.classList.remove('is-vt-active');
 			});
+			transition.updateCallbackDone.catch(() => {});
+
+			// Rescate anti-congelamiento: si la VT no termina en 1s, se salta
+			// para que un overlay colgado no rompa la plataforma visualmente.
+			const timeout = setTimeout(() => {
+				transition.skipTransition();
+			}, 1000);
+			transition.finished.finally(() => clearTimeout(timeout)).catch(() => {});
+
 			// Evitar excepciones no capturadas si la transición se aborta
 			if (transition.ready) transition.ready.catch(() => {});
 			if (transition.finished) transition.finished.catch(() => {});
@@ -93,30 +132,135 @@
 		return () => window.removeEventListener('global_settings_update', handleSettingsUpdate);
 	});
 
+	let hasBootedInSession = $state(
+		typeof window !== 'undefined' && typeof sessionStorage !== 'undefined'
+			? sessionStorage.getItem('vsocial_booted') === '1'
+			: false
+	);
 	let installChecked = $state(false);
 	let isInstalled = $state(false);
+	let bootGraceElapsed = $state(false);
+	let isHeavyLoading = $state(false);
 
 	$effect(() => {
 		if (data?.isInstalled !== undefined) {
-			installChecked = true;
 			isInstalled = data.isInstalled;
 		}
 	});
 
-	// Rutas públicas — no requieren auth. Se evalúa de forma explícita
-	// para evitar ambigüedades durante el hydration de SSR en Svelte 5.
-	const publicPrefixes = ['/about', '/install', '/setup'];
+	onMount(() => {
+		if (!hasBootedInSession) {
+			// Gracia visual mínima para que el arranque inicial de la sesión sea suave y cinematográfico
+			const timer = setTimeout(() => {
+				bootGraceElapsed = true;
+			}, 400);
+			return () => clearTimeout(timer);
+		} else {
+			bootGraceElapsed = true;
+			// En recargas posteriores, solo mostramos el splash si la carga toma demasiado tiempo (>500ms)
+			const heavyTimer = setTimeout(() => {
+				if (!installChecked || !authStore.initialized) {
+					isHeavyLoading = true;
+				}
+			}, 500);
+			return () => clearTimeout(heavyTimer);
+		}
+	});
+
+	// Zonas clave donde tiene sentido el Boot Screen (arranque principal de la plataforma)
+	const BOOT_KEY_ROUTES = ['/', '/feed'];
+	const isBootKeyRoute = $derived(BOOT_KEY_ROUTES.includes(page.url.pathname));
+
+	// Rutas públicas y de acceso general (permiten visualización a visitantes o perfiles directos)
+	const publicPrefixes = [
+		'/about',
+		'/install',
+		'/setup',
+		'/u',
+		'/posts',
+		'/reels',
+		'/explore',
+		'/marketplace',
+		'/leaderboard'
+	];
 	const publicExact = ['/', '/login', '/register', '/privacy', '/terms', '/cookies'];
+	const isStrictlyPrivate = $derived(
+		page.url.pathname.startsWith('/feed') ||
+			page.url.pathname.startsWith('/messages') ||
+			page.url.pathname.startsWith('/notifications') ||
+			page.url.pathname.startsWith('/settings') ||
+			page.url.pathname.startsWith('/studio') ||
+			page.url.pathname.startsWith('/posts/create') ||
+			page.url.pathname.startsWith('/reels/create') ||
+			page.url.pathname.startsWith('/marketplace/create')
+	);
 	const isPublicRoute = $derived(
-		publicExact.includes(page.url.pathname) ||
-			publicPrefixes.some((prefix) => page.url.pathname.startsWith(prefix))
+		!isStrictlyPrivate &&
+			(publicExact.includes(page.url.pathname) ||
+				publicPrefixes.some((prefix) => page.url.pathname.startsWith(prefix)))
 	);
 	const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
 	const isReelsRoute = $derived(
 		page.url.pathname.startsWith('/reels') && !page.url.pathname.startsWith('/reels/create')
 	);
-	// En rutas públicas no bloqueamos el render aunque installChecked sea false
-	const showBootScreen = $derived(!installChecked && !isPublicRoute && !isAdminRoute);
+	const isInitializing = $derived(!installChecked || !authStore.initialized);
+
+	// El Boot Screen solo se activa en el primer arranque frío de zonas clave (/) o (/feed)
+	const showBootScreen = $derived(
+		isBootKeyRoute &&
+			!isAdminRoute &&
+			!(isPublicRoute && !authStore.token) &&
+			((!hasBootedInSession && (isInitializing || !bootGraceElapsed)) ||
+				(hasBootedInSession && isInitializing && isHeavyLoading))
+	);
+
+	onMount(() => {
+		perfStore.init();
+
+		// ── Visual Viewport → variables CSS + clase has-keyboard ───────────────
+		// En móvil el teclado virtual no redimensiona el layout viewport de forma
+		// fiable (iOS sobre todo). Exponemos --vv-height / --vv-top para que los
+		// contenedores fijos (messages, reels, drawers) se re-dimensionen y el
+		// teclado nunca tape el composer/textarea.
+		const vv = window.visualViewport;
+		const root = document.documentElement;
+		// Se parte de la altura visual ACTUAL (no de innerHeight, que en móvil
+		// incluye la barra de URL expandida y provocaría un falso "teclado abierto").
+		let maxVvHeight = vv ? vv.height : window.innerHeight;
+		let applyRaf = null;
+
+		const apply = () => {
+			const h = vv ? vv.height : window.innerHeight;
+			const top = vv ? vv.offsetTop : 0;
+			maxVvHeight = Math.max(maxVvHeight, h);
+			const keyboardOpen = maxVvHeight - h > 120;
+			root.style.setProperty('--vv-height', `${h}px`);
+			root.style.setProperty('--vv-top', `${top}px`);
+			root.classList.toggle('has-keyboard', keyboardOpen);
+		};
+
+		const scheduleApply = () => {
+			if (applyRaf) return;
+			applyRaf = requestAnimationFrame(() => {
+				applyRaf = null;
+				apply();
+			});
+		};
+
+		if (vv) {
+			apply();
+			vv.addEventListener('resize', scheduleApply);
+			vv.addEventListener('scroll', scheduleApply);
+			window.addEventListener('orientationchange', () => {
+				maxVvHeight = 0;
+				setTimeout(apply, 200);
+			});
+			return () => {
+				vv.removeEventListener('resize', scheduleApply);
+				vv.removeEventListener('scroll', scheduleApply);
+			};
+		}
+	});
 
 	onMount(async () => {
 		await authStore.initialize();
@@ -162,6 +306,13 @@
 
 		installChecked = true;
 
+		// Marcar la sesión como inicializada para evitar pantallas de arranque repetitivas
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.setItem('vsocial_booted', '1');
+			hasBootedInSession = true;
+		}
+		isHeavyLoading = false;
+
 		if (!isPublicRoute && !authStore.isAuthenticated) {
 			goto('/login');
 			return;
@@ -197,11 +348,23 @@
 
 		const wheelHandler = (e) => {
 			if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-			e.preventDefault(); // Bloquear scroll vertical solo dentro del slider
+			if (!activeWheelListenerTarget) return;
 
-			scrollTarget += e.deltaY * 1.2;
 			const maxScroll =
 				activeWheelListenerTarget.scrollWidth - activeWheelListenerTarget.clientWidth;
+			if (maxScroll <= 0) return;
+
+			// Si el carrusel ya llegó al límite horizontal, no bloquear el scroll vertical de la página
+			if (
+				(activeWheelListenerTarget.scrollLeft <= 0 && e.deltaY < 0) ||
+				(activeWheelListenerTarget.scrollLeft >= maxScroll && e.deltaY > 0)
+			) {
+				return;
+			}
+
+			e.preventDefault();
+
+			scrollTarget += e.deltaY * 1.2;
 			scrollTarget = Math.max(0, Math.min(scrollTarget, maxScroll));
 
 			if (!isScrolling) {
@@ -230,7 +393,7 @@
 					return;
 				}
 
-				const slider = lastTarget?.closest?.('.overflow-x-auto, .hide-scrollbar');
+				const slider = lastTarget?.closest?.('.horizontal-wheel-slider, .story-slider');
 				if (slider && slider.scrollWidth > slider.clientWidth) {
 					if (activeWheelListenerTarget !== slider) {
 						if (activeWheelListenerTarget) {
@@ -302,52 +465,102 @@
 <svelte:body class:is-reels={isReelsRoute} />
 
 <LiquidBackground />
-
+<FpsHud />
+<RouteProgress />
 {#if showBootScreen}
-	<div class="vs-boot" data-vs-boot out:fade={{ duration: 400, easing: cubicOut }}>
+	<div class="vs-boot" data-vs-boot out:fade={{ duration: 450, easing: cubicOut }}>
+		<!-- Bioluminescent ambient plasma glow -->
+		<div class="vs-boot__backdrop-glow vs-boot__glow--cyan"></div>
+		<div class="vs-boot__backdrop-glow vs-boot__glow--magenta"></div>
+		<div class="vs-boot__backdrop-glow vs-boot__glow--teal"></div>
+
+		<!-- Holographic Liquid-Glass Core -->
 		<div class="vs-boot__core">
 			<div class="vs-boot__prism"></div>
-			<h1 class="vs-boot__brand">
-				<span class="vs-boot__mark">VS</span>ocial
-			</h1>
+			<div class="vs-boot__orbit-ring"></div>
+			<div class="vs-boot__orbit-ring vs-boot__orbit-ring--reverse"></div>
+
+			<!-- Brand Emblem & Typography -->
+			<div class="vs-boot__brand-group">
+				<div class="vs-boot__emblem">
+					<span class="vs-boot__emblem-glow"></span>
+					<span class="vs-boot__emblem-mark">VS</span>
+				</div>
+				<div class="vs-boot__titles">
+					<h1 class="vs-boot__brand">
+						<span class="vs-boot__mark">VS</span><span class="vs-boot__suffix">ocial</span>
+					</h1>
+					<span class="vs-boot__tagline">NEXT-GEN CREATOR NETWORK</span>
+				</div>
+			</div>
+
+			<!-- Dynamic Quantum Progress Meter -->
 			<div class="vs-boot__meter">
-				<span class="vs-boot__pulse"></span>
-				<p class="vs-boot__status">Iniciando Motor</p>
+				<div class="vs-boot__track">
+					<div class="vs-boot__fill"></div>
+					<div class="vs-boot__scanner"></div>
+				</div>
+				<div class="vs-boot__meta">
+					<span class="vs-boot__live-dot"></span>
+					<p class="vs-boot__status">
+						{hasBootedInSession ? 'Cargando Datos...' : 'Sincronizando Entorno'}
+					</p>
+				</div>
 			</div>
 		</div>
 	</div>
-{:else if isPublicRoute}
-	{@render children()}
 {:else if isAdminRoute}
 	{@render children()}
 {:else if authStore.isAuthenticated}
 	<div
-		class="vs-shell"
+		class="vs-shell app-layout-container"
 		class:vs-shell--collapsed={!uiStore.sidebarExpanded}
+		class:sidebar-expanded={uiStore.sidebarExpanded}
 		class:vs-shell--reels={isReelsRoute}
+		style="--sidebar-width: {uiStore.sidebarExpanded ? '250px' : '80px'};"
 	>
 		<aside class="vs-shell__rail">
 			<SideNav />
 		</aside>
 
 		<div class="vs-shell__stage">
-			<TopBar />
+			<!-- En /reels la página es inmersiva a pantalla completa: la TopBar global
+				   se oculta para que no se cruce con los controles propios del reproductor. -->
+			{#if !isReelsRoute}
+				<TopBar />
+			{/if}
 			<main class="vs-shell__canvas">
 				{@render children()}
 			</main>
 		</div>
 
 		<MobileNav />
+		<!-- Drawer overlay for collapsed sidebar on tablets -->
+		<div
+			class="vs-sidebar-drawer"
+			class:open={uiStore.drawerOpen}
+			role="button"
+			tabindex="-1"
+			aria-label="Cerrar menú de navegación"
+			onclick={() => (uiStore.drawerOpen = false)}
+			onkeydown={(e) => {
+				if (e.key === 'Escape') uiStore.drawerOpen = false;
+			}}
+		>
+			<aside class="vs-sidebar-drawer__panel">
+				<SideNav />
+			</aside>
+		</div>
 	</div>
-{:else}
-	<div class="vs-boot vs-boot--fallback" out:fade={{ duration: 300 }}>
-		<span class="vs-boot__spinner"></span>
-	</div>
+{:else if isPublicRoute}
+	{@render children()}
 {/if}
 
 <PwaPrompt />
 <CookieBanner />
 <MediaLightbox />
+<ConfirmModal />
+<LevelUpModal />
 
 <style>
 	:global(body.is-reels),
@@ -371,20 +584,47 @@
 		inset: 0;
 		display: grid;
 		place-items: center;
-		background: var(--bg-canvas);
+		background: radial-gradient(circle at 50% 50%, #061e2d 0%, #030f17 60%, #02090e 100%);
 		isolation: isolate;
-		animation: vsBootEnter 0.6s var(--ease-out) both;
+		z-index: 9999;
+		overflow: hidden;
+		animation: vsBootEnter 0.5s var(--ease-out) both;
 	}
 
-	.vs-boot::before {
-		content: '';
+	.vs-boot__backdrop-glow {
 		position: absolute;
-		inset: -20%;
-		background:
-			radial-gradient(circle at 30% 40%, rgba(0, 229, 255, 0.18) 0%, transparent 55%),
-			radial-gradient(circle at 70% 60%, rgba(232, 74, 114, 0.14) 0%, transparent 50%),
-			radial-gradient(circle at 50% 85%, rgba(255, 215, 0, 0.1) 0%, transparent 60%);
-		z-index: -1;
+		border-radius: 9999px;
+		filter: blur(80px);
+		pointer-events: none;
+		opacity: 0.35;
+		will-change: transform, opacity;
+	}
+
+	.vs-boot__glow--cyan {
+		width: 480px;
+		height: 480px;
+		top: 15%;
+		left: 20%;
+		background: radial-gradient(circle, rgba(0, 229, 255, 0.45) 0%, transparent 70%);
+		animation: bootFloatOrb1 12s ease-in-out infinite alternate;
+	}
+
+	.vs-boot__glow--magenta {
+		width: 420px;
+		height: 420px;
+		bottom: 15%;
+		right: 20%;
+		background: radial-gradient(circle, rgba(236, 72, 153, 0.35) 0%, transparent 70%);
+		animation: bootFloatOrb2 14s ease-in-out infinite alternate;
+	}
+
+	.vs-boot__glow--teal {
+		width: 380px;
+		height: 380px;
+		bottom: 25%;
+		left: 30%;
+		background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+		animation: bootFloatOrb3 10s ease-in-out infinite alternate;
 	}
 
 	.vs-boot__core {
@@ -392,17 +632,22 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 2rem;
-		padding: 3rem 3.5rem;
-		border-radius: var(--radius-xl);
-		background: var(--glass-bg);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid transparent;
-		border-image: var(--glass-border) 1;
-		box-shadow: var(--glass-shadow), var(--glass-inset-highlight);
+		gap: 2.25rem;
+		padding: 3.25rem 4rem;
+		border-radius: 28px;
+		background: rgba(12, 35, 55, 0.65);
+		backdrop-filter: blur(24px) saturate(1.35);
+		-webkit-backdrop-filter: blur(24px) saturate(1.35);
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		box-shadow:
+			0 24px 64px -12px rgba(0, 0, 0, 0.65),
+			0 0 35px rgba(0, 229, 255, 0.15),
+			inset 0 1px 2px rgba(255, 255, 255, 0.4),
+			inset 0 -1px 2px rgba(0, 229, 255, 0.2);
 		overflow: hidden;
-		animation: vsCoreFloat 0.8s var(--ease-spring) both;
+		animation: vsCoreFloat 0.75s var(--ease-spring) both;
+		z-index: 10;
+		max-width: 90vw;
 	}
 
 	.vs-boot__core::before {
@@ -410,33 +655,97 @@
 		position: absolute;
 		inset: 0;
 		background: var(--noise-texture);
-		opacity: 0.03;
+		opacity: 0.035;
 		pointer-events: none;
 	}
 
 	.vs-boot__prism {
 		position: absolute;
-		top: -40%;
+		top: -50%;
 		left: 50%;
-		width: 220%;
-		height: 60%;
+		width: 200%;
+		height: 80%;
 		transform: translateX(-50%);
 		background: radial-gradient(
 			ellipse at 50% 50%,
-			rgba(0, 229, 255, 0.12) 0%,
-			rgba(232, 74, 114, 0.06) 50%,
-			transparent 75%
+			rgba(0, 229, 255, 0.16) 0%,
+			rgba(16, 185, 129, 0.08) 40%,
+			rgba(236, 72, 153, 0.04) 65%,
+			transparent 80%
 		);
 		pointer-events: none;
+	}
+
+	.vs-boot__orbit-ring {
+		position: absolute;
+		inset: -40%;
+		border-radius: 48%;
+		border: 1px dashed rgba(0, 229, 255, 0.12);
+		animation: bootOrbit 20s linear infinite;
+		pointer-events: none;
+	}
+
+	.vs-boot__orbit-ring--reverse {
+		inset: -35%;
+		border-radius: 46%;
+		border: 1px dotted rgba(236, 72, 153, 0.1);
+		animation: bootOrbit 28s linear infinite reverse;
+	}
+
+	.vs-boot__brand-group {
+		display: flex;
+		align-items: center;
+		gap: 1.5rem;
+		position: relative;
+		z-index: 2;
+	}
+
+	.vs-boot__emblem {
+		position: relative;
+		width: 64px;
+		height: 64px;
+		border-radius: 18px;
+		background: linear-gradient(135deg, rgba(0, 229, 255, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
+		border: 1px solid rgba(0, 229, 255, 0.4);
+		box-shadow:
+			0 8px 24px rgba(0, 229, 255, 0.25),
+			inset 0 1px 2px rgba(255, 255, 255, 0.6);
+		display: grid;
+		place-items: center;
+		overflow: hidden;
+	}
+
+	.vs-boot__emblem-glow {
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6) 0%, transparent 60%);
+		pointer-events: none;
+	}
+
+	.vs-boot__emblem-mark {
+		font-family: var(--font-display);
+		font-weight: 900;
+		font-size: 1.75rem;
+		letter-spacing: -0.05em;
+		background: linear-gradient(135deg, #ffffff 0%, #00e5ff 100%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+
+	.vs-boot__titles {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 
 	.vs-boot__brand {
 		position: relative;
 		font-family: var(--font-display);
 		font-weight: 900;
-		font-size: clamp(3rem, 8vw, 4.25rem);
+		font-size: clamp(2.5rem, 6vw, 3.5rem);
 		letter-spacing: -0.03em;
-		color: var(--text-primary);
+		color: #ffffff;
 		margin: 0;
 		line-height: 1;
 	}
@@ -446,69 +755,114 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		text-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
+		text-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+	}
+
+	.vs-boot__suffix {
+		color: #ffffff;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+	}
+
+	.vs-boot__tagline {
+		font-family: var(--font-display);
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.25em;
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.5);
 	}
 
 	.vs-boot__meter {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 1rem;
+		width: 100%;
+		max-width: 260px;
+		position: relative;
+		z-index: 2;
 	}
 
-	.vs-boot__pulse {
-		width: 2.5rem;
-		height: 3px;
+	.vs-boot__track {
+		position: relative;
+		width: 100%;
+		height: 5px;
 		border-radius: 9999px;
-		background: var(--accent-gradient);
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		overflow: hidden;
+		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+	}
+
+	.vs-boot__fill {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: linear-gradient(90deg, #00e5ff 0%, #10b981 50%, #ec4899 100%);
 		background-size: 200% 100%;
-		animation: vsPulseSweep 1.6s var(--ease-out) infinite;
-		box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
+		animation: vsPulseSweep 1.8s ease-in-out infinite;
+		box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+	}
+
+	.vs-boot__scanner {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 40px;
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			rgba(255, 255, 255, 0.8) 50%,
+			transparent 100%
+		);
+		animation: bootScannerSweep 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	}
+
+	.vs-boot__meta {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.vs-boot__live-dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 9999px;
+		background: #00e5ff;
+		box-shadow:
+			0 0 10px #00e5ff,
+			0 0 16px #00e5ff;
+		animation: vsDotPulse 1.2s ease-in-out infinite alternate;
 	}
 
 	.vs-boot__status {
 		margin: 0;
 		font-family: var(--font-display);
-		font-size: 0.72rem;
+		font-size: 0.75rem;
 		font-weight: 600;
-		letter-spacing: 0.28em;
+		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: var(--text-secondary);
-	}
-
-	.vs-boot--fallback {
-		display: grid;
-		place-items: center;
-	}
-
-	.vs-boot--fallback .vs-boot__spinner {
-		width: 48px;
-		height: 48px;
-		position: relative;
-		background: var(--bg-surface);
-		border-radius: var(--radius-squircle);
-		box-shadow: var(--shadow-glow);
-		animation: squircle-pulse 1.2s var(--ease-spring) infinite alternate;
-	}
-	.vs-boot--fallback .vs-boot__spinner::after {
-		content: '';
-		position: absolute;
-		inset: 2px;
-		border-radius: inherit;
-		background: var(--accent-gradient);
-		opacity: 0.5;
-		filter: blur(2px);
-		animation: squircle-glow 1.2s var(--ease-spring) infinite alternate;
+		color: rgba(255, 255, 255, 0.75);
 	}
 
 	.vs-shell {
+		--sidebar-width: 250px;
 		display: flex;
 		min-height: 100vh;
 		position: relative;
+		box-sizing: border-box;
+	}
+
+	.vs-shell.vs-shell--collapsed {
+		--sidebar-width: 80px;
+	}
+
+	.vs-shell.sidebar-expanded {
+		--sidebar-width: 250px;
 	}
 
 	.vs-shell__rail {
-		width: 16rem;
+		width: var(--sidebar-width, 80px);
 		flex-shrink: 0;
 		position: sticky;
 		top: 0;
@@ -518,11 +872,14 @@
 		/* z-index elevado para que el sidenav siempre quede sobre el contenido
 		   (PostCard hover llega a z-index:40, esta a 100 evita la colisión) */
 		z-index: 100;
-		transition: width var(--t-spring);
+		transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+		will-change: width;
+		contain: layout paint;
+		box-sizing: border-box;
 	}
 
 	.vs-shell--collapsed .vs-shell__rail {
-		width: 5rem;
+		width: var(--sidebar-width, 80px);
 	}
 
 	.vs-shell__stage {
@@ -552,7 +909,7 @@
 	@keyframes vsCoreFloat {
 		from {
 			opacity: 0;
-			transform: translateY(14px) scale(0.96);
+			transform: translateY(18px) scale(0.94);
 		}
 		to {
 			opacity: 1;
@@ -563,21 +920,65 @@
 	@keyframes vsPulseSweep {
 		0% {
 			background-position: 0% 50%;
-			opacity: 0.6;
 		}
 		50% {
 			background-position: 100% 50%;
-			opacity: 1;
 		}
 		100% {
 			background-position: 0% 50%;
-			opacity: 0.6;
 		}
 	}
 
-	@keyframes vsSpin {
+	@keyframes bootScannerSweep {
+		0% {
+			left: -40px;
+		}
+		100% {
+			left: 100%;
+		}
+	}
+
+	@keyframes bootOrbit {
 		to {
 			transform: rotate(360deg);
+		}
+	}
+
+	@keyframes vsDotPulse {
+		0% {
+			transform: scale(0.85);
+			opacity: 0.6;
+		}
+		100% {
+			transform: scale(1.2);
+			opacity: 1;
+		}
+	}
+
+	@keyframes bootFloatOrb1 {
+		0% {
+			transform: translate(0, 0) scale(1);
+		}
+		100% {
+			transform: translate(40px, 30px) scale(1.1);
+		}
+	}
+
+	@keyframes bootFloatOrb2 {
+		0% {
+			transform: translate(0, 0) scale(1);
+		}
+		100% {
+			transform: translate(-35px, -25px) scale(1.08);
+		}
+	}
+
+	@keyframes bootFloatOrb3 {
+		0% {
+			transform: translate(0, 0) scale(1);
+		}
+		100% {
+			transform: translate(25px, -35px) scale(1.05);
 		}
 	}
 

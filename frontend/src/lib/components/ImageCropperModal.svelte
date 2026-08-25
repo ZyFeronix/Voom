@@ -582,8 +582,8 @@
 		inset: 0;
 		z-index: var(--z-modal-backdrop, 500);
 		background: color-mix(in srgb, #000000 65%, transparent);
-		backdrop-filter: blur(16px) saturate(1.2);
-		-webkit-backdrop-filter: blur(16px) saturate(1.2);
+		backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
+		-webkit-backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -774,12 +774,14 @@
 		align-items: center;
 		gap: 8px;
 		background: rgba(0, 0, 0, 0.55);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
+		backdrop-filter: var(--glass-blur, blur(8px));
+		-webkit-backdrop-filter: var(--glass-blur, blur(8px));
 		border: 1px solid rgba(255, 255, 255, 0.25);
 		border-radius: var(--radius-full);
 		padding: 4px 10px 4px 4px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+		box-shadow:
+			0 2px 10px rgba(0, 0, 0, 0.15),
+			0 0 12px rgba(56, 189, 248, 0.25);
 	}
 
 	.silhouette-circle {
@@ -812,8 +814,8 @@
 
 	.grid-line {
 		position: absolute;
-		background: rgba(255, 255, 255, 0.3);
-		box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+		background: rgba(255, 255, 255, 0.35);
+		box-shadow: 0 0 4px rgba(0, 0, 0, 0.25);
 	}
 
 	.v-line {
@@ -837,7 +839,7 @@
 		border-style: solid;
 		pointer-events: none;
 		z-index: 2;
-		filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+		filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
 	}
 
 	.bracket-tl {
@@ -870,8 +872,8 @@
 		z-index: 3;
 		pointer-events: none;
 		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
+		backdrop-filter: var(--glass-blur, blur(6px));
+		-webkit-backdrop-filter: var(--glass-blur, blur(6px));
 		border: 1px solid rgba(255, 255, 255, 0.15);
 		border-radius: var(--radius-full);
 		padding: 3px 10px;
@@ -881,7 +883,9 @@
 		font-size: 0.72rem;
 		color: rgba(255, 255, 255, 0.9);
 		white-space: nowrap;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		box-shadow:
+			0 2px 8px rgba(0, 0, 0, 0.15),
+			0 0 8px rgba(56, 189, 248, 0.15);
 	}
 
 	.hint-icon {

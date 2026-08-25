@@ -43,7 +43,7 @@
 	let rvfcHandle = null;
 	let isPlaying = $state(false);
 	let currentTime = $state(0);
-	let volume = $state(1);
+	let volume = $state(0.5);
 	let isMuted = $state(false);
 	let playbackRate = $state(1.0);
 	let fitMode = $state('cover'); // 'cover' | 'contain'
@@ -1885,9 +1885,7 @@
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
-		box-shadow:
-			0 1px 0 var(--border-subtle),
-			0 4px 16px rgba(0, 0, 0, 0.03);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		position: relative;
 		z-index: 30;
 	}
@@ -3068,7 +3066,7 @@
 		display: flex;
 		flex-direction: column;
 		z-index: 20;
-		box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 	@media (max-width: 1024px) {
 		.editor-console-sidebar {

@@ -171,6 +171,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
+		border-radius: inherit;
 		z-index: 0;
 		background: var(--bg-surface-solid, rgba(15, 23, 42, 0.94));
 		backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
@@ -422,7 +423,7 @@
 		background: var(--bg-surface-hover);
 		border-color: var(--accent-blue-base);
 		color: var(--accent-blue-base);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+		box-shadow: var(--shadow-xs), var(--shadow-glow);
 	}
 
 	.msn-card-action-btn .material-icons-round {

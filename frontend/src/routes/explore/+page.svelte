@@ -454,7 +454,7 @@
 														muted
 														playsinline
 														preload="metadata"
-													/>
+													></video>
 												{/if}
 												<span class="reel-play">
 													<span class="material-icons-round">play_arrow</span>
@@ -1262,7 +1262,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		transition: transform var(--t-spring);
 	}
 

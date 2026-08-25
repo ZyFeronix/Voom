@@ -22,6 +22,9 @@ function parsePostMetadata(post) {
 			if (meta.location) {
 				post.location = meta.location;
 			}
+			if (meta.quote) {
+				post.quoted_post = meta.quote;
+			}
 		} catch (e) {
 			console.error('Failed to parse post metadata:', e);
 		}
@@ -46,7 +49,14 @@ export async function GET({ request, url }) {
 		let trending_tags = [];
 		try {
 			trending_tags = await db
-				.prepare('SELECT tag_name, post_count FROM hashtags ORDER BY post_count DESC LIMIT 20')
+				.prepare(
+					`SELECT ph.tag_name, COUNT(DISTINCT ph.post_id) AS post_count
+					FROM post_hashtags ph
+					JOIN posts p ON p.id = ph.post_id AND p.deleted_at IS NULL AND (p.status = 'published' OR p.status IS NULL) AND p.privacy = 'public'
+					JOIN users u ON u.id = p.user_id AND u.is_active = 1 AND u.is_banned = 0
+					GROUP BY ph.tag_name
+					ORDER BY post_count DESC, MAX(p.created_at) DESC LIMIT 20`
+				)
 				.all();
 		} catch {}
 		const featured_posts = await db
@@ -109,7 +119,13 @@ export async function GET({ request, url }) {
 		try {
 			results.hashtags = await db
 				.prepare(
-					'SELECT tag_name, post_count FROM hashtags WHERE tag_name LIKE ? ORDER BY post_count DESC LIMIT ?'
+					`SELECT ph.tag_name, COUNT(DISTINCT ph.post_id) AS post_count
+					FROM post_hashtags ph
+					JOIN posts p ON p.id = ph.post_id AND p.deleted_at IS NULL AND (p.status = 'published' OR p.status IS NULL) AND p.privacy = 'public'
+					JOIN users u ON u.id = p.user_id AND u.is_active = 1 AND u.is_banned = 0
+					WHERE ph.tag_name LIKE ?
+					GROUP BY ph.tag_name
+					ORDER BY post_count DESC, MAX(p.created_at) DESC LIMIT ?`
 				)
 				.all(like, limit);
 		} catch {

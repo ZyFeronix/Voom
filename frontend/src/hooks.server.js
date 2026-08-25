@@ -159,17 +159,55 @@ function startCrons() {
 
 			if (expired.length === 0) return;
 
-			// Limpiar ficheros de avatar/portada en disco antes de perder las URLs
+			// Recolectar TODOS los ficheros del usuario antes de perder las URLs:
+			// avatar/portada + media de posts + reels (video y thumbnail) + stories.
+			// Las filas se borran por ON DELETE CASCADE, pero los ficheros del disco
+			// quedarían huérfanos si no se eliminan explícitamente.
+			const fileUrls = [];
+			const collect = (url) => {
+				if (url && url.startsWith('/uploads/')) fileUrls.push(url);
+			};
+
+			const ph = expired.map(() => '?').join(',');
 			for (const u of expired) {
-				for (const url of [u.avatar_url, u.cover_url]) {
-					if (!url || !url.startsWith('/uploads/')) continue;
-					const sub = url.startsWith('/uploads/avatars/') ? 'avatars' : 'covers';
-					try {
-						const filePath = resolve(getUploadsDir(sub), basename(url));
-						if (existsSync(filePath)) unlinkSync(filePath);
-					} catch (_e) {
-						/* fichero ya ausente — ignorar */
-					}
+				collect(u.avatar_url);
+				collect(u.cover_url);
+			}
+
+			try {
+				const postMedia = await db
+					.prepare(
+						`SELECT pm.media_url AS url FROM post_media pm
+						 JOIN posts p ON p.id = pm.post_id WHERE p.user_id IN (${ph})`
+					)
+					.all(...expired.map((u) => u.id));
+				postMedia.forEach((r) => collect(r.url));
+
+				const reelMedia = await db
+					.prepare(`SELECT video_url, thumbnail_url FROM reels WHERE user_id IN (${ph})`)
+					.all(...expired.map((u) => u.id));
+				reelMedia.forEach((r) => {
+					collect(r.video_url);
+					collect(r.thumbnail_url);
+				});
+
+				const storyMedia = await db
+					.prepare(`SELECT media_url AS url FROM stories WHERE user_id IN (${ph})`)
+					.all(...expired.map((u) => u.id));
+				storyMedia.forEach((r) => collect(r.url));
+			} catch (_e) {
+				console.error('[cron] GDPR erasure: fallo recolectando media:', _e.message);
+			}
+
+			// Limpiar ficheros en disco antes de borrar las filas
+			for (const url of [...new Set(fileUrls)]) {
+				const m = url.match(/^\/uploads\/([^/]+)\//);
+				if (!m) continue;
+				try {
+					const filePath = resolve(getUploadsDir(m[1]), basename(url));
+					if (existsSync(filePath)) unlinkSync(filePath);
+				} catch (_e) {
+					/* fichero ya ausente — ignorar */
 				}
 			}
 
@@ -177,8 +215,8 @@ function startCrons() {
 			// messages, reacciones, follows, stories, reels, marketplace, gigs, activity_logs,
 			// notifications, oauth_accounts, check_ins, sesiones, ajustes, etc.
 			const ids = expired.map((u) => u.id);
-			const ph = ids.map(() => '?').join(',');
-			const result = await db.prepare(`DELETE FROM users WHERE id IN (${ph})`).run(...ids);
+			const delPh = ids.map(() => '?').join(',');
+			const result = await db.prepare(`DELETE FROM users WHERE id IN (${delPh})`).run(...ids);
 			console.log(
 				`[cron] GDPR erasure: hard-deleted ${result.changes} user(s) + cascaded records + orphaned files`
 			);
@@ -228,18 +266,71 @@ function startCrons() {
 		}
 	}, 86_400_000);
 
+	// ── 10. Activity Logs Retention (daily: purge records older than 90 days) ──
+	// Política formal de retención: evita crecimiento indefinido de activity_logs.
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			const result = await db
+				.prepare("DELETE FROM activity_logs WHERE created_at < datetime('now', '-90 days')")
+				.run();
+			if (result.changes > 0) {
+				console.log(
+					`[cron] Activity logs retention: purged ${result.changes} record(s) older than 90 days`
+				);
+			}
+		} catch (err) {
+			console.error('[cron] Activity logs retention error:', err.message);
+		}
+	}, 86_400_000);
+
+	// ── 11. Expired Sessions Cleanup (daily: remove expired user_sessions) ──
+	// Evita que la tabla user_sessions crezca indefinidamente con tokens vencidos.
+	setInterval(async () => {
+		try {
+			const db = getDb();
+			const result = await db
+				.prepare("DELETE FROM user_sessions WHERE expires_at < datetime('now')")
+				.run();
+			if (result.changes > 0) {
+				console.log(`[cron] Expired sessions: purged ${result.changes} session(s)`);
+			}
+		} catch (err) {
+			console.error('[cron] Expired sessions cleanup error:', err.message);
+		}
+	}, 86_400_000);
+
 	console.log('[boot] All cron workers started');
 }
 
 /** @type {import('@sveltejs/kit').Handle} */
 export async function handle({ event, resolve }) {
 	const { pathname } = event.url;
+	// ── Resolución de IP del cliente ──
+	// Por defecto SOLO se confía en la dirección del socket (getClientAddress):
+	// leer X-Forwarded-For sin control permite suplantar IPs y anular el rate
+	// limiter. Detrás de un reverse-proxy que no reescribe la IP del cliente,
+	// activa TRUST_PROXY=1. Se toma la entrada MÁS A LA DERECHA porque es la que
+	// añadió tu propio edge (la izquierda es suplantable por el cliente).
 	let clientIp = '127.0.0.1';
-	try {
-		clientIp = event.getClientAddress();
-	} catch (_e) {
+	const trustProxy = process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true';
+	if (trustProxy) {
 		const forwarded = event.request.headers.get('x-forwarded-for');
-		clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+		if (forwarded) {
+			const hops = forwarded
+				.split(',')
+				.map((h) => h.trim())
+				.filter(Boolean);
+			clientIp = hops[hops.length - 1] || clientIp;
+		} else {
+			try {
+				clientIp = event.getClientAddress();
+			} catch (_e) {}
+		}
+	} else {
+		try {
+			clientIp = event.getClientAddress();
+		} catch (_e) {}
 	}
 	const method = event.request.method;
 
@@ -418,6 +509,30 @@ export async function handle({ event, resolve }) {
 	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload'); // Fuerza HTTPS
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self)');
+
+	// ── 3b. Content-Security-Policy ──
+	// Permite: recursos del mismo origen (fuentes autoalojadas en /fonts) +
+	// Socket.IO inline; bloquea inline eval, iframes externos y objetos embebidos.
+	// 'unsafe-inline' en style-src es necesario para Svelte SSR + backdrop-filter.
+	// Ajustar connect-src si se despliega con dominio custom (añadir wss://dominio.com).
+	const cspDirectives = [
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline'", // unsafe-inline requerido por SvelteKit SSR + hydratación
+		"style-src 'self' 'unsafe-inline'",
+		"font-src 'self'",
+		"img-src 'self' data: blob: https:",
+		"media-src 'self' blob:",
+		"connect-src 'self' ws: wss:", // WebSocket para Socket.IO
+		"frame-ancestors 'none'", // refuerza X-Frame-Options
+		"object-src 'none'",
+		"base-uri 'self'",
+		"form-action 'self'"
+	].join('; ');
+	// Solo aplicar CSP en respuestas HTML (no en JSON de la API ni assets)
+	const ct = response.headers.get('content-type') || '';
+	if (ct.includes('text/html')) {
+		response.headers.set('Content-Security-Policy', cspDirectives);
+	}
 
 	// ── Start crons on first request ──
 	if (!cronsStarted) {

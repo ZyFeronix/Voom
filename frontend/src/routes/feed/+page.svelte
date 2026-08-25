@@ -11,18 +11,18 @@
 		posts as postsApi
 	} from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import PostCard from '$lib/components/PostCard.svelte';
-	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import QuickChatWidget from '$lib/components/QuickChatWidget.svelte';
 	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
 	import KlipyPicker from '$lib/components/KlipyPicker.svelte';
 	import HashtagTextarea from '$lib/components/HashtagTextarea.svelte';
 	import CheckinButton from '$lib/components/gamification/CheckinButton.svelte';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 	import { compressImage } from '$lib/utils/imageCompression.js';
 	import VoiceRecorder from '$lib/components/VoiceRecorder.svelte';
 	import { getProxiedMediaUrl } from '$lib/utils/mediaProxy.js';
-	import AnonIdentityModal from '$lib/components/AnonIdentityModal.svelte';
-	import { getAnonIdentity } from '$lib/stores/anonIdentity.svelte.js';
 
 	// ── Runes State ──────────────────────────────────────────────────────────
 	let { data: _data } = $props();
@@ -41,8 +41,6 @@
 		custom: '¿Qué está pasando en tu mundo virtual hoy?'
 	};
 	let composerPlaceholder = $derived(MODE_PLACEHOLDERS[platformMode] || MODE_PLACEHOLDERS.custom);
-	let scrollY = $state(0);
-	let innerWidth = $state(1024);
 	let leftColHeight = $state(0);
 
 	let posts = $state([]);
@@ -59,6 +57,13 @@
 		}
 		return list;
 	});
+
+	function formatFollowerCount(count) {
+		if (!count && count !== 0) return '';
+		if (count >= 1000000) return `${(count / 1000000).toFixed(1).replace(/\.0$/, '')}M`;
+		if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+		return count.toString();
+	}
 	let activeStories = $state([]);
 	let trendingTags = $state([]);
 
@@ -67,6 +72,21 @@
 	let cursor = $state('');
 	let hasMore = $state(true);
 	let newPostText = $state('');
+	let composerFocused = $state(false);
+	let composerCardRef = $state(null);
+	let composerExpanded = $derived(
+		composerFocused ||
+			newPostText.trim().length > 0 ||
+			selectedFiles.length > 0 ||
+			!!attachedGif ||
+			!!attachedVoiceNote ||
+			pollAttached ||
+			showMediaModal ||
+			showEmojis ||
+			showGifModal ||
+			showPollModal ||
+			showVoiceModal
+	);
 	let posting = $state(false);
 	let postError = $state('');
 	let globalFeedMode = $state('intelligent');
@@ -89,7 +109,7 @@
 			name: 'Eco Balance',
 			icon: 'eco',
 			tag: 'Recomendado',
-			desc: 'Equilibrio armónico y orgánico entre novedad, tus gustos y diversidad.',
+			desc: 'Equilibrio orgánico entre lo nuevo, tus intereses y la variedad: un feed sereno y natural, sin ruido ni excesos.',
 			mode: 'intelligent',
 			weights: {
 				interests: 50,
@@ -106,7 +126,7 @@
 			name: 'Radar / Fresco',
 			icon: 'schedule',
 			tag: 'Cronológico',
-			desc: 'Línea de tiempo cronológica en tiempo real con máxima frescura.',
+			desc: 'Todo en orden cronológico y en tiempo real: lo último de tus contactos y comunidades, sin filtros de algoritmo.',
 			mode: 'radar',
 			weights: {
 				interests: 20,
@@ -123,7 +143,7 @@
 			name: 'Inteligente AI',
 			icon: 'auto_awesome',
 			tag: 'Predictivo',
-			desc: 'Optimizado según tus interacciones y afinidad con creadores.',
+			desc: 'Aprende de tus likes, comentarios y creadores favoritos para mostrarte primero lo que realmente te importa.',
 			mode: 'intelligent',
 			weights: {
 				interests: 80,
@@ -140,7 +160,7 @@
 			name: 'Tendencias & Viral',
 			icon: 'local_fire_department',
 			tag: 'Popular',
-			desc: 'Lo más comentado, votado y compartido de la comunidad.',
+			desc: 'Sube el volumen de la conversación: lo más comentado, votado y compartido, con el pulso del momento.',
 			mode: 'intelligent',
 			weights: {
 				interests: 35,
@@ -151,6 +171,45 @@
 				diversity: 30
 			},
 			color: '#f59e0b'
+		}
+	];
+
+	const WEIGHT_STATS = [
+		{
+			id: 'interests',
+			label: 'Intereses / Temas',
+			color: '#06B6D4',
+			desc: 'Más contenido sobre los temas y hashtags que sigues.'
+		},
+		{
+			id: 'interactions',
+			label: 'Interacción / Likes',
+			color: '#10B981',
+			desc: 'Prioriza lo que reaccionas, comentas o guardas.'
+		},
+		{
+			id: 'social',
+			label: 'Círculo Social',
+			color: '#8B5CF6',
+			desc: 'Más publicaciones de tus amigos, seguidos y grupos.'
+		},
+		{
+			id: 'popularity',
+			label: 'Popularidad / Viral',
+			color: '#F59E0B',
+			desc: 'Lo que está en tendencia y más se comparte.'
+		},
+		{
+			id: 'recency',
+			label: 'Novedad / Reciente',
+			color: '#3B82F6',
+			desc: 'Contenido fresco y recién publicado.'
+		},
+		{
+			id: 'diversity',
+			label: 'Diversidad / Descubrimiento',
+			color: '#EC4899',
+			desc: 'Nuevos creadores y temas fuera de tu burbuja.'
 		}
 	];
 
@@ -175,56 +234,20 @@
 
 	// Tabs and attachments
 	let activeFeedArea = $state('all'); // 'all' (Para Ti), 'following' (Siguiendo), 'anonymous' (Rincón Anónimo)
-	let isAnonymousPost = $state(false);
 	let attachedGif = $state('');
-	let attachedMusic = $state(null);
 	let pollAttached = $state(false);
 	let pollQuestion = $state('');
 	let pollOptions = $state(['', '']);
 
-	let myAnonUsername = $state(null);
-	let anonIdentityLoaded = $state(false);
-	let showAnonIdentityModal = $state(false);
-	let pendingAnonPublish = $state(false);
-
-	async function ensureAnonIdentity() {
-		if (!anonIdentityLoaded) {
-			const ident = await getAnonIdentity();
-			myAnonUsername = ident?.anon_username || null;
-			anonIdentityLoaded = true;
-		}
-		return myAnonUsername;
-	}
-
-	// Activa el modo anónimo (pide la identidad anónima permanente la primera vez)
-	async function enableAnonMode() {
-		const ident = await ensureAnonIdentity();
-		if (!ident) {
-			pendingAnonPublish = false;
-			showAnonIdentityModal = true;
-			return;
-		}
-		isAnonymousPost = true;
-	}
-
 	function setFeedArea(area) {
 		if (activeFeedArea === area) return;
 		activeFeedArea = area;
-		if (area === 'anonymous') {
-			isAnonymousPost = true;
-			ensureAnonIdentity().then((ident) => {
-				if (!ident) {
-					showAnonIdentityModal = true;
-				}
-			});
-		}
 		loadPosts(true);
 	}
 
 	// Quick Post Modals & Pickers
 	let showEmojis = $state(false);
 	let showPollModal = $state(false);
-	let showMusicModal = $state(false);
 	let showGifModal = $state(false);
 	let showMediaModal = $state(false);
 	let showVoiceModal = $state(false);
@@ -314,11 +337,70 @@
 		};
 		document.addEventListener('visibilitychange', onVisibilityChange);
 
+		const handleClickOutsideComposer = (e) => {
+			if (
+				!composerFocused &&
+				!showEmojis &&
+				!showGifModal &&
+				!showMediaModal &&
+				!showPollModal &&
+				!showVoiceModal
+			) {
+				return;
+			}
+			if (composerCardRef && !composerCardRef.contains(e.target)) {
+				composerFocused = false;
+				if (
+					!newPostText.trim() &&
+					selectedFiles.length === 0 &&
+					!attachedGif &&
+					!attachedVoiceNote &&
+					!pollAttached
+				) {
+					showEmojis = false;
+					showGifModal = false;
+					showMediaModal = false;
+					showPollModal = false;
+					showVoiceModal = false;
+				}
+			}
+		};
+		document.addEventListener('pointerdown', handleClickOutsideComposer);
+
+		const handleFocusComposer = () => {
+			composerFocused = true;
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+			setTimeout(() => {
+				document.getElementById('new_post_text')?.focus();
+			}, 150);
+		};
+
+		const handleOpenStoryUpload = () => {
+			showStoryCaptionModal = true;
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+			setTimeout(() => {
+				if (storyFileInput) storyFileInput.click();
+			}, 150);
+		};
+
+		window.addEventListener('focus_feed_composer', handleFocusComposer);
+		window.addEventListener('open_story_upload', handleOpenStoryUpload);
+
+		if (
+			page.url.searchParams.get('focus') === '1' ||
+			page.url.searchParams.get('focus_composer') === '1'
+		) {
+			handleFocusComposer();
+		}
+
 		return () => {
 			clearInterval(storyInterval);
 			clearInterval(pollInterval);
 			clearInterval(sugRotationInterval);
 			document.removeEventListener('visibilitychange', onVisibilityChange);
+			window.removeEventListener('focus_feed_composer', handleFocusComposer);
+			window.removeEventListener('open_story_upload', handleOpenStoryUpload);
+			document.removeEventListener('pointerdown', handleClickOutsideComposer);
 		};
 	});
 
@@ -496,7 +578,7 @@
 	}
 
 	async function handleCheckin() {
-		if (checkinLoading) return;
+		if (checkinLoading) return null;
 		checkinLoading = true;
 		try {
 			const res = await fetch('/api/gamification/checkin', {
@@ -508,20 +590,34 @@
 			});
 			const data = await res.json();
 			if (data.success) {
-				checkinState = {
-					canCheckin: false,
-					nextCheckin: data.nextCheckinAt,
-					streak: data.newStreak,
-					loaded: true
-				};
+				// Permitir que la animación de explosión y celebración se reproduzca
+				// antes de desmontar el contenedor en el feed
+				setTimeout(() => {
+					checkinState = {
+						canCheckin: false,
+						nextCheckin: data.nextCheckinAt,
+						streak: data.newStreak,
+						loaded: true
+					};
+				}, 2800);
+
 				if (data.leveledUp) {
-					alert(`¡Felicidades! Has subido al nivel ${data.newLevel}`);
+					setTimeout(() => {
+						uiStore.showLevelUp({
+							level: data.newLevel,
+							xpGained: data.xpAwarded,
+							message: `¡Increíble! Tu racha diaria te ha llevado al Nivel ${data.newLevel} en V-SOCIAL.`
+						});
+					}, 1600);
 				}
+				return data;
 			} else {
-				alert(data.message || 'Error en check-in');
+				console.warn('[Checkin]', data.message);
+				return data;
 			}
 		} catch (_err) {
-			alert('Error de conexión al procesar check-in');
+			console.error('[Checkin Error]', _err);
+			return { success: false, message: 'Error de conexión al procesar check-in' };
 		} finally {
 			checkinLoading = false;
 		}
@@ -541,15 +637,6 @@
 			!attachedGif
 		)
 			return;
-
-		if (isAnonymousPost) {
-			const ident = await ensureAnonIdentity();
-			if (!ident) {
-				pendingAnonPublish = true;
-				showAnonIdentityModal = true;
-				return;
-			}
-		}
 
 		posting = true;
 		postError = '';
@@ -573,14 +660,10 @@
 			if (attachedGif) {
 				uploadedMedia.push({ url: attachedGif, type: 'image' });
 			}
-			if (attachedMusic) {
-				finalBody += `\n🎵 Escuchando: ${attachedMusic.title} - ${attachedMusic.artist}`;
-			}
 
 			const payload = {
 				body: finalBody,
-				media_urls: uploadedMedia,
-				is_anonymous: isAnonymousPost ? 1 : 0
+				media_urls: uploadedMedia
 			};
 
 			if (pollAttached && pollQuestion.trim() && pollOptions.filter((o) => o.trim()).length >= 2) {
@@ -591,39 +674,29 @@
 			}
 
 			await postsApi.create(payload);
-			if (isAnonymousPost && activeFeedArea === 'following') {
-				setFeedArea('anonymous');
-			} else {
+			if (posts.length === 0) {
 				await loadPosts(true);
+			} else {
+				await pollNewPosts();
 			}
 
 			// Reset
 			newPostText = '';
-			if (activeFeedArea !== 'anonymous') {
-				isAnonymousPost = false;
-			}
 			selectedFiles.forEach((item) => {
 				if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
 			});
 			selectedFiles = [];
 			attachedGif = '';
-			attachedMusic = null;
 			pollAttached = false;
 			pollQuestion = '';
 			pollOptions = ['', ''];
-			showMusicModal = false;
 			showPollModal = false;
 			showEmojis = false;
 			showMediaModal = false;
 			showVoiceModal = false;
 			attachedVoiceNote = null;
 		} catch (err) {
-			if (err?.code === 'ANON_IDENTITY_REQUIRED' || err?.message?.includes('identidad anónima')) {
-				pendingAnonPublish = true;
-				showAnonIdentityModal = true;
-			} else {
-				postError = err?.message ?? 'Error al publicar. Inténtalo de nuevo.';
-			}
+			postError = err?.message ?? 'Error al publicar. Inténtalo de nuevo.';
 		} finally {
 			posting = false;
 		}
@@ -633,7 +706,6 @@
 		showMediaModal = !showMediaModal;
 		if (showMediaModal) {
 			showGifModal = false;
-			showMusicModal = false;
 			showPollModal = false;
 			showEmojis = false;
 			showVoiceModal = false;
@@ -645,7 +717,6 @@
 		if (showVoiceModal) {
 			showMediaModal = false;
 			showGifModal = false;
-			showMusicModal = false;
 			showPollModal = false;
 			showEmojis = false;
 		}
@@ -655,7 +726,6 @@
 		showGifModal = !showGifModal;
 		if (showGifModal) {
 			showMediaModal = false;
-			showMusicModal = false;
 			showPollModal = false;
 			showEmojis = false;
 			showVoiceModal = false;
@@ -667,7 +737,6 @@
 		if (showPollModal) {
 			showMediaModal = false;
 			showGifModal = false;
-			showMusicModal = false;
 			showEmojis = false;
 			showVoiceModal = false;
 		}
@@ -678,7 +747,6 @@
 		if (showEmojis) {
 			showMediaModal = false;
 			showGifModal = false;
-			showMusicModal = false;
 			showPollModal = false;
 			showVoiceModal = false;
 		}
@@ -703,11 +771,29 @@
 		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
 			e.preventDefault();
 			handleCreatePost(e);
+		} else if (e.key === 'Escape') {
+			if (
+				!newPostText.trim() &&
+				selectedFiles.length === 0 &&
+				!attachedGif &&
+				!attachedVoiceNote &&
+				!pollAttached
+			) {
+				composerFocused = false;
+				showEmojis = false;
+				showGifModal = false;
+				showMediaModal = false;
+				showPollModal = false;
+				showVoiceModal = false;
+				e.target?.blur?.();
+			}
 		}
 	}
 
-	async function handleFileSelect(e) {
-		const files = Array.from(e.target.files);
+	// Procesa (y comprime) cualquier lote de archivos y los añade a la cola de adjuntos
+	async function processMediaFiles(fileList) {
+		const files = Array.from(fileList || []);
+		if (!files.length) return;
 		// Comprimir todas las imagenes concurrentemente
 		const processed = await Promise.all(
 			files.map(async (file) => {
@@ -721,8 +807,41 @@
 			})
 		);
 		selectedFiles = [...selectedFiles, ...processed];
+	}
+
+	async function handleFileSelect(e) {
+		await processMediaFiles(e.target.files);
 		showMediaModal = false;
 		if (e.target) e.target.value = '';
+	}
+
+	// ── Drag & Drop directo sobre el compositor ───────────────────────────────
+	let composerDragOver = $state(false);
+
+	function handleComposerDragEnter(e) {
+		e.preventDefault();
+		composerDragOver = true;
+	}
+
+	function handleComposerDragOver(e) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+		composerDragOver = true;
+	}
+
+	function handleComposerDragLeave(e) {
+		// Solo se oculta cuando el puntero sale realmente del compositor
+		if (!e.currentTarget.contains(e.relatedTarget)) {
+			composerDragOver = false;
+		}
+	}
+
+	async function handleComposerDrop(e) {
+		e.preventDefault();
+		composerDragOver = false;
+		if (e.dataTransfer?.files?.length) {
+			await processMediaFiles(e.dataTransfer.files);
+		}
 	}
 
 	function removeSelectedFile(idx) {
@@ -985,18 +1104,106 @@
 			isRotatingSug = false;
 		}, 400);
 	}
+
+	/* ── Snapshot: al navegar a un post y volver con el botón atrás, el feed
+	   se restaura tal como estaba (posts cargados, cursor, pestaña activa y
+	   modo de algoritmo) sin perder lo que ya se había visto. Se guardan
+	   copias planas porque history.state se clona estructurado. */
+	export const snapshot = {
+		capture: () => ({
+			posts: [...posts],
+			hasMore,
+			cursor,
+			activeFeedArea,
+			globalFeedMode,
+			userWeights: { ...userWeights }
+		}),
+		restore: (value) => {
+			if (!value) return;
+			posts = Array.isArray(value.posts) ? value.posts : [];
+			hasMore = value.hasMore ?? true;
+			cursor = value.cursor ?? '';
+			activeFeedArea = value.activeFeedArea ?? 'all';
+			globalFeedMode = value.globalFeedMode ?? 'intelligent';
+			if (value.userWeights) userWeights = value.userWeights;
+		}
+	};
 </script>
 
 <svelte:head>
 	<title>Feed - VSocial</title>
 </svelte:head>
 
-<svelte:window bind:scrollY bind:innerWidth />
+<div class="feed-shell mx-auto px-4 lg:px-8 pt-3 pb-6">
+	<!-- ═══════════════════════════════════════════════════════════
+	     BANDA DE FILTRADO — tabs (Para Ti / Siguiendo / Rincón Anónimo)
+	     + sintonizador de algoritmo. Banda horizontal dedicada entre el
+	     Top Header y la columna central de contenido.
+	     ═══════════════════════════════════════════════════════════ -->
+	<nav class="feed-filter-band hide-scrollbar" aria-label="Filtros del feed">
+		<button
+			type="button"
+			class="feed-area-btn"
+			class:active={activeFeedArea === 'all'}
+			onclick={() => setFeedArea('all')}
+			aria-pressed={activeFeedArea === 'all'}
+		>
+			<span class="material-icons-round text-base tab-icon">auto_awesome</span>
+			<span>Para Ti</span>
+		</button>
+		<button
+			type="button"
+			class="feed-area-btn feed-area-following"
+			class:active={activeFeedArea === 'following'}
+			onclick={() => setFeedArea('following')}
+			aria-pressed={activeFeedArea === 'following'}
+		>
+			<span class="material-icons-round text-base tab-icon">people</span>
+			<span>Siguiendo</span>
+		</button>
+		<button
+			type="button"
+			class="feed-area-btn feed-area-anon"
+			class:active={activeFeedArea === 'anonymous'}
+			onclick={() => setFeedArea('anonymous')}
+			aria-pressed={activeFeedArea === 'anonymous'}
+		>
+			<span class="material-icons-round text-base tab-icon">theater_comedy</span>
+			<span>Rincón Anónimo</span>
+			<span class="anon-mini-badge hidden sm:inline-flex">Anónimo</span>
+		</button>
 
-<div class="feed-shell mx-auto px-4 lg:px-8 py-6">
-	<div class="feed-grid grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
+		<div class="feed-nav-divider" aria-hidden="true"></div>
+
+		<!-- Frutiger Aqua Algorithm Quick Pill -->
+		<button
+			type="button"
+			class="aqua-algo-btn"
+			class:active={showAlgorithmModal}
+			onclick={() => (showAlgorithmModal = true)}
+			title="Sintonizador de Algoritmo (Frutiger Aqua/Eco)"
+		>
+			<span class="material-icons-round text-base aqua-icon">water_drop</span>
+			<span class="hidden sm:inline">Algoritmo</span>
+			<span class="aqua-chip-badge">
+				{#if globalFeedMode === 'radar'}
+					Radar
+				{:else if userWeights.recency >= 80}
+					Fresco
+				{:else if userWeights.popularity >= 75}
+					Viral
+				{:else if userWeights.interests >= 70}
+					AI
+				{:else}
+					Eco
+				{/if}
+			</span>
+		</button>
+	</nav>
+
+	<div class="feed-grid items-stretch">
 		<!-- Left Column (Quick Chat & Footer Links - Rock-Solid & Stable) -->
-		<div class="feed-col-left hidden lg:block lg:col-span-3 h-full">
+		<div class="feed-col-left quick-chat-column h-full flex-shrink-0">
 			<div
 				bind:clientHeight={leftColHeight}
 				class="sticky transition-all duration-300 ease-in-out space-y-4"
@@ -1029,9 +1236,9 @@
 		</div>
 
 		<!-- Center Column (Feed posts & Create Box) -->
-		<div class="feed-col-center col-span-1 lg:col-span-6 space-y-4">
+		<div class="feed-col-center feed-main-column space-y-4 min-w-0">
 			<div
-				class="transition-all duration-500 ease-in-out overflow-hidden {storiesEnabled
+				class="stories-container-wrap transition-all duration-500 ease-in-out overflow-hidden {storiesEnabled
 					? ''
 					: 'pointer-events-none'}"
 				style="max-height: {storiesEnabled
@@ -1042,9 +1249,9 @@
 					? '1.5rem'
 					: '0'};"
 			>
-				<!-- Stories bar -->
+				<!-- Stories bar: contenedores orgánicos, bordes suavizados (Frutiger Aqua) -->
 				<div
-					class="glass-panel p-4 overflow-x-auto flex gap-3 items-center hide-scrollbar"
+					class="glass-panel stories-bar story-slider horizontal-wheel-slider p-4 overflow-x-auto flex gap-4 items-center hide-scrollbar"
 					style="scroll-snap-type: x mandatory;"
 				>
 					<!-- Create Story slot -->
@@ -1055,8 +1262,8 @@
 							storyCaptionText = '';
 						}}
 						disabled={uploadingStory}
-						class="relative flex-shrink-0 cursor-pointer focus:outline-none group shadow-lg hover:shadow-cyan-500/20 transition-all duration-300"
-						style="flex: 0 0 110px; width: 110px; height: 160px; scroll-snap-align: start; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--glass-border); background-color: var(--bg-surface);"
+						class="story-create-card relative flex-shrink-0 cursor-pointer focus:outline-none group transition-all duration-300"
+						style="flex: 0 0 112px; width: 112px; height: 162px; scroll-snap-align: start; border-radius: var(--radius-xl); overflow: hidden; border: 1px solid var(--border-glass); background-color: var(--bg-surface); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);"
 					>
 						<!-- Top area: User's Profile Picture -->
 						<div
@@ -1086,17 +1293,18 @@
 
 						<!-- Bottom area: Solid dark with text -->
 						<div
-							style="position: absolute; bottom: 0; left: 0; right: 0; height: 50px; background-color: var(--bg-surface); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 8px;"
+							style="position: absolute; bottom: 0; left: 0; right: 0; height: 54px; background-color: var(--bg-surface); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 6px 6px;"
 						>
-							<span style="font-size: 11px; font-weight: bold; color: var(--text-primary);"
+							<span
+								style="font-size: 10.5px; font-weight: bold; color: var(--text-primary); text-align: center; line-height: 1.3;"
 								>Crear Historia</span
 							>
 						</div>
 
-						<!-- The Floating '+' Button -->
+						<!-- The Floating '+' Button (glow cyan controlado, gradiente premium) -->
 						<div
-							style="position: absolute; top: 94px; left: 50%; transform: translateX(-50%); width: 32px; height: 32px; border-radius: var(--radius-squircle); corner-shape: squircle; background: var(--grad-primary, linear-gradient(to top right, #22d3ee, #3b82f6)); border: 3px solid var(--bg-surface); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.4); z-index: 10;"
-							class="group-hover:scale-110 transition-transform duration-300"
+							class="story-plus-btn"
+							style="position: absolute; top: 94px; left: 50%; transform: translateX(-50%); width: 32px; height: 32px; border-radius: var(--radius-squircle); corner-shape: squircle; background: var(--grad-primary, linear-gradient(to top right, #22d3ee, #3b82f6)); border: 3px solid var(--bg-surface); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm), 0 0 12px rgba(34, 211, 238, 0.45); z-index: 10; transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease-out);"
 						>
 							<span
 								class="material-icons-round"
@@ -1125,8 +1333,8 @@
 					{#each activeStories as userStory}
 						<button
 							onclick={() => openStory(userStory)}
-							class="relative flex-shrink-0 rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-cyan-400/50 hover:-translate-y-1 transition-all duration-300 focus:outline-none group shadow-lg"
-							style="flex: 0 0 110px; width: 110px; height: 160px; scroll-snap-align: start;"
+							class="story-card relative flex-shrink-0 overflow-hidden cursor-pointer hover:border-cyan-400/50 hover:-translate-y-1 transition-all duration-300 focus:outline-none group"
+							style="flex: 0 0 112px; width: 112px; height: 162px; scroll-snap-align: start;"
 						>
 							<!-- Background Media -->
 							{#if userStory.items && userStory.items.length > 0 && userStory.items[0].media_url}
@@ -1184,7 +1392,7 @@
 								style="position: absolute; bottom: 12px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; z-index: 10; padding: 0 8px;"
 							>
 								<div
-									style="width: 36px; height: 36px; border-radius: var(--radius-squircle); corner-shape: squircle; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); box-shadow: 0 2px 8px rgba(0,0,0,0.5); background: var(--grad-primary, linear-gradient(to top right, #22d3ee, #3b82f6));"
+									style="width: 36px; height: 36px; border-radius: var(--radius-squircle); corner-shape: squircle; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); box-shadow: var(--shadow-sm), var(--shadow-glow); background: var(--grad-primary, linear-gradient(to top right, #22d3ee, #3b82f6));"
 								>
 									{#if userStory.avatar_url}
 										<img
@@ -1211,6 +1419,35 @@
 							</div>
 						</button>
 					{/each}
+
+					<!-- Slots placeholder vacíos para completar la fila -->
+					{#each Array(Math.max(0, 3 - activeStories.length)) as _, idx}
+						<div class="story-slot-placeholder slot-ph-{idx + 1}" aria-hidden="true">
+							<div
+								style="width: 40px; height: 40px; border-radius: var(--radius-squircle); corner-shape: squircle; background: var(--bg-surface); display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--border-subtle); box-shadow: inset 0 2px 4px rgba(255,255,255,0.4);"
+							>
+								<span
+									class="material-icons-round"
+									style="font-size: 20px; color: var(--text-tertiary); opacity: 0.55;"
+									>person_outline</span
+								>
+							</div>
+							<div
+								style="display: flex; flex-direction: column; align-items: center; padding: 0 6px;"
+							>
+								<span
+									style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-align: center; line-height: 1.2;"
+								>
+									Amigos
+								</span>
+								<span
+									style="font-size: 9px; font-weight: 500; color: var(--text-tertiary); text-align: center; opacity: 0.85; margin-top: 2px;"
+								>
+									Sin historias
+								</span>
+							</div>
+						</div>
+					{/each}
 				</div>
 
 				<!-- Story Caption Inline Panel -->
@@ -1218,7 +1455,7 @@
 					<div
 						transition:slide={{ duration: 400, easing: expoOut }}
 						class="dropdown-panel mt-2"
-						style="min-height: max-content; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); background: var(--bg-surface2); padding: 16px; width: 100%; box-shadow: 0 16px 48px rgba(0,0,0,0.25);"
+						style="min-height: max-content; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); background: var(--bg-surface2); padding: 16px; width: 100%; box-shadow: var(--shadow-lg), var(--shadow-glow);"
 					>
 						<div class="panel-header flex justify-between items-center mb-4">
 							<h3 class="text-xs font-bold uppercase text-muted flex items-center gap-2">
@@ -1325,386 +1562,337 @@
 				{/if}
 			</div>
 
-			<!-- Create Post Box / Modern Creator Studio -->
+			<!-- Create Post Box -->
 			{#if authStore.isAuthenticated}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 				<div
-					class="composer-card p-4 sm:p-5 mb-5 relative"
-					style="position: relative; z-index: {showEmojis ||
-					showGifModal ||
-					showMediaModal ||
-					showMusicModal ||
-					showPollModal ||
-					showVoiceModal
-						? 50
-						: 10};"
+					bind:this={composerCardRef}
+					class="composer-card p-4 sm:p-5 mb-4 relative {composerDragOver
+						? 'drag-over'
+						: ''} {composerExpanded ? 'expanded' : 'compact'}"
+					style="container-type: inline-size; z-index: {showEmojis || showGifModal ? 50 : 10};"
+					ondragenter={handleComposerDragEnter}
+					ondragover={handleComposerDragOver}
+					ondragleave={handleComposerDragLeave}
+					ondrop={handleComposerDrop}
+					onclick={() => {
+						composerFocused = true;
+					}}
+					role="region"
+					aria-label="Crear publicación"
 				>
+					{#if composerDragOver}
+						<div class="composer-drag-overlay">
+							<div class="composer-drag-badge">
+								<span class="material-icons-round">cloud_upload</span>
+								<span>Suelta los archivos aquí para adjuntarlos</span>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Anonymous mode indicator banner if active -->
+					{#if activeFeedArea === 'anonymous'}
+						<div
+							class="anon-active-tag inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-3"
+						>
+							<span class="anon-pulse-dot"></span>
+							<span class="material-icons-round text-xs">visibility_off</span>
+							<span>Publicando de forma 100% Anónima</span>
+						</div>
+					{/if}
+
 					<form onsubmit={handleCreatePost} class="flex flex-col">
 						{#if postError}
 							<div
 								class="flex items-start gap-2 p-3 rounded-xl error-banner text-xs font-semibold mb-3"
+								transition:slide={{ duration: 250 }}
 							>
 								<span class="material-icons-round text-sm shrink-0">error_outline</span>
 								<span>{postError}</span>
 							</div>
 						{/if}
 
-						{#if isAnonymousPost}
-							<div
-								class="anon-mode-pill flex items-center justify-between p-2.5 rounded-xl mb-3"
-								transition:slide={{ duration: 300 }}
-							>
-								<div class="flex items-center gap-2 text-xs font-semibold">
-									<span class="material-icons-round anon-icon text-base">theater_comedy</span>
-									<span class="anon-mode-text">
-										<strong>Modo Anónimo Activo:</strong> Tu nombre y avatar no serán visibles para la
-										comunidad.
-									</span>
+						<div class="flex gap-3">
+							<!-- User / Anon Avatar -->
+							{#if activeFeedArea === 'anonymous'}
+								<div class="anon-composer-avatar shrink-0" title="Modo Anónimo">
+									<span class="material-icons-round text-lg">visibility_off</span>
 								</div>
-								{#if myAnonUsername}
-									<span class="anon-composer-identity" title="Tu identidad anónima permanente">
-										<span class="material-icons-round" style="font-size:13px">masks</span>
-										Publicarás como @{myAnonUsername}
-									</span>
-								{/if}
-								<button
-									type="button"
-									class="anon-mode-deactivate"
-									onclick={() => (isAnonymousPost = false)}
-								>
-									Desactivar
-								</button>
-							</div>
-						{/if}
-
-						<!-- Composer Header: User identity + Privacy Selector -->
-						<div class="composer-user-row flex items-center justify-between gap-3 mb-3">
-							<div class="flex items-center gap-3">
-								{#if isAnonymousPost}
-									<div
-										class="anon-composer-avatar"
-										title="Modo Anónimo Activo"
-										style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
-									>
-										<span class="material-icons-round text-lg">visibility_off</span>
-									</div>
-								{:else if authStore.user?.avatar_url}
-									<img
-										src={authStore.user.avatar_url}
-										alt={authStore.user.username}
-										class="composer-user-avatar w-11 h-11 squircle object-cover"
-										style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
-										width="44"
-										height="44"
-										loading="lazy"
-										decoding="async"
-									/>
-								{:else}
-									<div
-										class="vs-avatar-letter avatar-md composer-user-avatar"
-										style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
-									>
-										{(authStore.user?.display_name ||
-											authStore.user?.username ||
-											'?')[0].toUpperCase()}
-									</div>
-								{/if}
-
-								<div class="flex flex-col">
-									<div class="flex items-center gap-1.5 font-bold text-xs text-main">
-										{#if isAnonymousPost}
-											<span class="anon-user-title">Publicación Anónima</span>
-										{:else}
-											<span class="truncate max-w-[180px] sm:max-w-[240px]">
-												{authStore.user?.display_name || authStore.user?.username}
-											</span>
-											{#if authStore.user?.is_verified}
-												<VerifiedBadge />
-											{/if}
-										{/if}
-									</div>
-
-									<button
-										type="button"
-										class="composer-privacy-btn flex items-center gap-1 mt-0.5"
-										class:anon={isAnonymousPost}
-										onclick={() => (isAnonymousPost ? (isAnonymousPost = false) : enableAnonMode())}
-										title="Alternar entre modo Público y Anónimo"
-									>
-										{#if isAnonymousPost}
-											<span class="material-icons-round text-[13px] anon-privacy-icon"
-												>theater_comedy</span
-											>
-											<span>100% Anónimo</span>
-										{:else}
-											<span class="material-icons-round text-[13px] text-cyan-400">public</span>
-											<span>Público</span>
-										{/if}
-										<span class="material-icons-round text-[13px] opacity-60">swap_horiz</span>
-									</button>
-								</div>
-							</div>
-
-							{#if isAnonymousPost}
-								<div
-									class="anon-active-tag hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
-								>
-									<span class="anon-pulse-dot"></span>
-									<span>Secreto</span>
-								</div>
-							{/if}
-						</div>
-
-						<!-- Input Box -->
-						<div class="composer-input-wrapper mb-3">
-							<HashtagTextarea
-								id="new_post_text"
-								bind:value={newPostText}
-								onkeydown={handleKeyDown}
-								placeholder={isAnonymousPost
-									? '¿Qué secreto o confesión quieres compartir anónimamente?'
-									: composerPlaceholder}
-								rows={3}
-								class="feed-post-composer-input"
-							/>
-						</div>
-
-						<!-- Attachments Display -->
-						{#if attachedGif}
-							<div
-								class="gif-attachment-preview self-start mb-3"
-								transition:slide={{ duration: 300, easing: expoOut }}
-							>
+							{:else if authStore.user?.avatar_url}
 								<img
-									src={getProxiedMediaUrl(attachedGif)}
-									alt="GIF adjunto"
-									class="gif-attachment-thumb"
-									width="220"
-									height="160"
+									src={authStore.user.avatar_url}
+									alt={authStore.user.username}
+									class="w-10 h-10 rounded-full object-cover composer-user-avatar shrink-0"
+									width="40"
+									height="40"
 									loading="lazy"
 									decoding="async"
-									crossorigin="anonymous"
-									referrerpolicy="no-referrer"
 								/>
-								<span class="gif-attachment-label">GIF</span>
-								<button
-									type="button"
-									class="remove-media-btn"
-									onclick={() => (attachedGif = '')}
-									aria-label="Quitar GIF"
-								>
-									<span class="material-icons-round text-sm">close</span>
-								</button>
-							</div>
-						{/if}
+							{:else}
+								<div class="vs-avatar-letter avatar-md composer-user-avatar shrink-0">
+									{(authStore.user?.display_name ||
+										authStore.user?.username ||
+										'?')[0].toUpperCase()}
+								</div>
+							{/if}
 
-						{#if selectedFiles.length > 0}
-							<div class="media-preview-grid mb-3">
-								{#each selectedFiles as item, idx}
-									<div class="media-preview-item">
-										{#if item.file.type.startsWith('video/')}
-											<video
-												src={item.previewUrl}
-												class="preview-thumb"
-												muted
-												playsinline
-												preload="metadata"
-											></video>
-											<span class="media-type-badge"
-												><span class="material-icons-round text-xs">videocam</span></span
-											>
-										{:else}
-											<img
-												src={item.previewUrl}
-												alt=""
-												class="preview-thumb"
-												width="76"
-												height="76"
-												loading="lazy"
-												decoding="async"
-											/>
-										{/if}
+							<!-- Textarea and attachments container -->
+							<div class="flex-1 min-w-0 flex flex-col gap-2.5">
+								<div class="composer-input-wrapper">
+									<HashtagTextarea
+										id="new_post_text"
+										bind:value={newPostText}
+										onfocus={() => {
+											composerFocused = true;
+										}}
+										onkeydown={handleKeyDown}
+										placeholder={composerPlaceholder}
+										rows={composerExpanded ? 3 : 1}
+										class="feed-post-textarea"
+									/>
+								</div>
+
+								<!-- Attachments Previews -->
+								{#if attachedGif}
+									<div
+										class="gif-attachment-preview self-start"
+										transition:slide={{ duration: 300, easing: expoOut }}
+									>
+										<img
+											src={getProxiedMediaUrl(attachedGif)}
+											alt="GIF adjunto"
+											class="gif-attachment-thumb"
+											width="220"
+											height="160"
+											loading="lazy"
+											decoding="async"
+											crossorigin="anonymous"
+											referrerpolicy="no-referrer"
+										/>
+										<span class="gif-attachment-label">GIF</span>
 										<button
 											type="button"
 											class="remove-media-btn"
-											onclick={() => removeSelectedFile(idx)}
-											aria-label="Quitar archivo"
+											onclick={() => (attachedGif = '')}
+											aria-label="Quitar GIF"
 										>
 											<span class="material-icons-round text-sm">close</span>
 										</button>
 									</div>
-								{/each}
-							</div>
-						{/if}
+								{/if}
 
-						{#if pollAttached}
-							<div
-								class="flex flex-col gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-bold text-emerald-400 self-start w-full max-w-sm mb-3"
-							>
-								<div class="flex justify-between items-center">
-									<span class="flex items-center gap-1.5"
-										><span class="material-icons-round text-sm">poll</span> Encuesta</span
+								{#if selectedFiles.length > 0}
+									<div
+										class="media-preview-grid grid-count-{Math.min(selectedFiles.length, 4)}"
+										transition:slide={{ duration: 300, easing: expoOut }}
 									>
-									<button
-										type="button"
-										class="bg-transparent border-none cursor-pointer text-muted hover:text-white"
-										onclick={() => {
-											pollAttached = false;
-											pollQuestion = '';
-											pollOptions = ['', ''];
-										}}
+										{#each selectedFiles as item, idx}
+											<div class="media-preview-item">
+												{#if item.file.type.startsWith('video/')}
+													<!-- Preview nativo (mismo patrón del story-tray): los custom
+														elements <media-player> de Vidstack fueron eliminados y
+														nunca se registran → altura 0 → video invisible. -->
+													<video
+														src={item.previewUrl}
+														class="preview-thumb"
+														muted
+														playsinline
+														preload="metadata"
+													></video>
+													<span class="media-type-badge">
+														<span class="material-icons-round text-xs">videocam</span>
+													</span>
+												{:else}
+													<img
+														src={item.previewUrl}
+														alt=""
+														class="preview-thumb"
+														width="76"
+														height="76"
+														loading="lazy"
+														decoding="async"
+													/>
+												{/if}
+												<button
+													type="button"
+													class="remove-media-btn"
+													onclick={() => removeSelectedFile(idx)}
+													aria-label="Quitar archivo"
+												>
+													<span class="material-icons-round text-sm">close</span>
+												</button>
+											</div>
+										{/each}
+									</div>
+								{/if}
+
+								{#if pollAttached}
+									<div
+										class="flex flex-col gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs font-bold text-emerald-400 self-start w-full max-w-sm"
+										transition:slide={{ duration: 300, easing: expoOut }}
 									>
-										<span class="material-icons-round text-[10px]">close</span>
-									</button>
-								</div>
-								<div class="truncate font-semibold text-main">
-									{pollQuestion || '(Sin pregunta)'}
-								</div>
-								<div class="flex flex-col gap-1 text-[10px] text-muted pl-4">
-									{#each pollOptions.filter((o) => o.trim()) as opt}
-										<div>• {opt}</div>
-									{/each}
-								</div>
-							</div>
-						{/if}
+										<div class="flex justify-between items-center">
+											<span class="flex items-center gap-1.5 text-emerald-400">
+												<span class="material-icons-round text-sm">poll</span> Encuesta
+											</span>
+											<button
+												type="button"
+												class="bg-transparent border-none cursor-pointer text-muted hover:text-white p-0.5 rounded transition"
+												onclick={() => {
+													pollAttached = false;
+													pollQuestion = '';
+													pollOptions = ['', ''];
+												}}
+												aria-label="Quitar encuesta"
+											>
+												<span class="material-icons-round text-xs">close</span>
+											</button>
+										</div>
+										<div class="truncate font-semibold text-main">
+											{pollQuestion || '(Sin pregunta)'}
+										</div>
+										<div class="flex flex-col gap-1 text-[11px] text-muted pl-3">
+											{#each pollOptions.filter((o) => o.trim()) as opt}
+												<div>• {opt}</div>
+											{/each}
+										</div>
+									</div>
+								{/if}
 
-						{#if attachedMusic}
-							<div
-								class="composer-attached-music flex items-center gap-1.5 p-2 rounded-xl text-xs font-bold self-start mb-3"
-							>
-								<span class="material-icons-round text-sm">music_note</span>
-								<span>Audio: {attachedMusic.title} - {attachedMusic.artist}</span>
-								<button
-									type="button"
-									class="bg-transparent border-none cursor-pointer text-muted hover:text-main"
-									onclick={() => (attachedMusic = null)}
-								>
-									<span class="material-icons-round text-[10px]">close</span>
-								</button>
-							</div>
-						{/if}
-
-						{#if attachedVoiceNote}
-							<div
-								class="flex items-center gap-1.5 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-xs font-bold text-cyan-400 self-start mb-3"
-							>
-								<span class="material-icons-round text-sm">mic</span>
-								<span>Nota de voz grabada</span>
-								<button
-									type="button"
-									class="bg-transparent border-none cursor-pointer text-muted hover:text-white"
-									onclick={() => (attachedVoiceNote = null)}
-								>
-									<span class="material-icons-round text-[10px]">close</span>
-								</button>
-							</div>
-						{/if}
-
-						<!-- Bottom Bar: Toolbar & Action Buttons -->
-						<div
-							class="composer-bottom-bar flex flex-wrap items-center justify-between gap-2 pt-3 border-t relative"
-							style="border-top-color: var(--border-glass);"
-						>
-							<div class="composer-tools flex items-center gap-1 flex-wrap">
-								<button
-									type="button"
-									class="tool-btn tool-media"
-									title="Añadir fotos o videos"
-									onclick={toggleMediaPanel}
-								>
-									<span class="material-icons-round">image</span>
-								</button>
-								<input
-									type="file"
-									id="post_file_input"
-									name="post_file_input"
-									bind:this={fileInput}
-									multiple
-									accept="image/*,video/*"
-									style="display: none"
-									onchange={handleFileSelect}
-								/>
-
-								<button
-									type="button"
-									class="tool-btn tool-gif"
-									title="Añadir GIF animado"
-									onclick={toggleGifPanel}
-								>
-									<span class="material-icons-round">gif_box</span>
-								</button>
-
-								<button
-									type="button"
-									class="tool-btn tool-emoji"
-									title="Emojis y Stickers"
-									onclick={toggleEmojiPanel}
-								>
-									<span class="material-icons-round">mood</span>
-								</button>
-
-								<button
-									type="button"
-									class="tool-btn tool-poll"
-									title="Crear Encuesta"
-									onclick={togglePollPanel}
-								>
-									<span class="material-icons-round">poll</span>
-								</button>
-
-								<button
-									type="button"
-									class="tool-btn tool-voice"
-									title="Nota de Voz"
-									onclick={toggleVoicePanel}
-								>
-									<span class="material-icons-round">mic</span>
-								</button>
-
-								<button
-									type="button"
-									class="tool-btn tool-anon"
-									class:active={isAnonymousPost}
-									title="Publicar como Anónimo"
-									onclick={() => (isAnonymousPost ? (isAnonymousPost = false) : enableAnonMode())}
-								>
-									<span class="material-icons-round">visibility_off</span>
-								</button>
-							</div>
-
-							<div class="composer-actions flex items-center gap-2 ml-auto">
-								<a
-									href="/posts/create"
-									class="tool-btn-advanced"
-									title="Editor Avanzado con fondos y opciones completas"
-								>
-									<span class="material-icons-round text-base">tune</span>
-								</a>
-
-								<button
-									type="submit"
-									disabled={posting ||
-										(!newPostText.trim() &&
-											selectedFiles.length === 0 &&
-											!pollAttached &&
-											!attachedGif &&
-											!attachedVoiceNote)}
-									class="composer-publish-btn flex items-center gap-1.5"
-								>
-									{#if posting}
-										<span class="material-icons-round text-sm animate-spin">sync</span>
-										<span>Publicando</span>
-									{:else}
-										<span>Publicar</span>
-										<span class="material-icons-round text-sm">send</span>
-									{/if}
-								</button>
+								{#if attachedVoiceNote}
+									<div
+										class="flex items-center justify-between gap-3 p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-xs font-semibold text-cyan-400 self-start w-full max-w-xs"
+										transition:slide={{ duration: 300, easing: expoOut }}
+									>
+										<div class="flex items-center gap-2 min-w-0">
+											<div
+												class="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0"
+											>
+												<span class="material-icons-round text-cyan-400 text-sm">mic</span>
+											</div>
+											<span class="truncate">Nota de voz grabada</span>
+										</div>
+										<button
+											type="button"
+											class="bg-transparent border-none cursor-pointer text-muted hover:text-white p-0.5 rounded transition shrink-0"
+											onclick={() => (attachedVoiceNote = null)}
+											aria-label="Quitar nota de voz"
+										>
+											<span class="material-icons-round text-xs">close</span>
+										</button>
+									</div>
+								{/if}
 							</div>
 						</div>
 
-						<!-- Inline Modals -->
+						<!-- Composer Bottom Toolbar (Revelado condicionalmente al expandir) -->
+						{#if composerExpanded}
+							<div
+								transition:slide={{ duration: 250, easing: expoOut }}
+								class="flex flex-wrap items-center justify-between gap-2 border-t border-glass-border pt-3 mt-3 relative"
+							>
+								<div class="composer-tools">
+									<button
+										type="button"
+										class="tool-btn tool-media {showMediaModal ? 'active' : ''}"
+										title="Añadir fotos o videos"
+										onclick={toggleMediaPanel}
+										aria-label="Añadir fotos o videos"
+									>
+										<span class="material-icons-round">image</span>
+									</button>
+									<input
+										type="file"
+										id="post_file_input"
+										name="post_file_input"
+										bind:this={fileInput}
+										multiple
+										accept="image/*,video/*"
+										style="display: none"
+										onchange={handleFileSelect}
+									/>
+
+									<button
+										type="button"
+										class="tool-btn tool-gif {showGifModal ? 'active' : ''}"
+										title="Añadir GIF"
+										onclick={toggleGifPanel}
+										aria-label="Añadir GIF"
+									>
+										<span class="material-icons-round">gif_box</span>
+									</button>
+
+									<button
+										type="button"
+										class="tool-btn tool-voice {showVoiceModal ? 'active' : ''}"
+										title="Grabar nota de voz"
+										onclick={toggleVoicePanel}
+										aria-label="Grabar nota de voz"
+									>
+										<span class="material-icons-round">mic</span>
+									</button>
+
+									<button
+										type="button"
+										class="tool-btn tool-poll {showPollModal ? 'active' : ''}"
+										title="Crear encuesta"
+										onclick={togglePollPanel}
+										aria-label="Crear encuesta"
+									>
+										<span class="material-icons-round">poll</span>
+									</button>
+
+									<button
+										type="button"
+										class="tool-btn tool-emoji {showEmojis ? 'active' : ''}"
+										title="Emojis"
+										onclick={toggleEmojiPanel}
+										aria-label="Insertar emoji"
+									>
+										<span class="material-icons-round">sentiment_satisfied_alt</span>
+									</button>
+								</div>
+
+								<div class="flex items-center gap-2 shrink-0 ml-auto">
+									<a
+										href="/posts/create"
+										class="tool-btn-advanced flex items-center gap-1 px-3 py-1.5 text-xs font-semibold"
+										style="width: auto; height: 36px; border-radius: var(--radius-full); text-decoration: none;"
+										title="Editor Avanzado"
+									>
+										<span class="material-icons-round text-sm">tune</span>
+										<span class="hidden sm:inline">Avanzado</span>
+									</a>
+
+									<button
+										type="submit"
+										disabled={posting ||
+											(!newPostText.trim() &&
+												selectedFiles.length === 0 &&
+												!pollAttached &&
+												!attachedGif &&
+												!attachedVoiceNote)}
+										class="composer-publish-btn"
+									>
+										{#if posting}
+											<span class="material-icons-round text-sm animate-spin"
+												>progress_activity</span
+											>
+											<span>Publicando...</span>
+										{:else}
+											<span class="material-icons-round text-sm">send</span>
+											<span>Publicar</span>
+										{/if}
+									</button>
+								</div>
+							</div>
+						{/if}
+
+						<!-- Inline Dropdown Panels -->
 						{#if showVoiceModal}
 							<div
-								transition:slide={{ duration: 300, easing: expoOut }}
+								transition:slide={{ duration: 350, easing: expoOut }}
 								class="mt-3 flex justify-center"
 								style="position: relative; z-index: 70;"
 							>
@@ -1721,8 +1909,24 @@
 						{/if}
 
 						{#if showMediaModal}
-							<div transition:slide={{ duration: 300, easing: expoOut }} class="mt-3">
+							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div class="glass-panel p-4" style="min-height: max-content;">
+									<div class="flex justify-between items-center mb-3">
+										<span
+											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
+										>
+											<span class="material-icons-round text-cyan-400 text-sm">perm_media</span>
+											Añadir Fotos o Videos
+										</span>
+										<button
+											type="button"
+											class="aqua-close-btn"
+											onclick={() => (showMediaModal = false)}
+											aria-label="Cerrar panel de multimedia"
+										>
+											<span class="material-icons-round text-sm">close</span>
+										</button>
+									</div>
 									<div
 										role="button"
 										tabindex="0"
@@ -1733,8 +1937,7 @@
 										ondrop={(e) => {
 											e.preventDefault();
 											if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-												fileInput.files = e.dataTransfer.files;
-												handleFileSelect({ target: fileInput });
+												processMediaFiles(e.dataTransfer.files);
 												showMediaModal = false;
 											}
 										}}
@@ -1742,21 +1945,39 @@
 										<div class="dropzone-icon">
 											<span
 												class="material-icons-round"
-												style="color: rgba(34,211,238,0.8); font-size: 22px;">cloud_upload</span
+												style="color: rgba(34,211,238,0.9); font-size: 24px;">cloud_upload</span
 											>
 										</div>
-										<p class="dropzone-text">Arrastra imágenes/videos o haz clic</p>
+										<p class="dropzone-text">
+											Arrastra imágenes/videos o haz clic para seleccionar
+										</p>
 									</div>
 								</div>
 							</div>
 						{/if}
 
 						{#if showEmojis}
-							<div transition:slide={{ duration: 300, easing: expoOut }} class="mt-3">
+							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div
 									class="glass-panel p-4"
-									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
+									style="position: relative; display: flex; flex-direction: column; align-items: center; min-height: max-content;"
 								>
+									<div class="w-full flex justify-between items-center mb-2">
+										<span
+											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
+										>
+											<span class="material-icons-round text-amber-400 text-sm">mood</span>
+											Selector de Emojis
+										</span>
+										<button
+											type="button"
+											class="aqua-close-btn"
+											onclick={() => (showEmojis = false)}
+											aria-label="Cerrar emojis"
+										>
+											<span class="material-icons-round text-sm">close</span>
+										</button>
+									</div>
 									<TwemojiPicker
 										variant="inline"
 										onSelect={insertEmoji}
@@ -1767,11 +1988,27 @@
 						{/if}
 
 						{#if showGifModal}
-							<div transition:slide={{ duration: 300, easing: expoOut }} class="mt-3">
+							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div
 									class="glass-panel p-4"
-									style="position: relative; display: flex; justify-content: center; min-height: max-content;"
+									style="position: relative; display: flex; flex-direction: column; align-items: center; min-height: max-content;"
 								>
+									<div class="w-full flex justify-between items-center mb-2">
+										<span
+											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
+										>
+											<span class="material-icons-round text-amber-400 text-sm">gif_box</span>
+											Buscar GIFs
+										</span>
+										<button
+											type="button"
+											class="aqua-close-btn"
+											onclick={() => (showGifModal = false)}
+											aria-label="Cerrar GIFs"
+										>
+											<span class="material-icons-round text-sm">close</span>
+										</button>
+									</div>
 									<KlipyPicker
 										onClose={() => (showGifModal = false)}
 										onSelect={(url, _gif) => {
@@ -1784,44 +2021,51 @@
 						{/if}
 
 						{#if showPollModal}
-							<div transition:slide={{ duration: 300, easing: expoOut }} class="mt-3">
+							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div class="glass-panel p-4 w-full" style="min-height: max-content;">
 									<div class="panel-header flex justify-between items-center mb-3">
-										<span class="panel-title text-xs font-bold uppercase text-muted"
-											>Crear Encuesta</span
+										<span
+											class="panel-title text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
 										>
+											<span class="material-icons-round text-blue-400 text-sm">poll</span>
+											Crear Encuesta
+										</span>
 										<button
 											type="button"
-											class="bg-transparent border-none cursor-pointer text-muted hover:text-rose-500"
+											class="aqua-close-btn"
 											onclick={() => (showPollModal = false)}
-											><span class="material-icons-round text-sm">close</span></button
+											aria-label="Cerrar encuesta"
 										>
+											<span class="material-icons-round text-sm">close</span>
+										</button>
 									</div>
-									<div class="flex flex-col gap-1.5 mb-3">
+									<div class="flex flex-col gap-2 mb-3">
 										<input
 											type="text"
 											id="poll_question"
 											name="poll_question"
-											class="aero-input w-full text-xs py-1.5 px-3"
-											placeholder="Pregunta..."
+											class="aero-input w-full text-xs py-2 px-3"
+											placeholder="Pregunta de la encuesta..."
 											bind:value={pollQuestion}
 										/>
-										<input
-											type="text"
-											id="poll_opt_0"
-											name="poll_opt_0"
-											class="aero-input w-full text-xs py-1.5 px-3"
-											placeholder="Opción 1"
-											bind:value={pollOptions[0]}
-										/>
-										<input
-											type="text"
-											id="poll_opt_1"
-											name="poll_opt_1"
-											class="aero-input w-full text-xs py-1.5 px-3"
-											placeholder="Opción 2"
-											bind:value={pollOptions[1]}
-										/>
+										<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+											<input
+												type="text"
+												id="poll_opt_0"
+												name="poll_opt_0"
+												class="aero-input w-full text-xs py-1.5 px-3"
+												placeholder="Opción 1"
+												bind:value={pollOptions[0]}
+											/>
+											<input
+												type="text"
+												id="poll_opt_1"
+												name="poll_opt_1"
+												class="aero-input w-full text-xs py-1.5 px-3"
+												placeholder="Opción 2"
+												bind:value={pollOptions[1]}
+											/>
+										</div>
 										{#each pollOptions.slice(2) as _opt, idx}
 											<div class="flex items-center gap-1.5">
 												<input
@@ -1834,139 +2078,42 @@
 												/>
 												<button
 													type="button"
-													class="bg-transparent border-none cursor-pointer text-muted hover:text-rose-500"
+													class="aqua-close-btn shrink-0"
+													style="width: 28px; height: 28px;"
 													onclick={() =>
 														(pollOptions = pollOptions.filter((_, i) => i !== idx + 2))}
+													aria-label="Eliminar opción"
 												>
-													<span class="material-icons-round text-sm">close</span>
+													<span class="material-icons-round text-xs">close</span>
 												</button>
 											</div>
 										{/each}
 										{#if pollOptions.length < 6}
 											<button
 												type="button"
-												class="text-cyan-400 hover:text-cyan-300 text-[10px] font-semibold text-left bg-transparent border-none cursor-pointer mt-1"
+												class="text-cyan-400 hover:text-cyan-300 text-xs font-semibold text-left bg-transparent border-none cursor-pointer mt-1 inline-flex items-center gap-1"
 												onclick={() => (pollOptions = [...pollOptions, ''])}
-												>+ Añadir otra opción</button
 											>
+												<span class="material-icons-round text-xs">add</span>
+												Añadir otra opción
+											</button>
 										{/if}
 									</div>
 									<button
 										type="button"
-										class="btn-aero-primary w-full py-2 text-xs font-bold shadow-lg"
+										class="btn-aero-primary w-full py-2 text-xs font-bold shadow-lg flex items-center justify-center gap-1.5"
 										onclick={() => {
 											pollAttached = true;
 											showPollModal = false;
-										}}>Adjuntar Encuesta</button
+										}}
 									>
+										<span class="material-icons-round text-sm">check</span>
+										Adjuntar Encuesta
+									</button>
 								</div>
 							</div>
 						{/if}
 					</form>
-				</div>
-			{/if}
-
-			<!-- Feed Area Navigation Tabs & Frutiger Aqua Algorithm Pill -->
-			<div class="feed-area-nav mb-4 hide-scrollbar">
-				<button
-					type="button"
-					class="feed-area-btn flex-1"
-					class:active={activeFeedArea === 'all'}
-					onclick={() => setFeedArea('all')}
-				>
-					<span class="material-icons-round text-base tab-icon">auto_awesome</span>
-					<span>Para Ti</span>
-				</button>
-				<button
-					type="button"
-					class="feed-area-btn feed-area-following flex-1"
-					class:active={activeFeedArea === 'following'}
-					onclick={() => setFeedArea('following')}
-				>
-					<span class="material-icons-round text-base tab-icon">people</span>
-					<span>Siguiendo</span>
-				</button>
-				<button
-					type="button"
-					class="feed-area-btn feed-area-anon flex-1"
-					class:active={activeFeedArea === 'anonymous'}
-					onclick={() => setFeedArea('anonymous')}
-				>
-					<span class="material-icons-round text-base tab-icon">theater_comedy</span>
-					<span>Rincón Anónimo</span>
-					<span class="anon-mini-badge hidden sm:inline-flex">Anónimo</span>
-				</button>
-
-				<div class="feed-nav-divider" aria-hidden="true"></div>
-
-				<!-- Frutiger Aqua Algorithm Quick Pill -->
-				<button
-					type="button"
-					class="aqua-algo-btn"
-					class:active={showAlgorithmModal}
-					onclick={() => (showAlgorithmModal = true)}
-					title="Sintonizador de Algoritmo (Frutiger Aqua/Eco)"
-				>
-					<span class="material-icons-round text-base aqua-icon">water_drop</span>
-					<span class="hidden sm:inline">Algoritmo</span>
-					<span class="aqua-chip-badge">
-						{#if globalFeedMode === 'radar'}
-							Radar
-						{:else if userWeights.recency >= 80}
-							Fresco
-						{:else if userWeights.popularity >= 75}
-							Viral
-						{:else if userWeights.interests >= 70}
-							AI
-						{:else}
-							Eco
-						{/if}
-					</span>
-				</button>
-			</div>
-
-			{#if activeFeedArea === 'anonymous'}
-				<!-- Anonymous Area Hero Banner -->
-				<div
-					class="anon-area-hero glass-panel p-4 mb-4 relative overflow-hidden"
-					transition:slide={{ duration: 400, easing: expoOut }}
-				>
-					<div
-						class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10"
-					>
-						<div class="flex items-center gap-3">
-							<div class="anon-hero-icon shrink-0">
-								<span class="material-icons-round text-2xl">theater_comedy</span>
-							</div>
-							<div>
-								<h3 class="text-sm font-bold text-main flex items-center gap-2">
-									Rincón Anónimo
-									<span class="anon-badge text-[9px] py-0.5 px-2">100% Anónimo</span>
-								</h3>
-								<p class="text-xs text-muted">
-									Preguntas, secretos y confesiones sin revelar tu identidad. Tu post se publica de
-									forma pública, con un username anónimo exclusivo. Respeta a la comunidad.
-								</p>
-							</div>
-						</div>
-						<button
-							type="button"
-							class="btn-aero-primary text-xs py-1.5 px-3 shrink-0 flex items-center gap-1.5 ml-auto sm:ml-0"
-							onclick={async () => {
-								await enableAnonMode();
-								if (isAnonymousPost) {
-									const textarea = document.getElementById('new_post_text');
-									if (textarea) {
-										textarea.focus();
-										textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-									}
-								}
-							}}
-						>
-							<span class="material-icons-round text-sm">edit_note</span>
-							<span>Publicar Secreto</span>
-						</button>
-					</div>
 				</div>
 			{/if}
 
@@ -2030,10 +2177,10 @@
 		</div>
 
 		<!-- Right Column (trending and secondary suggestions) -->
-		<div class="feed-col-right hidden lg:block lg:col-span-3 h-full">
+		<div class="feed-col-right trends-suggestions-column h-full flex-shrink-0">
 			<div
 				class="sticky transition-all duration-300 ease-in-out flex flex-col gap-4"
-				style="top: 70px; {leftColHeight ? `height: ${leftColHeight}px;` : ''}"
+				style="top: 70px;"
 			>
 				<!-- Gamification Checkin (solo si el botón realmente se va a mostrar) -->
 				{#if gamificationEnabled && authStore.isAuthenticated && checkinState.loaded && checkinState.canCheckin}
@@ -2053,7 +2200,7 @@
 
 				<!-- Trending Hashtags Card -->
 				<div class="glass-panel p-4 flex-shrink-0">
-					<h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-3 px-0.5">
+					<h3 class="text-xs font-bold uppercase tracking-wider text-tertiary mb-3 px-0.5">
 						Tendencias hoy
 					</h3>
 
@@ -2066,7 +2213,7 @@
 									>
 										#{tag.tag}
 									</p>
-									<p class="text-[10px] text-muted mt-0.5 leading-snug">
+									<p class="text-[10px] text-tertiary mt-0.5 leading-snug">
 										{tag.posts.toLocaleString()} publicaciones
 									</p>
 								</a>
@@ -2078,39 +2225,26 @@
 				<!-- Sugerencias Card -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class="glass-panel p-4 relative group/sug sug-card flex-1 flex flex-col min-h-0"
+					class="glass-panel p-4 flex flex-col flex-shrink-0 sug-card"
 					onmouseenter={() => (isHoveringSug = true)}
 					onmouseleave={() => (isHoveringSug = false)}
 				>
-					<!-- Luces volumétricas de fondo (adaptables por opacidad) -->
+					<!-- Header -->
 					<div
-						class="absolute -top-10 -right-10 w-40 h-40 squircle blur-3xl opacity-20 dark:opacity-10 transition-all duration-700 group-hover/sug:opacity-30 group-hover/sug:scale-110"
-						style="background: var(--primary); z-index: 0; pointer-events: none;"
-					></div>
-					<div
-						class="absolute -bottom-10 -left-10 w-40 h-40 squircle blur-3xl opacity-15 dark:opacity-5 transition-all duration-700 group-hover/sug:opacity-25 group-hover/sug:scale-110"
-						style="background: var(--aero-sky); z-index: 0; pointer-events: none;"
-					></div>
-
-					<div
-						class="flex justify-between items-center mb-3 relative z-10 flex-shrink-0"
-						style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;"
+						class="sug-header flex justify-between items-center mb-3 relative z-10 flex-shrink-0"
 					>
-						<h3
-							class="text-xs font-black uppercase tracking-widest flex items-center gap-2"
-							style="color: var(--text-main);"
-						>
+						<div class="flex items-center gap-1.5 min-w-0 flex-shrink-0">
 							<span class="material-icons-round text-sm" style="color: var(--primary);"
 								>auto_awesome</span
-							> Sugerencias
-						</h3>
-						<div class="flex items-center gap-1.5">
+							>
+							<h3 class="sug-header-title">Sugerencias</h3>
+						</div>
+						<div class="flex items-center gap-1 flex-shrink-0">
 							{#if suggestedCreators.length > 4}
 								<button
 									type="button"
 									onclick={rotateSuggestions}
-									class="p-1 rounded-full transition-all hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer"
-									style="background: var(--glass-surface); border: 1px solid var(--glass-border); color: var(--text-muted); width: 24px; height: 24px;"
+									class="sug-action-btn rotate-btn flex items-center justify-center cursor-pointer flex-shrink-0"
 									title="Rotar sugerencias"
 									aria-label="Rotar sugerencias"
 								>
@@ -2126,75 +2260,114 @@
 							{/if}
 							<a
 								href="/explore"
-								class="text-[10px] font-bold uppercase px-3 py-1 rounded-full transition-all hover:scale-105"
-								style="background: var(--glass-surface); border: 1px solid var(--glass-border); color: var(--text-primary);"
-								>Ver más</a
+								class="sug-action-link flex items-center flex-shrink-0"
+								title="Explorar todos los creadores"
 							>
+								<span>Ver más</span>
+							</a>
 						</div>
 					</div>
 
-					<div class="sug-list relative z-10 flex-1 min-h-0 overflow-y-auto">
-						{#each displayedSuggestions as creator (creator.id || creator.username)}
+					<!-- Lista de creadores sugeridos -->
+					<div class="sug-list relative z-10 flex flex-col gap-1.5">
+						{#if loading && suggestedCreators.length === 0}
+							{#each [1, 2, 3] as _}
+								<div
+									class="sug-skeleton-item flex items-center justify-between gap-2.5 p-2 rounded-xl"
+								>
+									<div class="sug-skeleton-avatar w-10 h-10 rounded-2xl shimmer"></div>
+									<div class="flex-1 min-w-0 space-y-1.5">
+										<div class="sug-skeleton-bar w-24 h-3.5 rounded-md shimmer"></div>
+										<div class="sug-skeleton-bar w-16 h-2.5 rounded-md shimmer"></div>
+									</div>
+									<div class="sug-skeleton-btn w-16 h-7 rounded-full shimmer"></div>
+								</div>
+							{/each}
+						{:else if displayedSuggestions.length === 0}
 							<div
-								class="sug-creator-item flex items-center justify-between gap-2.5 p-2 -mx-1.5 rounded-xl transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer flex-shrink-0"
-								in:fade={{ duration: 250 }}
+								class="sug-empty-state flex flex-col items-center justify-center p-4 text-center"
 							>
-								<a
-									href="/u/{creator.username}"
-									class="flex items-center gap-2.5 min-w-0 text-decoration-none flex-1"
-								>
-									<div
-										class="relative flex-shrink-0"
-										style="flex: 0 0 40px; min-width: 40px; min-height: 40px; width: 40px; height: 40px;"
-									>
-										{#if creator.avatar_url}
-											<img
-												src={creator.avatar_url}
-												alt={creator.username}
-												class="w-10 h-10 squircle object-cover shadow-sm transition-transform hover:scale-105 flex-shrink-0"
-												style="width: 40px; height: 40px; border: 2px solid var(--glass-border);"
-												width="40"
-												height="40"
-												loading="lazy"
-												decoding="async"
-											/>
-										{:else}
-											<div
-												class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0 shadow-sm transition-transform hover:scale-105"
-												style="width: 40px; height: 40px; min-width: 40px; min-height: 40px; background: var(--grad-primary); border: 2px solid var(--glass-highlight);"
-											>
-												<span class="text-white font-black text-xs drop-shadow-md">
-													{creator.display_name
-														? creator.display_name[0].toUpperCase()
-														: creator.username[0].toUpperCase()}
-												</span>
-											</div>
-										{/if}
-									</div>
-									<div class="min-w-0 flex-1">
-										<p
-											class="font-bold text-[13px] truncate transition-colors leading-snug"
-											style="color: var(--text-main);"
-										>
-											{creator.display_name || creator.username}
-										</p>
-										<p
-											class="text-[11px] truncate leading-snug"
-											style="color: var(--text-muted); font-weight: 500;"
-										>
-											@{creator.username}
-										</p>
-									</div>
-								</a>
-								<button
-									onclick={() => toggleFollowSuggested(creator.username)}
-									class="btn-aero-primary {creator.is_following ? 'following' : ''} flex-shrink-0"
-									style="padding: 0 10px; height: 30px; font-size: 0.72rem; min-width: 78px;"
-								>
-									{creator.is_following ? 'Siguiendo' : 'Seguir'}
-								</button>
+								<div class="sug-empty-icon flex items-center justify-center mb-2">
+									<span class="material-icons-round text-2xl">celebration</span>
+								</div>
+								<p class="text-xs font-semibold text-main">¡Estás al día!</p>
+								<p class="text-[11px] text-tertiary mt-0.5">
+									Sigue interactuando para descubrir más creadores
+								</p>
 							</div>
-						{/each}
+						{:else}
+							{#each displayedSuggestions as creator (creator.id || creator.username)}
+								<div
+									class="suggestion-user-card sug-creator-item flex items-center justify-between gap-2 p-1.5 rounded-xl transition-all cursor-pointer flex-shrink-0"
+									in:fade={{ duration: 250 }}
+								>
+									<a
+										href="/u/{creator.username}"
+										class="sug-creator-link flex items-center gap-2.5 min-w-0 flex-1 text-decoration-none"
+									>
+										<div
+											class="relative flex-shrink-0 sug-avatar-shield"
+											style="flex: 0 0 38px; min-width: 38px; min-height: 38px; width: 38px; height: 38px;"
+											title={creator.display_name || creator.username}
+										>
+											<AeroAvatar
+												src={creator.avatar_url}
+												alt={creator.display_name || creator.username}
+												size="sm"
+												isVtuber={creator.is_virtual}
+											/>
+										</div>
+										<div class="suggestion-user-info min-w-0 flex-1">
+											<div class="sug-name-row flex items-center gap-1">
+												<span class="suggestion-username sug-name font-bold text-[13px] truncate">
+													{creator.display_name || creator.username}
+												</span>
+												{#if creator.is_verified}
+													<VerifiedBadge isVerified={true} size="13px" />
+												{/if}
+												{#if creator.is_virtual}
+													<span class="sug-badge-vtuber" title="Creador Virtual">VTuber</span>
+												{/if}
+											</div>
+											<div class="sug-handle-row flex items-center gap-1 text-[11px]">
+												<span class="suggestion-handle sug-handle truncate">
+													@{creator.username}
+												</span>
+												{#if creator.follower_count > 0}
+													<span class="sug-follower-pill truncate">
+														• {formatFollowerCount(creator.follower_count)} seg.
+													</span>
+												{/if}
+											</div>
+										</div>
+									</a>
+
+									<button
+										type="button"
+										onclick={() => toggleFollowSuggested(creator.username)}
+										class="sug-follow-btn {creator.is_following
+											? 'is-following'
+											: 'is-unfollowed'} flex-shrink-0"
+										title={creator.is_following
+											? `Dejar de seguir a @${creator.username}`
+											: `Seguir a @${creator.username}`}
+										aria-label={creator.is_following
+											? `Dejar de seguir a @${creator.username}`
+											: `Seguir a @${creator.username}`}
+									>
+										{#if creator.is_following}
+											<span class="material-icons-round text-xs sug-btn-icon-check">check</span>
+											<span class="material-icons-round text-xs sug-btn-icon-unfollow">close</span>
+											<span class="sug-btn-text-following">Siguiendo</span>
+											<span class="sug-btn-text-unfollow">Dejar</span>
+										{:else}
+											<span class="material-icons-round text-xs sug-btn-icon-add">add</span>
+											<span>Seguir</span>
+										{/if}
+									</button>
+								</div>
+							{/each}
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -2416,7 +2589,7 @@
           border: 1px solid rgba(251,113,133,0.25);
           border-radius: 1.5rem;
           padding: 2rem;
-          box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 32px 64px rgba(0,0,0,0.6), 0 0 40px rgba(225,29,72,0.12);
+          box-shadow: var(--shadow-lg), 0 0 30px rgba(225, 29, 72, 0.2);
           text-align: center;
         "
 			transition:scale={{ duration: 220, start: 0.92 }}
@@ -2510,23 +2683,6 @@
 	</div>
 {/if}
 
-<AnonIdentityModal
-	open={showAnonIdentityModal}
-	onClose={() => {
-		showAnonIdentityModal = false;
-		pendingAnonPublish = false;
-	}}
-	onCreated={(username) => {
-		myAnonUsername = username;
-		anonIdentityLoaded = true;
-		showAnonIdentityModal = false;
-		if (pendingAnonPublish) {
-			pendingAnonPublish = false;
-			isAnonymousPost = true;
-		}
-	}}
-/>
-
 <!-- Frutiger Aqua / Eco Algorithm Tuner Modal -->
 {#if showAlgorithmModal}
 	<div
@@ -2558,7 +2714,7 @@
 							<span class="aqua-eco-tag">Frutiger Aqua</span>
 						</h2>
 						<p class="text-[11px] text-muted">
-							Personaliza el flujo y balance de contenido de tu Para Ti
+							Sintoniza el equilibrio de tu feed: novedad, intereses, tu círculo social y tendencias
 						</p>
 					</div>
 				</div>
@@ -2580,6 +2736,9 @@
 					<span class="material-icons-round text-xs text-cyan-400">tune</span>
 					Modos & Presets de Feed
 				</div>
+				<p class="text-[9px] text-muted leading-tight m-0 px-1">
+					Elige un modo listo para usar o afina tu mezcla a mano más abajo.
+				</p>
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
 					{#each ALGO_PRESETS as preset}
@@ -2645,10 +2804,13 @@
 						expand_more
 					</span>
 				</button>
+				<p class="text-[9px] text-muted leading-tight m-0 px-2 pb-1">
+					Arrastra cada barra para dar más o menos peso a cada factor de tu feed.
+				</p>
 
 				{#if showCustomSliders}
 					<div class="pt-2 px-1 space-y-2.5" transition:slide={{ duration: 250 }}>
-						{#each [{ id: 'interests', label: 'Intereses / Temas', color: '#06B6D4' }, { id: 'interactions', label: 'Interacción / Likes', color: '#10B981' }, { id: 'social', label: 'Círculo Social', color: '#8B5CF6' }, { id: 'popularity', label: 'Popularidad / Viral', color: '#F59E0B' }, { id: 'recency', label: 'Novedad / Reciente', color: '#3B82F6' }, { id: 'diversity', label: 'Diversidad / Descubrimiento', color: '#EC4899' }] as stat}
+						{#each WEIGHT_STATS as stat}
 							<div class="flex flex-col gap-1 group">
 								<div
 									class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider px-1"
@@ -2664,6 +2826,9 @@
 										{userWeights[stat.id]}%
 									</span>
 								</div>
+								<p class="text-[9px] text-muted leading-tight m-0 px-1">
+									{stat.desc}
+								</p>
 								<div class="aqua-slider-track">
 									<div
 										class="aqua-slider-fill"
@@ -2730,48 +2895,453 @@
 		position: relative;
 	}
 
-	.feed-col-right .sticky {
-		min-height: 500px;
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-	.sug-card {
-		flex: 1 1 auto;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-	}
-	.sug-list {
-		flex: 1 1 auto;
-		min-height: 0;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-		gap: 0.25rem;
-		overflow-y: auto;
-	}
-	.sug-list::-webkit-scrollbar {
-		width: 4px;
-	}
-	.sug-list::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.sug-list::-webkit-scrollbar-thumb {
-		background: rgba(14, 165, 233, 0.25);
-		border-radius: var(--radius-sm);
-	}
-	.sug-list::-webkit-scrollbar-thumb:hover {
-		background: rgba(14, 165, 233, 0.5);
-	}
-	:global([data-theme='dark']) .sug-list::-webkit-scrollbar-thumb,
-	:global([data-theme='midnight']) .sug-list::-webkit-scrollbar-thumb {
-		background: rgba(255, 255, 255, 0.15);
+	:global([data-theme='light'][data-perf-mode='true']) .feed-post-wrap :global(.aero-post-card),
+	:global([data-theme='light'][data-perf-profile='lite']) .feed-post-wrap :global(.aero-post-card),
+	:global([data-theme='light'][data-glass-blur='none']) .feed-post-wrap :global(.aero-post-card) {
+		background: linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.95) 0%,
+			rgba(224, 246, 252, 0.9) 100%
+		) !important;
+		border: 1px solid rgba(14, 165, 233, 0.28) !important;
+		border-top: 1px solid #ffffff !important;
+		box-shadow: inset 0 1.5px 2px #ffffff !important;
 	}
 
-	.sug-creator-item:hover {
-		background: var(--glass-surface);
-		box-shadow: inset 0 0 0 1px var(--glass-highlight);
+	/* ── Historias: contenedores orgánicos con bordes suavizados ── */
+	.stories-container-wrap {
+		container-type: inline-size;
+		width: 100%;
+		max-width: 100%;
+		border-radius: var(--radius-superellipse);
+	}
+
+	.stories-bar {
+		scroll-behavior: smooth;
+		overscroll-behavior-x: contain;
+		scrollbar-width: thin;
+		scrollbar-color: color-mix(in srgb, var(--aero-blue) 40%, transparent) transparent;
+		border-radius: var(--radius-superellipse);
+	}
+	.stories-bar::before,
+	.stories-bar::after {
+		display: none !important;
+	}
+	.stories-bar::-webkit-scrollbar {
+		height: 4px;
+	}
+	.stories-bar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.stories-bar::-webkit-scrollbar-thumb {
+		background: color-mix(in srgb, var(--aero-blue) 40%, transparent);
+		border-radius: var(--radius-full, 999px);
+	}
+	.stories-bar::-webkit-scrollbar-thumb:hover {
+		background: var(--aero-blue);
+	}
+
+	.story-card {
+		border-radius: var(--radius-xl);
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		box-shadow: var(--glass-inset-highlight), var(--shadow-sm), var(--shadow-glow);
+		transform: translateZ(0);
+	}
+	.story-card:hover {
+		box-shadow: var(--glass-inset-highlight), var(--shadow-md), var(--shadow-glow);
+	}
+	.story-create-card {
+		transform: translateZ(0);
+	}
+	.story-create-card:hover {
+		border-color: rgba(34, 211, 238, 0.48) !important;
+		box-shadow:
+			var(--glass-inset-highlight),
+			0 6px 22px rgba(34, 211, 238, 0.24);
+	}
+	.story-create-card:hover .story-plus-btn {
+		box-shadow:
+			var(--shadow-sm),
+			0 0 22px rgba(34, 211, 238, 0.85);
+		scale: 1.12;
+	}
+	.story-create-card:hover .story-plus-btn .material-icons-round {
+		animation: storyPlusSpin 0.6s var(--ease-spring);
+	}
+	@keyframes storyPlusSpin {
+		0% {
+			transform: rotate(0deg) scale(1);
+		}
+		60% {
+			transform: rotate(90deg) scale(1.15);
+		}
+		100% {
+			transform: rotate(0deg) scale(1);
+		}
+	}
+
+	.story-slot-placeholder {
+		flex: 0 0 112px;
+		width: 112px;
+		height: 162px;
+		scroll-snap-align: start;
+		border-radius: var(--radius-xl);
+		border: 1.5px dashed var(--border-subtle);
+		background: var(--bg-surface);
+		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		transition:
+			opacity 0.25s ease,
+			transform 0.25s ease;
+	}
+
+	/* Cuando el menú lateral está desplegado o en pantallas donde el ancho del feed
+	   sea menor a 530px, ocultamos el 3er placeholder para que queden exactamente
+	   3 tarjetas visibles (1 crear + 2 placeholders = 400px), encajando a la perfección
+	   sin desbordamiento ni cortes antiestéticos */
+	@container (max-width: 530px) {
+		.story-slot-placeholder.slot-ph-3 {
+			display: none !important;
+		}
+	}
+
+	/* En pantallas muy estrechas (< 400px), mostramos solo 1 placeholder (total 2 tarjetas) */
+	@container (max-width: 395px) {
+		.story-slot-placeholder.slot-ph-2,
+		.story-slot-placeholder.slot-ph-3 {
+			display: none !important;
+		}
+	}
+
+	/* Regla de compatibilidad si el sidebar está expandido */
+	:global(.sidebar-expanded) .feed-col-center .story-slot-placeholder.slot-ph-3,
+	:global(.vs-shell:not(.vs-shell--collapsed)) .feed-col-center .story-slot-placeholder.slot-ph-3 {
+		display: none;
+	}
+	@media (min-width: 1600px) {
+		:global(.sidebar-expanded) .feed-col-center .story-slot-placeholder.slot-ph-3,
+		:global(.vs-shell:not(.vs-shell--collapsed))
+			.feed-col-center
+			.story-slot-placeholder.slot-ph-3 {
+			display: flex;
+		}
+	}
+	/* ── Sugerencias Card (Coherente con toda la plataforma) ── */
+	.sug-card {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	/* Header */
+	.sug-header {
+		border-bottom: 1px solid var(--border-subtle);
+		padding-bottom: 8px;
+		gap: 6px;
+	}
+	.sug-header-title {
+		font-family: var(--font-display, 'Outfit', sans-serif);
+		font-size: 0.78rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--text-main, var(--text-primary));
+		margin: 0;
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+	.sug-action-btn {
+		width: 24px;
+		height: 24px;
+		border-radius: var(--radius-full);
+		background: var(--glass-surface, rgba(255, 255, 255, 0.06));
+		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+		color: var(--text-muted);
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+		flex-shrink: 0;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transition:
+			background var(--t-base),
+			color var(--t-base),
+			border-color var(--t-base);
+	}
+	.sug-action-btn:hover {
+		background: var(--bg-surface);
+		color: var(--aero-blue, #1b85f3);
+		border-color: rgba(27, 133, 243, 0.35);
+	}
+	.sug-action-btn:active {
+		transform: scale(0.95);
+	}
+	.sug-action-link {
+		font-size: 0.65rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 3px 8px;
+		border-radius: var(--radius-full);
+		background: var(--glass-surface, rgba(255, 255, 255, 0.06));
+		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.12));
+		color: var(--text-primary);
+		text-decoration: none;
+		white-space: nowrap;
+		flex-shrink: 0;
+		line-height: 1;
+		transition:
+			background var(--t-base),
+			color var(--t-base),
+			border-color var(--t-base);
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+	}
+	.sug-action-link:hover {
+		background: var(--grad-primary, linear-gradient(135deg, #1b85f3, #00d4aa));
+		color: #ffffff;
+		border-color: transparent;
+	}
+	.sug-arrow-icon {
+		font-size: 11px;
+	}
+
+	/* List & Rows */
+	.sug-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		width: 100%;
+		min-width: 0;
+	}
+	.suggestion-user-card,
+	.sug-creator-item {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		width: 100%;
+		min-width: 0;
+		max-width: 100%;
+		box-sizing: border-box;
+		border-radius: var(--radius-md, 14px);
+		border: 1px solid transparent;
+		background: transparent;
+		transition: background var(--t-base);
+	}
+	.sug-creator-item:hover,
+	.suggestion-user-card:hover {
+		background: var(--glass-surface, rgba(255, 255, 255, 0.06));
+	}
+	.sug-creator-link {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		min-width: 0;
+		flex: 1 1 auto;
+		text-decoration: none;
+		outline: none;
+	}
+	.sug-creator-link:hover .sug-name {
+		color: var(--aero-blue, #1b85f3);
+	}
+	.sug-avatar-shield {
+		border-radius: var(--radius-squircle);
+	}
+
+	.suggestion-user-info {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		flex: 1 1 auto;
+		overflow: hidden;
+		gap: 1px;
+	}
+	.sug-name-row {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.suggestion-username,
+	.sug-name {
+		font-weight: 700;
+		font-size: 13px;
+		line-height: 1.35;
+		letter-spacing: -0.011em;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 100%;
+		transition: color var(--t-base);
+	}
+	.sug-handle-row {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+	}
+	.suggestion-handle,
+	.sug-handle {
+		font-weight: 500;
+		font-size: 11px;
+		line-height: 1.35;
+		color: color-mix(in srgb, var(--text-primary) 58%, transparent);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.sug-follower-pill {
+		font-size: 11px;
+		color: color-mix(in srgb, var(--text-primary) 45%, transparent);
+		white-space: nowrap;
+	}
+	.sug-badge-vtuber {
+		display: inline-flex;
+		align-items: center;
+		font-size: 0.6rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		padding: 1px 5px;
+		border-radius: var(--radius-xs, 4px);
+		background: linear-gradient(135deg, rgba(46, 180, 255, 0.2) 0%, rgba(0, 212, 170, 0.2) 100%);
+		border: 1px solid rgba(0, 212, 170, 0.4);
+		color: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 8px rgba(0, 212, 170, 0.25);
+		line-height: 1.2;
+		flex-shrink: 0;
+	}
+
+	/* Follow Buttons */
+	.sug-follow-btn {
+		height: 27px;
+		min-width: 66px;
+		padding: 0 9px;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		border-radius: var(--radius-full);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 3px;
+		cursor: pointer;
+		outline: none;
+		user-select: none;
+		box-sizing: border-box;
+		flex-shrink: 0;
+		white-space: nowrap;
+		transition:
+			background var(--t-base),
+			border-color var(--t-base),
+			color var(--t-base),
+			filter var(--t-base);
+	}
+	.sug-follow-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, #2eb4ff);
+		outline-offset: 2px;
+	}
+	.sug-follow-btn:active {
+		transform: scale(0.96);
+	}
+
+	/* Estado: Seguir (Neo-Aero Primary - Equilibrado y Elegante) */
+	.sug-follow-btn.is-unfollowed {
+		background: linear-gradient(135deg, #1b85f3 0%, #2eb4ff 100%);
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		color: #ffffff;
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+	}
+	.sug-follow-btn.is-unfollowed:hover {
+		filter: brightness(1.08);
+	}
+	.sug-follow-btn .sug-btn-icon-add {
+		font-size: 13px;
+		margin-left: -1px;
+	}
+
+	/* Estado: Siguiendo (Frosted Glass) */
+	.sug-follow-btn.is-following {
+		background: var(--glass-surface, rgba(255, 255, 255, 0.08));
+		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+		color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+	}
+	.sug-follow-btn.is-following .sug-btn-icon-unfollow,
+	.sug-follow-btn.is-following .sug-btn-text-unfollow {
+		display: none;
+	}
+	.sug-follow-btn.is-following .sug-btn-icon-check,
+	.sug-follow-btn.is-following .sug-btn-text-following {
+		display: inline-block;
+	}
+	.sug-follow-btn.is-following .sug-btn-icon-check {
+		font-size: 13px;
+		color: var(--aero-mint, #00d4aa);
+	}
+
+	.sug-follow-btn.is-following:hover {
+		background: rgba(236, 72, 153, 0.12);
+		border-color: rgba(236, 72, 153, 0.35);
+		color: var(--aero-rose, #ec4899);
+	}
+	.sug-follow-btn.is-following:hover .sug-btn-icon-check,
+	.sug-follow-btn.is-following:hover .sug-btn-text-following {
+		display: none;
+	}
+	.sug-follow-btn.is-following:hover .sug-btn-icon-unfollow,
+	.sug-follow-btn.is-following:hover .sug-btn-text-unfollow {
+		display: inline-block;
+	}
+	.sug-follow-btn.is-following:hover .sug-btn-icon-unfollow {
+		font-size: 13px;
+	}
+
+	/* Skeleton & Empty States */
+	.sug-skeleton-item {
+		background: var(--glass-surface, rgba(255, 255, 255, 0.04));
+		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.06));
+	}
+	.sug-skeleton-avatar,
+	.sug-skeleton-bar,
+	.sug-skeleton-btn {
+		background: var(--glass-surface, rgba(255, 255, 255, 0.1));
+	}
+	.shimmer {
+		position: relative;
+		overflow: hidden;
+	}
+	.shimmer::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		transform: translateX(-100%);
+		background: linear-gradient(
+			90deg,
+			transparent 0%,
+			rgba(255, 255, 255, 0.15) 50%,
+			transparent 100%
+		);
+		animation: sug-shimmer 1.8s infinite;
+	}
+	@keyframes sug-shimmer {
+		100% {
+			transform: translateX(100%);
+		}
+	}
+
+	.sug-empty-icon {
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-full);
+		background: rgba(27, 133, 243, 0.1);
+		border: 1px solid rgba(27, 133, 243, 0.25);
+		color: var(--aero-blue, #1b85f3);
 	}
 	.text-main {
 		color: var(--text-primary);
@@ -2796,27 +3366,61 @@
 	.composer-card {
 		position: relative;
 		background: var(--bg-surface);
-		border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.12));
+		border: 1px solid var(--border-glass, var(--glass-border));
 		backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
 		-webkit-backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
 		border-radius: var(--radius-xl, 22px);
-		box-shadow:
-			0 8px 32px rgba(0, 0, 0, 0.12),
-			var(--glass-inset-highlight);
 		transition:
 			border-color 0.25s var(--ease-out),
-			box-shadow 0.25s var(--ease-out);
+			background-color 0.25s var(--ease-out);
 	}
 	.composer-card:focus-within {
 		border-color: rgba(27, 133, 243, 0.4);
+	}
+
+	/* Composer compactable: estado inicial 1 línea, expande al enfocar */
+	.composer-input-wrapper.composer-compact :global(.hashtag-wrapper) {
+		min-height: 0;
+	}
+	.composer-input-wrapper.composer-compact :global(.hashtag-input),
+	.composer-input-wrapper.composer-compact :global(.hashtag-backdrop) {
+		height: 38px;
+		overflow: hidden;
+	}
+	/* Transición suave al expandir/colapsar */
+	.composer-input-wrapper {
+		transition:
+			border-color 0.25s var(--ease-out),
+			box-shadow 0.25s var(--ease-out),
+			min-height 0.3s var(--ease-out),
+			background 0.25s var(--ease-out);
+	}
+	.composer-input-wrapper :global(.hashtag-wrapper),
+	.composer-input-wrapper :global(.hashtag-input),
+	.composer-input-wrapper :global(.hashtag-backdrop) {
+		transition:
+			height 0.3s var(--ease-out),
+			min-height 0.3s var(--ease-out);
+	}
+	.composer-input-wrapper:not(.composer-compact) :global(.hashtag-input),
+	.composer-input-wrapper:not(.composer-compact) :global(.hashtag-backdrop) {
+		min-height: 80px;
+	}
+	/* El hueco compacto invita al clic: cursor y borde acento en hover */
+	.composer-input-wrapper.composer-compact {
+		cursor: text;
+	}
+	.composer-input-wrapper.composer-compact:hover {
+		border-color: rgba(var(--accent-blue-rgb), 0.4);
 		box-shadow:
-			0 10px 36px rgba(27, 133, 243, 0.12),
-			var(--glass-inset-highlight);
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.1),
+			var(--glass-inset-highlight),
+			inset 0 1px 3px rgba(0, 0, 0, 0.04);
 	}
 
 	.composer-user-avatar {
 		border: 2px solid rgba(255, 255, 255, 0.15);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
 		transition: transform 0.2s var(--ease-out);
 	}
 	.composer-user-avatar:hover {
@@ -2902,9 +3506,7 @@
 	.anon-mode-text {
 		color: var(--anon-text, var(--text-secondary));
 	}
-	.anon-mode-pill .anon-icon {
-		color: var(--anon-accent, #4f46e5);
-	}
+
 	.anon-mode-deactivate {
 		font-size: 0.75rem;
 		color: var(--anon-text, #4f46e5);
@@ -2933,28 +3535,27 @@
 		font-weight: 700;
 	}
 
-	.composer-attached-music {
-		background: var(--anon-bg, rgba(99, 102, 241, 0.12));
-		border: 1px solid var(--anon-border, rgba(99, 102, 241, 0.35));
-		color: var(--anon-text, #4338ca);
-	}
-
-	/* ── Textarea Input Box ── */
+	/* ── Textarea Input Box ──
+	   Legibilidad absoluta: contraste máximo sobre cristal, caret cyan
+	   y tracking/leading pensados para sesiones de lectura largas. */
 	.composer-input-wrapper {
 		position: relative;
 		border-radius: var(--radius-md, 14px);
-		background: var(--bg-overlay, rgba(255, 255, 255, 0.03));
-		border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
-		box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+		background: var(--bg-input, rgba(255, 255, 255, 0.05));
+		border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+		box-shadow:
+			var(--glass-inset-highlight),
+			inset 0 2px 6px rgba(0, 0, 0, 0.06);
 		transition: all 0.2s var(--ease-out);
 		overflow: hidden;
 	}
 	.composer-input-wrapper:focus-within {
-		background: var(--bg-surface, rgba(255, 255, 255, 0.05));
-		border-color: rgba(27, 133, 243, 0.4);
+		background: var(--bg-surface);
+		border-color: rgba(var(--accent-blue-rgb), 0.5);
 		box-shadow:
-			0 0 0 3px rgba(27, 133, 243, 0.12),
-			inset 0 1px 3px rgba(0, 0, 0, 0.05);
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.14),
+			var(--glass-inset-highlight),
+			inset 0 1px 3px rgba(0, 0, 0, 0.04);
 	}
 	:global(.composer-input-wrapper .hashtag-wrapper) {
 		width: 100%;
@@ -2964,19 +3565,37 @@
 	:global(.composer-input-wrapper .hashtag-input) {
 		padding: 12px 14px !important;
 		font-size: 0.95rem !important;
-		line-height: 1.55 !important;
+		font-weight: 450;
+		line-height: 1.6 !important;
+		letter-spacing: 0.011em;
+	}
+	/* El textarea real es transparente por diseño (el backdrop renderiza el texto
+	   con highlights); aquí solo afinamos caret y el render del backdrop. */
+	:global(.composer-input-wrapper .hashtag-input) {
+		caret-color: var(--aero-sky) !important;
+	}
+	:global(.composer-input-wrapper .hashtag-backdrop) {
+		color: var(--text-primary) !important;
+	}
+	:global(.composer-input-wrapper .hashtag-input::placeholder) {
+		color: var(--text-muted);
+		opacity: 0.9;
 	}
 
-	/* ── Toolbar Icon Buttons ── */
+	/* ── Toolbar Icon Buttons ──
+	   Rejilla matemática: tiles de 36px exactos, gap uniforme de 6px,
+	   íconos de 20px centrados en su celda (sin desviaciones ópticas). */
 	.composer-tools {
 		display: flex;
 		align-items: center;
-		gap: 3px;
+		gap: 6px;
+		padding: 2px 0;
 	}
 	.tool-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		flex: 0 0 36px;
 		width: 36px;
 		height: 36px;
 		border-radius: var(--radius-squircle);
@@ -2986,9 +3605,12 @@
 		color: var(--text-muted);
 		cursor: pointer;
 		transition: all 0.2s var(--ease-spring);
+		/* Refracción sin parpadeo: capa GPU estable */
+		transform: translateZ(0);
 	}
 	.tool-btn .material-icons-round {
 		font-size: 20px;
+		display: block;
 		transition:
 			transform 0.2s var(--ease-spring),
 			color 0.2s ease;
@@ -3002,31 +3624,51 @@
 		transform: scale(0.92);
 	}
 
-	/* Hover colors */
-	.tool-media:hover {
+	/* Hover & Active colors */
+	.tool-media:hover,
+	.tool-media.active {
 		color: var(--aero-mint, #00d4aa);
 		border-color: rgba(0, 212, 170, 0.35);
-		background: rgba(0, 212, 170, 0.1);
+		background: rgba(0, 212, 170, 0.12);
 	}
-	.tool-gif:hover {
+	.tool-media.active {
+		box-shadow: 0 0 10px rgba(0, 212, 170, 0.25);
+	}
+	.tool-gif:hover,
+	.tool-gif.active {
 		color: var(--aero-amber, #f5a623);
 		border-color: rgba(245, 166, 35, 0.35);
-		background: rgba(245, 166, 35, 0.1);
+		background: rgba(245, 166, 35, 0.12);
 	}
-	.tool-emoji:hover {
+	.tool-gif.active {
+		box-shadow: 0 0 10px rgba(245, 166, 35, 0.25);
+	}
+	.tool-emoji:hover,
+	.tool-emoji.active {
 		color: var(--aero-sky, #2eb4ff);
 		border-color: rgba(46, 180, 255, 0.35);
-		background: rgba(46, 180, 255, 0.1);
+		background: rgba(46, 180, 255, 0.12);
 	}
-	.tool-poll:hover {
+	.tool-emoji.active {
+		box-shadow: 0 0 10px rgba(46, 180, 255, 0.25);
+	}
+	.tool-poll:hover,
+	.tool-poll.active {
 		color: var(--aero-blue, #1b85f3);
 		border-color: rgba(27, 133, 243, 0.35);
-		background: rgba(27, 133, 243, 0.1);
+		background: rgba(27, 133, 243, 0.12);
 	}
-	.tool-voice:hover {
+	.tool-poll.active {
+		box-shadow: 0 0 10px rgba(27, 133, 243, 0.25);
+	}
+	.tool-voice:hover,
+	.tool-voice.active {
 		color: var(--accent-blue-base, #1b85f3);
 		border-color: rgba(27, 133, 243, 0.35);
-		background: rgba(27, 133, 243, 0.1);
+		background: rgba(27, 133, 243, 0.12);
+	}
+	.tool-voice.active {
+		box-shadow: 0 0 10px rgba(27, 133, 243, 0.25);
 	}
 
 	.tool-anon:hover {
@@ -3069,24 +3711,28 @@
 		transform: scale(0.92);
 	}
 
-	/* ── Publish Button ── */
+	/* ── Publish Button ──
+	   Degradado cyan sutil + radio consistente con la norma de botones
+	   (píldora estándar, 9999px), brillo especular superior e inner glossy. */
 	.composer-publish-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		padding: 8px 20px;
+		padding: 9px 22px;
 		border-radius: var(--radius-full, 9999px);
 		border: 1px solid rgba(255, 255, 255, 0.35);
-		background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
-		color: #ffffff;
+		background: var(--grad-primary, linear-gradient(135deg, #0ea5e9 0%, #22d3ee 100%));
+		color: var(--text-on-accent, #ffffff);
 		font-family: var(--font-sans);
 		font-size: 0.85rem;
 		font-weight: 700;
-		letter-spacing: 0.01em;
+		letter-spacing: 0.02em;
 		cursor: pointer;
 		box-shadow:
 			0 4px 18px rgba(14, 165, 233, 0.35),
-			inset 0 1px 1px rgba(255, 255, 255, 0.4);
+			inset 0 1px 1px rgba(255, 255, 255, 0.45),
+			inset 0 -3px 8px rgba(0, 90, 120, 0.25);
+		text-shadow: var(--btn-primary-text-shadow, none);
 		transition: all 0.2s var(--ease-spring);
 	}
 	.composer-publish-btn:hover:not(:disabled) {
@@ -3106,25 +3752,107 @@
 		box-shadow: none;
 	}
 
-	/* ── Feed Area Nav Tabs (Segmented Control) ── */
-	.feed-area-nav {
+	/* ── Banda de Filtrado (Para Ti / Siguiendo / Rincón Anónimo / Algoritmo) ──
+	   Banda horizontal dedicada entre el Top Header y la columna central.
+	   Cristal multicapa: desenfoque + línea especular superior + ruido sutil. */
+	.feed-filter-band {
+		position: relative;
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 5px;
-		border: 1px solid var(--border-subtle);
+		justify-content: space-between;
+		gap: 4px;
+		padding: 6px 8px;
+		margin: 0 0 0.75rem;
+		border-radius: var(--radius-xl, 20px);
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
 		-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
-		border-radius: var(--radius-xl, 20px);
-		box-shadow: var(--shadow-sm, 0 4px 16px rgba(0, 0, 0, 0.04)), var(--glass-inset-highlight);
+		border: 1px solid var(--border-glass, var(--glass-border));
 		overflow-x: auto;
 		overflow-y: hidden;
 		scrollbar-width: none;
 		-ms-overflow-style: none;
+		transform: translateZ(0);
 	}
-	.feed-area-nav::-webkit-scrollbar {
+	.feed-filter-band::-webkit-scrollbar {
 		display: none;
+	}
+	/* Línea especular superior (refracción de luz del cristal) */
+	.feed-filter-band::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 10%;
+		right: 10%;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+		pointer-events: none;
+		z-index: 1;
+	}
+	.feed-filter-band > * {
+		position: relative;
+	} /* ── Móvil (≤640px): el diseño se mantiene IGUAL (fila única, mismas
+	   piezas), solo se compactan las píldoras y se hace VISIBLE el scroll
+	   horizontal (barra fina cyan) para que el desbordamiento se entienda
+	   como deslizable en vez de parecer recortado. */
+	@media (max-width: 639px) {
+		.feed-filter-band {
+			flex-wrap: nowrap;
+			justify-content: flex-start;
+			gap: 6px;
+			padding: 6px;
+			scrollbar-width: thin;
+			scrollbar-color: color-mix(in srgb, var(--aero-blue) 45%, transparent) transparent;
+		}
+		.feed-filter-band::-webkit-scrollbar {
+			height: 3px;
+			display: block;
+		}
+		.feed-filter-band::-webkit-scrollbar-track {
+			background: transparent;
+		}
+		.feed-filter-band::-webkit-scrollbar-thumb {
+			background: color-mix(in srgb, var(--aero-blue) 45%, transparent);
+			border-radius: var(--radius-full, 999px);
+		}
+		.feed-area-btn {
+			padding: 0 12px;
+			gap: 6px;
+		}
+		.feed-area-btn .tab-icon {
+			font-size: 16px;
+		}
+		.feed-nav-divider {
+			display: none;
+		}
+		.aqua-algo-btn {
+			padding: 0 12px;
+		}
+
+		/* Stories: SE conservan los slots relleno (fila completa igual que
+		   escritorio); solo se vuelve visible su scroll fino horizontal y se
+		   da respiro a las tarjetas al deslizar. */
+		.feed-col-center .glass-panel.hide-scrollbar {
+			scrollbar-width: thin;
+			scrollbar-color: color-mix(in srgb, var(--aero-blue) 45%, transparent) transparent;
+			scroll-padding-inline: 8px;
+		}
+		.feed-col-center .glass-panel.hide-scrollbar::-webkit-scrollbar {
+			height: 3px;
+			display: block;
+		}
+		.feed-col-center .glass-panel.hide-scrollbar::-webkit-scrollbar-track {
+			background: transparent;
+		}
+		.feed-col-center .glass-panel.hide-scrollbar::-webkit-scrollbar-thumb {
+			background: color-mix(in srgb, var(--aero-blue) 45%, transparent);
+			border-radius: var(--radius-full, 999px);
+		}
+	}
+
+	/* Tabs: estado activo con línea de acento cyan + brillo volumétrico en la base */
+	.feed-area-btn {
+		--tab-accent: var(--aero-sky);
 	}
 
 	.feed-area-btn {
@@ -3133,6 +3861,7 @@
 		align-items: center;
 		justify-content: center;
 		gap: 8px;
+		flex: 0 0 auto;
 		height: 38px;
 		padding: 0 14px;
 		background: transparent;
@@ -3175,52 +3904,36 @@
 		transform: scale(0.98);
 	}
 
-	/* Active Tab States */
+	/* Active Tab States - Gel Aqua Capsules */
 	.feed-area-btn.active {
 		font-weight: 700;
-		color: var(--text-primary);
-		background: linear-gradient(
-			135deg,
-			rgba(var(--accent-blue-rgb), 0.16) 0%,
-			rgba(46, 180, 255, 0.1) 100%
-		);
-		border-color: rgba(var(--accent-blue-rgb), 0.32);
+		color: #ffffff;
+		background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+		border-color: rgba(255, 255, 255, 0.65);
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 		box-shadow:
-			0 2px 8px rgba(var(--accent-blue-rgb), 0.18),
-			var(--glass-inset-highlight);
+			inset 0 1px 2px rgba(255, 255, 255, 0.8),
+			0 4px 14px rgba(2, 132, 199, 0.35);
 	}
 	.feed-area-btn.active .tab-icon {
-		color: var(--accent-blue-base, #1b85f3);
-		filter: drop-shadow(0 0 6px rgba(var(--accent-blue-rgb), 0.4));
+		color: #ffffff;
+		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 	}
 	.feed-area-btn.active:hover {
-		filter: brightness(1.06);
+		filter: brightness(1.08);
 	}
 
 	.feed-area-btn.feed-area-following.active {
-		background: linear-gradient(135deg, rgba(0, 212, 170, 0.16) 0%, rgba(14, 165, 233, 0.1) 100%);
-		border-color: rgba(0, 212, 170, 0.35);
-		color: var(--text-primary);
+		background: linear-gradient(180deg, #2dd4bf 0%, #0d9488 100%);
 		box-shadow:
-			0 2px 8px rgba(0, 212, 170, 0.18),
-			var(--glass-inset-highlight);
+			inset 0 1px 2px rgba(255, 255, 255, 0.8),
+			0 4px 14px rgba(13, 148, 136, 0.35);
 	}
-	.feed-area-btn.feed-area-following.active .tab-icon {
-		color: #00d4aa;
-		filter: drop-shadow(0 0 6px rgba(0, 212, 170, 0.4));
-	}
-
 	.feed-area-btn.feed-area-anon.active {
-		background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%);
-		border-color: rgba(168, 85, 247, 0.35);
-		color: var(--text-primary);
+		background: linear-gradient(180deg, #c084fc 0%, #7c3aed 100%);
 		box-shadow:
-			0 2px 8px rgba(168, 85, 247, 0.2),
-			var(--glass-inset-highlight);
-	}
-	.feed-area-btn.feed-area-anon.active .tab-icon {
-		color: #a855f7;
-		filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4));
+			inset 0 1px 2px rgba(255, 255, 255, 0.8),
+			0 4px 14px rgba(124, 58, 237, 0.35);
 	}
 
 	.feed-nav-divider {
@@ -3324,24 +4037,93 @@
 		letter-spacing: 0.05em;
 		pointer-events: none;
 	}
+	/* Cuadrícula adaptativa de adjuntos (estilo X / Facebook) */
 	.media-preview-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-		gap: 10px;
+		grid-template-columns: 1fr 1fr;
+		grid-auto-rows: 1fr;
+		gap: 6px;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
 		animation: fadeIn 0.2s ease;
+	}
+	.media-preview-grid.grid-count-1 {
+		display: flex;
+		justify-content: center;
+		background: transparent;
+	}
+	.media-preview-grid.grid-count-3 .media-preview-item:first-child {
+		grid-row: span 2;
+	}
+	.media-preview-grid.grid-count-4 {
+		grid-template-rows: 1fr 1fr;
 	}
 	.media-preview-item {
 		position: relative;
 		border-radius: var(--radius-sm);
 		overflow: hidden;
-		aspect-ratio: 1;
+		aspect-ratio: 16 / 9;
 		box-shadow: var(--shadow-sm);
 		background: var(--bg-overlay);
+	}
+	.media-preview-grid.grid-count-1 .media-preview-item {
+		aspect-ratio: auto;
+		max-height: 420px;
+		width: auto;
+		max-width: 100%;
+		background: transparent;
+		box-shadow: none;
+	}
+	.media-preview-grid.grid-count-1 .preview-thumb {
+		width: auto;
+		max-width: 100%;
+		height: auto;
+		max-height: 420px;
+		margin: 0 auto;
+		display: block;
+		border-radius: var(--radius-sm);
+		box-shadow: var(--shadow-sm);
 	}
 	.preview-thumb {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+
+	/* Overlay Drag & Drop sobre el compositor */
+	.composer-card.drag-over {
+		border-color: rgba(34, 211, 238, 0.7);
+		box-shadow:
+			0 0 0 3px rgba(34, 211, 238, 0.25),
+			0 10px 36px rgba(34, 211, 238, 0.15),
+			var(--glass-inset-highlight);
+	}
+	.composer-drag-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 60;
+		border-radius: inherit;
+		background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+	}
+	.composer-drag-badge {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 12px 20px;
+		border-radius: var(--radius-full);
+		border: 2px dashed rgba(34, 211, 238, 0.6);
+		background: rgba(34, 211, 238, 0.1);
+		color: var(--aero-sky, #38bdf8);
+		font-weight: 800;
+		font-size: 0.85rem;
+		box-shadow:
+			var(--shadow-md),
+			0 0 16px rgba(34, 211, 238, 0.35);
 	}
 	.media-type-badge {
 		position: absolute;

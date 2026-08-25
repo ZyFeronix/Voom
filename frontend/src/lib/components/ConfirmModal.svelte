@@ -3,16 +3,14 @@
 	import { backOut } from 'svelte/easing';
 	import { uiStore } from '$lib/stores/ui.svelte.js';
 
-	let confirmData = $derived(uiStore.confirmData);
+	let confirmData = $derived(uiStore.confirmRequest);
 
 	function handleConfirm() {
-		if (confirmData?.onConfirm) {
-			confirmData.onConfirm();
-		}
+		uiStore.resolveConfirm(true);
 	}
 
 	function handleCancel() {
-		uiStore.dismissConfirm();
+		uiStore.resolveConfirm(false);
 	}
 
 	function handleKeydown(e) {
@@ -74,7 +72,8 @@
 		inset: 0;
 		z-index: 1000;
 		background: rgba(0, 0, 0, 0.45);
-		backdrop-filter: blur(6px);
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -154,9 +153,9 @@
 
 	/* Theme Day Overrides */
 	:global([data-theme='light']) .confirm-modal-card {
-		background: #ffffff;
-		border-color: rgba(0, 0, 0, 0.1);
-		box-shadow: 0 20px 45px rgba(0, 40, 90, 0.15);
+		background: var(--bg-surface);
+		border-color: var(--border-subtle);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 
 	:global([data-theme='light']) .confirm-icon-wrapper {

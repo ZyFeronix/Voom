@@ -1957,6 +1957,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		content: '';
 		position: absolute;
 		inset: 0;
+		border-radius: inherit;
 		background: var(--noise-texture);
 		opacity: 0.015;
 		mix-blend-mode: overlay;
@@ -1971,6 +1972,8 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		left: 0;
 		right: 0;
 		height: 1px;
+		border-top-left-radius: inherit;
+		border-top-right-radius: inherit;
 		background: linear-gradient(
 			90deg,
 			transparent,
@@ -2242,7 +2245,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		backdrop-filter: blur(24px) saturate(1.4);
 		-webkit-backdrop-filter: blur(24px) saturate(1.4);
 		border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.14));
-		box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 		padding: 1.25rem 1.25rem 1.5rem;
 		display: flex;
 		flex-direction: column;
@@ -2252,7 +2255,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 	:global([data-theme='light']) .mobile-nav-drawer {
 		background: #ffffff;
 		border: 1px solid rgba(0, 0, 0, 0.1);
-		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 	.mobile-nav-list {
 		display: flex;
