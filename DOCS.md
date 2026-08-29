@@ -740,28 +740,50 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 | `visibility.js` | Acceso por visibilidad de perfil (`public`/`followers`/`friends`). |
 | `user-settings.js` | Validación de updates de `user_settings` (compartida con tests). |
 | `design/sanitize.js` | Sanitizador isomórfico del CSS custom de perfil. |
+| `email.js` | Motor de email async (Nodemailer): verificación y reset de contraseña con `email_tokens`; SMTP desde `system_settings`. |
+| `roles.js` | Jerarquía y permisos del staff multi-rol (`requirePerm`, `roleHasPerm`). |
+| `audit.js` | Auditoría del staff en `admin_audit_logs` (`logAdminAction`, best-effort). |
+| `invites.js` | Códigos de invitación: generación, validación y consumo atómico. |
 | `utils/sound.js` | Sonido de zumbido del chat (`/sounds/nudge.mp3`), precalentado tras el primer gesto del usuario. |
 | `features.svelte.js` | Store de feature flags servidos por `system_settings`. |
 | `svelte.config.js` | Runes mode forzado (excepto node_modules), adapter-node con precompress. |
-| `Dockerfile` | Multi-stage build (alpine), output precomprimido. |
-| `docker-compose.yml` | Single service + healthcheck + volumen persistente. |
-| `nginx.conf` | Proxy reverso WebSocket-ready, buffering off. |
+| `Dockerfile` | Multi-stage (node:20-slim): layout espejo del dev, CMD sobre `server.js` (SvelteKit + Socket.IO), runtime con deps de producción. |
+| `docker-entrypoint.sh` | Genera/persiste JWT_SECRET en el volumen y aplica migraciones solo en upgrades. |
+| `docker-compose.yml` | Stack de producción: app + Caddy (HTTPS automático) + backups opcionales (profile). |
+| `Caddyfile` | TLS automático de Let's Encrypt para el dominio; proxy al contenedor. |
+| `DEPLOY.md` | Guía de instalación paso a paso para no avanzados (VPS + Portainer). |
+| `nginx.conf` | Proxy reverso alternativo WebSocket-ready, buffering off. |
 | `server.js` | Entrypoint de producción standalone. |
 
 ---
 
 ## 17. Roadmap
 
-Pendiente:
+### ✅ Completado (v0.6.0-beta.2 — hito beta cerrada voom.social)
 
-- [ ] Sincronización in-memory para múltiples instancias Node
-- [ ] Cola de workers interna para emails, push, thumbnails
-- [ ] Optimización continua en Turso/SQLite
-- [x] CI/CD pipeline (GitHub Actions) — `.github/workflows/ci.yml` corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`, con cancelación de runs obsoletos y subida del artifact `build/`. Mirror a GitLab en `.github/workflows/sync.yml` (solo `main`, solo cambios de contenido).
-- [x] Suites de tests Vitest — 17 suites (227 tests, todos en verde) en `tests/`: auth, settings, feed-algorithm (con regresión anti-gaming del council), messages_adversarial, appearance_adversarial, moderation_strikes, verifications, voomojis, invites, email, reposts, anonymous posts, anon identities, custom assets, design, gamification y marketplace. Se ejecutan con `cd frontend && npm run test`.
-- [ ] Tests de integración y e2e (Playwright)
-- [x] Gestión self-service de sesiones activas (`/settings/security`)
-- [ ] Web Push real (VAPID): la tabla `web_push_subscriptions` existe; falta el envío
+- [x] **Beta cerrada con códigos de invitación** (migración `019`): gate de registro, generación por lotes con usos/expiración, trazabilidad por usuario, panel `/admin/invites`.
+- [x] **Email operativo**: verificación de correo, recuperación de contraseña (revoca sesiones), reenvío con cooldown; `email.js` async sobre Nodemailer con SMTP desde `/admin/apis`.
+- [x] **Modo Mantenimiento y Modo Demo con enforcement** real en `hooks.server.js` (503 API / página pública `/maintenance`; solo-lectura en demo).
+- [x] **Staff multi-rol con auditoría** (migración `018`): roles admin/super_admin/moderador/soporte/equipo, permisos granulares, `admin_audit_logs`, tablón de anuncios internos.
+- [x] **Despliegue Docker pegar-y-listo**: imagen con Socket.IO funcional, stack Caddy con HTTPS automático, entrypoint con JWT_SECRET persistente y migraciones en upgrade, backups diarios opcionales, CI que publica a GHCR, guía `DEPLOY.md`.
+- [x] **Apariencia global por usuario (016) + Frutiger Aero Engine (017)**: hub `/settings/design` con presets de 1 clic, cristal/radios/gloss/wallpaper.
+- [x] **Fixes del council del feed**: regresión anti-auto-gaming testada end-to-end, over-fetch de diversidad 60-80 candidatos.
+- [x] **Apariencia y mensajería rediseñadas**: /messages Retro-Aero full-bleed (zumbido, WebRTC arreglado, overlay móvil), Leaderboard con podio, ajustes modularizados en 10 sub-secciones.
+- [x] **Perfiles de rendimiento** lite/balanced/high con benchmark FPS, HUD, luz ambiental reactiva y fuentes autoalojadas.
+- [x] CI/CD pipeline (GitHub Actions) — `.github/workflows/ci.yml` corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`; `.github/workflows/docker-publish.yml` publica la imagen a GHCR en cada tag `v*`. Mirror a GitLab en `sync.yml`.
+- [x] Suites de tests Vitest — 17 suites (227 tests, todos en verde) en `tests/`: auth, settings, feed-algorithm (regresión anti-gaming), messages_adversarial, appearance_adversarial, moderation_strikes, verifications, voomojis, invites, email, reposts, anonymous_posts, anon_identities, custom_assets, design, gamification y marketplace.
+- [x] Gestión self-service de sesiones activas (`/settings/security`).
+
+### 🔜 Pendiente
+
+- [ ] **Emotes personalizados estilo Discord** (`:shortcode:` + tablas `custom_emotes`/`emote_collections`) — fase 2 de REQUERIMIENTOS.
+- [ ] **Grupos y Comunidades**: tablas y flag existen (`groups_enabled`); falta UI/API (WIP).
+- [ ] **OAuth Google/Apple**: lógica backend en `oauth.js`; faltan inputs de credenciales en la UI y el flujo de login.
+- [ ] **Web Push real (VAPID)**: la tabla `web_push_subscriptions` existe; falta el envío.
+- [ ] Sincronización in-memory para múltiples instancias Node (los crons con `setInterval` no escalan a PM2 cluster).
+- [ ] Cola de workers interna para emails, push, thumbnails.
+- [ ] Optimización continua en Turso/SQLite (remote libSQL ya soportado por el adaptador).
+- [ ] Tests de integración y e2e (Playwright) para flujos críticos (mensajería, reels, registro con invitación).
 
 ---
 

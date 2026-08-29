@@ -53,6 +53,9 @@ cd frontend
 npm run dev
 ```
 
+> **Producción:** la vía soportada es Docker + Portainer con HTTPS automático —
+> sigue [`DEPLOY.md`](./DEPLOY.md) (VPS → DNS → stack → asistente web).
+
 ---
 
 ## Branch Strategy
@@ -75,7 +78,8 @@ Types: `feat`, `fix`, `refactor`, `style`, `docs`, `test`, `chore`, `perf`
 
 Scopes: `auth`, `feed`, `posts`, `reels`, `stories`, `marketplace`, `messages`,
 `notifications`, `gigs`, `admin`, `groups`, `pages`, `db`, `ui`,
-`security`, `api`, `gamification`, `docs`, `deps`, `gdpr`, `legal`, `settings`
+`security`, `api`, `gamification`, `docs`, `deps`, `gdpr`, `legal`, `settings`,
+`design`, `invites`, `email`, `deploy`
 
 Examples:
 ```
@@ -139,9 +143,9 @@ npm run test:watch  # watch mode
 
 - Unit tests for server modules and utilities.
 - Integration tests for API endpoints.
-- Current suites (12, 126 tests) in `tests/` (note: the folder is gitignored — local development only): `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`, `design.test.js`, `settings.test.js`, `gamification.test.js`, `marketplace.test.js`.
+- Current suites (17, 227 tests) in `tests/` (note: the folder is gitignored — local development only): `auth.test.js`, `settings.test.js`, `feed-algorithm.test.js` (incl. council anti-gaming regression), `messages_adversarial.test.js`, `appearance_adversarial.test.js`, `moderation_strikes.test.js`, `verifications.test.js`, `voomojis.test.js`, `invites.test.js`, `email.test.js`, `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `design.test.js`, `gamification.test.js`, `marketplace.test.js`.
 - Run a single suite from the repo root: `npx vitest run tests/auth.test.js` (or filter with `-t "<name>"`).
-- Add tests in `tests/` with `.test.js` extension.
+- Add tests in `tests/` with `.test.js` extension. The harness imports `../frontend/src/...`, uses the real dev DB (`initDb()`/`closeDb()` in beforeAll/afterAll) and unique fixture usernames with cleanup in `finally`.
 
 ---
 
@@ -181,8 +185,9 @@ Good first contributions:
 1. **Add tests** — coverage can always improve. Add Vitest tests for API endpoints and DB queries.
 2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
 3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Testing** – 12 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
-6. **Email templates** — improve verification and password reset email HTML.
+4. **E2E testing** — 17 suites exist (`tests/`); add Playwright E2E for critical flows (messaging, reels, invite-code registration).
+5. **Email templates** — polish the verification/reset email HTML in `lib/server/email.js` (keep links absolute).
+6. **Self-hosting** — try `DEPLOY.md` on a fresh VPS and report friction; the stack (Caddy + backups) is the happy path for beta operators.
 
 ---
 

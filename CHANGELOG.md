@@ -42,7 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Saldrá como **v0.6.0-beta.2** — hito de beta cerrada (invitaciones, email operativo, despliegue Docker pegar-y-listo)._
+## [0.6.0-beta.2] - 2026-08-29
+
+_Hito de la beta cerrada en voom.social: códigos de invitación, email operativo (verificación + reset de contraseña), enforcement de mantenimiento/demo y despliegue Docker pegar-y-listo con HTTPS automático._
 
 ### Added (beta cerrada voom.social)
 - **Códigos de invitación (migración `019`):** registro por invitación para la beta cerrada. Nueva tabla `invite_codes` (formato `VOOM-XXXX-XXXX`, usos máximos, expiración, activación, nota interna) + `invite_uses` (trazabilidad de qué usuario entró con cada código). Consumo **atómico** con reversión (`lib/server/invites.js`): tolera registros concurrentes con el último cupo. Gate en la rama `register` con parse tolerante de flags; panel **/admin/invites** (generación por lotes, activar/desactivar, copiar, stats) + toggle «Registro Solo con Invitación» en /admin/settings + endpoint público `GET /api/auth/config`. Suite `tests/invites.test.js` (10 tests).

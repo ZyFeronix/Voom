@@ -30,9 +30,9 @@
 
 ---
 
-## 2. Esquema Relacional de Base de Datos (14 Dominios)
+## 2. Esquema Relacional de Base de Datos (15 Dominios)
 
-El esquema canónico único reside en `schema_sqlite.sql` (949 líneas SQL idempotentes con `CREATE TABLE IF NOT EXISTS`). La estructura cubre 14 dominios funcionales:
+El esquema canónico único reside en `schema_sqlite.sql` (1039 líneas SQL idempotentes con `CREATE TABLE IF NOT EXISTS`). La estructura cubre 15 dominios funcionales:
 
 ```mermaid
 erDiagram
@@ -208,6 +208,11 @@ Cumplimiento estricto y verificado de los derechos del interesado (Artículos 15
 Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas técnicas integradas desde la versión anterior:
 
 ### 🚀 Nuevas Implementaciones (Added)
+- **Códigos de Invitación — Beta Cerrada (migración `019`):** registro por invitación con códigos `VOOM-XXXX-XXXX` (`invite_codes` + `invite_uses`), consumo **atómino** con reversión (`lib/server/invites.js`), gate en el registro gobernado por `require_invite_code`, panel `/admin/invites` (lotes, usos máximos, expiración, trazabilidad por usuario) y endpoint público `GET /api/auth/config`.
+- **Email Operativo — Verificación y Reset:** `email.js` reescrito a async sobre Nodemailer (SMTP desde `/admin/apis`); endpoints `forgot-password` / `reset-password` (revoca todas las sesiones), `verify-email` y `resend-verification` con cooldown; página `/reset-password`; enforcement opcional de `email_verification_required` en el login; enlaces de email absolutos.
+- **Modo Mantenimiento y Modo Demo con Enforcement:** guard en `hooks.server.js` — 503 en API y página pública `/maintenance` durante mantenimiento (bypass staff por Bearer o cookie, `/admin` exento); demo mode bloquea mutaciones de no-staff (403).
+- **Staff Multi-Rol con Auditoría (migración `018`):** jerarquía admin/super_admin/moderador/soporte/equipo con permisos granulares (`roles.js`, `requirePerm`), auditoría completa en `admin_audit_logs` (`audit.js`), tablón de anuncios internos y paneles `/admin/team`, `/admin/audit`, `/admin/strikes`.
+- **Despliegue Docker Pegar-y-Listo:** Dockerfile con layout espejo del dev y CMD sobre `server.js` (Socket.IO vivo en el contenedor), entrypoint con JWT_SECRET persistente y migraciones en upgrade, stack con **Caddy (HTTPS automático)**, `ORIGIN`/`TRUST_PROXY`/`BODY_SIZE_LIMIT` correctos, backups diarios opcionales, CI que publica a `ghcr.io` y guía `DEPLOY.md`.
 - **Algoritmos de Feed Transparentes:** Implementación de Radar en Vivo (cronológico puro), Feed Inteligente (afinidad abierta) y Descubrimiento (anti-monopolio).
 - **Sistema de Moods & Encuestas:** Selector con físicas elásticas, columna `posts.mood` y votación atómica en `[METADATA]` JSON.
 - **Editor de Stories Funcional (`/stories/create`):** Creación interactiva de historias visuales y de texto con previsualización móvil en vivo.
@@ -265,3 +270,8 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 - **Migraciones bajo el adaptador libsql:** `scripts/migrate-up.js` consumía la API async como síncrona y no aplicaba migraciones pendientes; corregido con `await` en todo el flujo.
 - **Doble barra de búsqueda:** el buscador global del TopBar se oculta en `/explore` (buscador hero propio) y `/marketplace` (filtro "Buscar en la tienda").
 - **Store de rendimiento endurecido:** saneamiento de `localStorage` con lista blanca de valores legítimos por clave (evita controles segmentados sin opción activa heredados de versiones anteriores).
+- **Email.js roto por el adaptador async:** el módulo usaba llamadas síncronas (`.get()/.run()` sin `await`) y nadie lo importaba — verificación y reset de contraseña no existían en la práctica; reescrito completo.
+- **Instalador desalineado:** `/api/install` creaba un admin con rol `admin` (sin permisos del panel multi-rol) y escribía flags como `'true'/'false'` (inconsistente con los lectores `'1'/'0'`); ahora crea `super_admin` verificado con flags normalizados y **stamp-a `_migrations`** para que las upgrades no re-apliquen la migración 001 (dialecto Postgres).
+- **Socket.IO muerto en Docker:** el CMD ejecutaba `build/index.js` (adapter-node puro) sin el servidor de sockets; ahora corre `server.js` con el layout espejado.
+- **Uploads rechazados en producción Docker:** el `BODY_SIZE_LIMIT` por defecto de adapter-node (512 KB) descartaba los archivos de hasta 50 MB; fijado a 52428800 en el stack.
+- **Validación de dimensiones en /api/upload:** avatar cuadrado ≥100px y portada banner 2:1–8:1 validados server-side con `image-size` (el servidor es fuente de verdad aunque el crop sea client-side).

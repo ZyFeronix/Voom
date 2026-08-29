@@ -32,18 +32,19 @@ Para quienes buscan el futuro, no el pasado.
 | **Pagos P2P** | Sin billetera ni pasarelas: enlace PayPal/Patreon/Ko-fi por usuario (`payment_link`); marketplace = catálogo/contacto |
 | **Reels** | Videos cortos con likes, comentarios, métricas y **thumbnails automáticos con ffmpeg** + aspect-ratio sin CLS |
 | **Stories** | Historias efímeras (24h) + highlights permanentes |
-| **Mensajería** | Chat DM + grupos con media, voz, replies, reacciones, typing indicators |
+| **Mensajería** | Chat DM + grupos rediseñado estilo MSN (Retro-Aero): media, voz, replies, reacciones, typing, **zumbido** y **llamadas WebRTC** (audio/video/pantalla) |
 | **Notificaciones** | HTTP polling con cursor + push Socket.IO en tiempo real, pestañas inteligentes, optimistic UI |
 | **Marketplace** | Categorías, listings con precio/condición/ubicación, detección de fraude |
 | **Freelance Gigs** | Tablón de encargos y postulaciones |
 | **Grupos & Páginas** | Tablas en schema + feature flag (`groups_enabled`); sin UI/API todavía |
 | **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas + skeleton) |
-| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, claves de APIs externas (`/admin/apis`), tags curados (`/admin/tags`), verificación de creadores y strikes |
+| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, claves de APIs externas (`/admin/apis`), tags curados (`/admin/tags`), verificación de creadores y strikes, **staff multi-rol con auditoría** (`/admin/team`, `/admin/audit`, roles admin/moderador/soporte/equipo) y **códigos de invitación** (`/admin/invites`) |
+| **Beta Cerrada & Email** | Registro por **códigos de invitación** (`VOOM-XXXX-XXXX`, usos/expiración/trazabilidad), **verificación de email** y **recuperación de contraseña** (Nodemailer, SMTP desde `/admin/apis`), modo mantenimiento y modo demo con enforcement real |
 | **Notificaciones Push** | En tiempo real vía Socket.IO (`new_notification`). Tabla `web_push_subscriptions` en schema; envío Web Push (VAPID) pendiente |
 | **Legal & RGPD** | Páginas `/privacy` `/terms` `/cookies`, banner de cookies, consentimiento + age gate 13+, borrado de cuenta con ventana de 30 días, exportación de datos JSON |
 | **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting (1000 req/min por IP / 2000 por usuario), CSRF, headers HSTS, bloqueos, snooze, anti-bots (reputación + heurísticas) |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
-| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado |
+| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado, **apariencia global por usuario** + **Frutiger Aero Engine** (presets, cristal, radios, gloss, wallpaper) y perfiles de rendimiento lite/balanced/high |
 
 ---
 
