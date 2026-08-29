@@ -45,7 +45,8 @@ export async function GET({ request, _url, params }) {
 				caption: s.caption,
 				background_color: s.background_color,
 				text_meta: s.text_meta,
-				created_at: s.created_at
+				created_at: s.created_at,
+				expires_at: s.expires_at
 			});
 		}
 		return json({ stories: Object.values(grouped) });

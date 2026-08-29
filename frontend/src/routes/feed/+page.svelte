@@ -981,6 +981,48 @@
 		clearInterval(storyInterval);
 	}
 
+	// ── Story footer: tiempo restante dinámico de la historia visible ──────
+	let storyRemaining = $state('');
+
+	/** El backend guarda DATETIME en UTC ('YYYY-MM-DD HH:MM:SS'). Lo interpreta como tal. */
+	function storyExpiryAt(item) {
+		if (item?.expires_at) {
+			const d = new Date(String(item.expires_at).replace(' ', 'T') + 'Z');
+			if (!isNaN(d.getTime())) return d;
+		}
+		// Fallback para datos antiguos en caché: 24h desde el alta.
+		if (item?.created_at) {
+			const d = new Date(String(item.created_at).replace(' ', 'T') + 'Z');
+			if (!isNaN(d.getTime())) return new Date(d.getTime() + 24 * 60 * 60 * 1000);
+		}
+		return null;
+	}
+
+	function formatStoryRemaining(exp) {
+		const diff = exp.getTime() - Date.now();
+		if (diff <= 0) return 'Esta historia ha expirado';
+		const totalMin = Math.floor(diff / 60000);
+		const h = Math.floor(totalMin / 60);
+		const m = totalMin % 60;
+		if (h <= 0 && m <= 0) return 'Desaparece en menos de un minuto';
+		if (h <= 0) return `Desaparece en ${m} min`;
+		if (m === 0) return `Desaparece en ${h} h`;
+		return `Desaparece en ${h}h ${m}m`;
+	}
+
+	// Actualiza el texto al cambiar de historia y refresca cada 30s en vivo.
+	$effect(() => {
+		const exp = storyExpiryAt(selectedStoryUser?.items?.[selectedStoryIndex]);
+		if (!exp) {
+			storyRemaining = '';
+			return;
+		}
+		const tick = () => (storyRemaining = formatStoryRemaining(exp));
+		tick();
+		const id = setInterval(tick, 30000);
+		return () => clearInterval(id);
+	});
+
 	// ── Tap vs. mantener presionado en las zonas del visor ──────────────────
 	let storyHoldTimeout = null;
 	let storyHeldPaused = false; // true cuando el hold ya disparó la pausa
@@ -1540,12 +1582,13 @@
 							class="story-card relative flex-shrink-0 overflow-hidden cursor-pointer hover:border-cyan-400/50 hover:-translate-y-1 transition-all duration-300 focus:outline-none group"
 							style="flex: 0 0 112px; width: 112px; height: 162px; scroll-snap-align: start;"
 						>
-							<!-- Background Media -->
-							{#if userStory.items && userStory.items.length > 0 && userStory.items[0].media_url}
-								{#if userStory.items[0].media_type === 'video'}
+							{@const cover = userStory.items[userStory.items.length - 1]}
+							<!-- Background Media: siempre la historia más reciente -->
+							{#if userStory.items && userStory.items.length > 0 && cover.media_url}
+								{#if cover.media_type === 'video'}
 									{#if storiesEnabled}
 										<video
-											src={userStory.items[0].media_url}
+											src={cover.media_url}
 											class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
 											muted
 											playsinline
@@ -1554,7 +1597,7 @@
 									{/if}
 								{:else}
 									<img
-										src={userStory.items[0].media_url}
+										src={cover.media_url}
 										class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
 										alt="story"
 										width="110"
@@ -2761,18 +2804,26 @@
 						onpointerup={onStoryZonePointerUp}
 						onpointercancel={onStoryZonePointerCancel}
 						oncontextmenu={(e) => e.preventDefault()}
-						class="flex-1 h-full opacity-0 cursor-west-resize bg-transparent border-none touch-none select-none"
+						class="group flex-1 h-full flex items-center justify-start pl-2 sm:pl-3 bg-transparent border-none touch-none select-none cursor-pointer"
 						aria-label="Item anterior"
-					></button>
+					>
+						<span class="story-nav-arrow" aria-hidden="true">
+							<span class="material-icons-round">keyboard_arrow_left</span>
+						</span>
+					</button>
 					<!-- Right click zone -->
 					<button
 						onpointerdown={onStoryZonePointerDown}
 						onpointerup={onStoryZonePointerUp}
 						onpointercancel={onStoryZonePointerCancel}
 						oncontextmenu={(e) => e.preventDefault()}
-						class="flex-1 h-full opacity-0 cursor-east-resize bg-transparent border-none touch-none select-none"
+						class="group flex-1 h-full flex items-center justify-end pr-2 sm:pr-3 bg-transparent border-none touch-none select-none cursor-pointer"
 						aria-label="Item siguiente"
-					></button>
+					>
+						<span class="story-nav-arrow" aria-hidden="true">
+							<span class="material-icons-round">keyboard_arrow_right</span>
+						</span>
+					</button>
 				</div>
 			</div>
 
@@ -2782,7 +2833,7 @@
 					class="text-[10px] text-center font-bold tracking-wide"
 					style="color: rgba(255, 255, 255, 0.5);"
 				>
-					Historias de Voom! • Desaparecen en 24h
+					Historias de Voom! • {storyRemaining || 'Desaparecen en 24h'}
 				</p>
 			</div>
 		</div>
@@ -2957,6 +3008,35 @@
 	}
 	.story-card:hover {
 		box-shadow: var(--glass-inset-highlight), var(--shadow-md), var(--shadow-glow);
+	}
+	/* Flechas visibles de navegación entre historias (izquierda/derecha) */
+	.story-nav-arrow {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-full);
+		background: rgba(0, 0, 0, 0.38);
+		border: 1px solid rgba(255, 255, 255, 0.22);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		color: rgba(255, 255, 255, 0.9);
+		pointer-events: none;
+		transition:
+			transform var(--t-spring),
+			background var(--t-fast),
+			opacity var(--t-fast);
+		opacity: 0.9;
+	}
+	.story-nav-arrow .material-icons-round {
+		font-size: 24px;
+	}
+	button:hover .story-nav-arrow,
+	button:focus-visible .story-nav-arrow {
+		opacity: 1;
+		background: rgba(0, 0, 0, 0.55);
+		transform: scale(1.08);
 	}
 	.story-create-card {
 		transform: translateZ(0);
