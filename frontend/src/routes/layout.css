@@ -38,6 +38,8 @@
 	--font-display:
 		'Outfit', 'Outfit Fallback', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
 		Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+	--font-mono:
+		'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
 	/* =========================================
      Fondos y Superficies (Light/Aero) - Frutiger Aqua / Eco Luminous Real
@@ -447,7 +449,7 @@ html {
 }
 
 ::view-transition-old(root) {
-	animation: vt-crossfade-old 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	animation: vt-crossfade-old 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
@@ -467,14 +469,14 @@ html {
 	}
 	to {
 		opacity: 0;
-		transform: translateY(-6px) scale(0.996);
+		transform: translateY(-18px) scale(0.99);
 	}
 }
 
 @keyframes vt-crossfade-new {
 	from {
 		opacity: 0;
-		transform: translateY(6px) scale(0.996);
+		transform: translateY(26px) scale(0.99);
 	}
 	to {
 		opacity: 1;
@@ -720,6 +722,20 @@ html {
 	view-transition-name: vs-canvas;
 }
 
+/* ── Transición unificada para cambios de layout ──────────────────────
+   Al entrar/salir del shell (/login, landing, /admin no tienen canvas),
+   los grupos nombrados solo existen en un lado del snapshot: cada pieza
+   (rail 0s, topbar 0.28s, canvas 0.32s) llega en momento distinto y se
+   percibe como un fallo de carga fragmentado. En esos cruces anulamos
+   los nombres (+layout.svelte añade la clase html.vt-root-only) para que
+   TODO viaje en el grupo root con su crossfade único por perfil. */
+html.vt-root-only .vs-shell__rail,
+html.vt-root-only .vs-topbar,
+html.vt-root-only .vs-mobile-nav,
+html.vt-root-only .vs-shell__canvas {
+	view-transition-name: none;
+}
+
 /* Chrome de la interfaz anclado sin parpadeos */
 ::view-transition-group(vs-sidenav),
 ::view-transition-group(vs-mobilenav) {
@@ -729,6 +745,36 @@ html {
 ::view-transition-group(vs-topbar) {
 	animation-duration: 0.28s;
 	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(vs-topbar) {
+	animation: vt-topbar-out 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	will-change: opacity, transform;
+}
+::view-transition-new(vs-topbar) {
+	animation: vt-topbar-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	will-change: opacity, transform;
+}
+
+@keyframes vt-topbar-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-100%);
+	}
+}
+
+@keyframes vt-topbar-in {
+	from {
+		opacity: 0;
+		transform: translateY(-100%);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
 }
 
 /* ── Transición Global y Canvas (Perfil High / Enabled ~0.32s) ── */
@@ -763,14 +809,14 @@ html {
 }
 [data-view-transitions='fast']::view-transition-old(vs-canvas),
 [data-view-transitions='fast']::view-transition-old(root) {
-	animation: vt-crossfade-old 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-old-fast 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
 }
 [data-view-transitions='fast']::view-transition-new(vs-canvas),
 [data-view-transitions='fast']::view-transition-new(root) {
-	animation: vt-crossfade-new 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-new-fast 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 2;
@@ -788,7 +834,7 @@ html {
 [data-view-transitions='lite']::view-transition-old(root),
 [data-perf-mode='true']::view-transition-old(vs-canvas),
 [data-perf-mode='true']::view-transition-old(root) {
-	animation: vt-crossfade-old 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-old-lite 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
@@ -797,7 +843,7 @@ html {
 [data-view-transitions='lite']::view-transition-new(root),
 [data-perf-mode='true']::view-transition-new(vs-canvas),
 [data-perf-mode='true']::view-transition-new(root) {
-	animation: vt-crossfade-new 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-new-lite 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 2;
@@ -839,6 +885,28 @@ html {
 	}
 	to {
 		opacity: 1;
+	}
+}
+
+@keyframes vt-crossfade-old-fast {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-14px) scale(0.994);
+	}
+}
+
+@keyframes vt-crossfade-new-fast {
+	from {
+		opacity: 0;
+		transform: translateY(20px) scale(0.994);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
 	}
 }
 
@@ -892,7 +960,7 @@ html.theme-transitioning *::after {
 		stroke 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Keyframes de navegación completa (perfil 'enabled' / 'balanced') */
+/* Keyframes de navegación completa (perfil 'lite' / hardware económico) */
 @keyframes vt-crossfade-old-lite {
 	from {
 		opacity: 1;
@@ -900,13 +968,13 @@ html.theme-transitioning *::after {
 	}
 	to {
 		opacity: 0;
-		transform: translateY(-4px);
+		transform: translateY(-10px);
 	}
 }
 @keyframes vt-crossfade-new-lite {
 	from {
 		opacity: 0;
-		transform: translateY(6px);
+		transform: translateY(14px);
 	}
 	to {
 		opacity: 1;
@@ -4347,4 +4415,74 @@ select,
 	100% {
 		transform: translateY(0) scale(1);
 	}
+}
+
+/* =========================================================================
+   APARIENCIA GLOBAL POR USUARIO (migración 016 — /settings/design «Aplicación»)
+   El appearance store (lib/stores/appearance.svelte.js) escribe inline-style
+   en <html> para acento/escala/fuente/wallpaper; aquí solo viven los ejes que
+   necesitan hoja de estilos: densidad (data-density), capa de wallpaper y
+   la garantía de que [hidden] vence a cualquier display:flex/grid.
+   ========================================================================= */
+
+/* Los paneles del hub se alternan con hidden + clases display:flex/grid:
+   sin esta regla el atributo perdería por especificidad. */
+[hidden] {
+	display: none !important;
+}
+
+/* ── Wallpaper global: capa fija detrás del contenido ──
+   Pintada desde body::before con las variables --app-wallpaper /
+   --wallpaper-dim que fija el store (y el script anti-flash). Sin URL no hay
+   regla activa; una imagen rota simplemente no pinta nada (capa transparente,
+   sin parches de color). Sin backdrop-filter: compatible con perfil lite. */
+html[data-wallpaper='true'] body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image:
+		linear-gradient(rgba(0, 0, 0, var(--wallpaper-dim, 0.3)), rgba(0, 0, 0, var(--wallpaper-dim, 0.3))),
+		var(--app-wallpaper);
+	background-size: cover;
+	background-position: center center;
+	background-repeat: no-repeat;
+}
+
+/* ── Densidad: compacta / cómoda / amplia ──
+   Solo selectores de máximo tráfico; el default (cozy) NO define nada.
+   La tarjeta de post fija su padding en PostCard.svelte (1.7rem 1.6rem):
+   los overrides usan !important para vencer al estilo de componente. */
+
+/* Compacta: aprieta paddings verticales de tarjetas, filas y listas */
+html[data-density='compact'] .aero-post-card {
+	padding: 1.05rem 1.15rem !important;
+}
+html[data-density='compact'] .glass-card.panel-card,
+html[data-density='compact'] .perf-settings-card {
+	padding: 0.9rem;
+}
+html[data-density='compact'] .sidebar-btn {
+	padding: 7px 12px;
+}
+html[data-density='compact'] .post-text,
+html[data-density='compact'] .comment-text {
+	line-height: 1.45;
+}
+
+/* Amplia: aire extra donde más se acumula texto */
+html[data-density='roomy'] .aero-post-card {
+	padding: 2.2rem 1.9rem !important;
+}
+html[data-density='roomy'] .glass-card.panel-card,
+html[data-density='roomy'] .perf-settings-card {
+	padding: 1.6rem;
+}
+html[data-density='roomy'] .sidebar-btn {
+	padding: 14px 18px;
+}
+html[data-density='roomy'] .post-text,
+html[data-density='roomy'] .comment-text {
+	line-height: 1.75;
 }
