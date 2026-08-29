@@ -252,6 +252,42 @@
 	let showMediaModal = $state(false);
 	let showVoiceModal = $state(false);
 	let attachedVoiceNote = $state(null);
+	let voiceNoteObjectUrl = $state(null);
+	let voiceAudioEl = $state(null);
+	let isPlayingVoiceNote = $state(false);
+
+	function setAttachedVoiceNote(blob) {
+		if (voiceNoteObjectUrl) URL.revokeObjectURL(voiceNoteObjectUrl);
+		if (isPlayingVoiceNote && voiceAudioEl) {
+			voiceAudioEl.pause();
+			isPlayingVoiceNote = false;
+		}
+		voiceNoteObjectUrl = blob ? URL.createObjectURL(blob) : null;
+		attachedVoiceNote = blob;
+	}
+
+	function toggleVoicePlayback() {
+		if (!voiceAudioEl || !voiceNoteObjectUrl) return;
+		if (isPlayingVoiceNote) {
+			voiceAudioEl.pause();
+			isPlayingVoiceNote = false;
+		} else {
+			voiceAudioEl.play();
+			isPlayingVoiceNote = true;
+		}
+	}
+
+	function removeVoiceNote() {
+		if (voiceAudioEl) {
+			voiceAudioEl.pause();
+			isPlayingVoiceNote = false;
+		}
+		if (voiceNoteObjectUrl) {
+			URL.revokeObjectURL(voiceNoteObjectUrl);
+			voiceNoteObjectUrl = null;
+		}
+		attachedVoiceNote = null;
+	}
 
 	let fileInput = $state(null);
 	let selectedFiles = $state([]);
@@ -394,6 +430,11 @@
 		}
 
 		return () => {
+			if (voiceAudioEl) voiceAudioEl.pause();
+			if (voiceNoteObjectUrl) {
+				URL.revokeObjectURL(voiceNoteObjectUrl);
+				voiceNoteObjectUrl = null;
+			}
 			clearInterval(storyInterval);
 			clearInterval(pollInterval);
 			clearInterval(sugRotationInterval);
@@ -694,7 +735,7 @@
 			showEmojis = false;
 			showMediaModal = false;
 			showVoiceModal = false;
-			attachedVoiceNote = null;
+			removeVoiceNote();
 		} catch (err) {
 			postError = err?.message ?? 'Error al publicar. Inténtalo de nuevo.';
 		} finally {
@@ -2008,22 +2049,42 @@
 								{/if}
 
 								{#if attachedVoiceNote}
+									<audio
+										bind:this={voiceAudioEl}
+										src={voiceNoteObjectUrl}
+										onended={() => (isPlayingVoiceNote = false)}
+										onpause={() => (isPlayingVoiceNote = false)}
+										onplay={() => (isPlayingVoiceNote = true)}
+										style="display: none"
+									></audio>
 									<div
 										class="flex items-center justify-between gap-3 p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-xs font-semibold text-cyan-400 self-start w-full max-w-xs"
 										transition:slide={{ duration: 300, easing: expoOut }}
 									>
 										<div class="flex items-center gap-2 min-w-0">
-											<div
-												class="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0"
+											<button
+												type="button"
+												class="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0 cursor-pointer border-none p-0 transition hover:bg-cyan-500/40"
+												onclick={toggleVoicePlayback}
+												title={isPlayingVoiceNote ? 'Pausar nota de voz' : 'Reproducir nota de voz'}
+												aria-label={isPlayingVoiceNote ? 'Pausar nota de voz' : 'Reproducir nota de voz'}
 											>
-												<span class="material-icons-round text-cyan-400 text-sm">mic</span>
-											</div>
-											<span class="truncate">Nota de voz grabada</span>
+												<span class="material-icons-round text-cyan-400 text-sm" aria-hidden="true"
+													>{isPlayingVoiceNote ? 'pause' : 'play_arrow'}</span
+												>
+											</button>
+											<span class="truncate flex items-center gap-1">
+												<span class="flex items-center gap-0.5" class:playing={isPlayingVoiceNote} aria-hidden="true">
+													<span class="voice-eq-bar"></span><span class="voice-eq-bar"></span
+													><span class="voice-eq-bar"></span>
+												</span>
+												Nota de voz grabada
+											</span>
 										</div>
 										<button
 											type="button"
 											class="bg-transparent border-none cursor-pointer text-muted hover:text-white p-0.5 rounded transition shrink-0"
-											onclick={() => (attachedVoiceNote = null)}
+											onclick={removeVoiceNote}
 											aria-label="Quitar nota de voz"
 										>
 											<span class="material-icons-round text-xs">close</span>
@@ -2145,7 +2206,7 @@
 							>
 								<VoiceRecorder
 									onrecorded={(blob) => {
-										attachedVoiceNote = blob;
+										setAttachedVoiceNote(blob);
 										showVoiceModal = false;
 									}}
 									oncancel={() => {
@@ -4248,6 +4309,39 @@
 	.remove-media-btn:hover {
 		background: rgba(232, 74, 114, 0.9);
 	}
+
+	/* ── Ecualizador "play" de la nota de voz adjunta ────────── */
+	.voice-eq-bar {
+		display: inline-block;
+		width: 3px;
+		height: 6px;
+		border-radius: 1px;
+		background: currentColor;
+		opacity: 0.55;
+	}
+	.playing .voice-eq-bar {
+		animation: voice-eq-wave 0.9s ease-in-out infinite;
+		opacity: 1;
+	}
+	.playing .voice-eq-bar:nth-child(1) {
+		animation-delay: -0.45s;
+	}
+	.playing .voice-eq-bar:nth-child(2) {
+		animation-delay: -0.1s;
+	}
+	.playing .voice-eq-bar:nth-child(3) {
+		animation-delay: -0.3s;
+	}
+	@keyframes voice-eq-wave {
+		0%,
+		100% {
+			transform: scaleY(0.5);
+		}
+		50% {
+			transform: scaleY(1.4);
+		}
+	}
+
 	@keyframes fadeIn {
 		from {
 			opacity: 0;
