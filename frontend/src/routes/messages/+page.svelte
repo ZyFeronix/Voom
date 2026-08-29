@@ -9,15 +9,13 @@
 
 	import { createChatStore } from '$lib/stores/chat.svelte.js';
 	import { createRTCStore } from '$lib/stores/rtc.svelte.js';
-	import { playNudge } from '$lib/utils/sound.js';
-
-	const ZUMBIDO_TEXT = '⚡ ¡ZUMBIDO!';
+	import { playNudge, playMessageReceived } from '$lib/utils/sound.js';
+	import { ZUMBIDO_TEXT, isZumbidoMessage } from '$lib/utils/zumbido.js';
 
 	import ConversationsSidebar from './components/ConversationsSidebar.svelte';
 	import ChatPane from './components/ChatPane.svelte';
 	import RTCModals from './components/RTCModals.svelte';
 	import NewDMModal from './components/NewDMModal.svelte';
-	import StatusConfigModal from '$lib/components/StatusConfigModal.svelte';
 
 	const chatStore = createChatStore();
 	const rtcStore = createRTCStore();
@@ -31,11 +29,6 @@
 	let pendingProduct = $state(null);
 
 	let showNewDMModal = $state(false);
-	let showStatusConfig = $state(false);
-
-	function openStatusConfig() {
-		showStatusConfig = true;
-	}
 	let isShaking = $state(false);
 	let shakeTimeout = null;
 	let lastShakeTime = 0;
@@ -60,18 +53,17 @@
 	let callTimer = null;
 	let rtcManager = null;
 
-	async function loadConversations(keepActive = false, hideLoading = false) {
+	async function loadConversations(hideLoading = false) {
 		if (!hideLoading) chatStore.loadingConvs = true;
 		try {
 			const res = await messagesApi.conversations.list();
 			chatStore.setConversations(res.conversations || []);
-			if (!keepActive && chatStore.conversations.length > 0 && !chatStore.activeConvId) {
-				// selectConversation(chatStore.conversations[0].id);
-			}
+			// Sin auto-selección: se muestra la tarjeta de bienvenida y el usuario
+			// elige la conversación manualmente.
 		} catch (e) {
 			console.error('Failed to load conversations', e);
 		} finally {
-			chatStore.loadingConvs = false;
+			if (!hideLoading) chatStore.loadingConvs = false;
 		}
 	}
 
@@ -93,7 +85,7 @@
 			chatStore.setMessages([]);
 		} finally {
 			chatStore.loadingMsgs = false;
-			tick().then(() => chatPaneComponent?.scrollToBottom());
+			tick().then(() => chatPaneComponent?.ensureScrollToBottom(true, 'instant'));
 		}
 	}
 
@@ -140,7 +132,7 @@
 			try {
 				const res = await messagesApi.conversations.create({ user_id: user.id });
 				if (res.conversation_id) {
-					await loadConversations(true, true);
+					await loadConversations(true);
 					selectConversation(res.conversation_id);
 				}
 			} catch (error) {
@@ -169,7 +161,7 @@
 						content: newText,
 						edited_at: res.edited_at
 					});
-					loadConversations(true, true);
+					loadConversations(true);
 				}
 			} catch (e) {
 				console.error('Edit error:', e);
@@ -212,12 +204,14 @@
 			: voiceBlob
 				? 'audio'
 				: null;
+		const cleanText = (text || '').trim();
+		const finalBody = cleanText || (voiceBlob ? 'Nota de voz' : file ? 'Archivo adjunto' : '');
 		const pendingMsg = {
 			id: tempId,
 			conversation_id: chatStore.activeConvId,
 			sender_id: authStore.user?.id,
-			body: text || (voiceBlob ? 'Nota de voz' : 'Archivo adjunto'),
-			content: text || (voiceBlob ? 'Nota de voz' : 'Archivo adjunto'),
+			body: finalBody,
+			content: finalBody,
 			created_at: new Date().toISOString(),
 			is_deleted: 0,
 			reactions: {},
@@ -241,7 +235,7 @@
 
 		chatStore.addMessage(pendingMsg);
 		tick().then(() => {
-			chatPaneComponent?.scrollToBottom();
+			chatPaneComponent?.ensureScrollToBottom(true, 'smooth');
 			if (isZumbido) {
 				playNudge();
 				triggerShake();
@@ -281,7 +275,7 @@
 			}
 
 			const res = await messagesApi.send(chatStore.activeConvId, {
-				body: text,
+				body: cleanText,
 				media_url: uploadedMedia,
 				media_type: mediaType,
 				reply_to_id: replyTo?.id || null
@@ -296,14 +290,14 @@
 					pending: false,
 					uploading: false,
 					_retry: {
-						body: text,
+						body: cleanText,
 						media_url: uploadedMedia,
 						media_type: mediaType,
 						reply_to_id: replyTo?.id || null
 					}
 				});
 			}
-			loadConversations(true, true);
+			loadConversations(true);
 		} catch (e) {
 			console.error('Send error:', e);
 			// Mantener el mensaje visible marcado como fallido para permitir reintento.
@@ -315,7 +309,7 @@
 			});
 		} finally {
 			chatStore.sending = false;
-			tick().then(() => chatPaneComponent?.scrollToBottom());
+			tick().then(() => chatPaneComponent?.ensureScrollToBottom(true, 'smooth'));
 		}
 	}
 
@@ -336,8 +330,8 @@
 			if (res.message) {
 				chatStore.messages = chatStore.messages.filter((m) => m.id !== msgId);
 				chatStore.addMessage({ ...res.message, pending: false });
-				tick().then(() => chatPaneComponent?.scrollToBottom());
-				loadConversations(true, true);
+				tick().then(() => chatPaneComponent?.ensureScrollToBottom(true, 'smooth'));
+				loadConversations(true);
 			} else {
 				chatStore.updateMessage(msgId, { error: true, pending: false });
 			}
@@ -402,7 +396,7 @@
 			const res = await messagesApi.pin(convId);
 			const conv = chatStore.conversations.find((c) => c.id === convId);
 			if (conv) conv.is_pinned = res.is_pinned;
-			await loadConversations(true, true);
+			await loadConversations(true);
 		} catch (e) {
 			console.error('Pin error:', e);
 		}
@@ -426,7 +420,7 @@
 			const res = await messagesApi.delete(msgId);
 			if (res.success || res.status === 'success') {
 				chatStore.deleteMessage(msgId);
-				loadConversations(true, true);
+				loadConversations(true);
 			}
 		} catch (error) {
 			console.error('Error deleting message:', error);
@@ -462,18 +456,30 @@
 		rtcStore.micMuted = false;
 		rtcStore.camMuted = false;
 
-		const rm = new RTCManager(chatStore.activeConvId, authStore.user.id);
-
-		rm.onLocalStream = (s) => (rtcStore.localStream = s);
-		rm.onRemoteStream = (peerId, s) => {
-			if (!rtcStore.remoteStreams.some((rs) => rs.peerId === peerId)) {
-				rtcStore.remoteStreams = [...rtcStore.remoteStreams, { peerId, stream: s }];
-			}
-		};
-		rm.onPeerLeft = (peerId) => {
-			rtcStore.remoteStreams = rtcStore.remoteStreams.filter((rs) => rs.peerId !== peerId);
-			if (rtcStore.remoteStreams.length === 0) endCall();
-		};
+		// La clase RTCManager recibe las callbacks por constructor:
+		// (conversationId, onStreamAdded, onStreamRemoved, callType).
+		const rm = new RTCManager(
+			chatStore.activeConvId,
+			(peerId, stream, streamCallType) => {
+				// Track remoto recibido: se registra una sola vez por peer.
+				if (!rtcStore.remoteStreams.some((rs) => rs.peerId === peerId)) {
+					rtcStore.remoteStreams = [
+						...rtcStore.remoteStreams,
+						{ peerId, stream, callType: streamCallType }
+					];
+				}
+			},
+			(peerId) => {
+				// Stream remoto retirado (peer colgó, falló o se cerró la PC).
+				rtcStore.remoteStreams = rtcStore.remoteStreams.filter((rs) => rs.peerId !== peerId);
+				// Si ya no queda ningún peer remoto en una llamada activa, se corta.
+				// El guard evita re-entrada: rtc.js marca _closed en sendHangupAndClose.
+				if (rtcStore.remoteStreams.length === 0 && rtcStore.inCall && rtcManager) {
+					endCall();
+				}
+			},
+			type
+		);
 
 		rtcManager = rm;
 		rtcStore.rtcManager = rm;
@@ -620,45 +626,69 @@
 	// Effect: SSE Messages
 	$effect(() => {
 		const newMsgs = notificationsStore.newMessages;
-		if (newMsgs.length > 0) {
-			untrack(() => {
-				let shouldReload = false;
-				newMsgs.forEach((msg) => {
-					if (Number(msg.conversation_id) === Number(chatStore.activeConvId)) {
-						if (!chatStore.messages.some((m) => Number(m.id) === Number(msg.id))) {
-							const tempIndex = chatStore.messages.findIndex(
-								(m) =>
-									m.pending && m.body === msg.body && Number(m.sender_id) === Number(msg.sender_id)
-							);
-							if (tempIndex !== -1) {
-								chatStore.messages[tempIndex] = { ...msg, pending: false };
-								chatStore.messages = [...chatStore.messages];
-							} else {
-								chatStore.addMessage(msg);
-							}
+		if (newMsgs.length === 0) return;
+		untrack(() => {
+			// Refrescar el sidebar ÚNICAMENTE cuando llega un mensaje genuinamente
+			// nuevo (ya sea de la conversación activa o de otra). Evita re-fetch
+			// espurios por duplicados o por mensajes propios ya reflejados en
+			// handleSendMessage (que llama a loadConversations al enviar).
+			let shouldReloadSidebar = false;
 
-							if (Number(msg.sender_id) !== Number(authStore.user?.id)) {
-								// Zumbido recibido: reproduce el sonido nudge.
-								if ((msg.body || msg.content || '') === ZUMBIDO_TEXT) {
-									playNudge();
-									triggerShake();
-								}
-								messagesApi
-									.markRead(chatStore.activeConvId, msg.id)
-									.then(() => {
-										notificationsStore.fetchUnreadMessageCount();
-									})
-									.catch(() => {});
-							}
-							tick().then(() => chatPaneComponent?.scrollToBottom());
+			newMsgs.forEach((msg) => {
+				const isActiveConv = Number(msg.conversation_id) === Number(chatStore.activeConvId);
+
+				if (isActiveConv) {
+					if (
+						!chatStore.messages.some(
+							(m) => (m.id && msg.id && Number(m.id) === Number(msg.id)) || m.id === msg.id
+						)
+					) {
+						shouldReloadSidebar = true;
+						const tempIndex = chatStore.messages.findIndex(
+							(m) =>
+								m.pending &&
+								Number(m.sender_id) === Number(msg.sender_id) &&
+								((m.body || '').trim() === (msg.body || '').trim() ||
+									(m.media_type && m.media_type === msg.media_type) ||
+									(!m.body && !msg.body))
+						);
+						if (tempIndex !== -1) {
+							chatStore.messages[tempIndex] = { ...msg, pending: false, uploading: false };
+							chatStore.messages = [...chatStore.messages];
+						} else {
+							chatStore.addMessage(msg);
 						}
+
+						if (Number(msg.sender_id) !== Number(authStore.user?.id)) {
+							// Zumbido recibido: reproduce el sonido nudge.
+							if (isZumbidoMessage(msg)) {
+								playNudge();
+								triggerShake();
+							} else {
+								playMessageReceived();
+							}
+							messagesApi
+								.markRead(chatStore.activeConvId, msg.id)
+								.then(() => {
+									notificationsStore.fetchUnreadMessageCount();
+								})
+								.catch(() => {});
+						}
+						tick().then(() => chatPaneComponent?.ensureScrollToBottom(false, 'smooth'));
 					}
-					shouldReload = true;
-				});
-				if (shouldReload) loadConversations(false, true);
-				notificationsStore.clearNewMessages();
+				} else {
+					// Mensaje de otra conversación: el hilo activo no se toca, pero el
+					// sidebar debe reflejar el último mensaje y el badge de no leídos.
+					shouldReloadSidebar = true;
+					if (Number(msg.sender_id) !== Number(authStore.user?.id)) {
+						playMessageReceived();
+					}
+				}
 			});
-		}
+
+			if (shouldReloadSidebar) loadConversations(true);
+			notificationsStore.clearNewMessages();
+		});
 	});
 
 	// Effect: Reset RTC when active conversation changes
@@ -695,8 +725,11 @@
 									callType: payload.callType || 'audio'
 								};
 							} else if (payload.type === 'hangup' || payload.type === 'peer_left') {
+								// 'hangup' lo gestiona la propia clase (cierra la PC y dispara
+								// onStreamRemoved → limpia remoteStreams y corta la llamada si
+								// quedó vacía). 'peer_left' es defensivo: handleSignal lo ignora.
 								if (rtcStore.inCall && rtcManager) {
-									rtcManager.handlePeerLeft(sig.sender_id);
+									await rtcManager.handleSignal(sig.sender_id, payload);
 								}
 								if (rtcStore.incomingCallOffer?.sender_id === sig.sender_id) {
 									rtcStore.incomingCallOffer = null;
@@ -719,13 +752,14 @@
 
 	// Removed nonexistent typingEvents effect
 
-	let typingSocketHandler = null;
-	let typingIntervalId = null;
-	let zumbidoSocketHandler = null;
-	let messageEditedHandler = null;
-	let messageDeletedHandler = null;
-	let messagesReadHandler = null;
-	let messageReactionHandler = null;
+	// Handlers Socket.IO efímeros de la vista. Se registran/de-registran de forma
+	// reactiva (suscripción viviente) vía Svelte 5 $effect con función de limpieza,
+	// en lugar de un sondeo con setInterval que dejaba listeners huérfanos tras
+	// caídas de red o reconexiones tardías.
+	//
+	// Se usan funciones declaradas (no arrow en variables reasignadas) para que el
+	// $effect de suscripción pueda referenciar referencias estables y el cleanup
+	// haga socket.off() con la misma referencia exacta.
 
 	// Emite el evento de "escribiendo" al peer con throttling básico.
 	let lastTypingEmit = 0;
@@ -738,7 +772,31 @@
 		socket.emit('typing', { convId: chatStore.activeConvId, isTyping });
 	}
 
-	messageEditedHandler = (data) => {
+	function handleIncomingTyping(data) {
+		// El servidor emite { convId, userId, isTyping } (ver lib/server/socket.js).
+		if (
+			Number(data.convId) === Number(chatStore.activeConvId) &&
+			Number(data.userId) !== Number(authStore.user?.id)
+		) {
+			isPeerTyping = !!data.isTyping;
+			if (typingTimeout) clearTimeout(typingTimeout);
+			if (data.isTyping) {
+				typingTimeout = setTimeout(() => (isPeerTyping = false), 5000);
+			}
+		}
+	}
+
+	function handleIncomingZumbido(data) {
+		// Manejador de zumbidos directos en tiempo real.
+		if (Number(data.senderId) === Number(authStore.user?.id)) return;
+		playNudge();
+		triggerShake();
+		if (Number(data.convId) !== Number(chatStore.activeConvId)) {
+			loadConversations(true);
+		}
+	}
+
+	function handleMessageEdited(data) {
 		if (Number(data.conversation_id) === Number(chatStore.activeConvId)) {
 			chatStore.updateMessage(data.id, {
 				body: data.body,
@@ -746,24 +804,24 @@
 				edited_at: data.edited_at
 			});
 		}
-	};
+	}
 
-	messageDeletedHandler = (data) => {
+	function handleMessageDeleted(data) {
 		if (Number(data.conversation_id) === Number(chatStore.activeConvId)) {
 			chatStore.deleteMessage(data.id);
 		}
-		loadConversations(true, true);
-	};
+		loadConversations(true);
+	}
 
-	messagesReadHandler = (data) => {
+	function handleMessagesRead(data) {
 		if (Number(data.conversation_id) === Number(chatStore.activeConvId)) {
 			chatStore.applyPeerLastRead(data.last_read_id);
 		}
-	};
+	}
 
 	// Reacciones en vivo del peer (añadir/quitar). Las propias ya se aplican
 	// de forma optimista en handleReact, así que se ignoran aquí.
-	messageReactionHandler = (data) => {
+	function handleMessageReaction(data) {
 		if (Number(data.conversation_id) !== Number(chatStore.activeConvId)) return;
 		if (Number(data.actor_id) === Number(authStore.user?.id)) return;
 		const msg = chatStore.messages.find((m) => Number(m.id) === Number(data.message_id));
@@ -781,7 +839,40 @@
 			}
 		}
 		chatStore.messages = [...chatStore.messages];
-	};
+	}
+
+	// Suscripción viviente a los eventos Socket.IO de la vista.
+	// Reacciona cuando el socket cambia (reconexiones) o conecta: registra los
+	// listeners y re-registra tras caídas de red. El cleanup desregistra todo.
+	// No depende de activeConvId para registrarse; los handlers filtran por
+	// conversación internamente y el join de sala se gestiona en selectConversation.
+	$effect(() => {
+		const socket = notificationsStore.getSocket();
+		if (!socket) return;
+
+		const register = () => {
+			socket.on('typing', handleIncomingTyping);
+			socket.on('zumbido', handleIncomingZumbido);
+			socket.on('message_edited', handleMessageEdited);
+			socket.on('message_deleted', handleMessageDeleted);
+			socket.on('messages_read', handleMessagesRead);
+			socket.on('message_reaction', handleMessageReaction);
+		};
+
+		// Registrar inmediatamente si ya está conectado y en las reconexiones.
+		if (socket.connected) register();
+		socket.on('connect', register);
+
+		return () => {
+			socket.off('connect', register);
+			socket.off('typing', handleIncomingTyping);
+			socket.off('zumbido', handleIncomingZumbido);
+			socket.off('message_edited', handleMessageEdited);
+			socket.off('message_deleted', handleMessageDeleted);
+			socket.off('messages_read', handleMessagesRead);
+			socket.off('message_reaction', handleMessageReaction);
+		};
+	});
 
 	onMount(async () => {
 		await loadConversations();
@@ -813,7 +904,7 @@
 							user_id: listing.user_id
 						});
 						if (res.conversation_id) {
-							await loadConversations(true, true);
+							await loadConversations(true);
 							conv = chatStore.conversations.find(
 								(c) => Number(c.id) === Number(res.conversation_id)
 							);
@@ -828,77 +919,39 @@
 			goto('/messages', { replaceState: true });
 		}
 
-		// Typing event setup directly via socket. El servidor emite
-		// { convId, userId, isTyping } (ver lib/server/socket.js).
-		typingSocketHandler = (data) => {
-			if (
-				Number(data.convId) === Number(chatStore.activeConvId) &&
-				Number(data.userId) !== Number(authStore.user?.id)
-			) {
-				isPeerTyping = !!data.isTyping;
-				if (typingTimeout) clearTimeout(typingTimeout);
-				if (data.isTyping) {
-					typingTimeout = setTimeout(() => (isPeerTyping = false), 5000);
-				}
-			}
-		};
-
-		// Manejador de zumbidos directos en tiempo real
-		zumbidoSocketHandler = (data) => {
-			if (Number(data.senderId) === Number(authStore.user?.id)) return;
-			playNudge();
-			triggerShake();
-			if (Number(data.convId) !== Number(chatStore.activeConvId)) {
-				loadConversations(true, true);
-			}
-		};
-
-		typingIntervalId = setInterval(() => {
-			const socket = notificationsStore.getSocket();
-			if (socket) {
-				clearInterval(typingIntervalId);
-				socket.on('typing', typingSocketHandler);
-				socket.on('zumbido', zumbidoSocketHandler);
-				socket.on('message_edited', messageEditedHandler);
-				socket.on('message_deleted', messageDeletedHandler);
-				socket.on('messages_read', messagesReadHandler);
-				socket.on('message_reaction', messageReactionHandler);
-			}
-		}, 1000);
+		// Los handlers de socket se definen y registran de forma reactiva en el
+		// $effect `socketEventSubscriptions` (ver más abajo), no dentro de onMount.
 	});
 
 	onDestroy(() => {
-		if (typingIntervalId) clearInterval(typingIntervalId);
 		if (typingTimeout) clearTimeout(typingTimeout);
 		if (shakeTimeout) clearTimeout(shakeTimeout);
 		if (nudgeCooldownTimer) clearInterval(nudgeCooldownTimer);
 		const socket = notificationsStore.getSocket();
 		if (socket) {
 			// Salir de la sala de la conversación activa al abandonar la vista.
+			// Los listeners de eventos ya se desregistran en el cleanup del $effect
+			// `socketEventSubscriptions`; aquí solo se abandona la sala.
 			if (joinedConvId) socket.emit('leave_conversation', joinedConvId);
-			if (typingSocketHandler) socket.off('typing', typingSocketHandler);
-			if (zumbidoSocketHandler) socket.off('zumbido', zumbidoSocketHandler);
-			if (messageEditedHandler) socket.off('message_edited', messageEditedHandler);
-			if (messageDeletedHandler) socket.off('message_deleted', messageDeletedHandler);
-			if (messagesReadHandler) socket.off('messages_read', messagesReadHandler);
-			if (messageReactionHandler) socket.off('message_reaction', messageReactionHandler);
 		}
 		if (rtcManager) {
-			rtcManager.destroy();
+			// close() detiene el stream local y cierra todas las PeerConnections.
+			rtcManager.close();
 		}
 	});
 </script>
 
 <svelte:head>
-	<title>Mensajes — VSocial</title>
+	<title>Mensajes — Voom!</title>
 </svelte:head>
 
 <div class="messages-container" class:shake={isShaking}>
-	<div class="glass-card chat-window">
+	<!-- .chat-window define su propio glass (blur/ruido/especular); NO apilar la
+	     clase global glass-card: duplicaría backdrop-filter y pseudo-capas. -->
+	<div class="chat-window">
 		<ConversationsSidebar
 			{chatStore}
 			{mobileView}
-			onStatusConfig={openStatusConfig}
 			onNewDM={() => (showNewDMModal = true)}
 			onSelectConversation={selectConversation}
 			onPinConversation={handlePinConversation}
@@ -960,72 +1013,96 @@
 	onDeclineCall={declineCall}
 />
 
-{#if showStatusConfig}
-	<StatusConfigModal onClose={() => (showStatusConfig = false)} />
-{/if}
-
 <style>
+	/* ═══════════════════════════════════════════════════════════
+	   Voom! Messenger — Shell "Retro-Aero limpio"
+	   Una sola superficie de cristal por zona, cero gradientes
+	   apilados, un acento (azul aero) para la interacción.
+	   ═══════════════════════════════════════════════════════════ */
+
 	.messages-container {
-		position: fixed;
-		top: 58px;
-		left: 0;
-		right: 0;
-		bottom: 0;
+		position: relative;
+		width: 100%;
+		height: 100dvh;
+		max-height: 100dvh;
 		padding: 0;
 		margin: 0;
 		display: flex;
 		flex-direction: column;
-	}
-
-	@media (min-width: 768px) {
-		.messages-container {
-			left: 16rem;
-		}
-
-		:global(.vs-shell--collapsed) .messages-container {
-			left: 5rem;
-		}
+		overflow: hidden;
+		background: var(--bg-base, #071322);
 	}
 
 	@media (max-width: 768px) {
 		.messages-container {
-			/* El contenedor se dimensiona contra el visual viewport: cuando el teclado
-			   abre, --vv-height se encoge y el composer queda visible por encima.
-			   --vv-top compensa el paneo que iOS aplica al enfocar un input. */
-			top: calc(var(--vv-top, 0px) + 58px);
-			height: calc(var(--vv-height, 100vh) - 58px);
-			bottom: auto;
+			height: var(--vv-height, 100dvh);
+			max-height: var(--vv-height, 100dvh);
+			padding-bottom: 72px;
 			box-sizing: border-box;
-			/* Deja espacio para el nav flotante (~96px) + margen, para que el
-			   composer no quede parcialmente detrás de él. */
-			padding-bottom: 112px;
-			border-radius: var(--radius-xs);
-			border: none;
 		}
 
-		/* Teclado abierto: la barra de navegación inferior se oculta, así que el
-		   padding extra ya no hace falta y el chat aprovecha todo el alto. */
 		:global(html.has-keyboard) .messages-container {
-			padding-bottom: 12px;
+			padding-bottom: 8px;
 		}
 	}
 
+	/* Superficie única de mensajería: ocupa TODO el área, sin
+	   zonas flotantes ni márgenes. Un solo cristal + hairline. */
 	.chat-window {
+		position: relative;
 		display: flex;
-		flex: 1;
+		flex: 1 1 auto;
 		min-height: 0;
 		width: 100%;
 		height: 100%;
-		border-radius: var(--radius-xs);
-		overflow: visible;
-		background:
-			radial-gradient(70% 100% at 0% 0%, rgba(var(--accent-blue-rgb), 0.04), transparent 50%),
-			var(--bg-surface);
+		border-radius: 0;
+		overflow: hidden;
+		isolation: isolate;
 		border: none;
-		border-top: 1px solid var(--glass-border-t);
-		box-shadow: 0 -6px 24px rgba(15, 40, 80, 0.06);
+		background: rgba(13, 27, 46, 0.72);
+		backdrop-filter: var(--glass-blur, blur(18px) saturate(1.15));
+		-webkit-backdrop-filter: var(--glass-blur, blur(18px) saturate(1.15));
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 	}
 
+	:global([data-theme='light']) .chat-window {
+		background: rgba(255, 255, 255, 0.88);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	}
+
+	:global([data-theme='dark']) .chat-window {
+		background: rgba(13, 27, 46, 0.78);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+	}
+
+	:global([data-theme='midnight']) .chat-window {
+		background: rgba(6, 13, 28, 0.9);
+		box-shadow: inset 0 1px 0 rgba(160, 210, 255, 0.08);
+	}
+
+	/* ── Perfiles de rendimiento ───────────────────────────── */
+	:global(:root[data-perf='high']) .chat-window,
+	:global(:root[data-perf-profile='high']) .chat-window {
+		backdrop-filter: var(--glass-blur, blur(16px) saturate(1.15));
+		-webkit-backdrop-filter: var(--glass-blur, blur(16px) saturate(1.15));
+	}
+
+	:global(:root[data-perf='balanced']) .chat-window,
+	:global(:root[data-perf-profile='balanced']) .chat-window {
+		backdrop-filter: blur(8px) saturate(1.05);
+		-webkit-backdrop-filter: blur(8px) saturate(1.05);
+	}
+
+	:global(:root[data-perf='eco']) .chat-window,
+	:global(:root[data-perf-profile='lite']) .chat-window,
+	:global(:root[data-perf-mode='true']) .chat-window {
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+		background: var(--bg-surface-solid, var(--bg-surface)) !important;
+		box-shadow: none !important;
+	}
+
+	/* ── Zumbido: sacudida de la ventana completa ──────────── */
 	@keyframes global-shake {
 		0%,
 		100% {
@@ -1033,20 +1110,20 @@
 		}
 		10%,
 		90% {
-			transform: translate3d(-10px, -4px, 0) rotate(-0.8deg);
+			transform: translate3d(-8px, -3px, 0) rotate(-0.6deg);
 		}
 		20%,
 		80% {
-			transform: translate3d(12px, 5px, 0) rotate(1deg);
+			transform: translate3d(10px, 4px, 0) rotate(0.8deg);
 		}
 		30%,
 		50%,
 		70% {
-			transform: translate3d(-14px, 6px, 0) rotate(-1.2deg);
+			transform: translate3d(-12px, 5px, 0) rotate(-1deg);
 		}
 		40%,
 		60% {
-			transform: translate3d(14px, -5px, 0) rotate(1.2deg);
+			transform: translate3d(12px, -4px, 0) rotate(1deg);
 		}
 	}
 

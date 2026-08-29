@@ -3,12 +3,12 @@
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { formatListTime } from '$lib/utils/datetime.js';
 	import { fly, fade } from 'svelte/transition';
+	import { clickOutside } from '$lib/actions/clickOutside.js';
 	import { parseMsnEmotes } from '$lib/data/msnEmoticons.js';
 
 	let {
 		chatStore,
 		mobileView,
-		onStatusConfig,
 		onNewDM,
 		onSelectConversation,
 		onPinConversation,
@@ -16,6 +16,75 @@
 	} = $props();
 
 	let menuOpenId = $state(null);
+	let statusPickerOpen = $state(false);
+	let customStatusText = $state(authStore.user?.custom_status_text || '');
+	let statusInputFocused = $state(false);
+	let statusSavedRecently = $state(false);
+
+	const STATUS_OPTIONS = [
+		{ id: 'online', label: 'En línea', color: '#00d4aa' },
+		{ id: 'away', label: 'Inactivo', color: '#f5a623' },
+		{ id: 'dnd', label: 'No molestar', color: '#f43f5e' },
+		{ id: 'invisible', label: 'Invisible', color: '#94a3b8' }
+	];
+
+	const currentStatusObj = $derived(
+		STATUS_OPTIONS.find((s) => s.id === (authStore.user?.custom_status || 'online')) ||
+			STATUS_OPTIONS[0]
+	);
+
+	async function selectStatus(statusId) {
+		if (authStore.user) {
+			authStore.updateUser({ custom_status: statusId });
+		}
+		try {
+			await fetch('/api/users/me/status', {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${authStore.token}`
+				},
+				body: JSON.stringify({
+					custom_status: statusId,
+					custom_status_text: customStatusText,
+					duration_minutes: 'forever'
+				})
+			});
+		} catch (e) {
+			console.error('Failed to update status', e);
+		}
+	}
+
+	async function saveCustomStatusText() {
+		try {
+			const res = await fetch('/api/users/me/status', {
+				method: 'PUT',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${authStore.token}`
+				},
+				body: JSON.stringify({
+					custom_status: authStore.user?.custom_status || 'online',
+					custom_status_text: customStatusText,
+					duration_minutes: 'forever'
+				})
+			});
+			if (res.ok) {
+				const data = await res.json();
+				authStore.updateUser({
+					custom_status: data.custom_status,
+					custom_status_text: data.custom_status_text
+				});
+				statusSavedRecently = true;
+				setTimeout(() => {
+					statusSavedRecently = false;
+				}, 2000);
+			}
+		} catch (e) {
+			console.error('Failed to save status text', e);
+		}
+	}
+
 	// Filtro de la bandeja: todos / sin leer / fijados. 'all' por defecto.
 	let filter = $state('all');
 
@@ -47,6 +116,12 @@
 		if (filter === 'pinned') return chatStore.filteredConversations.filter((c) => c.is_pinned);
 		return chatStore.filteredConversations;
 	});
+
+	// Agrupación Fijados / Todas (solo en el filtro "Todos").
+	const pinnedGroup = $derived(filter === 'all' ? filteredConvs.filter((c) => c.is_pinned) : []);
+	const restGroup = $derived(
+		filter === 'all' ? filteredConvs.filter((c) => !c.is_pinned) : filteredConvs
+	);
 
 	// Vista previa del último mensaje con prefijos de medio / estado.
 	function previewParts(conv) {
@@ -92,63 +167,166 @@
 	}
 </script>
 
-<svelte:window onclick={() => (menuOpenId = null)} />
+<svelte:window
+	onclick={() => (menuOpenId = null)}
+	onkeydown={(e) => {
+		if (e.key === 'Escape') {
+			menuOpenId = null;
+			statusPickerOpen = false;
+		}
+	}}
+/>
 
 <aside class="conversations-sidebar" class:hidden-mobile={mobileView === 'chat'}>
-	<!-- Encabezado: título + acciones -->
+	<!-- Encabezado con tarjeta de perfil y presencia integrada (sin popups) -->
 	<header class="sidebar-header">
-		<div class="sidebar-title-row">
-			<div class="title-block">
-				<h1 class="sidebar-title">Mensajes</h1>
-				<span class="sidebar-count">
-					{chatStore.conversations.length}
-					{chatStore.conversations.length === 1 ? 'conversación' : 'conversaciones'}
-				</span>
+		<div class="user-profile-card">
+			<div class="user-avatar-slot" style="flex: 0 0 44px; min-width: 44px; min-height: 44px">
+				{#if authStore.user?.avatar_url}
+					<img
+						src={authStore.user.avatar_url}
+						alt="Mi Avatar"
+						class="user-card-avatar"
+						width="44"
+						height="44"
+						loading="lazy"
+						decoding="async"
+					/>
+				{:else}
+					<div class="user-card-init">
+						{(authStore.user?.display_name || authStore.user?.username || '?')[0].toUpperCase()}
+					</div>
+				{/if}
+				<span class="user-presence-dot status-{authStore.user?.custom_status || 'online'}"></span>
 			</div>
 
-			<div class="sidebar-actions flex">
-				<button
-					onclick={(e) => onStatusConfig?.(e)}
-					class="aero-icon-btn"
-					aria-label="Estado de conexión"
-					title="Cambiar estado"
-				>
-					{#if authStore.user?.avatar_url}
-						<img
-							src={authStore.user.avatar_url}
-							alt="Mi Estado"
-							class="status-avatar status-border-{authStore.user?.custom_status || 'online'}"
-						/>
-					{:else}
-						<div
-							class="status-avatar-initial status-border-{authStore.user?.custom_status ||
-								'online'}"
+			<div class="user-card-details">
+				<div class="user-card-topline">
+					<span
+						class="user-card-name"
+						title={authStore.user?.display_name || authStore.user?.username}
+					>
+						{authStore.user?.display_name || authStore.user?.username || 'Mi Perfil'}
+					</span>
+					<div class="status-pill-container" use:clickOutside={() => (statusPickerOpen = false)}>
+						<button
+							type="button"
+							class="status-pill-badge status-{currentStatusObj.id}"
+							class:active={statusPickerOpen}
+							onclick={() => (statusPickerOpen = !statusPickerOpen)}
+							aria-label="Cambiar estado de conexión"
+							aria-expanded={statusPickerOpen}
 						>
-							{(authStore.user?.display_name || authStore.user?.username || '?')[0].toUpperCase()}
-						</div>
-					{/if}
-				</button>
-				<button onclick={onNewDM} class="aero-icon-btn new-dm-btn" aria-label="Nuevo Mensaje">
-					<span class="material-icons-round">chat</span>
-				</button>
+							<span class="status-dot-mini status-{currentStatusObj.id}"></span>
+							<span class="status-pill-label">{currentStatusObj.label}</span>
+							<span class="material-icons-round status-pill-chevron">expand_more</span>
+						</button>
+
+						{#if statusPickerOpen}
+							<div class="status-pill-dropdown" transition:fly={{ y: 4, duration: 150 }}>
+								{#each STATUS_OPTIONS as opt (opt.id)}
+									{@const isCurrent = currentStatusObj.id === opt.id}
+									<button
+										type="button"
+										class="status-pill-opt"
+										class:selected={isCurrent}
+										onclick={() => {
+											selectStatus(opt.id);
+											statusPickerOpen = false;
+										}}
+									>
+										<span class="status-dot-mini status-{opt.id}"></span>
+										<span class="status-opt-name">{opt.label}</span>
+										{#if isCurrent}
+											<span class="material-icons-round status-opt-check">check</span>
+										{/if}
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				</div>
+
+				<div class="user-status-capsule" class:focused={statusInputFocused}>
+					<span class="material-icons-round status-capsule-icon" class:saved={statusSavedRecently}>
+						{statusSavedRecently ? 'check_circle' : 'edit_note'}
+					</span>
+					<input
+						type="text"
+						placeholder="¿Qué estás pensando?"
+						bind:value={customStatusText}
+						onfocus={() => (statusInputFocused = true)}
+						onblur={() => {
+							statusInputFocused = false;
+							saveCustomStatusText();
+						}}
+						onkeydown={(e) => {
+							if (e.key === 'Enter') {
+								e.preventDefault();
+								e.currentTarget.blur();
+							}
+						}}
+						class="user-status-text-input"
+						maxlength="60"
+						title="Escribe tu estado personal (presiona Enter para guardar)"
+					/>
+					<div class="status-capsule-actions">
+						{#if customStatusText && statusInputFocused}
+							<button
+								type="button"
+								class="status-capsule-clear-btn"
+								style="flex: 0 0 24px; min-width: 24px; min-height: 24px"
+								onmousedown={(e) => {
+									e.preventDefault();
+									customStatusText = '';
+									saveCustomStatusText();
+								}}
+								aria-label="Borrar estado"
+								title="Borrar estado"
+							>
+								<span class="material-icons-round">close</span>
+							</button>
+						{/if}
+						{#if statusInputFocused}
+							<span
+								class="status-limiter"
+								class:limit-warn={customStatusText.length > 50}
+								title="Límite de caracteres"
+							>
+								{customStatusText.length}/60
+							</span>
+						{/if}
+					</div>
+				</div>
 			</div>
+
+			<button
+				onclick={onNewDM}
+				class="new-chat-btn"
+				style="flex: 0 0 32px; min-width: 32px; min-height: 32px"
+				aria-label="Nuevo Mensaje"
+				title="Iniciar nuevo chat"
+			>
+				<span class="material-icons-round">add</span>
+			</button>
 		</div>
 
 		<!-- Búsqueda -->
 		<div class="search-wrapper">
-			<span class="material-icons-round">search</span>
+			<span class="material-icons-round search-icon">search</span>
 			<input
 				id="chat_search_input"
 				name="chat_search"
 				type="text"
-				placeholder="Buscar chats..."
+				placeholder="Buscar conversaciones..."
 				bind:value={chatStore.searchQuery}
-				class="aero-input"
-				style="padding-top: 5px; padding-bottom: 5px; font-size: 0.78rem;"
+				class="search-input"
+				autocomplete="off"
 			/>
 			{#if chatStore.searchQuery}
 				<button
 					class="search-clear-btn"
+					style="flex: 0 0 28px; min-width: 28px; min-height: 28px"
 					onclick={() => (chatStore.searchQuery = '')}
 					aria-label="Limpiar búsqueda"
 				>
@@ -180,108 +358,122 @@
 	<!-- Lista de conversaciones -->
 	<div class="conversations-list">
 		{#if chatStore.loadingConvs}
-			{#each Array(7) as _, i (i)}
-				<div class="skeleton-item">
-					<div class="skeleton-avatar animate-pulse"></div>
+			{#each Array(6) as _, i (i)}
+				<div class="skeleton-item" style="--stagger-delay: {i * 60}ms;" in:fade={{ duration: 150 }}>
+					<div
+						class="skeleton-avatar"
+						style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
+					></div>
 					<div class="skeleton-lines">
-						<div class="skeleton-line short animate-pulse"></div>
-						<div class="skeleton-line long animate-pulse"></div>
+						<div class="skeleton-line short"></div>
+						<div class="skeleton-line long"></div>
 					</div>
 				</div>
 			{/each}
 		{:else if filteredConvs.length === 0}
-			<div class="empty-conversations" in:fly={{ y: 20, duration: 400 }}>
-				<span class="material-icons-round">
-					{chatStore.searchQuery || filter !== 'all' ? 'search_off' : 'question_answer'}
-				</span>
-				<p>
+			<div class="empty-conversations" in:fly={{ y: 15, duration: 300 }}>
+				<div class="empty-conv-icon-glow">
+					<span class="material-icons-round">
+						{chatStore.searchQuery || filter !== 'all' ? 'search_off' : 'chat_bubble_outline'}
+					</span>
+				</div>
+				<p class="empty-conv-title">
 					{#if chatStore.searchQuery}
 						Sin resultados para “{chatStore.searchQuery}”
 					{:else if filter === 'unread'}
-						No tienes mensajes sin leer
+						Todo al día. No tienes mensajes sin leer.
 					{:else if filter === 'pinned'}
-						Aún no fijas ninguna conversación
+						Aún no has fijado ninguna conversación.
 					{:else}
-						No hay conversaciones
+						Bandeja de mensajes vacía
 					{/if}
 				</p>
 				{#if !chatStore.searchQuery && filter === 'all'}
-					<button class="empty-new-chat" onclick={onNewDM}>Iniciar un chat</button>
+					<button class="btn-aero-primary empty-new-chat" onclick={onNewDM}>
+						<span class="material-icons-round" style="font-size: 16px;">add</span> Iniciar un chat
+					</button>
 				{/if}
 			</div>
 		{:else}
-			<ul class="conv-list-inner">
-				{#each filteredConvs as conv, i (conv.id)}
+			<div class="conv-list-inner">
+				{#if pinnedGroup.length > 0}
+					<div class="group-label" in:fade={{ duration: 180 }}>
+						<span class="material-icons-round">push_pin</span> Fijados
+					</div>
+				{/if}
+				{#snippet convCard(conv, i, flipMenu = false)}
 					{@const preview = previewParts(conv)}
-					<li>
+					{@const online = peerOnline(conv)}
+					<div
+						role="button"
+						tabindex="0"
+						class="conv-card"
+						class:active={chatStore.activeConvId === conv.id}
+						class:has-unread={conv.unread_count > 0}
+						class:menu-open={menuOpenId === conv.id}
+						class:menu-flip={flipMenu}
+						in:fly={{ y: 10, duration: 220, delay: Math.min(i, 8) * 25 }}
+						onclick={() => onSelectConversation(conv.id)}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onSelectConversation(conv.id);
+							}
+						}}
+					>
 						<div
-							onclick={() => onSelectConversation(conv.id)}
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') {
-									e.preventDefault();
-									onSelectConversation(conv.id);
-								}
-							}}
-							role="button"
-							tabindex="0"
-							class="conv-item"
-							class:active={chatStore.activeConvId === conv.id}
-							class:has-unread={conv.unread_count > 0}
-							in:fly={{ y: 12, duration: 250, delay: Math.min(i, 8) * 30 }}
+							class="conv-avatar-wrap"
+							style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
 						>
-							<!-- Indicador de activo (barra lateral) -->
-							<span class="active-bar" aria-hidden="true"></span>
-
-							<div class="conv-avatar-wrapper">
-								<div
-									class="conv-avatar"
-									style="flex: 0 0 44px; min-width: 44px; min-height: 44px; width: 44px; height: 44px;"
-								>
-									{#if conv.peer_avatar}
-										<img
-											src={conv.peer_avatar}
-											alt={conv.name || conv.peer_display_name}
-											width="44"
-											height="44"
-											loading="lazy"
-											decoding="async"
-										/>
-									{:else}
-										<span
-											>{getInitials(
-												conv.name || conv.peer_display_name || conv.peer_username
-											)}</span
+							{#if conv.peer_avatar}
+								<img
+									src={conv.peer_avatar}
+									alt={conv.name || conv.peer_display_name}
+									class="conv-avatar-img"
+									width="44"
+									height="44"
+									loading="lazy"
+									decoding="async"
+								/>
+							{:else}
+								<div class="conv-avatar-init">
+									{getInitials(conv.name || conv.peer_display_name || conv.peer_username)}
+								</div>
+							{/if}
+							{#if online}
+								<span class="conv-online-dot" title="En línea"></span>
+							{/if}
+						</div>
+						<div class="conv-details">
+							<div class="conv-line1">
+								<h3 class="conv-name">
+									<span class="conv-name-text"
+										>{conv.name || conv.peer_display_name || conv.peer_username}</span
+									>
+									{#if conv.is_verified}
+										<span class="material-icons-round verified-check" title="Cuenta verificada"
+											>verified</span
 										>
 									{/if}
-								</div>
-								{#if peerOnline(conv)}
-									<span class="online-indicator"></span>
-								{/if}
-							</div>
-
-							<div class="conv-details">
-								<div class="conv-meta">
-									<h3 class="conv-name">
-										{#if conv.is_pinned}
-											<span class="material-icons-round pin-icon" title="Conversación fijada"
-												>push_pin</span
-											>
-										{/if}
-										<span class="conv-name-text"
-											>{conv.name || conv.peer_display_name || conv.peer_username}</span
-										>
-										{#if conv.is_verified}
-											<span class="material-icons-round verified-check" title="Cuenta verificada"
-												>verified</span
-											>
-										{/if}
-									</h3>
+								</h3>
+								<div class="conv-meta-action">
 									{#if conv.last_message_time}
-										<time class="conv-time" datetime={conv.last_message_time}>
-											{formatListTime(conv.last_message_time)}
-										</time>
+										<time class="conv-time" datetime={conv.last_message_time}
+											>{formatListTime(conv.last_message_time)}</time
+										>
 									{/if}
+									<button
+										class="conv-menu-btn"
+										style="flex: 0 0 28px; min-width: 28px; min-height: 28px;"
+										onclick={(e) => toggleMenu(e, conv.id)}
+										aria-label="Opciones de conversación"
+										title="Opciones"
+									>
+										<span class="material-icons-round">more_vert</span>
+									</button>
 								</div>
+							</div>
+							<div class="conv-line2">
 								<p class="conv-preview">
 									{#if preview.icon === 'done_all'}
 										<span class="material-icons-round preview-status-icon">done_all</span>
@@ -296,59 +488,54 @@
 													src={part.url}
 													alt={part.code}
 													title={part.code}
-													style="width: 1.1em; height: 1.1em; vertical-align: middle; margin: 0 1px; image-rendering: pixelated;"
 												/>
 											{:else}
-												{part.text}
+												{part.content || part.text}
 											{/if}
 										{/each}
 									{:else}
 										{preview.text}
 									{/if}
 								</p>
-							</div>
-
-							<div class="conv-badges">
-								{#if conv.is_muted}
-									<span class="material-icons-round mute-icon" title="Silenciado"
-										>notifications_off</span
-									>
-								{/if}
 								{#if conv.unread_count > 0}
-									<span class="unread-badge" class:muted={conv.is_muted}>
-										{conv.unread_count > 99 ? '99+' : conv.unread_count}
-									</span>
-								{/if}
-							</div>
-
-							<div class="conv-menu-wrapper">
-								<button
-									class="conv-menu-btn"
-									onclick={(e) => toggleMenu(e, conv.id)}
-									aria-label="Opciones de conversación"
-									title="Opciones"
-								>
-									<span class="material-icons-round">more_vert</span>
-								</button>
-								{#if menuOpenId === conv.id}
-									<div class="conv-menu" transition:fly={{ y: -6, duration: 150 }}>
-										<button class="conv-menu-item" onclick={(e) => handlePin(e, conv.id)}>
-											<span class="material-icons-round">push_pin</span>
-											{conv.is_pinned ? 'Dejar de fijar' : 'Fijar chat'}
-										</button>
-										<button class="conv-menu-item" onclick={(e) => handleMute(e, conv.id)}>
-											<span class="material-icons-round">
-												{conv.is_muted ? 'notifications_active' : 'notifications_off'}
-											</span>
-											{conv.is_muted ? 'Reactivar sonido' : 'Silenciar'}
-										</button>
-									</div>
+									<span class="unread-badge" class:muted={conv.is_muted}
+										>{conv.unread_count > 99 ? '99+' : conv.unread_count}</span
+									>
 								{/if}
 							</div>
 						</div>
-					</li>
+						{#if menuOpenId === conv.id}
+							<div
+								class="conv-menu"
+								use:clickOutside={() => (menuOpenId = null)}
+								transition:fly={{ y: -6, duration: 150 }}
+							>
+								<button class="conv-menu-item" onclick={(e) => handlePin(e, conv.id)}>
+									<span class="material-icons-round">push_pin</span>
+									{conv.is_pinned ? 'Dejar de fijar' : 'Fijar chat'}
+								</button>
+								<button class="conv-menu-item" onclick={(e) => handleMute(e, conv.id)}>
+									<span class="material-icons-round"
+										>{conv.is_muted ? 'notifications_active' : 'notifications_off'}</span
+									>
+									{conv.is_muted ? 'Reactivar sonido' : 'Silenciar'}
+								</button>
+							</div>
+						{/if}
+					</div>
+				{/snippet}
+				{#each pinnedGroup as conv, i (conv.id)}
+					{@render convCard(conv, i)}
 				{/each}
-			</ul>
+				{#if pinnedGroup.length > 0 && restGroup.length > 0}
+					<div class="group-label" in:fade={{ duration: 180 }}>
+						<span class="material-icons-round">forum</span> Todas las conversaciones
+					</div>
+				{/if}
+				{#each restGroup as conv, i (conv.id)}
+					{@render convCard(conv, i, i >= restGroup.length - 2)}
+				{/each}
+			</div>
 		{/if}
 	</div>
 
@@ -364,7 +551,14 @@
 </aside>
 
 <style>
+	/* ═══════════════════════════════════════════════════════════
+	   Voom! Messenger — Bandeja de conversaciones "Retro-Aero"
+	   Lista plana tipo contactos MSN moderno: filas limpias,
+	   selección con acento, segmented control y menús sin solapes.
+	   ═══════════════════════════════════════════════════════════ */
+
 	.conversations-sidebar {
+		position: relative;
 		width: 320px;
 		flex-shrink: 0;
 		border-right: 1px solid var(--border-subtle);
@@ -373,128 +567,326 @@
 		min-height: 0;
 		height: 100%;
 		overflow: hidden;
-		background: var(--bg-surface);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
+		isolation: isolate;
+		background: rgba(var(--accent-blue-rgb), 0.03);
+	}
+	:global([data-theme='dark']) .conversations-sidebar,
+	:global([data-theme='midnight']) .conversations-sidebar {
+		background: rgba(0, 0, 0, 0.14);
 	}
 
-	/* ── Header ─────────────────────────────────────────────── */
+	/* ── Cabecera ───────────────────────────────────────────── */
 	.sidebar-header {
-		padding: 14px 14px 10px;
+		position: relative;
+		z-index: 2;
+		padding: 12px 12px 10px;
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
 		border-bottom: 1px solid var(--border-subtle);
-		background:
-			radial-gradient(120% 90% at 85% -30%, rgba(var(--accent-blue-rgb), 0.09), transparent 60%),
-			rgba(var(--accent-blue-rgb), 0.02);
 	}
 
-	.sidebar-title-row {
+	/* Fila de perfil: simple, sin caja pesada */
+	.user-profile-card {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 2px 2px;
+	}
+
+	.user-avatar-slot {
+		position: relative;
+		width: 42px;
+		height: 42px;
+		flex: 0 0 42px;
+		min-width: 42px;
+		min-height: 42px;
+		flex-shrink: 0;
+	}
+	.user-card-avatar {
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
+		corner-shape: squircle;
+		object-fit: cover;
+		display: block;
+	}
+	.user-card-init {
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
+		corner-shape: squircle;
+		background: linear-gradient(140deg, var(--aero-sky), var(--accent-blue-base));
+		color: #ffffff;
+		font-weight: 800;
+		font-size: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.user-presence-dot {
+		position: absolute;
+		bottom: -2px;
+		right: -2px;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		border: 2px solid var(--bg-surface-solid, var(--bg-surface));
+	}
+	.user-presence-dot.status-online {
+		background: var(--aero-mint, #00d4aa);
+	}
+	.user-presence-dot.status-away,
+	.user-presence-dot.status-idle {
+		background: #f5a623;
+	}
+	.user-presence-dot.status-dnd {
+		background: #e5484d;
+	}
+	.user-presence-dot.status-invisible,
+	.user-presence-dot.status-offline {
+		background: #64748b;
+	}
+
+	.user-card-details {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.user-card-topline {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 4px;
 	}
-
-	.title-block {
-		min-width: 0;
-	}
-
-	.sidebar-title {
+	.user-card-name {
 		font-family: var(--font-display);
-		font-size: 1.25rem;
 		font-weight: 800;
+		font-size: 0.88rem;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
-		margin: 0;
-		line-height: 1.15;
-		background: linear-gradient(120deg, var(--text-primary) 55%, var(--accent-blue-base) 130%);
-		-webkit-background-clip: text;
-		background-clip: text;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
-	.sidebar-count {
-		font-size: 0.68rem;
-		color: var(--text-muted);
-		font-weight: 600;
+	/* Selector de estado: pill compacta con chevron */
+	.status-pill-container {
+		position: relative;
+		flex-shrink: 0;
 	}
-
-	.sidebar-actions {
-		gap: 6px;
+	.status-pill-badge {
+		display: inline-flex;
 		align-items: center;
+		gap: 4px;
+		padding: 3px 7px;
+		background: transparent;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-full);
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			background 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.status-pill-badge:hover,
+	.status-pill-badge.active {
+		background: rgba(var(--accent-blue-rgb), 0.08);
+		border-color: rgba(var(--accent-blue-rgb), 0.3);
+	}
+	.status-pill-badge:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.status-pill-label {
+		font-size: 0.66rem;
+		font-weight: 700;
+		color: var(--text-secondary);
+		white-space: nowrap;
+	}
+	.status-pill-chevron {
+		font-size: 13px !important;
+		color: var(--text-muted);
+	}
+	.status-dot-mini {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.status-dot-mini.status-online {
+		background: var(--aero-mint, #00d4aa);
+	}
+	.status-dot-mini.status-away,
+	.status-dot-mini.status-idle {
+		background: #f5a623;
+	}
+	.status-dot-mini.status-dnd {
+		background: #e5484d;
+	}
+	.status-dot-mini.status-invisible,
+	.status-dot-mini.status-offline {
+		background: #64748b;
 	}
 
-	.status-avatar {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		object-fit: cover;
-		border: 2px solid transparent;
+	/* Dropdown de estado: superficie sólida con sombra */
+	.status-pill-dropdown {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		min-width: 150px;
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border: 1px solid var(--border-subtle);
+		border-radius: 12px;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+		z-index: 30;
+		padding: 4px;
+		display: flex;
+		flex-direction: column;
 	}
-
-	.status-avatar-initial {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--grad-primary);
-		color: white;
+	.status-pill-opt {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		font-weight: bold;
-		font-size: 13px;
-		border: 2px solid transparent;
+		gap: 8px;
+		padding: 7px 9px;
+		background: transparent;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		font-family: inherit;
+		text-align: left;
+		transition: background 0.13s ease;
+	}
+	.status-pill-opt:hover {
+		background: rgba(var(--accent-blue-rgb), 0.08);
+	}
+	.status-pill-opt:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: -2px;
+	}
+	.status-pill-opt.selected {
+		background: rgba(var(--accent-blue-rgb), 0.06);
+	}
+	.status-opt-name {
+		flex: 1;
+		font-size: 0.76rem;
+		font-weight: 600;
+		color: var(--text-primary);
+	}
+	.status-opt-check {
+		font-size: 15px !important;
+		color: var(--accent-blue-base);
 	}
 
-	.aero-icon-btn {
-		position: relative;
-		background: rgba(var(--accent-blue-rgb), 0.06);
-		border: 1px solid transparent;
+	/* Cápsula de estado personal */
+	.user-status-capsule {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 0 8px;
+		border: 1px solid var(--border-subtle);
+		border-radius: 10px;
+		background: transparent;
+		transition:
+			border-color 0.15s ease,
+			box-shadow 0.15s ease;
+	}
+	.user-status-capsule.focused {
+		border-color: var(--accent-blue-base);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.12);
+	}
+	.status-capsule-icon {
+		font-size: 15px !important;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+	.status-capsule-icon.saved {
+		color: var(--aero-mint, #00d4aa);
+	}
+	.user-status-text-input {
+		flex: 1;
+		min-width: 0;
+		border: none;
+		background: transparent;
+		outline: none;
+		padding: 7px 0;
+		font-size: 0.76rem;
+		color: var(--text-primary);
+		font-family: inherit;
+	}
+	.user-status-text-input::placeholder {
+		color: var(--text-muted);
+		opacity: 0.7;
+	}
+	.status-capsule-actions {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+	.status-capsule-clear-btn {
+		background: transparent;
+		border: none;
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 0;
-		width: 32px;
-		height: 32px;
-		min-width: 32px;
-		min-height: 32px;
-		box-sizing: border-box;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		padding: 2px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		overflow: visible;
-		transition:
-			background 0.18s,
-			color 0.18s,
-			transform 0.18s var(--ease-spring),
-			box-shadow 0.2s,
-			border-color 0.18s;
+		border-radius: var(--radius-full);
 	}
-	.aero-icon-btn .status-avatar,
-	.aero-icon-btn .status-avatar-initial {
-		pointer-events: none;
-	}
-	.aero-icon-btn:hover {
-		background: rgba(var(--accent-blue-rgb), 0.12);
+	.status-capsule-clear-btn:hover {
 		color: var(--text-primary);
-		transform: translateY(-1px);
-		border-color: rgba(var(--accent-blue-rgb), 0.25);
+		background: rgba(var(--accent-blue-rgb), 0.1);
 	}
-	.aero-icon-btn:active {
-		transform: scale(0.94);
+	.status-capsule-clear-btn .material-icons-round {
+		font-size: 13px;
+	}
+	.status-limiter {
+		font-size: 0.62rem;
+		font-weight: 700;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
+	}
+	.status-limiter.limit-warn {
+		color: var(--aero-amber, #f5a623);
 	}
 
-	.new-dm-btn {
-		background: linear-gradient(135deg, var(--aero-sky), var(--accent-blue-base));
-		color: #fff;
-		box-shadow: 0 2px 8px rgba(var(--accent-blue-rgb), 0.35);
+	/* Botón nuevo chat */
+	.new-chat-btn {
+		background: var(--accent-blue-base);
+		border: none;
+		color: #ffffff;
+		cursor: pointer;
+		padding: 0;
+		width: 34px;
+		height: 34px;
+		min-width: 34px;
+		min-height: 34px;
+		flex: 0 0 34px;
+		border-radius: 11px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.35);
+		transition:
+			transform 0.15s var(--ease-spring),
+			filter 0.15s ease;
 	}
-	.new-dm-btn:hover {
-		background: linear-gradient(135deg, var(--accent-blue-light), var(--accent-blue-base));
-		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.5);
+	.new-chat-btn:hover {
+		transform: translateY(-1px);
+		filter: brightness(1.08);
+	}
+	.new-chat-btn:active {
+		transform: scale(0.94);
+	}
+	.new-chat-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.new-chat-btn .material-icons-round {
+		font-size: 19px;
 	}
 
 	/* ── Búsqueda ───────────────────────────────────────────── */
@@ -503,18 +895,37 @@
 		display: flex;
 		align-items: center;
 	}
-
-	.search-wrapper .material-icons-round {
+	.search-icon {
 		position: absolute;
-		left: 10px;
-		top: 50%;
-		transform: translateY(-50%);
+		left: 11px;
 		color: var(--text-muted);
-		font-size: 1rem;
+		font-size: 1rem !important;
 		pointer-events: none;
 		z-index: 1;
 	}
-
+	.search-input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 9px 34px;
+		font-size: 0.82rem;
+		font-family: inherit;
+		border-radius: 11px;
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		color: var(--text-primary);
+		outline: none;
+		transition:
+			border-color 0.16s ease,
+			box-shadow 0.16s ease;
+	}
+	.search-input:focus {
+		border-color: var(--accent-blue-base);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.12);
+	}
+	.search-input::placeholder {
+		color: var(--text-muted);
+		opacity: 0.7;
+	}
 	.search-clear-btn {
 		position: absolute;
 		right: 6px;
@@ -522,74 +933,83 @@
 		border: none;
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 2px;
+		padding: 0;
+		width: 26px;
+		height: 26px;
+		min-width: 26px;
+		min-height: 26px;
+		flex: 0 0 26px;
 		display: flex;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		transition: color 0.15s;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-full);
 	}
 	.search-clear-btn:hover {
 		color: var(--text-primary);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+	}
+	.search-clear-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 1px;
 	}
 	.search-clear-btn .material-icons-round {
-		font-size: 14px;
+		font-size: 15px;
 	}
 
-	/* ── Tabs de filtro ─────────────────────────────────────── */
+	/* ── Filtros: segmented control limpio ──────────────────── */
 	.filter-tabs {
 		display: flex;
-		gap: 4px;
+		gap: 2px;
 		padding: 3px;
-		background: rgba(var(--accent-blue-rgb), 0.05);
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-sm);
+		border-radius: 11px;
+		background: rgba(var(--accent-blue-rgb), 0.04);
 	}
-
 	.filter-tab {
 		flex: 1;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		gap: 5px;
-		padding: 4px 6px;
-		font-size: 0.72rem;
-		font-weight: 700;
-		color: var(--text-muted);
+		padding: 6px 8px;
 		background: transparent;
 		border: none;
-		border-radius: calc(var(--radius-sm) - 3px);
+		border-radius: 8px;
 		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.73rem;
+		font-weight: 700;
+		color: var(--text-muted);
 		transition:
-			background 0.18s,
-			color 0.18s,
-			box-shadow 0.18s;
+			background 0.15s ease,
+			color 0.15s ease,
+			box-shadow 0.15s ease;
 	}
-
 	.filter-tab:hover {
-		color: var(--text-primary);
+		color: var(--text-secondary);
 	}
-
+	.filter-tab:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: -2px;
+	}
 	.filter-tab.active {
-		background: var(--bg-surface-solid, #fff);
-		color: var(--accent-blue-base);
-		box-shadow:
-			0 1px 4px rgba(0, 0, 0, 0.08),
-			inset 0 1px 0 rgba(255, 255, 255, 0.35);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		color: var(--text-primary);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 	}
-
 	.filter-badge {
-		min-width: 16px;
-		height: 16px;
-		padding: 0 4px;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		background: linear-gradient(135deg, var(--aero-sky), var(--accent-blue-base));
-		color: #fff;
-		font-size: 0.62rem;
-		font-weight: 800;
+		min-width: 17px;
+		height: 16px;
+		padding: 0 4px;
 		border-radius: var(--radius-full);
-		line-height: 1;
+		background: var(--accent-blue-base);
+		color: #ffffff;
+		font-size: 0.6rem;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
 	}
 
 	/* ── Lista ──────────────────────────────────────────────── */
@@ -597,470 +1017,418 @@
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 8px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--scrollbar-thumb) transparent;
-		padding: 4px 0 8px;
 	}
-
+	.conversations-list::-webkit-scrollbar {
+		width: 5px;
+		background: transparent;
+	}
+	.conversations-list::-webkit-scrollbar-thumb {
+		background: var(--scrollbar-thumb);
+		border-radius: var(--radius-xs);
+	}
 	.conv-list-inner {
-		list-style: none;
-		margin: 0;
-		padding: 0 6px;
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 	}
 
-	.conv-item {
-		width: 100%;
-		padding: 9px 10px;
+	.group-label {
 		display: flex;
-		gap: 10px;
 		align-items: center;
-		background: none;
-		border: none;
-		border-radius: var(--radius-md);
-		cursor: pointer;
-		transition:
-			background 0.18s ease,
-			box-shadow 0.2s ease,
-			transform 0.18s ease;
-		text-align: left;
-		position: relative;
-		isolation: isolate;
+		gap: 5px;
+		padding: 10px 6px 4px;
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.group-label .material-icons-round {
+		font-size: 12px;
 	}
 
-	.conv-item:focus-visible {
-		outline: 2px solid var(--accent-blue-base);
+	/* Fila de conversación: plana, selección con acento (guía MSN) */
+	.conv-card {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 8px;
+		border-radius: 12px;
+		cursor: pointer;
+		border: 1px solid transparent;
+		transition:
+			background 0.14s ease,
+			border-color 0.14s ease;
+	}
+	.conv-card:hover {
+		background: rgba(var(--accent-blue-rgb), 0.06);
+	}
+	.conv-card:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
 		outline-offset: -2px;
 	}
-
-	.conv-item:hover {
-		background: var(--bg-surface-hover);
+	.conv-card.active {
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		border-color: rgba(var(--accent-blue-rgb), 0.28);
+	}
+	.conv-card.menu-open {
+		background: rgba(var(--accent-blue-rgb), 0.08);
 	}
 
-	.conv-item.active {
-		background: var(--bg-overlay);
-		box-shadow:
-			inset 0 1px 0 var(--glass-border-t),
-			0 2px 8px rgba(var(--accent-blue-rgb), 0.08);
-	}
-
-	/* Barra de activo a la izquierda, con transición suave */
-	.active-bar {
-		position: absolute;
-		left: 0;
-		top: 50%;
-		transform: translateY(-50%) scaleY(0);
-		width: 3px;
-		height: 60%;
-		border-radius: var(--radius-full);
-		background: linear-gradient(180deg, var(--aero-sky), var(--accent-blue-base));
-		box-shadow: 0 0 8px rgba(var(--accent-blue-rgb), 0.5);
-		transition: transform 0.22s var(--ease-spring);
-	}
-	.conv-item.active .active-bar {
-		transform: translateY(-50%) scaleY(1);
-	}
-
-	.conv-item.pinned {
-		background: rgba(var(--accent-blue-rgb), 0.04);
-	}
-
-	.pin-icon {
-		font-size: 0.72rem !important;
-		color: var(--accent-blue-base);
+	.conv-avatar-wrap {
+		position: relative;
+		width: 44px;
+		height: 44px;
+		flex: 0 0 44px;
+		min-width: 44px;
+		min-height: 44px;
 		flex-shrink: 0;
-		transform: rotate(45deg);
 	}
-
-	.conv-badges {
+	.conv-avatar-img {
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
+		corner-shape: squircle;
+		object-fit: cover;
+		display: block;
+	}
+	.conv-avatar-init {
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
+		corner-shape: squircle;
+		background: linear-gradient(140deg, var(--aero-sky), var(--accent-blue-base));
 		display: flex;
 		align-items: center;
+		justify-content: center;
+		color: #ffffff;
+		font-weight: 800;
+		font-size: 0.86rem;
+	}
+	.conv-online-dot {
+		position: absolute;
+		bottom: -2px;
+		right: -2px;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: var(--aero-mint, #00d4aa);
+		border: 2px solid var(--bg-surface-solid, var(--bg-surface));
+	}
+
+	.conv-details {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.conv-line1 {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 6px;
+	}
+	.conv-name {
+		display: inline-flex;
+		align-items: center;
 		gap: 4px;
+		min-width: 0;
+		font-weight: 700;
+		font-size: 0.85rem;
+		color: var(--text-primary);
+		margin: 0;
+	}
+	.conv-name-text {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.verified-check {
+		font-size: 0.82rem !important;
+		color: var(--badge-verified, var(--aero-sky));
 		flex-shrink: 0;
 	}
-
-	.mute-icon {
-		font-size: 0.95rem !important;
+	.conv-meta-action {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		flex-shrink: 0;
+	}
+	.conv-time {
+		font-size: 0.64rem;
 		color: var(--text-muted);
-		opacity: 0.7;
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
 	}
-
-	.unread-badge.muted {
-		background: var(--text-muted);
-		box-shadow: none;
-		opacity: 0.7;
-	}
-
-	.conv-menu-wrapper {
-		position: relative;
-		flex-shrink: 0;
-	}
-
 	.conv-menu-btn {
 		background: transparent;
 		border: none;
-		color: var(--text-muted);
+		color: transparent;
 		cursor: pointer;
-		padding: 2px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		padding: 0;
+		width: 26px;
+		height: 26px;
+		min-width: 26px;
+		min-height: 26px;
+		flex: 0 0 26px;
 		display: flex;
 		align-items: center;
-		opacity: 0;
+		justify-content: center;
+		border-radius: 8px;
 		transition:
-			opacity 0.18s,
-			background 0.2s,
-			color 0.2s;
+			color 0.14s ease,
+			background 0.14s ease;
 	}
-	.conv-item:hover .conv-menu-btn,
-	.conv-item:focus-within .conv-menu-btn {
-		opacity: 1;
+	.conv-card:hover .conv-menu-btn,
+	.conv-card:focus-within .conv-menu-btn,
+	.conv-card.menu-open .conv-menu-btn {
+		color: var(--text-muted);
 	}
 	.conv-menu-btn:hover {
+		color: var(--text-primary) !important;
 		background: rgba(var(--accent-blue-rgb), 0.12);
-		color: var(--accent-blue-base);
+	}
+	.conv-menu-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 1px;
 	}
 	.conv-menu-btn .material-icons-round {
-		font-size: 18px;
+		font-size: 16px;
 	}
 
+	.conv-line2 {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.conv-preview {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		min-width: 0;
+		flex: 1;
+		margin: 0;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.conv-card.has-unread .conv-preview {
+		color: var(--text-secondary);
+		font-weight: 600;
+	}
+	.preview-status-icon,
+	.preview-attachment-icon {
+		font-size: 13px !important;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+	.unread-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 19px;
+		height: 18px;
+		padding: 0 5px;
+		border-radius: var(--radius-full);
+		background: var(--accent-blue-base);
+		color: #ffffff;
+		font-size: 0.62rem;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		flex-shrink: 0;
+		line-height: 1;
+	}
+	.unread-badge.muted {
+		background: var(--text-muted);
+	}
+
+	/* Menú contextual: sólido, con flip para las últimas filas */
 	.conv-menu {
 		position: absolute;
-		top: 100%;
-		right: 0;
-		margin-top: 4px;
+		top: calc(100% - 4px);
+		right: 10px;
 		min-width: 170px;
-		background: var(--bg-surface-solid, #ffffff);
+		background: var(--bg-surface-solid, var(--bg-surface));
 		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-sm);
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-		z-index: 60;
-		overflow: hidden;
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
+		border-radius: 12px;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+		z-index: 20;
+		padding: 4px;
+		display: flex;
+		flex-direction: column;
+	}
+	.conv-card.menu-flip .conv-menu {
+		top: auto;
+		bottom: calc(100% - 4px);
 	}
 	.conv-menu-item {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		width: 100%;
-		padding: 8px 12px;
+		padding: 8px 10px;
 		background: transparent;
 		border: none;
-		color: var(--text-primary);
-		font-size: 0.78rem;
+		border-radius: 8px;
 		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: var(--text-primary);
 		text-align: left;
-		transition: background 0.15s;
+		transition: background 0.13s ease;
 	}
 	.conv-menu-item:hover {
-		background: var(--bg-overlay);
+		background: rgba(var(--accent-blue-rgb), 0.08);
+	}
+	.conv-menu-item:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: -2px;
 	}
 	.conv-menu-item .material-icons-round {
 		font-size: 16px;
 		color: var(--text-muted);
 	}
 
-	/* ── Avatar ─────────────────────────────────────────────── */
-	.conv-avatar-wrapper {
-		position: relative;
-		flex-shrink: 0;
-	}
-
-	.conv-avatar {
-		width: 44px;
-		height: 44px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--grad-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #fff;
-		font-weight: 700;
-		font-size: 0.82rem;
-		overflow: hidden;
-		box-shadow:
-			inset 0 1px 1px rgba(255, 255, 255, 0.3),
-			0 1px 3px rgba(0, 0, 0, 0.12);
-	}
-
-	.conv-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.online-indicator {
-		position: absolute;
-		bottom: -1px;
-		right: -1px;
-		width: 11px;
-		height: 11px;
-		background: var(--aero-mint);
-		border: 2px solid var(--bg-surface-solid, #ffffff);
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		box-shadow: 0 0 6px rgba(0, 212, 170, 0.55);
-	}
-
-	/* ── Detalles ───────────────────────────────────────────── */
-	.conv-details {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.conv-meta {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: 6px;
-	}
-
-	.conv-name {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		min-width: 0;
-		font-weight: 700;
-		font-size: 0.84rem;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
-	.conv-name-text {
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.verified-check {
-		font-size: 0.82rem !important;
-		color: var(--badge-verified, var(--aero-sky));
-		flex-shrink: 0;
-		filter: drop-shadow(0 0 3px rgba(var(--accent-blue-rgb), 0.4));
-	}
-
-	.conv-time {
-		font-size: 0.66rem;
-		color: var(--text-muted);
-		flex-shrink: 0;
-	}
-
-	.conv-preview {
-		display: flex;
-		align-items: center;
-		gap: 3px;
-		font-size: 0.73rem;
-		color: var(--text-muted);
-		margin: 2px 0 0 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.preview-attachment-icon {
-		font-size: 0.85rem !important;
-		color: var(--text-muted);
-		flex-shrink: 0;
-		opacity: 0.85;
-	}
-
-	.preview-status-icon {
-		font-size: 0.8rem !important;
-		color: var(--accent-blue-base);
-		flex-shrink: 0;
-		opacity: 0.8;
-	}
-
-	/* Ítems con no leídos: texto reforzado + hora en color acento */
-	.conv-item.has-unread .conv-name,
-	.conv-item.has-unread .conv-preview {
-		color: var(--text-primary);
-		font-weight: 700;
-	}
-	.conv-item.has-unread .conv-time {
-		color: var(--accent-blue-base);
-		font-weight: 700;
-	}
-
-	.unread-badge {
-		min-width: 18px;
-		padding: 1px 6px;
-		border-radius: var(--radius-full);
-		background: linear-gradient(135deg, var(--aero-sky), var(--accent-blue-base));
-		color: white;
-		font-weight: 800;
-		font-size: 0.66rem;
-		text-align: center;
-		box-shadow: 0 2px 6px rgba(var(--accent-blue-rgb), 0.35);
-	}
-
-	/* ── Skeletons ──────────────────────────────────────────── */
+	/* ── Esqueletos ─────────────────────────────────────────── */
 	.skeleton-item {
-		padding: 10px 12px;
 		display: flex;
-		gap: 10px;
 		align-items: center;
-		opacity: 0.6;
+		gap: 10px;
+		padding: 8px;
+		border-radius: 12px;
+		animation: skel-in 0.3s ease both;
+		animation-delay: var(--stagger-delay, 0ms);
 	}
-
+	@keyframes skel-in {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
 	.skeleton-avatar {
 		width: 44px;
 		height: 44px;
-		flex: 0 0 44px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		border-radius: 14px;
 		background: var(--border-subtle);
+		opacity: 0.6;
 	}
-
 	.skeleton-lines {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 	}
-
 	.skeleton-line {
-		height: 10px;
-		background: var(--border-subtle);
+		height: 9px;
 		border-radius: var(--radius-xs);
+		background: var(--border-subtle);
+		opacity: 0.6;
 	}
-
 	.skeleton-line.short {
-		width: 45%;
-		opacity: 0.8;
+		width: 40%;
 	}
-
 	.skeleton-line.long {
 		width: 75%;
-		opacity: 0.5;
 	}
 
-	/* ── Estado vacío ───────────────────────────────────────── */
+	/* ── Vacío ──────────────────────────────────────────────── */
 	.empty-conversations {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		justify-content: center;
-		padding: 48px 20px;
 		text-align: center;
-		color: var(--text-muted);
-		gap: 4px;
+		padding: 36px 16px;
+		gap: 10px;
 	}
-
-	.empty-conversations .material-icons-round {
-		font-size: 2.4rem;
-		margin-bottom: 6px;
-		opacity: 0.4;
-	}
-
-	.empty-conversations p {
-		font-size: 0.78rem;
-		margin: 0;
-		max-width: 210px;
-	}
-
-	.empty-new-chat {
-		margin-top: 10px;
-		padding: 6px 14px;
-		font-size: 0.75rem;
-		font-weight: 700;
-		color: var(--accent-blue-base);
+	.empty-conv-icon-glow {
+		width: 56px;
+		height: 56px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 18px;
+		corner-shape: squircle;
 		background: rgba(var(--accent-blue-rgb), 0.08);
-		border: 1px solid rgba(var(--accent-blue-rgb), 0.25);
-		border-radius: var(--radius-full);
-		cursor: pointer;
-		transition:
-			background 0.18s,
-			transform 0.18s var(--ease-spring);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
+		color: var(--accent-blue-base);
 	}
-	.empty-new-chat:hover {
-		background: rgba(var(--accent-blue-rgb), 0.16);
-		transform: translateY(-1px);
+	.empty-conv-icon-glow .material-icons-round {
+		font-size: 26px;
+	}
+	.empty-conv-title {
+		font-size: 0.82rem;
+		color: var(--text-muted);
+		margin: 0;
+		line-height: 1.45;
+		max-width: 220px;
+	}
+	.empty-new-chat {
+		margin-top: 6px;
+		padding: 8px 16px;
+		font-size: 0.78rem;
+		border-radius: var(--radius-full);
 	}
 
-	/* ── Footer de estado ───────────────────────────────────── */
+	/* ── Pie de conexión ────────────────────────────────────── */
 	.sidebar-footer {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 6px;
-		padding: 7px 14px;
+		padding: 9px 12px;
 		border-top: 1px solid var(--border-subtle);
 		font-size: 0.66rem;
 		font-weight: 600;
 		color: var(--text-muted);
-		background: rgba(var(--accent-blue-rgb), 0.03);
-		flex-shrink: 0;
 	}
-
 	.footer-dot {
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
 		background: var(--text-muted);
-		opacity: 0.5;
-		flex-shrink: 0;
 	}
-
 	.footer-dot.on {
-		background: var(--aero-mint);
-		opacity: 1;
-		box-shadow: 0 0 6px rgba(0, 212, 170, 0.6);
-		animation: footer-pulse 2.4s ease-in-out infinite;
+		background: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 0 2px rgba(var(--aero-mint-rgb, 0, 212, 170), 0.18);
 	}
 
-	@keyframes footer-pulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.55;
-		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.footer-dot.on,
-		.aero-icon-btn,
-		.active-bar {
-			animation: none !important;
-			transition: none !important;
-		}
-	}
-
+	/* ── Móvil ──────────────────────────────────────────────── */
 	@media (max-width: 768px) {
-		.conversations-sidebar.hidden-mobile {
-			display: none;
-		}
 		.conversations-sidebar {
 			width: 100%;
-			border-right: none;
 		}
-		.sidebar-header {
-			padding-top: 10px;
+		.conversations-sidebar.hidden-mobile {
+			transform: translateX(-100%);
+			opacity: 0;
+			pointer-events: none;
+			visibility: hidden;
+			transition:
+				transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.25s ease,
+				visibility 0s linear 0.28s;
 		}
-		.sidebar-footer {
-			display: none;
+		.conversations-sidebar:not(.hidden-mobile) {
+			transform: translateX(0);
+			opacity: 1;
+			visibility: visible;
+			transition:
+				transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.25s ease,
+				visibility 0s linear 0s;
 		}
-	}
-
-	:global(.conversations-list::-webkit-scrollbar) {
-		width: 5px !important;
-		background: transparent !important;
-	}
-	:global(.conversations-list::-webkit-scrollbar-track) {
-		background: transparent !important;
-		border: none !important;
-	}
-	:global(.conversations-list::-webkit-scrollbar-thumb) {
-		background: var(--scrollbar-thumb) !important;
-		border-radius: var(--radius-xs) !important;
-		border: none !important;
-	}
-	:global(.conversations-list::-webkit-scrollbar-thumb:hover) {
-		background: var(--scrollbar-thumb-hover) !important;
+		.conversations-sidebar {
+			will-change: transform, opacity;
+		}
 	}
 </style>

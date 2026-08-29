@@ -65,12 +65,34 @@ export function createChatStore() {
 	}
 
 	function addMessage(msg) {
+		if (!msg || !msg.id) return;
+		const existingIndex = messages.findIndex(
+			(m) => (m.id && msg.id && Number(m.id) === Number(msg.id)) || m.id === msg.id
+		);
+		if (existingIndex !== -1) {
+			messages[existingIndex] = { ...messages[existingIndex], ...msg };
+			messages = [...messages];
+			return;
+		}
 		messages = [...messages, msg].slice(-200);
 	}
 
 	function updateMessage(id, newData) {
 		const index = messages.findIndex((m) => m.id === id);
 		if (index !== -1) {
+			if (newData && newData.id && newData.id !== id) {
+				const duplicateIndex = messages.findIndex(
+					(m, idx) =>
+						idx !== index &&
+						((m.id && newData.id && Number(m.id) === Number(newData.id)) || m.id === newData.id)
+				);
+				if (duplicateIndex !== -1) {
+					// El mensaje con el ID definitivo ya existe en la lista (p. ej. recibido vía socket).
+					// Eliminamos el mensaje temporal para no dejar duplicados.
+					messages = messages.filter((m) => m.id !== id);
+					return;
+				}
+			}
 			messages[index] = { ...messages[index], ...newData };
 			messages = [...messages];
 		}

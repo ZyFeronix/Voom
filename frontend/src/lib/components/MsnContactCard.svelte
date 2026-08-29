@@ -151,6 +151,12 @@
 </aside>
 
 <style>
+	/* ═══════════════════════════════════════════════════════════
+	   Voom! Messenger — Ficha de contacto estilo MSN
+	   Drawer limpio: barra superior, identidad, stats planas y
+	   acciones con color semántico (ámbar zumbido, azul llamadas).
+	   ═══════════════════════════════════════════════════════════ */
+
 	.msn-contact-drawer {
 		position: absolute;
 		top: 0;
@@ -158,24 +164,14 @@
 		bottom: 0;
 		width: 300px;
 		max-width: 88vw;
-		z-index: var(--z-modal-content, 600);
+		z-index: 30;
 		border-left: 1px solid var(--border-subtle);
-		box-shadow:
-			-8px 0 24px rgba(0, 0, 0, 0.12),
-			0 0 20px rgba(var(--accent-blue-rgb), 0.06);
-		will-change: transform;
-		overflow: hidden;
+		background: var(--bg-surface-solid, var(--bg-surface));
+		box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
 	}
 
 	.msn-contact-drawer::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		z-index: 0;
-		background: var(--bg-surface-solid, rgba(15, 23, 42, 0.94));
-		backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
-		-webkit-backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2));
+		display: none;
 	}
 
 	.drawer-scroll-area {
@@ -186,299 +182,307 @@
 		display: flex;
 		flex-direction: column;
 		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) transparent;
 	}
 
+	/* Barra superior estilo ventana Live Messenger */
 	.msn-card-topbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0.5rem 0.8rem;
-		background: linear-gradient(
-			90deg,
-			rgba(var(--accent-blue-rgb), 0.12) 0%,
-			rgba(14, 165, 233, 0.06) 100%
-		);
+		padding: 0.55rem 0.8rem;
 		border-bottom: 1px solid var(--border-subtle);
+		background: rgba(var(--accent-blue-rgb), 0.05);
+		position: sticky;
+		top: 0;
+		z-index: 2;
 	}
-
 	.msn-card-brand {
 		display: flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 6px;
+		min-width: 0;
 	}
-
 	.msn-card-icon {
 		font-size: 0.9rem;
-		filter: drop-shadow(0 0 4px var(--accent-blue-base));
 	}
-
 	.msn-card-brand-title {
-		font-family: var(--font-display, sans-serif);
-		font-size: 0.65rem;
+		font-family: var(--font-display);
+		font-size: 0.62rem;
 		font-weight: 800;
-		letter-spacing: 0.08em;
-		color: var(--accent-blue-base);
-		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
-
 	.msn-card-close-btn {
 		background: transparent;
 		border: none;
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 0.2rem;
-		border-radius: var(--radius-xs);
+		padding: 3px;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		border-radius: 8px;
+		flex-shrink: 0;
 		transition:
-			background 0.15s,
-			color 0.15s;
+			color 0.14s ease,
+			background 0.14s ease;
 	}
-
 	.msn-card-close-btn:hover {
-		background: rgba(var(--accent-blue-rgb), 0.1);
 		color: var(--text-primary);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+	}
+	.msn-card-close-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 1px;
 	}
 	.msn-card-close-btn .material-icons-round {
-		font-size: 18px;
+		font-size: 16px;
 	}
 
+	/* Banner con avatar */
 	.msn-card-banner {
-		height: 75px;
-		background: linear-gradient(
-			135deg,
-			rgba(var(--accent-blue-rgb), 0.25) 0%,
-			rgba(0, 212, 170, 0.08) 100%
-		);
-		position: relative;
 		display: flex;
-		align-items: flex-end;
 		justify-content: center;
-		padding-bottom: 0.5rem;
-		border-bottom: 1px solid var(--border-subtle);
+		padding: 22px 16px 4px;
+		background: linear-gradient(180deg, rgba(var(--accent-blue-rgb), 0.08), transparent);
 	}
-
 	.msn-card-avatar-wrapper {
-		transform: translateY(20px);
-		filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.15));
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		flex-shrink: 0;
 	}
 
 	.msn-card-body {
-		padding: 1.4rem 0.85rem 0.85rem 0.85rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 14px;
+		padding: 12px 16px 18px;
 	}
-
 	.msn-card-identity {
-		text-align: center;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.15rem;
+		text-align: center;
+		gap: 2px;
 	}
-
 	.msn-card-name {
-		font-family: var(--font-display, sans-serif);
-		font-size: 0.95rem;
-		font-weight: 700;
+		font-family: var(--font-display);
+		font-size: 1.05rem;
+		font-weight: 800;
 		color: var(--text-primary);
-		display: flex;
-		align-items: center;
-		gap: 0.3rem;
 		margin: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		letter-spacing: -0.01em;
 	}
-
 	.msn-card-username {
-		font-size: 0.78rem;
-		color: var(--text-secondary);
+		font-size: 0.76rem;
+		color: var(--text-muted);
 		margin: 0;
 	}
 
+	/* Mensaje personal (guiño MSN) */
 	.msn-personal-status-pill {
-		margin-top: 0.35rem;
-		padding: 0.3rem 0.65rem;
-		border-radius: var(--radius-full, 9999px);
-		background: rgba(var(--accent-blue-rgb), 0.06);
-		border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
-		display: flex;
+		display: inline-flex;
 		align-items: center;
-		gap: 0.35rem;
+		gap: 6px;
+		margin-top: 8px;
+		padding: 5px 12px;
+		border-radius: var(--radius-full);
+		background: rgba(var(--accent-blue-rgb), 0.06);
+		border: 1px solid var(--border-subtle);
 		max-width: 100%;
 	}
-
 	.status-music-icon {
 		font-size: 0.78rem;
+		flex-shrink: 0;
 	}
-
 	.status-quote {
-		font-size: 0.72rem;
+		font-size: 0.74rem;
+		color: var(--text-secondary);
 		font-style: italic;
-		color: var(--accent-blue-base);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
+	/* Estado de conexión */
 	.msn-card-status-strip {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.35rem;
-		padding: 0.35rem 0.65rem;
-		background: var(--bg-surface);
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--border-subtle);
+		gap: 6px;
 	}
-
 	.msn-status-dot {
-		width: 7px;
-		height: 7px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		flex-shrink: 0;
 	}
-
 	.msn-status-dot.status-online {
-		background: var(--status-online, #25d366);
-		box-shadow: 0 0 8px rgba(37, 211, 102, 0.6);
+		background: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 0 2px rgba(var(--aero-mint-rgb, 0, 212, 170), 0.18);
 	}
-	.msn-status-dot.status-away {
-		background: var(--status-away, #f5a623);
-		box-shadow: 0 0 8px rgba(245, 166, 35, 0.6);
+	.msn-status-dot.status-away,
+	.msn-status-dot.status-idle {
+		background: #f5a623;
 	}
 	.msn-status-dot.status-dnd {
-		background: var(--status-dnd, #ef4444);
-		box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+		background: #e5484d;
 	}
 	.msn-status-dot.status-invisible,
 	.msn-status-dot.status-offline {
-		background: var(--status-invisible, #8fa8ae);
+		background: #64748b;
 	}
-
 	.msn-status-label {
 		font-size: 0.74rem;
-		font-weight: 600;
+		font-weight: 700;
 		color: var(--text-secondary);
 	}
 
+	/* Stats planas */
 	.msn-card-stats-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 1fr);
-		gap: 0.4rem;
-		background: var(--bg-surface);
-		padding: 0.5rem;
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--border-subtle);
+		gap: 6px;
 	}
-
 	.msn-stat-item {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		text-align: center;
+		gap: 1px;
+		padding: 9px 4px;
+		border: 1px solid var(--border-subtle);
+		border-radius: 12px;
+		background: rgba(var(--accent-blue-rgb), 0.03);
 	}
-
 	.stat-value {
-		font-family: var(--font-display, sans-serif);
-		font-size: 0.92rem;
+		font-family: var(--font-display);
+		font-size: 0.95rem;
 		font-weight: 800;
 		color: var(--text-primary);
+		line-height: 1.1;
 	}
-
 	.stat-label {
-		font-size: 0.65rem;
-		color: var(--text-muted);
-		text-transform: uppercase;
+		font-size: 0.6rem;
+		font-weight: 700;
 		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--text-muted);
 	}
 
+	/* Acciones */
 	.msn-card-actions {
 		display: flex;
 		flex-direction: column;
-		gap: 0.4rem;
+		gap: 6px;
 	}
-
 	.msn-card-action-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.4rem;
-		padding: 0.45rem 0.6rem;
-		border-radius: var(--radius-sm);
+		gap: 0.45rem;
+		padding: 0.55rem 0.7rem;
+		border-radius: 11px;
 		font-family: var(--font-display, sans-serif);
 		font-size: 0.78rem;
-		font-weight: 600;
+		font-weight: 700;
 		border: 1px solid var(--border-subtle);
-		background: var(--bg-surface);
+		background: transparent;
 		color: var(--text-primary);
 		cursor: pointer;
-		transition: all 0.18s var(--ease-out);
+		text-decoration: none;
+		transition:
+			background 0.15s ease,
+			border-color 0.15s ease,
+			color 0.15s ease;
 	}
-
 	.msn-card-action-btn:hover {
-		background: var(--bg-surface-hover);
-		border-color: var(--accent-blue-base);
-		color: var(--accent-blue-base);
-		box-shadow: var(--shadow-xs), var(--shadow-glow);
-	}
-
-	.msn-card-action-btn .material-icons-round {
-		font-size: 16px;
-	}
-
-	.msn-card-action-btn.nudge-btn {
-		background: linear-gradient(
-			135deg,
-			rgba(var(--accent-blue-rgb), 0.15) 0%,
-			rgba(245, 166, 35, 0.12) 100%
-		);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		border-color: rgba(var(--accent-blue-rgb), 0.3);
 		color: var(--accent-blue-base);
 	}
+	.msn-card-action-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.msn-card-action-btn .material-icons-round {
+		font-size: 16px;
+	}
+	.action-icon {
+		font-size: 0.85rem;
+	}
 
+	.msn-card-action-btn.nudge-btn {
+		background: rgba(var(--aero-amber-rgb, 245, 166, 35), 0.1);
+		border-color: rgba(var(--aero-amber-rgb, 245, 166, 35), 0.3);
+		color: var(--aero-amber, #b45309);
+	}
 	.msn-card-action-btn.nudge-btn:hover {
-		background: linear-gradient(
-			135deg,
-			rgba(var(--accent-blue-rgb), 0.25) 0%,
-			rgba(245, 166, 35, 0.2) 100%
-		);
-		box-shadow: 0 4px 14px rgba(var(--accent-blue-rgb), 0.25);
+		background: rgba(var(--aero-amber-rgb, 245, 166, 35), 0.18);
+		border-color: rgba(var(--aero-amber-rgb, 245, 166, 35), 0.45);
+		color: var(--aero-amber, #b45309);
+	}
+	:global([data-theme='dark']) .msn-card-action-btn.nudge-btn,
+	:global([data-theme='midnight']) .msn-card-action-btn.nudge-btn {
+		color: var(--aero-amber, #fbbf24);
 	}
 
+	.msn-card-action-btn.call-btn,
+	.msn-card-action-btn.video-btn {
+		background: rgba(var(--accent-blue-rgb), 0.08);
+		border-color: rgba(var(--accent-blue-rgb), 0.25);
+		color: var(--accent-blue-base);
+	}
+	.msn-card-action-btn.call-btn:hover,
+	.msn-card-action-btn.video-btn:hover {
+		background: rgba(var(--accent-blue-rgb), 0.15);
+	}
+
+	/* Bio */
 	.msn-card-bio-section {
-		padding: 0.6rem 0.75rem;
-		background: var(--bg-surface);
-		border-radius: var(--radius-sm);
+		padding: 12px;
 		border: 1px solid var(--border-subtle);
+		border-radius: 12px;
+		background: rgba(var(--accent-blue-rgb), 0.03);
 	}
-
 	.bio-title {
-		font-size: 0.68rem;
-		font-weight: 700;
-		color: var(--text-muted);
-		text-transform: uppercase;
 		display: block;
-		margin-bottom: 0.2rem;
+		font-size: 0.62rem;
+		font-weight: 800;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		margin-bottom: 4px;
 	}
-
 	.bio-text {
 		font-size: 0.76rem;
 		color: var(--text-secondary);
+		line-height: 1.5;
 		margin: 0;
-		line-height: 1.35;
 	}
 
+	/* Vacío */
 	.msn-card-empty {
-		padding: 2.5rem 1rem;
-		text-align: center;
-		color: var(--text-muted);
+		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.4rem;
+		justify-content: center;
+		gap: 8px;
+		padding: 24px;
+		color: var(--text-muted);
+		text-align: center;
+	}
+	.msn-card-empty .material-icons-round {
+		font-size: 34px;
+		opacity: 0.5;
+	}
+	.msn-card-empty p {
+		font-size: 0.78rem;
+		margin: 0;
 	}
 </style>

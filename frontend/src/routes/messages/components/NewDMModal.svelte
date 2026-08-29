@@ -80,21 +80,23 @@
 	transition:fade={{ duration: 150 }}
 >
 	<div
-		class="glass-card aero-modal dm-modal"
-		style="max-width: 360px; width: 100%; padding: 16px;"
+		class="aero-modal dm-modal"
 		transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
 	>
 		<header class="modal-header">
 			<div class="modal-title-block">
 				<span class="modal-title-icon material-icons-round">forum</span>
-				<h3 class="modal-title">Nuevo chat</h3>
+				<div class="modal-title-text">
+					<h3 class="modal-title">Nuevo chat</h3>
+					<span class="modal-subtitle">Busca por @usuario para empezar</span>
+				</div>
 			</div>
 			<button onclick={onClose} class="close-btn" aria-label="Cerrar modal">
 				<span class="material-icons-round">close</span>
 			</button>
 		</header>
 
-		<div class="search-wrapper" style="margin-top: 12px;">
+		<div class="search-wrapper">
 			<span class="material-icons-round">search</span>
 			<input
 				bind:this={searchInput}
@@ -102,8 +104,7 @@
 				placeholder="Buscar usuarios por @tag..."
 				bind:value={newDMSearch}
 				oninput={onSearchInput}
-				class="aero-input"
-				style="padding-left: 32px; font-size: 0.85rem;"
+				class="search-input"
 				autocomplete="off"
 			/>
 			{#if searchingUsers}
@@ -115,7 +116,7 @@
 		<div class="modal-results">
 			{#if searchingUsers && userSearchResults.length === 0}
 				<div class="modal-loading">
-					<span class="loading loading-spinner text-primary"></span>
+					<span class="inline-spinner" aria-hidden="true"></span>
 				</div>
 			{:else if userSearchResults.length === 0 && newDMSearch.trim()}
 				<p class="modal-empty-text">No se encontraron usuarios.</p>
@@ -133,10 +134,7 @@
 								class="modal-user-item"
 								in:fade={{ duration: 150, delay: i * 30 }}
 							>
-								<div
-									class="conv-avatar"
-									style="flex: 0 0 36px; min-width: 36px; min-height: 36px; width: 36px; height: 36px;"
-								>
+								<div class="conv-avatar" style="flex: 0 0 36px; min-width: 36px; min-height: 36px;">
 									{#if user.avatar_url}
 										<img
 											src={user.avatar_url}
@@ -168,25 +166,45 @@
 	.modal-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 50;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(5px);
+		z-index: 10000;
+		background: radial-gradient(
+			130% 130% at 50% 42%,
+			rgba(9, 17, 33, 0.5) 0%,
+			rgba(3, 8, 18, 0.75) 100%
+		);
+		backdrop-filter: blur(14px) saturate(1.15);
+		-webkit-backdrop-filter: blur(14px) saturate(1.15);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 16px;
 	}
 
+	/* Modal Neo-Aero: superficie sólida + borde degradado squircle */
+	.aero-modal {
+		width: 100%;
+		max-width: 390px;
+		padding: 18px;
+		box-sizing: border-box;
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border: 1px solid var(--border-subtle);
+		border-radius: 14px;
+		box-shadow:
+			0 20px 60px rgba(0, 0, 0, 0.28),
+			inset 0 1px 0 var(--glass-border-t);
+	}
+
 	.modal-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		gap: 8px;
 	}
 
 	.modal-title-block {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 10px;
 		min-width: 0;
 	}
 
@@ -194,22 +212,35 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 28px;
-		height: 28px;
+		width: 34px;
+		height: 34px;
 		flex-shrink: 0;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		border-radius: 8px;
 		background: linear-gradient(135deg, var(--aero-sky), var(--accent-blue-base));
 		color: #fff;
-		font-size: 15px !important;
-		box-shadow: 0 2px 6px rgba(var(--accent-blue-rgb), 0.35);
+		font-size: 17px !important;
+		box-shadow:
+			inset 0 1px 1px rgba(255, 255, 255, 0.4),
+			0 2px 6px rgba(var(--accent-blue-rgb), 0.35);
+	}
+
+	.modal-title-text {
+		min-width: 0;
 	}
 
 	.modal-title {
-		font-size: 0.95rem;
-		font-weight: 700;
+		font-family: var(--font-display);
+		font-size: 1rem;
+		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0;
+		letter-spacing: -0.01em;
+	}
+
+	.modal-subtitle {
+		font-size: 0.7rem;
+		color: var(--text-muted);
+		font-weight: 500;
 	}
 
 	.close-btn {
@@ -220,10 +251,9 @@
 		padding: 4px;
 		display: flex;
 		align-items: center;
-		border-radius: var(--radius-xs);
+		border-radius: 6px;
 		transition: all 0.15s ease;
 	}
-
 	.close-btn:hover {
 		color: var(--text-primary);
 		background: rgba(var(--accent-blue-rgb), 0.1);
@@ -233,8 +263,8 @@
 		position: relative;
 		display: flex;
 		align-items: center;
+		margin-top: 14px;
 	}
-
 	.search-wrapper .material-icons-round {
 		position: absolute;
 		left: 10px;
@@ -244,6 +274,28 @@
 		font-size: 1.05rem;
 		pointer-events: none;
 		z-index: 1;
+	}
+	.search-input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 9px 32px;
+		font-size: 0.86rem;
+		border-radius: 10px;
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-input, var(--bg-surface));
+		color: var(--text-primary);
+		outline: none;
+		transition:
+			border-color 0.18s ease,
+			box-shadow 0.18s ease;
+	}
+	.search-input:focus {
+		border-color: var(--accent-blue-base);
+		box-shadow: 0 0 0 3px rgba(var(--accent-blue-rgb), 0.14);
+	}
+	.search-input::placeholder {
+		color: var(--text-muted);
+		opacity: 0.7;
 	}
 
 	/* Spinner inline dentro del input mientras busca */
@@ -264,7 +316,7 @@
 	}
 
 	.modal-results {
-		max-height: 240px;
+		max-height: 250px;
 		overflow-y: auto;
 		margin-top: 12px;
 		scrollbar-width: thin;
@@ -289,19 +341,17 @@
 	.modal-empty-text,
 	.modal-hint {
 		text-align: center;
-		font-size: 0.75rem;
+		font-size: 0.78rem;
 		color: var(--text-muted);
-		padding: 20px;
+		padding: 22px;
 		margin: 0;
 	}
-
 	.modal-hint {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 8px;
 	}
-
 	.hint-icon {
 		font-size: 1.8rem;
 		opacity: 0.4;
@@ -312,8 +362,8 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 7px 9px;
-		border-radius: var(--radius-sm);
+		padding: 8px 10px;
+		border-radius: 10px;
 		background: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
 		cursor: pointer;
@@ -324,12 +374,14 @@
 			transform 0.18s var(--ease-spring),
 			box-shadow 0.18s ease;
 	}
-
 	.modal-user-item:hover {
 		background: var(--bg-surface-hover);
 		border-color: var(--accent-blue-base);
 		transform: translateY(-1px);
-		box-shadow: 0 4px 10px rgba(var(--accent-blue-rgb), 0.14);
+	}
+	.modal-user-item:focus-visible {
+		outline: 2px solid var(--aero-sky);
+		outline-offset: 2px;
 	}
 
 	.item-go-icon {
@@ -352,21 +404,18 @@
 	.conv-avatar {
 		width: 36px;
 		height: 36px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--grad-primary);
+		flex-shrink: 0;
+		border-radius: 8px;
+		background: linear-gradient(135deg, var(--accent-blue-base) 0%, var(--aero-mint) 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: #fff;
 		font-weight: 700;
-		font-size: 0.72rem;
+		font-size: 0.75rem;
 		overflow: hidden;
-		box-shadow:
-			inset 0 1px 1px rgba(255, 255, 255, 0.3),
-			0 1px 2px rgba(0, 0, 0, 0.1);
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35);
 	}
-
 	.conv-avatar img {
 		width: 100%;
 		height: 100%;
@@ -377,9 +426,8 @@
 		flex: 1;
 		min-width: 0;
 	}
-
 	.user-name-mini {
-		font-size: 0.78rem;
+		font-size: 0.8rem;
 		font-weight: 700;
 		color: var(--text-primary);
 		margin: 0;
@@ -387,9 +435,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-
 	.user-username-mini {
-		font-size: 0.68rem;
+		font-size: 0.7rem;
 		color: var(--text-muted);
 		margin: 1px 0 0 0;
 		white-space: nowrap;
@@ -397,13 +444,58 @@
 		text-overflow: ellipsis;
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.inline-spinner {
-			animation-duration: 1.4s;
-		}
-		.modal-user-item,
-		.item-go-icon {
-			transition: none;
-		}
+	/* ── Theme Adaptations ── */
+	:global([data-theme='light']) .aero-modal {
+		background: linear-gradient(
+			180deg,
+			rgba(255, 255, 255, 0.96) 0%,
+			rgba(235, 250, 253, 0.92) 100%
+		);
+		box-shadow:
+			0 20px 60px rgba(14, 165, 233, 0.18),
+			inset 0 1px 2px rgba(255, 255, 255, 0.95);
+	}
+	:global([data-theme='light']) .search-input {
+		background: rgba(255, 255, 255, 0.9);
+		border-color: var(--border-subtle);
+	}
+	:global([data-theme='light']) .modal-user-item {
+		background: rgba(255, 255, 255, 0.8);
+	}
+	:global([data-theme='light']) .modal-user-item:hover {
+		background: rgba(235, 248, 254, 0.95);
+	}
+
+	:global([data-theme='dark']) .aero-modal {
+		background: rgba(12, 35, 55, 0.92);
+		box-shadow:
+			0 20px 60px rgba(0, 0, 0, 0.45),
+			inset 0 1px 1px rgba(255, 255, 255, 0.2);
+	}
+
+	:global([data-theme='midnight']) .aero-modal {
+		background: rgba(6, 12, 24, 0.95);
+		box-shadow:
+			0 24px 70px rgba(0, 0, 0, 0.7),
+			inset 0 1px 1px rgba(160, 210, 255, 0.15);
+	}
+
+	/* ── Performance Modes ── */
+	:global(:root[data-perf='high']) .modal-backdrop,
+	:global(:root[data-perf-profile='high']) .modal-backdrop {
+		backdrop-filter: blur(14px) saturate(1.15);
+		-webkit-backdrop-filter: blur(14px) saturate(1.15);
+	}
+	:global(:root[data-perf='balanced']) .modal-backdrop,
+	:global(:root[data-perf-profile='balanced']) .modal-backdrop {
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+	}
+	:global(:root[data-perf='eco']) .modal-backdrop,
+	:global(:root[data-perf-profile='lite']) .modal-backdrop,
+	:global(:root[data-perf-mode='true']) .modal-backdrop {
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+		background: rgba(0, 0, 0, 0.75) !important;
 	}
 </style>

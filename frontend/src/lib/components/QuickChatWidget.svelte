@@ -63,10 +63,18 @@
 				if (Number(msg.conversation_id) === Number(activeConvId)) {
 					// Solo procesar mensajes realmente nuevos — evita repetir markRead /
 					// fetchUnreadMessageCount en cada re-ejecución del $effect (flood de peticiones).
-					if (!messages.some((m) => Number(m.id) === Number(msg.id))) {
+					if (
+						!messages.some(
+							(m) => (m.id && msg.id && Number(m.id) === Number(msg.id)) || m.id === msg.id
+						)
+					) {
 						const tempIndex = messages.findIndex(
 							(m) =>
-								m.pending && m.body === msg.body && Number(m.sender_id) === Number(msg.sender_id)
+								m.pending &&
+								Number(m.sender_id) === Number(msg.sender_id) &&
+								((m.body || '').trim() === (msg.body || '').trim() ||
+									(m.media_type && m.media_type === msg.media_type) ||
+									(!m.body && !msg.body))
 						);
 						if (tempIndex !== -1) {
 							messages[tempIndex] = { ...msg, pending: false };

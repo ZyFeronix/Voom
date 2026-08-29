@@ -1,6 +1,6 @@
 <script>
 	/**
-	 * MsnToastContainer.svelte - V-SOCIAL MSN Messenger Neo-Aero Toast Popups
+	 * MsnToastContainer.svelte - Voom! MSN Messenger Neo-Aero Toast Popups
 	 * Renderiza notificaciones emergentes estilo MSN Messenger / Windows Live Messenger
 	 * en la esquina inferior derecha con física de resorte y sintetizador Web Audio.
 	 */
@@ -155,7 +155,7 @@
 
 		// Solo si no está leída y es reciente
 		if (!latest.is_read) {
-			const actorName = latest.actor_username || 'V-SOCIAL';
+			const actorName = latest.actor_username || 'Voom!';
 			addToast({
 				id: `notif-${latest.id}`,
 				type: latest.type || 'system',

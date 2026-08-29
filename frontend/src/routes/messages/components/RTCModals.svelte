@@ -49,6 +49,16 @@
 		if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 		return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 	}
+
+	function callerName() {
+		return (
+			rtcStore.incomingCallOffer?.callerName ||
+			chatStore.conversations.find(
+				(c) => Number(c.id) === Number(rtcStore.incomingCallOffer?.conversation_id)
+			)?.peer_display_name ||
+			'Usuario'
+		);
+	}
 </script>
 
 <!-- ════════════════════════════════════════════════════════════════════ -->
@@ -57,50 +67,50 @@
 {#if rtcStore.showDeviceSetup}
 	<div class="rtc-modal-overlay" style="z-index: 10000;" transition:fade={{ duration: 200 }}>
 		<div
-			class="rtc-modal-glass"
-			style="max-width: 400px; padding: 24px;"
+			class="rtc-modal-glass setup-modal"
 			transition:scale={{ duration: 300, easing: backOut, start: 0.9 }}
 		>
-			<div class="rtc-header" style="padding: 0; margin-bottom: 16px; border-bottom: none;">
-				<h2 style="font-size: 1.25rem; margin:0;">Configuración de llamada</h2>
+			<header class="rtc-setup-header">
+				<h2 class="rtc-setup-title">Configuración de llamada</h2>
 				<button
-					class="aero-icon-btn text-white/70 hover:text-white"
+					class="rtc-close-btn"
 					onclick={onCloseDeviceSetup}
-					title="Cancelar"><span class="material-icons-round">close</span></button
+					title="Cancelar"
+					aria-label="Cancelar"
 				>
-			</div>
+					<span class="material-icons-round">close</span>
+				</button>
+			</header>
 
-			<div class="flex flex-col gap-4">
+			<div class="rtc-setup-body">
 				<!-- Preview -->
-				<div
-					class="relative w-full rounded-2xl overflow-hidden bg-black/50 aspect-video flex items-center justify-center border border-white/10 shadow-inner"
-				>
+				<div class="rtc-preview-frame">
 					{#if rtcStore.previewStream && rtcStore.pendingCallType === 'video'}
 						<video
 							use:srcObject={rtcStore.previewStream}
 							autoplay
 							muted
 							playsinline
-							class="w-full h-full object-cover"
+							class="rtc-video"
 						></video>
 					{:else}
-						<div class="flex flex-col items-center justify-center text-white/50">
-							<span class="material-icons-round text-4xl mb-2"
-								>{rtcStore.pendingCallType === 'video'
+						<div class="rtc-preview-empty">
+							<span class="material-icons-round">
+								{rtcStore.pendingCallType === 'video'
 									? 'videocam_off'
 									: rtcStore.pendingCallType === 'screen'
 										? 'present_to_all'
-										: 'mic'}</span
-							>
+										: 'mic'}
+							</span>
 						</div>
 					{/if}
 				</div>
 
 				<!-- Selectors -->
-				<div class="flex flex-col gap-3">
+				<div class="rtc-selectors">
 					{#if rtcStore.availableCams.length > 0 && rtcStore.pendingCallType === 'video'}
-						<div class="flex flex-col gap-1">
-							<label for="cam-select" class="text-xs text-muted font-medium">Cámara</label>
+						<div class="rtc-selector-row">
+							<label for="cam-select" class="rtc-selector-label">Cámara</label>
 							<CustomSelect
 								id="cam-select"
 								bind:value={rtcStore.selectedCamId}
@@ -112,8 +122,8 @@
 					{/if}
 
 					{#if rtcStore.availableMics.length > 0}
-						<div class="flex flex-col gap-1">
-							<label for="mic-select" class="text-xs text-muted font-medium">Micrófono</label>
+						<div class="rtc-selector-row">
+							<label for="mic-select" class="rtc-selector-label">Micrófono</label>
 							<CustomSelect
 								id="mic-select"
 								bind:value={rtcStore.selectedMicId}
@@ -125,22 +135,20 @@
 					{/if}
 				</div>
 
-				<div class="mt-2">
-					<button
-						class="btn-aero-primary w-full py-2.5 flex items-center justify-center gap-2"
-						onclick={onConfirmDeviceSetup}
-						aria-label="Unirse"
-					>
-						<span class="material-icons-round text-[18px]"
-							>{rtcStore.pendingCallType === 'screen'
-								? 'present_to_all'
-								: rtcStore.pendingCallType === 'video'
-									? 'videocam'
-									: 'call'}</span
-						>
-						Unirse a la llamada
-					</button>
-				</div>
+				<button
+					class="btn-aero-primary rtc-join-btn"
+					onclick={onConfirmDeviceSetup}
+					aria-label="Unirse"
+				>
+					<span class="material-icons-round">
+						{rtcStore.pendingCallType === 'screen'
+							? 'present_to_all'
+							: rtcStore.pendingCallType === 'video'
+								? 'videocam'
+								: 'call'}
+					</span>
+					Unirse a la llamada
+				</button>
 			</div>
 		</div>
 	</div>
@@ -153,16 +161,16 @@
 	<div class="rtc-modal-overlay" transition:fade={{ duration: 200 }}>
 		<div class="rtc-modal-glass" transition:scale={{ duration: 300, easing: backOut, start: 0.9 }}>
 			<!-- Header -->
-			<div class="rtc-header">
-				<div class="flex items-center gap-2">
-					<span class="material-icons-round text-sm" style="color: var(--accent-blue-base)">
+			<header class="rtc-call-header">
+				<div class="rtc-call-title-wrap">
+					<span class="material-icons-round rtc-call-type-icon">
 						{rtcStore.callType === 'screen'
 							? 'present_to_all'
 							: rtcStore.callType === 'video'
 								? 'videocam'
 								: 'call'}
 					</span>
-					<h3 class="font-bold text-sm m-0">
+					<h3 class="rtc-call-title">
 						{rtcStore.callType === 'screen'
 							? 'Compartiendo pantalla'
 							: rtcStore.callType === 'video'
@@ -172,13 +180,13 @@
 					<span class="rtc-duration">{formatDuration(rtcStore.callDurationSecs)}</span>
 				</div>
 				<button
-					class="aero-icon-btn !w-7 !h-7 bg-transparent hover:bg-white/10"
+					class="rtc-close-btn"
 					title="Minimizar"
 					onclick={() => (rtcStore.showCallModal = false)}
 				>
-					<span class="material-icons-round text-sm">minimize</span>
+					<span class="material-icons-round">minimize</span>
 				</button>
-			</div>
+			</header>
 
 			<!-- Video Grid -->
 			<div
@@ -220,27 +228,26 @@
 								<img
 									src={chatStore.activeConv.peer_avatar}
 									alt={chatStore.activeConv.peer_display_name}
-									class="w-full h-full object-cover squircle"
 									width="80"
 									height="80"
 									loading="lazy"
 									decoding="async"
 								/>
 							{:else}
-								<span class="material-icons-round" style="font-size:2.5rem;"
+								<span class="material-icons-round rtc-audio-fallback-icon"
 									>{rtcStore.micMuted ? 'mic_off' : 'mic'}</span
 								>
 							{/if}
 						</div>
-						<p class="text-sm font-semibold mt-2" style="color: var(--text-primary);">
+						<p class="rtc-peer-name">
 							{chatStore.activeConv?.peer_display_name ||
 								chatStore.activeConv?.peer_username ||
 								'Participante'}
 						</p>
 						{#if rtcStore.remoteStreams.length === 0}
-							<p class="text-xs text-muted">Llamando...</p>
+							<p class="rtc-peer-sub">Llamando...</p>
 						{:else}
-							<p class="text-xs" style="color:var(--accent-blue-base);">Conectado ✓</p>
+							<p class="rtc-peer-sub connected">Conectado ✓</p>
 						{/if}
 					</div>
 				{/if}
@@ -260,7 +267,6 @@
 
 			<!-- Controls Bar -->
 			<div class="rtc-controls">
-				<!-- Mute / Unmute Mic -->
 				<button
 					class="rtc-btn"
 					class:rtc-btn-active={rtcStore.micMuted}
@@ -271,7 +277,6 @@
 					<span class="material-icons-round">{rtcStore.micMuted ? 'mic_off' : 'mic'}</span>
 				</button>
 
-				<!-- Toggle Camera (if not audio-only) -->
 				{#if rtcStore.callType !== 'audio'}
 					<button
 						class="rtc-btn"
@@ -286,7 +291,6 @@
 					</button>
 				{/if}
 
-				<!-- Share Screen (if not screen share already) -->
 				{#if rtcStore.callType !== 'screen'}
 					<button
 						class="rtc-btn"
@@ -298,7 +302,6 @@
 					</button>
 				{/if}
 
-				<!-- Hangup -->
 				<button
 					class="rtc-btn hangup"
 					onclick={onEndCall}
@@ -313,42 +316,36 @@
 {/if}
 
 <!-- ════════════════════════════════════════════════════════════════════ -->
-<!-- Incoming Call Notification (Aero Toast)                             -->
+<!-- Incoming Call Notification (Aero Toast)                            -->
 <!-- ════════════════════════════════════════════════════════════════════ -->
-{#if rtcStore.incomingCall}
+{#if rtcStore.incomingCallOffer && !rtcStore.inCall}
 	<div
 		class="incoming-call-toast"
 		transition:fade={{ duration: 250 }}
 		role="alert"
 		aria-live="assertive"
 	>
-		<div class="flex items-center gap-3">
-			<div class="incoming-call-icon" style="animation: ring-bounce 0.6s infinite alternate;">
-				<span class="material-icons-round text-white text-xl"
-					>{rtcStore.incomingCall.callType === 'video' ? 'videocam' : 'call'}</span
-				>
+		<div class="incoming-call-row">
+			<div class="incoming-call-icon">
+				<span class="material-icons-round">
+					{rtcStore.incomingCallOffer.callType === 'video' ? 'videocam' : 'call'}
+				</span>
 			</div>
-			<div class="flex flex-col min-w-0">
-				<span class="text-xs font-bold uppercase tracking-wider text-emerald-400">
-					{rtcStore.incomingCall.callType === 'video' ? 'Videollamada' : 'Llamada de audio'} entrante
+			<div class="incoming-call-text">
+				<span class="incoming-call-kind">
+					{rtcStore.incomingCallOffer.callType === 'video' ? 'Videollamada' : 'Llamada de audio'} entrante
 				</span>
-				<span class="text-sm font-semibold truncate" style="color: var(--text-primary);">
-					{chatStore.conversations.find((c) => c.peer_id === rtcStore.incomingCall.callerId)
-						?.peer_display_name ||
-						chatStore.conversations.find((c) => c.peer_id === rtcStore.incomingCall.callerId)
-							?.peer_username ||
-						'Usuario'}
-				</span>
+				<span class="incoming-call-name">{callerName()}</span>
 			</div>
 		</div>
 
-		<div class="flex gap-2 mt-1">
+		<div class="incoming-call-actions">
 			<button class="rtc-answer-btn accept" onclick={onAcceptCall} aria-label="Aceptar llamada">
-				<span class="material-icons-round text-base">call</span>
+				<span class="material-icons-round">call</span>
 				Aceptar
 			</button>
 			<button class="rtc-answer-btn decline" onclick={onDeclineCall} aria-label="Rechazar llamada">
-				<span class="material-icons-round text-base">call_end</span>
+				<span class="material-icons-round">call_end</span>
 				Rechazar
 			</button>
 		</div>
@@ -356,9 +353,9 @@
 {/if}
 
 <!-- ════════════════════════════════════════════════════════════════════ -->
-<!-- Minimized Active Call Badge                                         -->
+<!-- Minimized Active Call Badge                                        -->
 <!-- ════════════════════════════════════════════════════════════════════ -->
-{#if rtcStore.isInCall && !rtcStore.showCallModal}
+{#if rtcStore.inCall && !rtcStore.showCallModal}
 	<button
 		class="rtc-minimized-badge"
 		onclick={() => (rtcStore.showCallModal = true)}
@@ -366,23 +363,26 @@
 		aria-label="Expandir llamada activa"
 		transition:fade={{ duration: 200 }}
 	>
-		<span class="material-icons-round" style="font-size:1rem; color:#4ade80;"
-			>fiber_manual_record</span
-		>
+		<span class="live-dot" aria-hidden="true"></span>
 		<span>{formatDuration(rtcStore.callDurationSecs)}</span>
-		<span class="material-icons-round text-sm">open_in_full</span>
+		<span class="material-icons-round expand-icon">open_in_full</span>
 	</button>
 {/if}
 
 <style>
-	/* ── WebRTC call UI styling ── */
+	/* ═══════════════════════════════════════════════════════════
+	   Voom! Messenger — Llamadas WebRTC "Retro-Aero limpio"
+	   Escenario oscuro sólido para vídeo, controles circulares,
+	   toast de llamada entrante y badge minimizado.
+	   ═══════════════════════════════════════════════════════════ */
+
 	.rtc-modal-overlay {
 		position: fixed;
 		inset: 0;
-		z-index: var(--z-modal-backdrop);
-		background: rgba(10, 25, 47, 0.65);
-		backdrop-filter: blur(20px);
-		-webkit-backdrop-filter: blur(20px);
+		z-index: var(--z-modal-backdrop, 9000);
+		background: rgba(4, 10, 22, 0.6);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -393,125 +393,186 @@
 		position: relative;
 		width: 480px;
 		max-width: 100%;
-		background: var(--bg-surface-solid, rgba(15, 23, 42, 0.9));
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-lg);
-		padding: 20px;
-		box-shadow:
-			var(--shadow-lg),
-			var(--shadow-glow),
-			inset 0 1px 0 var(--glass-border-t, rgba(255, 255, 255, 0.15));
+		background: #0d1828;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 18px;
+		padding: 18px;
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
-		overflow: hidden;
+		gap: 14px;
+		color: #ffffff;
 	}
-	.rtc-modal-glass::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		background: var(--noise-texture);
-		opacity: 0.02;
-		pointer-events: none;
-		z-index: 1;
+	.setup-modal {
+		width: 400px;
+		background: var(--bg-surface-solid, #0d1828);
+		color: var(--text-primary, #ffffff);
 	}
 
-	.rtc-header {
+	.rtc-setup-header {
 		display: flex;
-		justify-content: space-between;
 		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.rtc-setup-title {
+		font-family: var(--font-display);
+		font-size: 1rem;
+		font-weight: 800;
+		margin: 0;
 		color: var(--text-primary);
-		z-index: 2;
+	}
+	.rtc-close-btn {
+		background: rgba(255, 255, 255, 0.08);
+		border: none;
+		color: inherit;
+		cursor: pointer;
+		padding: 0;
+		width: 30px;
+		height: 30px;
+		min-width: 30px;
+		min-height: 30px;
+		border-radius: var(--radius-full);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: background 0.15s ease;
+	}
+	.rtc-close-btn:hover {
+		background: rgba(255, 255, 255, 0.16);
+	}
+	.rtc-close-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.rtc-close-btn .material-icons-round {
+		font-size: 16px;
 	}
 
-	.rtc-video-grid {
-		display: grid;
-		grid-template-columns: 1fr;
+	.rtc-setup-body {
+		display: flex;
+		flex-direction: column;
 		gap: 12px;
+	}
+	.rtc-preview-frame {
 		width: 100%;
-		z-index: 2;
-	}
-	.rtc-video-grid.multi {
-		grid-template-columns: 1fr 1fr;
-	}
-
-	.rtc-video-wrapper {
-		position: relative;
-		aspect-ratio: 16/9;
-		border-radius: var(--radius-md);
+		aspect-ratio: 4 / 3;
+		border-radius: 14px;
 		overflow: hidden;
-		background: rgba(0, 0, 0, 0.3);
-		border: 1px solid var(--border-subtle);
-		box-shadow: var(--shadow-sm);
+		background: #060c16;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
-
 	.rtc-video {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		display: block;
 	}
-
-	.rtc-label {
-		position: absolute;
-		bottom: 8px;
-		left: 8px;
-		background: rgba(10, 25, 47, 0.75);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
-		color: #fff;
-		padding: 3px 8px;
-		border-radius: var(--radius-xs);
-		font-size: 0.7rem;
-		font-weight: 600;
-		border: 1px solid rgba(255, 255, 255, 0.1);
+	.rtc-preview-empty {
+		color: rgba(255, 255, 255, 0.35);
 	}
-
-	.rtc-audio-pulse {
+	.rtc-preview-empty .material-icons-round {
+		font-size: 40px;
+	}
+	.rtc-selectors {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
 		gap: 10px;
-		padding: 24px 20px;
-		background: var(--bg-surface);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--border-subtle);
-		color: var(--accent-blue-base);
-		position: relative;
-		z-index: 2;
+	}
+	.rtc-selector-row {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.rtc-selector-label {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--text-muted);
+	}
+	.rtc-join-btn {
+		width: 100%;
+		justify-content: center;
+		padding: 12px;
+		font-size: 0.88rem;
+		border-radius: 13px;
 	}
 
-	.rtc-avatar-ring {
-		width: 72px;
-		height: 72px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		border: 3px solid rgba(var(--accent-blue-rgb), 0.5);
+	/* ── Modal de llamada activa ────────────────────────────── */
+	.rtc-call-header {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		color: var(--accent-blue-base);
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.rtc-call-title-wrap {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+	.rtc-call-type-icon {
+		font-size: 18px !important;
+		color: var(--aero-sky, var(--accent-blue-base));
+		flex-shrink: 0;
+	}
+	.rtc-call-title {
+		font-family: var(--font-display);
+		font-size: 0.95rem;
+		font-weight: 800;
+		margin: 0;
+		white-space: nowrap;
 		overflow: hidden;
-		animation: pulseGlow 2s ease-in-out infinite;
-		box-shadow:
-			0 0 0 6px rgba(var(--accent-blue-rgb), 0.08),
-			0 0 0 12px rgba(var(--accent-blue-rgb), 0.03);
+		text-overflow: ellipsis;
 	}
-
 	.rtc-duration {
-		font-size: 0.72rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: var(--aero-mint, #00d4aa);
 		font-variant-numeric: tabular-nums;
-		color: var(--accent-blue-base);
-		background: rgba(var(--accent-blue-rgb), 0.1);
-		border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
-		border-radius: var(--radius-sm);
-		padding: 2px 8px;
-		font-weight: 600;
+		flex-shrink: 0;
 	}
 
-	.rtc-self-cam {
+	.rtc-video-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.rtc-video-grid.multi {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.rtc-video-grid.multi .rtc-video-wrapper {
+		flex: 1 1 200px;
+	}
+	.rtc-video-wrapper {
 		position: relative;
+		width: 100%;
+		aspect-ratio: 4 / 3;
+		border-radius: 14px;
+		overflow: hidden;
+		background: #060c16;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+	.rtc-video-wrapper.rtc-self-cam {
+		width: 220px;
+		align-self: flex-end;
+		border-radius: 12px;
+	}
+	.rtc-label {
+		position: absolute;
+		left: 8px;
+		bottom: 8px;
+		padding: 3px 9px;
+		border-radius: var(--radius-full);
+		background: rgba(0, 0, 0, 0.6);
+		color: #ffffff;
+		font-size: 0.68rem;
+		font-weight: 700;
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
 	}
 	.rtc-cam-off-overlay {
 		position: absolute;
@@ -519,185 +580,287 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(0, 0, 0, 0.5);
-		color: rgba(255, 255, 255, 0.6);
-		font-size: 2rem;
-		border-radius: inherit;
+		background: rgba(6, 12, 22, 0.85);
+		color: rgba(255, 255, 255, 0.5);
+	}
+	.rtc-cam-off-overlay .material-icons-round {
+		font-size: 34px;
 	}
 
-	@keyframes pulseGlow {
-		0%,
-		100% {
-			transform: scale(1);
-			box-shadow:
-				0 0 0 6px rgba(var(--accent-blue-rgb), 0.08),
-				0 0 0 12px rgba(var(--accent-blue-rgb), 0.03);
-		}
-		50% {
-			transform: scale(1.04);
-			box-shadow:
-				0 0 0 10px rgba(var(--accent-blue-rgb), 0.12),
-				0 0 0 18px rgba(var(--accent-blue-rgb), 0.05);
-		}
-	}
-
-	.rtc-controls {
-		display: flex;
-		justify-content: center;
-		gap: 12px;
-		z-index: 2;
-	}
-
-	.rtc-btn {
-		width: 44px;
-		height: 44px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text-primary);
-		background: var(--bg-surface);
-		border: 1px solid var(--border-subtle);
-		cursor: pointer;
-		transition:
-			transform var(--t-spring),
-			background var(--t-base),
-			box-shadow var(--t-base);
-	}
-	.rtc-btn:hover {
-		transform: translateY(-2px) scale(1.06);
-		background: var(--bg-surface-hover);
-	}
-	.rtc-btn:active {
-		transform: scale(0.95);
-	}
-	.rtc-btn.rtc-btn-active {
-		background: rgba(239, 68, 68, 0.15) !important;
-		border-color: rgba(239, 68, 68, 0.4);
-		color: #ef4444;
-	}
-	.rtc-btn.hangup {
-		background: linear-gradient(135deg, #ef4444, #dc2626) !important;
-		box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
-		color: #ffffff;
-		border: none;
-	}
-	.rtc-btn.hangup:hover {
-		box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
-	}
-
-	.incoming-call-toast {
-		position: fixed;
-		bottom: 90px;
-		right: 20px;
-		background: var(--bg-surface-solid, rgba(8, 20, 40, 0.94));
-		backdrop-filter: blur(20px);
-		-webkit-backdrop-filter: blur(20px);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		padding: 16px;
-		box-shadow:
-			0 10px 40px rgba(0, 0, 0, 0.35),
-			0 0 0 1px rgba(var(--accent-blue-rgb), 0.08);
-		z-index: var(--z-critical);
-		width: 280px;
+	/* Audio: avatar + nombre */
+	.rtc-audio-pulse {
 		display: flex;
 		flex-direction: column;
+		align-items: center;
+		justify-content: center;
 		gap: 10px;
+		padding: 28px 16px 22px;
 	}
-
-	.incoming-call-icon {
-		width: 40px;
-		height: 40px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: linear-gradient(135deg, #22c55e, #16a34a);
+	.rtc-avatar-ring {
+		width: 88px;
+		height: 88px;
+		border-radius: 50%;
+		border: 3px solid rgba(var(--accent-blue-rgb), 0.5);
+		padding: 3px;
+		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		flex-shrink: 0;
-		box-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		animation: rtc-ring 2s ease-in-out infinite;
 	}
-
-	@keyframes ring-bounce {
-		from {
-			transform: scale(1) rotate(-8deg);
+	@keyframes rtc-ring {
+		0%,
+		100% {
+			box-shadow: 0 0 0 0 rgba(var(--accent-blue-rgb), 0.35);
 		}
-		to {
-			transform: scale(1.08) rotate(8deg);
+		50% {
+			box-shadow: 0 0 0 12px rgba(var(--accent-blue-rgb), 0);
 		}
 	}
-
-	.rtc-answer-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 4px;
-		flex: 1;
-		padding: 7px 10px;
-		border-radius: var(--radius-sm);
+	.rtc-avatar-ring img {
+		width: 100%;
+		height: 100%;
+		border-radius: 50%;
+		object-fit: cover;
+	}
+	.rtc-audio-fallback-icon {
+		font-size: 40px !important;
+		color: var(--aero-sky, var(--accent-blue-base));
+	}
+	.rtc-peer-name {
+		font-family: var(--font-display);
+		font-size: 1.05rem;
+		font-weight: 800;
+		margin: 0;
+	}
+	.rtc-peer-sub {
 		font-size: 0.76rem;
+		color: rgba(255, 255, 255, 0.55);
+		margin: 0;
+	}
+	.rtc-peer-sub.connected {
+		color: var(--aero-mint, #00d4aa);
 		font-weight: 700;
+	}
+
+	/* ── Controles ──────────────────────────────────────────── */
+	.rtc-controls {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 10px;
+		border-radius: var(--radius-full);
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+	.rtc-btn {
+		width: 46px;
+		height: 46px;
+		min-width: 46px;
+		min-height: 46px;
+		border-radius: 50%;
+		border: none;
+		background: rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition:
+			background 0.15s ease,
+			transform 0.14s var(--ease-spring);
+	}
+	.rtc-btn:hover {
+		background: rgba(255, 255, 255, 0.18);
+	}
+	.rtc-btn:active {
+		transform: scale(0.93);
+	}
+	.rtc-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.rtc-btn .material-icons-round {
+		font-size: 21px;
+	}
+	.rtc-btn.rtc-btn-active {
+		background: rgba(255, 255, 255, 0.85);
+		color: #0d1828;
+	}
+	.rtc-btn.hangup {
+		width: 56px;
+		height: 56px;
+		min-width: 56px;
+		min-height: 56px;
+		background: #e5484d;
+	}
+	.rtc-btn.hangup:hover {
+		background: #d63c41;
+	}
+
+	/* ── Toast de llamada entrante ──────────────────────────── */
+	.incoming-call-toast {
+		position: fixed;
+		top: 18px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 10001;
+		width: min(380px, calc(100vw - 24px));
+		background: var(--bg-surface-solid, #0d1828);
+		border: 1px solid var(--border-subtle);
+		border-radius: 16px;
+		box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+		padding: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.incoming-call-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		min-width: 0;
+	}
+	.incoming-call-icon {
+		width: 44px;
+		height: 44px;
+		min-width: 44px;
+		border-radius: var(--radius-full);
+		background: rgba(var(--accent-blue-rgb), 0.14);
+		color: var(--accent-blue-base);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		animation: rtc-ring 1.6s ease-in-out infinite;
+	}
+	.incoming-call-icon .material-icons-round {
+		font-size: 22px;
+	}
+	.incoming-call-text {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+	.incoming-call-kind {
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.incoming-call-name {
+		font-family: var(--font-display);
+		font-size: 0.95rem;
+		font-weight: 800;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.incoming-call-actions {
+		display: flex;
+		gap: 8px;
+	}
+	.rtc-answer-btn {
+		flex: 1;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		padding: 10px;
+		border-radius: 12px;
 		border: none;
 		cursor: pointer;
-		color: #fff;
+		font-family: inherit;
+		font-size: 0.82rem;
+		font-weight: 800;
 		transition:
-			transform var(--t-spring),
-			box-shadow var(--t-base);
-	}
-	.rtc-answer-btn.accept {
-		background: linear-gradient(135deg, #22c55e, #16a34a);
-		box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
-	}
-	.rtc-answer-btn.decline {
-		background: linear-gradient(135deg, #ef4444, #dc2626);
-		box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+			filter 0.15s ease,
+			transform 0.14s var(--ease-spring);
 	}
 	.rtc-answer-btn:hover {
-		transform: translateY(-1px) scale(1.03);
+		filter: brightness(1.08);
 	}
 	.rtc-answer-btn:active {
 		transform: scale(0.97);
 	}
+	.rtc-answer-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.rtc-answer-btn .material-icons-round {
+		font-size: 18px;
+	}
+	.rtc-answer-btn.accept {
+		background: var(--accent-blue-base);
+		color: #ffffff;
+	}
+	.rtc-answer-btn.decline {
+		background: rgba(229, 72, 77, 0.12);
+		color: #e5484d;
+		border: 1px solid rgba(229, 72, 77, 0.35);
+	}
 
+	/* ── Badge de llamada minimizada ────────────────────────── */
 	.rtc-minimized-badge {
 		position: fixed;
-		bottom: 80px;
-		right: 20px;
-		background: var(--bg-surface-solid, rgba(8, 20, 40, 0.92));
-		backdrop-filter: blur(12px);
-		border: 1px solid rgba(74, 222, 128, 0.3);
-		border-radius: var(--radius-xl);
-		padding: 6px 14px;
-		display: flex;
+		bottom: 18px;
+		right: 18px;
+		z-index: 10001;
+		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		font-size: 0.82rem;
-		font-weight: 600;
-		color: var(--text-main);
+		padding: 9px 14px;
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border-subtle);
+		background: var(--bg-surface-solid, #0d1828);
+		color: var(--text-primary);
 		cursor: pointer;
-		z-index: var(--z-critical);
-		box-shadow: var(--shadow-sm), var(--shadow-glow);
-		transition:
-			transform var(--t-spring),
-			box-shadow var(--t-base);
+		font-family: inherit;
+		font-size: 0.8rem;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+		transition: transform 0.15s var(--ease-spring);
 	}
 	.rtc-minimized-badge:hover {
 		transform: translateY(-2px);
-		box-shadow: var(--shadow-md), var(--shadow-glow);
 	}
-	.aero-icon-btn {
-		background: none;
-		border: none;
+	.rtc-minimized-badge:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.rtc-minimized-badge .live-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--aero-mint, #00d4aa);
+		animation: live-pulse 1.6s ease-in-out infinite;
+	}
+	@keyframes live-pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.4;
+		}
+	}
+	.rtc-minimized-badge .expand-icon {
+		font-size: 15px !important;
 		color: var(--text-muted);
-		cursor: pointer;
-		padding: 4px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background 0.2s;
+	}
+
+	/* Eco/lite: sin animaciones de anillo */
+	:global(:root[data-perf='eco']) .rtc-avatar-ring,
+	:global(:root[data-perf-profile='lite']) .rtc-avatar-ring,
+	:global(:root[data-perf-mode='true']) .rtc-avatar-ring,
+	:global(:root[data-perf='eco']) .incoming-call-icon,
+	:global(:root[data-perf-profile='lite']) .incoming-call-icon,
+	:global(:root[data-perf-mode='true']) .incoming-call-icon {
+		animation: none !important;
 	}
 </style>

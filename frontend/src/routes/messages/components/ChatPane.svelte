@@ -5,9 +5,11 @@
 	import { notificationsStore } from '$lib/stores/notifications.svelte.js';
 	import { isSoundEnabled, setSoundEnabled } from '$lib/utils/sound.js';
 	import { formatDayLabel, isDifferentDay, lastSeenLabel } from '$lib/utils/datetime.js';
+	import { isZumbidoMessage, ZUMBIDO_TEXT } from '$lib/utils/zumbido.js';
 	import MessageBubble from './MessageBubble.svelte';
 	import ChatComposer from './ChatComposer.svelte';
 	import MsnContactCard from '$lib/components/MsnContactCard.svelte';
+	import TwemojiPicker from '$lib/components/TwemojiPicker.svelte';
 
 	let {
 		chatStore,
@@ -37,9 +39,14 @@
 	let composerComponent = $state(null);
 	let deletingMessageId = $state(null);
 	let activeReactionMsgId = $state(null);
-	let reactionPickerDirection = $state('up');
+	// Portal de reacciones: posición fija calculada desde el botón que lo abre.
+	// position:fixed evita el recorte por overflow del área de mensajes y el
+	// solape con burbujas vecinas.
+	let pickerX = $state(0);
+	let pickerY = $state(0);
+	let pickerUp = $state(false);
+	let paneEl = $state(null);
 	let showMsnContactCard = $state(false);
-	let showGamesSoon = $state(false);
 	let soundOn = $state(isSoundEnabled());
 
 	function toggleSound() {
@@ -56,6 +63,10 @@
 	// Botón flotante "bajar al último mensaje"
 	let showScrollDown = $state(false);
 	let atBottom = $state(true);
+	let contentElement = $state(null);
+	let isInitialConvLoad = $state(true);
+	let prevConvId = $state(null);
+	let prevMsgCount = $state(0);
 
 	export function focusComposer() {
 		composerComponent?.focus?.();
@@ -81,7 +92,15 @@
 
 	function scrollToMessage(id) {
 		const el = scrollContainer?.querySelector(`[data-msg-id="${id}"]`);
-		if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		if (el) {
+			el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			el.classList.remove('quote-highlight');
+			void el.offsetWidth; // forzar reflow para reiniciar la animación
+			el.classList.add('quote-highlight');
+			setTimeout(() => {
+				el?.classList.remove('quote-highlight');
+			}, 1800);
+		}
 	}
 
 	function gotoMatch(dir) {
@@ -111,6 +130,8 @@
 
 	function handleScroll() {
 		if (!scrollContainer) return;
+		// Cerrar el portal de reacciones al desplazar el historial.
+		if (activeReactionMsgId !== null) activeReactionMsgId = null;
 		// Si nos acercamos al top, cargamos más
 		if (
 			scrollContainer.scrollTop < 100 &&
@@ -140,18 +161,116 @@
 		});
 	}
 
-	export function scrollToBottom(force = true) {
+	export function scrollToBottom(force = true, behavior = 'smooth') {
 		if (!scrollContainer) return;
-		// Solo autoscroll si el usuario ya está cerca del fondo (salvo force explícito)
 		if (!force && !atBottom) return;
-		requestAnimationFrame(() => {
-			if (scrollContainer) {
+		if (behavior === 'instant' || behavior === 'auto') {
+			scrollContainer.scrollTop = scrollContainer.scrollHeight;
+		} else {
+			scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+		}
+		atBottom = true;
+		showScrollDown = false;
+	}
+
+	// Asegura que la vista se desplace y permanezca en el último mensaje incluso ante
+	// reflows del navegador, transiciones de entrada o carga asíncrona de recursos.
+	export function ensureScrollToBottom(force = true, behavior = 'instant') {
+		if (!scrollContainer) return;
+		if (!force && !atBottom && !isInitialConvLoad) return;
+
+		const applyScroll = () => {
+			if (!scrollContainer) return;
+			if (behavior === 'instant' || behavior === 'auto') {
+				scrollContainer.scrollTop = scrollContainer.scrollHeight;
+			} else {
 				scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
-				atBottom = true;
-				showScrollDown = false;
+			}
+			atBottom = true;
+			showScrollDown = false;
+		};
+
+		applyScroll();
+		requestAnimationFrame(applyScroll);
+		setTimeout(applyScroll, 40);
+		setTimeout(applyScroll, 120);
+		setTimeout(applyScroll, 280);
+		setTimeout(applyScroll, 450);
+	}
+
+	// ResizeObserver: Cuando el contenedor de mensajes cambia de tamaño (por render
+	// de fuentes, hidratación o emoticons), mantiene la posición al fondo si correspondía.
+	$effect(() => {
+		if (!contentElement || !scrollContainer) return;
+		const ro = new ResizeObserver(() => {
+			if (atBottom || isInitialConvLoad) {
+				scrollContainer.scrollTop = scrollContainer.scrollHeight;
 			}
 		});
-	}
+		ro.observe(contentElement);
+		return () => ro.disconnect();
+	});
+
+	// Captura el evento 'load' de imágenes y videos hijos para que cuando terminen
+	// de descargarse y adquieran su altura real, no dejen desfasado el scroll hacia arriba.
+	$effect(() => {
+		if (!scrollContainer) return;
+		const handleMediaLoad = (e) => {
+			if (e.target && (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO')) {
+				if (atBottom || isInitialConvLoad) {
+					scrollContainer.scrollTop = scrollContainer.scrollHeight;
+				}
+			}
+		};
+		scrollContainer.addEventListener('load', handleMediaLoad, true);
+		return () => {
+			scrollContainer?.removeEventListener('load', handleMediaLoad, true);
+		};
+	});
+
+	// Efecto reactivo para detectar cambio de conversación o llegada de mensajes
+	$effect(() => {
+		const currentConvId = chatStore.activeConvId;
+		const loading = chatStore.loadingMsgs;
+		const messages = chatStore.messages;
+		const msgCount = messages.length;
+
+		// Cambio de chat: reiniciar bandera inicial para garantizar descenso al fondo
+		if (currentConvId !== prevConvId) {
+			prevConvId = currentConvId;
+			prevMsgCount = 0;
+			isInitialConvLoad = true;
+			atBottom = true;
+			showScrollDown = false;
+		}
+
+		// Al finalizar de cargar mensajes en la conversación activa:
+		if (!loading && msgCount > 0 && isInitialConvLoad) {
+			tick().then(() => {
+				ensureScrollToBottom(true, 'instant');
+				setTimeout(() => {
+					isInitialConvLoad = false;
+				}, 500);
+			});
+		} else if (!isInitialConvLoad && msgCount > prevMsgCount) {
+			// Mensaje nuevo agregado a la conversación activa
+			const lastMsg = messages[msgCount - 1];
+			const isFromMe = Number(lastMsg?.sender_id) === Number(authStore.user?.id);
+			tick().then(() => {
+				if (isFromMe) {
+					ensureScrollToBottom(true, 'smooth');
+				} else if (atBottom) {
+					ensureScrollToBottom(false, 'smooth');
+				}
+			});
+		}
+
+		prevMsgCount = msgCount;
+	});
+
+	const PICKER_WIDTH = 320;
+	const PICKER_HEIGHT = 270; // grilla 210px + pestañas + padding del portal
+	const PICKER_GAP = 8;
 
 	function handleReactionMenuClick(e, msgId) {
 		e.stopPropagation();
@@ -161,50 +280,71 @@
 		}
 		activeReactionMsgId = msgId;
 		const rect = e.currentTarget.getBoundingClientRect();
-		// Si hay espacio abajo, mostramos el picker hacia abajo, sino hacia arriba
-		if (window.innerHeight - rect.bottom > 300) {
-			reactionPickerDirection = 'down';
+		// El portal debe quedar DENTRO del área del chat (nunca sobre la
+		// sidebar ni fuera de la ventana): se clampa a los límites del pane.
+		const pane = (paneEl || document.body).getBoundingClientRect();
+		const loX = pane.left + 8;
+		const hiX = Math.max(loX, pane.right - PICKER_WIDTH - 8);
+		pickerX = Math.min(Math.max(loX, rect.left + rect.width / 2 - PICKER_WIDTH / 2), hiX);
+		// Flip según el espacio DENTRO del pane (no del viewport).
+		const spaceBelow = pane.bottom - rect.bottom;
+		const fitsDown = spaceBelow >= PICKER_HEIGHT + PICKER_GAP;
+		const fitsUp = rect.top - pane.top >= PICKER_HEIGHT + PICKER_GAP;
+		pickerUp = !fitsDown && fitsUp;
+		if (pickerUp) {
+			// translateY(-100%): el ancla es el borde inferior del portal.
+			pickerY = Math.max(rect.top - PICKER_GAP, pane.top + 8 + PICKER_HEIGHT);
 		} else {
-			reactionPickerDirection = 'up';
+			pickerY = Math.min(rect.bottom + PICKER_GAP, pane.bottom - 8 - PICKER_HEIGHT);
+		}
+	}
+
+	function handlePaneKeydown(e) {
+		if (e.key === 'Escape' && activeReactionMsgId !== null) {
+			activeReactionMsgId = null;
 		}
 	}
 </script>
 
-<div class="chat-pane" class:hidden-mobile={mobileView === 'list'}>
+<svelte:window onkeydown={handlePaneKeydown} />
+
+<div class="chat-pane" class:hidden-mobile={mobileView === 'list'} bind:this={paneEl}>
 	{#if chatStore.activeConvId && chatStore.activeConv}
-		<div class="chat-header-container">
-			<!-- Fila principal: identidad del peer + acciones -->
-			<header class="chat-header">
+		<!-- Cabecera única: identidad + estado en vivo + acciones.
+		     El wrapper interno la alinea con la columna de mensajes (980px). -->
+		<header class="chat-header">
+			<div class="chat-header-inner">
 				<div class="peer-profile-info">
-					<!-- Back button -->
+					<!-- Volver (solo móvil) -->
 					<button
 						onclick={() => {
 							chatStore.setActiveConvId(null);
 							onBackMobile();
 						}}
 						class="back-mobile-btn"
+						style="flex: 0 0 32px; min-width: 32px; min-height: 32px;"
 						aria-label="Volver a la lista de conversaciones"
+						title="Volver"
 					>
 						<span class="material-icons-round">arrow_back</span>
 					</button>
 
-					<!-- Peer Info -->
-					<div class="conv-avatar-wrapper">
-						<div
-							class="conv-avatar"
-							style="width: 38px; height: 38px; flex: 0 0 38px; min-width: 38px; min-height: 38px;"
-						>
+					<div
+						class="conv-avatar-wrapper"
+						style="flex: 0 0 44px; min-width: 44px; min-height: 44px;"
+					>
+						<div class="conv-avatar">
 							{#if chatStore.activeConv.peer_avatar}
 								<img
 									src={chatStore.activeConv.peer_avatar}
 									alt={chatStore.activeConv.name || chatStore.activeConv.peer_display_name}
-									width="38"
-									height="38"
+									width="44"
+									height="44"
 									loading="lazy"
 									decoding="async"
 								/>
 							{:else}
-								<span style="font-size: 0.82rem;"
+								<span
 									>{getInitials(
 										chatStore.activeConv.name ||
 											chatStore.activeConv.peer_display_name ||
@@ -220,7 +360,7 @@
 						></span>
 					</div>
 
-					<div style="min-width: 0;">
+					<div class="peer-text-block">
 						<h2 class="peer-name">
 							<span class="peer-name-text">
 								{chatStore.activeConv.name ||
@@ -249,10 +389,10 @@
 					</div>
 				</div>
 
-				<div class="header-actions-row">
+				<div class="chat-actions" role="toolbar" aria-label="Acciones del chat">
 					<!-- Zumbido: llama la atención del peer (estilo MSN) -->
 					<button
-						class="aero-icon-btn zumbido-btn"
+						class="icon-btn zumbido-btn"
 						class:in-cooldown={nudgeCooldown > 0}
 						disabled={nudgeCooldown > 0}
 						title={nudgeCooldown > 0
@@ -262,7 +402,7 @@
 							? `Zumbido en espera (${nudgeCooldown}s)`
 							: 'Enviar un Zumbido'}
 						onclick={() =>
-							onSendZumbido ? onSendZumbido() : onSendMessage?.({ text: '⚡ ¡ZUMBIDO!' })}
+							onSendZumbido ? onSendZumbido() : onSendMessage?.({ text: ZUMBIDO_TEXT })}
 					>
 						{#if nudgeCooldown > 0}
 							<span class="cooldown-num">{nudgeCooldown}</span>
@@ -270,42 +410,54 @@
 							<span class="material-icons-round">bolt</span>
 						{/if}
 					</button>
-					<!-- Juegos / Actividades (próximamente) -->
-					<button
-						class="aero-icon-btn header-tool-btn"
-						class:toggled={showGamesSoon}
-						title="Juegos y actividades (próximamente)"
-						aria-label="Juegos y actividades"
-						aria-expanded={showGamesSoon}
-						onclick={() => (showGamesSoon = !showGamesSoon)}
-					>
-						<span class="material-icons-round">sports_esports</span>
-					</button>
 
 					{#if rtcStore.inCall}
-						<button class="aero-icon-btn call-end-btn" title="Colgar" onclick={onEndCall}>
+						<button class="icon-btn call-end-btn" title="Colgar llamada" onclick={onEndCall}>
 							<span class="material-icons-round">call_end</span>
 						</button>
 					{:else}
 						<button
-							class="aero-icon-btn header-tool-btn"
+							class="icon-btn"
 							title="Llamada de audio"
+							aria-label="Iniciar llamada de audio"
 							onclick={onStartAudioCall}
 						>
 							<span class="material-icons-round">call</span>
 						</button>
 						<button
-							class="aero-icon-btn header-tool-btn"
+							class="icon-btn"
 							title="Videollamada"
+							aria-label="Iniciar videollamada"
 							onclick={onStartVideoCall}
 						>
 							<span class="material-icons-round">videocam</span>
 						</button>
 					{/if}
 
+					<button
+						type="button"
+						class="icon-btn"
+						class:toggled={soundOn === false}
+						title={soundOn ? 'Sonidos activados' : 'Sonidos silenciados'}
+						aria-label={soundOn ? 'Silenciar sonidos' : 'Activar sonidos'}
+						onclick={toggleSound}
+					>
+						<span class="material-icons-round">{soundOn ? 'volume_up' : 'volume_off'}</span>
+					</button>
+					<button
+						type="button"
+						class="icon-btn"
+						class:toggled={showSearch}
+						title="Buscar en la conversación"
+						aria-label="Buscar en la conversación"
+						onclick={toggleSearch}
+					>
+						<span class="material-icons-round">search</span>
+					</button>
+
 					{#if chatStore.activeConv.peer_username}
 						<button
-							class="aero-icon-btn header-tool-btn profile-btn"
+							class="icon-btn"
 							aria-label="Ver Ficha de Contacto"
 							title="Ver Ficha de Contacto"
 							onclick={() => (showMsnContactCard = !showMsnContactCard)}
@@ -314,51 +466,8 @@
 						</button>
 					{/if}
 				</div>
-			</header>
-
-			<!-- Sub-header: estado LiveChat + sonidos + búsqueda + menú secundario -->
-			<div class="chat-sub-header">
-				<div class="sub-header-info">
-					<span class="livechat-dot"></span>
-					<span class="livechat-label">LiveChat</span>
-					<span class="sub-header-sep" aria-hidden="true">•</span>
-					<span>Mensajería instantánea</span>
-				</div>
-				<div class="sub-header-tools">
-					<button
-						type="button"
-						class="sounds-toggle"
-						class:sounds-off={!soundOn}
-						onclick={toggleSound}
-						title={soundOn ? 'Sonidos activados' : 'Sonidos silenciados'}
-						aria-label={soundOn ? 'Silenciar sonidos' : 'Activar sonidos'}
-					>
-						<span class="material-icons-round" style="font-size: 13px;"
-							>{soundOn ? 'volume_up' : 'volume_off'}</span
-						>
-						<span>Sonidos</span>
-					</button>
-					<span class="tool-sep" aria-hidden="true"></span>
-					<button
-						type="button"
-						class="search-toggle"
-						class:active={showSearch}
-						onclick={toggleSearch}
-						title="Buscar en la conversación"
-						aria-label="Buscar en la conversación"
-					>
-						<span class="material-icons-round" style="font-size: 14px;">search</span>
-					</button>
-				</div>
 			</div>
-
-			{#if showGamesSoon}
-				<div class="games-soon-note" transition:fade={{ duration: 150 }}>
-					<span class="material-icons-round" style="font-size: 14px;">sports_esports</span>
-					Juegos y actividades — próximamente
-				</div>
-			{/if}
-		</div>
+		</header>
 
 		{#if showSearch}
 			<div class="in-chat-search" transition:fade={{ duration: 150 }}>
@@ -383,6 +492,7 @@
 				</span>
 				<button
 					class="search-nav-btn"
+					style="flex: 0 0 28px; min-width: 28px; min-height: 28px;"
 					onclick={() => gotoMatch(-1)}
 					disabled={searchMatches.length === 0}
 					aria-label="Anterior"
@@ -391,163 +501,200 @@
 				</button>
 				<button
 					class="search-nav-btn"
+					style="flex: 0 0 28px; min-width: 28px; min-height: 28px;"
 					onclick={() => gotoMatch(1)}
 					disabled={searchMatches.length === 0}
 					aria-label="Siguiente"
 				>
 					<span class="material-icons-round">keyboard_arrow_down</span>
 				</button>
-				<button class="search-nav-btn" onclick={toggleSearch} aria-label="Cerrar búsqueda">
+				<button
+					class="search-nav-btn"
+					style="flex: 0 0 28px; min-width: 28px; min-height: 28px;"
+					onclick={toggleSearch}
+					aria-label="Cerrar búsqueda"
+				>
 					<span class="material-icons-round">close</span>
 				</button>
 			</div>
 		{/if}
 
-		<!-- Chat Messages Area -->
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div
-			bind:this={scrollContainer}
-			class="messages-area"
-			onscroll={handleScroll}
-			onclick={() => {
-				activeReactionMsgId = null;
-			}}
-		>
-			{#if chatStore.hasMoreMessages && !chatStore.loadingMoreMessages}
-				<button class="load-more-btn" onclick={loadMore} aria-label="Cargar mensajes anteriores">
-					Cargar mensajes anteriores
-				</button>
-			{/if}
-			{#if chatStore.loadingMoreMessages}
-				<div class="loading-more glass-dots-loader">
-					<div class="glass-dot animate-pulse"></div>
-					<div class="glass-dot animate-pulse" style="animation-delay: 0.2s"></div>
-					<div class="glass-dot animate-pulse" style="animation-delay: 0.4s"></div>
-				</div>
-			{/if}
+		<!-- El stack contiene SOLO el historial + el botón flotante de scroll:
+		     así el botón nunca puede solaparse con el compositor. -->
+		<div class="messages-stack">
+			<!-- Chat Messages Area -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+			<div
+				bind:this={scrollContainer}
+				class="messages-area"
+				role="log"
+				aria-live="polite"
+				aria-label="Historial de mensajes de la conversación"
+				onscroll={handleScroll}
+				onclick={() => {
+					activeReactionMsgId = null;
+				}}
+			>
+				{#if chatStore.hasMoreMessages && !chatStore.loadingMoreMessages}
+					<button class="load-more-btn" onclick={loadMore} aria-label="Cargar mensajes anteriores">
+						Cargar mensajes anteriores
+					</button>
+				{/if}
+				{#if chatStore.loadingMoreMessages}
+					<div class="loading-more glass-dots-loader">
+						<div class="glass-dot animate-pulse"></div>
+						<div class="glass-dot animate-pulse" style="animation-delay: 0.2s"></div>
+						<div class="glass-dot animate-pulse" style="animation-delay: 0.4s"></div>
+					</div>
+				{/if}
 
-			{#key chatStore.chatSessionKey}
-				<div class="chat-content-frame" in:fade={{ duration: 280, delay: 60 }}>
-					{#if chatStore.loadingMsgs}
-						<div class="chat-skeletons">
-							<div class="skeleton-bubble peer">
-								<div class="skel-text long animate-pulse"></div>
-								<div class="skel-text short animate-pulse"></div>
+				{#key chatStore.chatSessionKey}
+					<div
+						bind:this={contentElement}
+						class="chat-content-frame"
+						in:fade={{ duration: 280, delay: 60 }}
+					>
+						{#if chatStore.loadingMsgs}
+							<div class="chat-skeletons">
+								<div class="skeleton-bubble peer">
+									<div class="skel-text long animate-pulse"></div>
+									<div class="skel-text short animate-pulse"></div>
+								</div>
+								<div class="skeleton-bubble me">
+									<div class="skel-text med animate-pulse"></div>
+								</div>
+								<div class="skeleton-bubble peer">
+									<div class="skel-text long animate-pulse"></div>
+								</div>
 							</div>
-							<div class="skeleton-bubble me">
-								<div class="skel-text med animate-pulse"></div>
+						{:else if chatStore.messages.length === 0}
+							<div class="empty-chat empty-chat-neo">
+								<div class="empty-icon-glow">
+									<span class="material-icons-round floating-icon">forum</span>
+								</div>
+								<p class="empty-chat-title">El inicio de algo genial</p>
+								<p class="empty-chat-subtitle">
+									Envía un mensaje para comenzar a chatear con {chatStore.activeConv
+										.peer_display_name || chatStore.activeConv.peer_username}.
+								</p>
 							</div>
-							<div class="skeleton-bubble peer">
-								<div class="skel-text long animate-pulse"></div>
-							</div>
-						</div>
-					{:else if chatStore.messages.length === 0}
-						<div class="empty-chat empty-chat-neo">
-							<div class="empty-icon-glow">
-								<span class="material-icons-round floating-icon">forum</span>
-							</div>
-							<p class="empty-chat-title">El inicio de algo genial</p>
-							<p class="empty-chat-subtitle">
-								Envía un mensaje para comenzar a chatear con {chatStore.activeConv
-									.peer_display_name || chatStore.activeConv.peer_username}.
-							</p>
-						</div>
-					{:else}
-						<div class="messages-transition-group">
-							{#each chatStore.messages as msg, i (msg.id)}
-								{@const isMe = Number(msg.sender_id) === Number(authStore.user?.id)}
-								{@const ANIM_WINDOW = 15}
-								{@const posFromEnd = chatStore.messages.length - 1 - i}
-								{@const animated = posFromEnd < ANIM_WINDOW}
-								{@const animIndex = animated ? ANIM_WINDOW - 1 - posFromEnd : -1}
-								{@const staggerDelay = animated ? animIndex * 90 : 0}
-								{@const newDay =
-									i === 0 || isDifferentDay(chatStore.messages[i - 1]?.created_at, msg.created_at)}
+						{:else}
+							<div class="messages-transition-group">
+								{#each chatStore.messages as msg, i (msg.id)}
+									{@const isMe = Number(msg.sender_id) === Number(authStore.user?.id)}
+									{@const ANIM_WINDOW = 15}
+									{@const posFromEnd = chatStore.messages.length - 1 - i}
+									{@const animated = posFromEnd < ANIM_WINDOW}
+									{@const animIndex = animated ? ANIM_WINDOW - 1 - posFromEnd : -1}
+									{@const staggerDelay = animated ? animIndex * 90 : 0}
+									{@const newDay =
+										i === 0 ||
+										isDifferentDay(chatStore.messages[i - 1]?.created_at, msg.created_at)}
+									{@const nextMsg = chatStore.messages[i + 1]}
+									{@const newDayNext =
+										nextMsg && isDifferentDay(msg.created_at, nextMsg.created_at)}
+									{@const isZumbidoMsg = isZumbidoMessage(msg)}
+									{@const samePrev =
+										i > 0 &&
+										!newDay &&
+										!isZumbidoMsg &&
+										!isZumbidoMessage(chatStore.messages[i - 1]) &&
+										Number(chatStore.messages[i - 1].sender_id) === Number(msg.sender_id)}
+									{@const sameNext =
+										nextMsg &&
+										!newDayNext &&
+										!isZumbidoMsg &&
+										!isZumbidoMessage(nextMsg) &&
+										Number(nextMsg.sender_id) === Number(msg.sender_id)}
 
-								{#if newDay}
-									<div class="date-chip" in:fade={{ duration: 200 }}>
-										<span>{formatDayLabel(msg.created_at)}</span>
-									</div>
-								{/if}
-
-								<MessageBubble
-									{msg}
-									{isMe}
-									activeConv={chatStore.activeConv}
-									{animated}
-									{staggerDelay}
-									{deletingMessageId}
-									{activeReactionMsgId}
-									{reactionPickerDirection}
-									isCurrentMatch={showSearch && searchMatches[currentMatchIdx] === msg.id}
-									onBubbleClick={() => {}}
-									onDeleteClick={(id) => (deletingMessageId = id)}
-									onConfirmDelete={(id) => {
-										onDeleteMessage(id);
-										deletingMessageId = null;
-									}}
-									onCancelDelete={() => (deletingMessageId = null)}
-									onReactionMenuClick={(e, id) => handleReactionMenuClick(e, id)}
-									onReact={(id, emoji) => onReact(id, emoji)}
-									onCloseReactionPicker={() => (activeReactionMsgId = null)}
-									onReply={(m) => onReply(m)}
-									onEdit={(m) => onEdit(m)}
-									onQuoteClick={(id) => scrollToMessage(id)}
-									onRetry={(id) => onRetrySend?.(id)}
-									onDiscard={(id) => onDiscardMessage?.(id)}
-								/>
-							{/each}
-
-							{#if isPeerTyping}
-								<div class="message-group peer no-anim" in:fade={{ duration: 150 }}>
-									<div class="message-bubble-row">
-										<div class="peer-mini-avatar">
-											{#if chatStore.activeConv.peer_avatar}
-												<img
-													src={chatStore.activeConv.peer_avatar}
-													alt={chatStore.activeConv.peer_display_name}
-													width="28"
-													height="28"
-													loading="lazy"
-													decoding="async"
-												/>
-											{:else}
-												<span
-													>{getInitials(
-														chatStore.activeConv.peer_display_name ||
-															chatStore.activeConv.peer_username
-													)}</span
-												>
-											{/if}
+									{#if newDay}
+										<div class="date-chip" in:fade={{ duration: 200 }}>
+											<span>{formatDayLabel(msg.created_at)}</span>
 										</div>
-										<div class="bubble-wrapper">
-											<div class="typing-bubble">
-												<div class="dot"></div>
-												<div class="dot"></div>
-												<div class="dot"></div>
+									{/if}
+
+									<MessageBubble
+										{msg}
+										{isMe}
+										activeConv={chatStore.activeConv}
+										{animated}
+										{staggerDelay}
+										isGroupStart={!samePrev}
+										isGroupEnd={!sameNext}
+										{deletingMessageId}
+										isCurrentMatch={showSearch && searchMatches[currentMatchIdx] === msg.id}
+										onBubbleClick={(e, id) => handleReactionMenuClick(e, id)}
+										onDeleteClick={(id) => (deletingMessageId = id)}
+										onConfirmDelete={(id) => {
+											onDeleteMessage(id);
+											deletingMessageId = null;
+										}}
+										onCancelDelete={() => (deletingMessageId = null)}
+										onReactionMenuClick={(e, id) => handleReactionMenuClick(e, id)}
+										onReact={(id, emoji) => onReact(id, emoji)}
+										onReply={(m) => onReply(m)}
+										onEdit={(m) => onEdit(m)}
+										onQuoteClick={(id) => scrollToMessage(id)}
+										onRetry={(id) => onRetrySend?.(id)}
+										onDiscard={(id) => onDiscardMessage?.(id)}
+									/>
+								{/each}
+
+								{#if isPeerTyping}
+									<div class="message-group peer no-anim" in:fade={{ duration: 150 }}>
+										<div class="message-bubble-row">
+											<div
+												class="peer-mini-avatar"
+												style="flex: 0 0 28px; min-width: 28px; min-height: 28px;"
+											>
+												{#if chatStore.activeConv.peer_avatar}
+													<img
+														src={chatStore.activeConv.peer_avatar}
+														alt={chatStore.activeConv.peer_display_name}
+														width="28"
+														height="28"
+														loading="lazy"
+														decoding="async"
+													/>
+												{:else}
+													<span
+														>{getInitials(
+															chatStore.activeConv.peer_display_name ||
+																chatStore.activeConv.peer_username
+														)}</span
+													>
+												{/if}
+											</div>
+											<div class="bubble-wrapper">
+												<div class="typing-bubble">
+													<div class="dot"></div>
+													<div class="dot"></div>
+													<div class="dot"></div>
+												</div>
 											</div>
 										</div>
 									</div>
-								</div>
-							{/if}
-						</div>
-					{/if}
-				</div>
-			{/key}
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/key}
+			</div>
+
+			{#if showScrollDown}
+				<button
+					class="scroll-down-btn"
+					onclick={() => scrollToBottom(true)}
+					aria-label="Ir al último mensaje"
+					title="Ir al último mensaje"
+					transition:fade={{ duration: 150 }}
+				>
+					<span class="material-icons-round">keyboard_arrow_down</span>
+				</button>
+			{/if}
 		</div>
 
-		{#if showScrollDown}
-			<button
-				class="scroll-down-btn"
-				onclick={() => scrollToBottom(true)}
-				aria-label="Ir al último mensaje"
-				title="Ir al último mensaje"
-				transition:fade={{ duration: 150 }}
-			>
-				<span class="material-icons-round">keyboard_arrow_down</span>
-			</button>
-		{/if}
 		{#if showMsnContactCard && chatStore.activeConv}
 			<MsnContactCard
 				peer={chatStore.activeConv}
@@ -556,7 +703,7 @@
 				onClose={() => (showMsnContactCard = false)}
 				onNudge={() => {
 					if (onSendZumbido) onSendZumbido();
-					else onSendMessage({ text: '⚡ ¡ZUMBIDO!' });
+					else onSendMessage({ text: ZUMBIDO_TEXT });
 					showMsnContactCard = false;
 				}}
 				onAudioCall={() => {
@@ -570,6 +717,18 @@
 			/>
 		{/if}
 
+		<!-- Portal de reacciones: fixed y anclado al botón que lo abrió (único
+		     por vista) — nunca queda recortado ni solapa burbujas. -->
+		{#if activeReactionMsgId !== null}
+			<div class="reaction-portal" class:up={pickerUp} style="left: {pickerX}px; top: {pickerY}px;">
+				<TwemojiPicker
+					variant="inline"
+					onSelect={(emoji) => onReact(activeReactionMsgId, emoji)}
+					onClose={() => (activeReactionMsgId = null)}
+				/>
+			</div>
+		{/if}
+
 		<ChatComposer
 			bind:this={composerComponent}
 			sending={chatStore.sending}
@@ -579,56 +738,97 @@
 			bind:pendingProduct
 		/>
 	{:else}
-		<!-- No Active Conversation Select -->
-		<div class="no-chat-selected">
-			<div class="empty-icon-glow big">
-				<span class="material-icons-round floating-icon">forum</span>
+		<!-- No Active Conversation Select: Rediseño Aero Welcome Card (R3) -->
+		<div class="no-chat-selected" in:fade={{ duration: 250 }}>
+			<div class="aero-welcome-card">
+				<div class="aero-orb-container">
+					<div class="aero-orb-halo" aria-hidden="true"></div>
+					<div class="empty-icon-glow big aero-orb">
+						<span class="material-icons-round floating-icon">forum</span>
+					</div>
+					<span class="aero-orb-sparkle s1 material-icons-round" aria-hidden="true"
+						>auto_awesome</span
+					>
+					<span class="aero-orb-sparkle s2 material-icons-round" aria-hidden="true">bolt</span>
+				</div>
+
+				<h2 class="no-chat-title">Tus Mensajes</h2>
+				<p class="no-chat-sub">
+					Selecciona un chat de la lista o crea uno nuevo para empezar a hablar en tiempo real.
+				</p>
+
+				<div class="aero-feature-pills">
+					<div class="feature-pill">
+						<span class="material-icons-round pill-icon">bolt</span>
+						<span>Zumbidos MSN</span>
+					</div>
+					<div class="feature-pill">
+						<span class="material-icons-round pill-icon">lock</span>
+						<span>Tiempo Real</span>
+					</div>
+					<div class="feature-pill">
+						<span class="material-icons-round pill-icon">videocam</span>
+						<span>Llamadas HD</span>
+					</div>
+				</div>
+
+				<button
+					type="button"
+					onclick={() => onNewDM?.()}
+					class="btn-aero-primary no-chat-cta"
+					aria-label="Nuevo mensaje"
+				>
+					<span class="material-icons-round">add_circle</span>
+					<span>Nuevo mensaje</span>
+				</button>
 			</div>
-			<h2 class="no-chat-title">Tus Mensajes</h2>
-			<p class="no-chat-sub">
-				Selecciona un chat de la lista o crea uno nuevo para empezar a hablar en tiempo real.
-			</p>
-			<button onclick={() => onNewDM?.()} class="btn-aero-primary no-chat-cta">
-				Nuevo mensaje
-			</button>
 		</div>
 	{/if}
 </div>
 
 <style>
+	/* ═══════════════════════════════════════════════════════════
+	   Voom! Messenger — Panel de chat "Retro-Aero limpio"
+	   Superficies planas, hairlines, un acento. Sin pill decorativa
+	   ni elementos absolutos que se crucen.
+	   ═══════════════════════════════════════════════════════════ */
+
 	.chat-pane {
 		flex: 1;
 		min-height: 0;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		background:
-			radial-gradient(90% 60% at 100% 0%, rgba(var(--accent-blue-rgb), 0.05), transparent 55%),
-			var(--bg-surface);
 		position: relative;
-		overflow-x: hidden;
+		isolation: isolate;
+		overflow: hidden;
+		background: transparent;
 	}
 
-	/* ── Header ─────────────────────────────────────────────── */
-	.chat-header-container {
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		border-bottom: 1px solid var(--border-subtle);
-		background:
-			radial-gradient(120% 100% at 100% -40%, rgba(var(--accent-blue-rgb), 0.08), transparent 60%),
-			var(--bg-surface);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		z-index: 10;
-	}
-
+	/* ── Cabecera: barra plana de 64px con hairline inferior ── */
 	.chat-header {
-		padding: 10px 14px;
+		position: relative;
+		z-index: 10;
+		display: flex;
+		border-bottom: 1px solid var(--border-subtle);
+		background: rgba(247, 251, 254, 0.85);
+		padding: 10px 16px;
+	}
+	.chat-header-inner {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 8px;
+		gap: 12px;
+		width: 100%;
+		max-width: 980px;
+		margin: 0 auto;
+		min-height: 44px;
+	}
+	:global([data-theme='dark']) .chat-header {
+		background: rgba(9, 20, 38, 0.45);
+	}
+	:global([data-theme='midnight']) .chat-header {
+		background: rgba(3, 8, 18, 0.5);
 	}
 
 	.peer-profile-info {
@@ -639,129 +839,134 @@
 	}
 
 	.back-mobile-btn {
-		background: none;
+		display: none;
+		background: transparent;
 		border: none;
-		padding: 2px;
-		color: var(--text-muted);
+		padding: 0;
+		width: 34px;
+		height: 34px;
+		min-width: 34px;
+		min-height: 34px;
+		flex: 0 0 34px;
+		color: var(--text-secondary);
 		cursor: pointer;
-		display: flex;
-		align-items: center;
-		border-radius: var(--radius-xs);
-		transition: color 0.18s;
+		border-radius: 10px;
+		transition:
+			background 0.16s ease,
+			color 0.16s ease;
 	}
-
 	.back-mobile-btn:hover {
+		background: rgba(var(--accent-blue-rgb), 0.1);
 		color: var(--text-primary);
+	}
+	.back-mobile-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
 	}
 
 	.conv-avatar-wrapper {
 		position: relative;
+		width: 44px;
+		height: 44px;
+		flex: 0 0 44px;
+		min-width: 44px;
+		min-height: 44px;
 		flex-shrink: 0;
 	}
 
 	.conv-avatar {
-		width: 38px;
-		height: 38px;
-		border-radius: var(--radius-squircle);
+		width: 100%;
+		height: 100%;
+		border-radius: 14px;
 		corner-shape: squircle;
-		background: var(--grad-primary);
+		background: linear-gradient(140deg, var(--aero-sky) 0%, var(--accent-blue-base) 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #fff;
-		font-weight: 700;
+		color: #ffffff;
+		font-weight: 800;
+		font-size: 0.9rem;
 		overflow: hidden;
-		box-shadow:
-			inset 0 1px 1px rgba(255, 255, 255, 0.3),
-			0 1px 3px rgba(0, 0, 0, 0.12);
 	}
-
 	.conv-avatar img {
 		width: 100%;
 		height: 100%;
+		border-radius: 14px;
+		corner-shape: squircle;
 		object-fit: cover;
+		display: block;
 	}
 
-	/* Punto de presencia junto al avatar */
 	.presence-dot {
 		position: absolute;
-		bottom: -1px;
-		right: -1px;
-		width: 11px;
-		height: 11px;
+		bottom: -2px;
+		right: -2px;
+		width: 12px;
+		height: 12px;
 		border-radius: var(--radius-full);
 		background: var(--text-muted);
-		border: 2px solid var(--bg-surface-solid, #ffffff);
-		opacity: 0.6;
-		transition:
-			background 0.25s,
-			box-shadow 0.25s,
-			opacity 0.25s;
+		border: 2px solid var(--bg-surface-solid, var(--bg-surface));
+		transition: background 0.2s ease;
+	}
+	.presence-dot.on {
+		background: var(--aero-mint, #00d4aa);
+		box-shadow: 0 0 0 2px rgba(var(--aero-mint-rgb, 0, 212, 170), 0.18);
 	}
 
-	.presence-dot.on {
-		background: var(--aero-mint);
-		opacity: 1;
-		box-shadow: 0 0 7px rgba(0, 212, 170, 0.6);
+	.peer-text-block {
+		min-width: 0;
 	}
 
 	.peer-name {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 6px;
 		font-weight: 700;
-		font-size: 0.94rem;
+		font-size: 0.95rem;
 		color: var(--text-primary);
 		margin: 0;
-		max-width: 100%;
+		letter-spacing: -0.01em;
 	}
-
 	.peer-name-text {
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		min-width: 0;
 	}
-
 	.verified-check {
 		font-size: 0.9rem !important;
 		color: var(--badge-verified, var(--aero-sky));
 		flex-shrink: 0;
-		filter: drop-shadow(0 0 3px rgba(var(--accent-blue-rgb), 0.4));
 	}
 
 	.peer-status {
 		font-size: 0.72rem;
 		color: var(--text-muted);
-		margin: 1px 0 0 0;
+		margin: 2px 0 0 0;
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: 5px;
 	}
-
 	.status-live-dot {
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: var(--aero-mint);
-		box-shadow: 0 0 5px rgba(0, 212, 170, 0.6);
+		background: var(--aero-mint, #00d4aa);
 		flex-shrink: 0;
 	}
-
 	.typing-status {
 		color: var(--accent-blue-base);
-		font-weight: 600;
+		font-weight: 700;
 	}
 
-	/* Puntos de "escribiendo…" inline en el header */
 	.typing-inline-dots {
 		display: inline-flex;
-		gap: 2px;
+		gap: 2.5px;
 		align-items: center;
 	}
 	.tdot {
-		width: 3.5px;
-		height: 3.5px;
+		width: 4px;
+		height: 4px;
 		border-radius: 50%;
 		background: var(--accent-blue-base);
 		animation: tdot-bounce 1.2s ease-in-out infinite;
@@ -777,243 +982,113 @@
 		60%,
 		100% {
 			transform: translateY(0);
-			opacity: 0.55;
+			opacity: 0.5;
 		}
 		30% {
-			transform: translateY(-3px);
+			transform: translateY(-3.5px);
 			opacity: 1;
 		}
 	}
 
-	.header-actions-row {
+	/* ── Acciones de cabecera: botones fantasma cuadrados ───── */
+	.chat-actions {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 4px;
 		flex-shrink: 0;
 	}
 
-	.aero-icon-btn {
-		background: none;
+	.icon-btn {
+		background: transparent;
 		border: none;
-		color: var(--text-muted);
+		color: var(--text-secondary);
 		cursor: pointer;
 		padding: 0;
 		width: 32px;
 		height: 32px;
 		min-width: 32px;
 		min-height: 32px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		flex: 0 0 32px;
+		border-radius: 10px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: all 0.18s ease;
 		box-sizing: border-box;
+		transition:
+			background 0.16s ease,
+			color 0.16s ease;
 	}
-	.aero-icon-btn .material-icons-round {
-		font-size: 17px;
+	.icon-btn:hover {
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		color: var(--accent-blue-base);
 	}
-
-	.header-tool-btn {
-		background: rgba(var(--accent-blue-rgb), 0.06);
-		border: 1px solid var(--border-subtle);
-		color: var(--text-primary);
+	.icon-btn:active {
+		transform: scale(0.94);
 	}
-	.header-tool-btn:hover {
+	.icon-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.icon-btn.toggled {
 		background: rgba(var(--accent-blue-rgb), 0.12);
 		color: var(--accent-blue-base);
-		border-color: var(--accent-blue-base);
-		transform: translateY(-1px);
 	}
-	.header-tool-btn.toggled {
-		background: rgba(var(--accent-blue-rgb), 0.14);
-		border-color: var(--accent-blue-base);
-		color: var(--accent-blue-base);
+	.icon-btn .material-icons-round {
+		font-size: 18px;
 	}
 
-	@media (max-width: 768px) {
-		.header-actions-row {
-			max-width: 56%;
-			overflow-x: auto;
-			scrollbar-width: none;
-			-webkit-overflow-scrolling: touch;
-		}
-		.header-actions-row::-webkit-scrollbar {
-			display: none;
-		}
-		.chat-header {
-			padding: 8px 12px;
-		}
-		.chat-sub-header {
-			padding: 2px 12px;
-		}
-		.messages-area {
-			padding: 10px 12px;
-		}
+	.icon-btn.zumbido-btn {
+		color: var(--aero-amber, #f5a623);
 	}
-
-	/* Botón de Zumbido resaltado en ámbar */
-	.zumbido-btn {
-		background: linear-gradient(135deg, rgba(245, 166, 35, 0.9), rgba(245, 140, 20, 0.9));
-		color: #fff;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		box-shadow: 0 0 10px rgba(245, 166, 35, 0.4);
-		transition: all var(--t-fast);
+	.icon-btn.zumbido-btn:hover:not(:disabled) {
+		background: rgba(var(--aero-amber-rgb, 245, 166, 35), 0.12);
+		color: var(--aero-amber, #f5a623);
 	}
-	.zumbido-btn:hover:not(:disabled) {
-		transform: scale(1.05);
-		box-shadow: 0 0 14px rgba(245, 166, 35, 0.6);
-	}
-	.zumbido-btn.in-cooldown {
-		background: rgba(245, 166, 35, 0.18) !important;
-		color: var(--aero-amber) !important;
-		border-color: rgba(245, 166, 35, 0.4) !important;
-		box-shadow: none !important;
+	.icon-btn.zumbido-btn.in-cooldown {
+		color: var(--text-muted);
 		cursor: not-allowed;
-		opacity: 0.85;
+		opacity: 0.65;
 	}
-	.zumbido-btn .cooldown-num {
-		font-size: 0.76rem;
+	.icon-btn.zumbido-btn .cooldown-num {
+		font-size: 0.74rem;
 		font-weight: 800;
 		font-family: var(--font-display);
 		line-height: 1;
 	}
 
-	.call-end-btn {
-		background: linear-gradient(135deg, #ef4444, #dc2626);
-		color: #fff;
-		border: 1px solid rgba(255, 255, 255, 0.2);
+	.icon-btn.call-end-btn {
+		background: #e5484d;
+		color: #ffffff;
 	}
-
-	.chat-sub-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 3px 14px;
-		background: rgba(var(--accent-blue-rgb), 0.04);
-		font-size: 0.72rem;
-		color: var(--text-muted);
-		border-top: 1px solid var(--border-subtle);
-	}
-
-	.sub-header-info {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		min-width: 0;
-		overflow: hidden;
-	}
-
-	.livechat-dot {
-		display: inline-block;
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--aero-mint);
-		box-shadow: 0 0 5px rgba(0, 212, 170, 0.6);
-		flex-shrink: 0;
-	}
-
-	.livechat-label {
-		font-weight: 700;
-		color: var(--text-primary);
-	}
-
-	.sub-header-sep {
-		opacity: 0.5;
+	.icon-btn.call-end-btn:hover {
+		background: #d63c41;
+		color: #ffffff;
 	}
 
 	@media (max-width: 768px) {
-		.sub-header-info > span:last-child {
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
+		.back-mobile-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.chat-header {
+			padding: 8px 10px;
 		}
 	}
 
-	.sub-header-tools {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		flex-shrink: 0;
-	}
-
-	.tool-sep {
-		width: 1px;
-		height: 12px;
-		background: var(--border-subtle);
-	}
-
-	.sounds-toggle {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		background: transparent;
-		border: none;
-		color: var(--text-muted);
-		font-size: 0.72rem;
-		cursor: pointer;
-		padding: 2px 4px;
-		border-radius: var(--radius-xs);
-		transition: color 0.18s ease;
-	}
-	.sounds-toggle:hover {
-		color: var(--accent-blue-base);
-	}
-	.sounds-toggle.sounds-off {
-		opacity: 0.5;
-	}
-
-	.search-toggle {
-		background: transparent;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		padding: 2px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		transition:
-			background 0.18s,
-			color 0.18s;
-	}
-	.search-toggle:hover,
-	.search-toggle.active {
-		background: rgba(var(--accent-blue-rgb), 0.12);
-		color: var(--accent-blue-base);
-	}
-
-	.games-soon-note {
-		position: absolute;
-		right: 12px;
-		top: 100%;
-		margin-top: 6px;
-		z-index: 40;
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding: 6px 12px;
-		font-size: 0.72rem;
-		color: var(--text-primary);
-		background: var(--bg-surface-solid, #ffffff);
-		border: 1px solid var(--border-subtle);
-		border-radius: var(--radius-md);
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-	}
-
+	/* ── Búsqueda dentro del chat: cluster de la cabecera ───── */
 	.in-chat-search {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 6px 12px;
+		gap: 8px;
+		padding: 8px 16px;
 		border-bottom: 1px solid var(--border-subtle);
-		background: var(--bg-surface);
+		background: transparent;
+		z-index: 10;
 	}
 	.in-chat-search > .material-icons-round {
-		color: var(--text-muted);
-		font-size: 1rem;
+		color: var(--accent-blue-base);
+		font-size: 1.05rem;
 	}
 	.in-chat-search-input {
 		flex: 1;
@@ -1022,17 +1097,19 @@
 		border: none;
 		outline: none;
 		color: var(--text-primary);
-		font-size: 0.8rem;
+		font-size: 0.84rem;
 	}
 	.in-chat-search-input::placeholder {
 		color: var(--text-muted);
-		opacity: 0.6;
+		opacity: 0.7;
 	}
 	.search-count {
-		font-size: 0.7rem;
-		color: var(--text-muted);
-		min-width: 30px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--accent-blue-base);
+		min-width: 32px;
 		text-align: center;
+		font-variant-numeric: tabular-nums;
 	}
 	.search-nav-btn {
 		background: transparent;
@@ -1041,85 +1118,90 @@
 		cursor: pointer;
 		display: flex;
 		align-items: center;
-		padding: 2px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		justify-content: center;
+		padding: 0;
+		width: 28px;
+		height: 28px;
+		min-width: 28px;
+		min-height: 28px;
+		flex: 0 0 28px;
+		border-radius: 8px;
 		transition:
-			background 0.18s,
-			color 0.18s;
+			background 0.16s ease,
+			color 0.16s ease;
 	}
 	.search-nav-btn:hover:not(:disabled) {
 		background: rgba(var(--accent-blue-rgb), 0.1);
 		color: var(--accent-blue-base);
+	}
+	.search-nav-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
 	}
 	.search-nav-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
 	}
 	.search-nav-btn .material-icons-round {
-		font-size: 17px;
+		font-size: 18px;
 	}
 
-	.scroll-down-btn {
-		position: absolute;
-		right: 18px;
-		bottom: 76px;
-		width: 34px;
-		height: 34px;
-		border-radius: 50%;
-		background: var(--grad-primary);
-		border: 1px solid var(--glass-border-t);
-		color: #fff;
+	/* ── Stack de mensajes: historial + botón flotante ──────── */
+	.messages-stack {
+		position: relative;
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		z-index: 30;
-		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.35);
-		transition:
-			transform 0.18s ease,
-			box-shadow 0.2s ease;
-	}
-	.scroll-down-btn:hover {
-		transform: translateY(-2px) scale(1.05);
-		box-shadow: 0 6px 18px rgba(var(--accent-blue-rgb), 0.5);
-	}
-	.scroll-down-btn .material-icons-round {
-		font-size: 20px;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
 	}
 
 	.messages-area {
+		position: relative;
+		z-index: 1;
 		flex: 1;
 		min-height: 0;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		padding: 14px 16px;
+		padding: 18px 20px;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		align-items: center;
+		gap: 6px;
 		scrollbar-width: thin;
 		scrollbar-color: var(--scrollbar-thumb) transparent;
 		scroll-behavior: smooth;
+		/* Tinte propio de la ZONA de mensajes: la hace legible como
+		   territorio distinto y da contraste a las burbujas del peer. */
+		background: rgba(var(--accent-blue-rgb), 0.03);
+		transition: background 0.25s ease;
+	}
+	:global([data-theme='dark']) .messages-area {
+		background: rgba(0, 0, 0, 0.14);
+	}
+	:global([data-theme='midnight']) .messages-area {
+		background: rgba(0, 0, 0, 0.24);
 	}
 
 	.load-more-btn {
 		padding: 6px 16px;
-		margin: 0 auto 6px;
-		background: var(--bg-surface);
+		margin: 0 auto 8px;
+		background: transparent;
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-full);
 		color: var(--accent-blue-base);
-		font-size: 0.78rem;
-		font-weight: 600;
+		font-size: 0.76rem;
+		font-weight: 700;
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition:
+			background 0.16s ease,
+			color 0.16s ease;
 	}
-
 	.load-more-btn:hover {
-		background: var(--accent-blue-base);
-		color: white;
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.3);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+	}
+	.load-more-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
 	}
 
 	.loading-more {
@@ -1129,6 +1211,50 @@
 		margin-bottom: 6px;
 	}
 
+	/* Botón flotante "bajar al último": dentro del stack, nunca
+	   sobre el compositor. */
+	.scroll-down-btn {
+		position: absolute;
+		right: 20px;
+		bottom: 16px;
+		width: 38px;
+		height: 38px;
+		min-width: 38px;
+		min-height: 38px;
+		border: none;
+		border-radius: var(--radius-full);
+		background: var(--accent-blue-base);
+		color: #ffffff;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		z-index: 15;
+		/* Anillo doble: destaca sobre fondo claro y oscuro */
+		box-shadow:
+			0 0 0 3px rgba(255, 255, 255, 0.55),
+			0 6px 18px rgba(var(--accent-blue-rgb), 0.45);
+		transition:
+			transform 0.16s var(--ease-spring),
+			background 0.16s ease,
+			box-shadow 0.16s ease;
+	}
+	.scroll-down-btn:hover {
+		background: var(--accent-blue-dark, var(--accent-blue-base));
+		transform: translateY(-2px);
+		box-shadow:
+			0 0 0 3px rgba(255, 255, 255, 0.7),
+			0 8px 22px rgba(var(--accent-blue-rgb), 0.55);
+	}
+	.scroll-down-btn:focus-visible {
+		outline: 2px solid var(--aero-sky, var(--accent-blue-base));
+		outline-offset: 2px;
+	}
+	.scroll-down-btn .material-icons-round {
+		font-size: 22px;
+	}
+
+	/* ── Estados vacíos y esqueletos ────────────────────────── */
 	.empty-chat {
 		height: 100%;
 		display: flex;
@@ -1139,109 +1265,54 @@
 		padding: 24px;
 		color: var(--text-muted);
 	}
-
 	.empty-chat-title {
-		font-size: 0.95rem;
-		font-weight: 700;
+		font-size: 1.05rem;
+		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0 0 4px 0;
+		letter-spacing: -0.01em;
 	}
-
 	.empty-chat-subtitle {
-		font-size: 0.75rem;
-		max-width: 240px;
+		font-size: 0.78rem;
+		max-width: 280px;
 		margin: 0;
+		line-height: 1.45;
 	}
 
-	/* Neo-Aero Empty State */
-	.empty-chat-neo {
-		background: linear-gradient(180deg, transparent 0%, rgba(var(--accent-blue-rgb), 0.03) 100%);
-		border-radius: var(--radius-lg);
-	}
-
-	.empty-icon-glow {
-		position: relative;
-		width: 56px;
-		height: 56px;
-		margin-bottom: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgba(var(--accent-blue-rgb), 0.04);
-		border: 1px solid var(--glass-border);
-		border-radius: 50%;
-		box-shadow:
-			0 0 20px rgba(var(--accent-blue-rgb), 0.08),
-			inset 0 1px 3px rgba(255, 255, 255, 0.1);
-	}
-	.empty-icon-glow.big {
-		width: 76px;
-		height: 76px;
-	}
-
-	.empty-icon-glow::before {
-		content: '';
-		position: absolute;
-		inset: -2px;
-		background: linear-gradient(135deg, var(--aero-sky), transparent, var(--aero-mint));
-		border-radius: 50%;
-		z-index: -1;
-		opacity: 0.3;
-		filter: blur(6px);
-		animation: spin-glow 6s linear infinite;
-	}
-
-	@keyframes spin-glow {
-		100% {
-			transform: rotate(360deg);
-		}
-	}
-
-	.floating-icon {
-		font-size: 1.75rem !important;
-		color: var(--accent-blue-base) !important;
-		animation: float 4s ease-in-out infinite;
-	}
-
-	/* Skeleton for Chat */
 	.chat-skeletons {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
 		padding: 12px 0;
 		width: 100%;
 		height: 100%;
 		justify-content: flex-end;
 	}
-
 	.skeleton-bubble {
-		padding: 8px 12px;
-		border-radius: var(--radius-md);
+		padding: 10px 14px;
+		border-radius: 16px;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 		max-width: 65%;
-		background: var(--bg-overlay);
-		border: 1px solid var(--glass-border);
+		background: var(--border-subtle);
+		opacity: 0.5;
 	}
-
 	.skeleton-bubble.peer {
 		align-self: flex-start;
-		border-bottom-left-radius: 2px;
+		border-bottom-left-radius: 4px;
 	}
-
 	.skeleton-bubble.me {
 		align-self: flex-end;
-		border-bottom-right-radius: 2px;
-		background: rgba(var(--accent-blue-rgb), 0.08);
+		border-bottom-right-radius: 4px;
+		background: rgba(var(--accent-blue-rgb), 0.25);
 	}
-
 	.skel-text {
 		height: 11px;
 		border-radius: var(--radius-xs);
-		background: var(--border-subtle);
+		background: var(--text-muted);
+		opacity: 0.4;
 	}
-
 	.skel-text.long {
 		width: 100%;
 	}
@@ -1252,7 +1323,6 @@
 		width: 40%;
 	}
 
-	/* Glass Dots Loader */
 	.glass-dots-loader {
 		display: flex;
 		gap: 5px;
@@ -1260,13 +1330,11 @@
 		justify-content: center;
 		padding: 8px;
 	}
-
 	.glass-dot {
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
 		background: var(--accent-blue-base);
-		box-shadow: 0 0 6px var(--accent-blue-base);
 	}
 
 	.chat-content-frame {
@@ -1274,67 +1342,72 @@
 		flex-direction: column;
 		flex: 1 0 auto;
 		justify-content: flex-start;
+		width: 100%;
+		max-width: 980px;
 	}
-
 	.messages-transition-group {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 6px;
 		width: 100%;
 		margin-top: auto;
 	}
 
-	/* ── Separadores de fecha ───────────────────────────────── */
+	/* ── Separador de fecha: texto puro con hairlines ───────── */
 	.date-chip {
 		align-self: center;
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		margin: 6px 0 2px;
+		gap: 12px;
+		margin: 12px 0 6px;
 		user-select: none;
+		width: 100%;
+		justify-content: center;
+	}
+	.date-chip::before,
+	.date-chip::after {
+		content: '';
+		flex: 1;
+		max-width: 140px;
+		height: 1px;
+		background: var(--border-subtle);
 	}
 	.date-chip span {
-		font-size: 0.64rem;
-		font-weight: 700;
-		letter-spacing: 0.05em;
+		font-size: 0.66rem;
+		font-weight: 800;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--text-muted);
-		background: rgba(var(--accent-blue-rgb), 0.07);
-		border: 1px solid var(--border-subtle);
-		padding: 2px 10px;
-		border-radius: var(--radius-full);
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 	}
 
+	/* ── Burbuja "escribiendo…" ─────────────────────────────── */
 	.typing-bubble {
 		display: flex;
-		gap: 4px;
+		gap: 5px;
 		align-items: center;
-		padding: 6px 12px;
-		border-radius: var(--radius-md);
-		border-bottom-left-radius: 2px;
-		background: var(--bg-surface-solid, #ffffff);
+		padding: 10px 15px;
+		border-radius: 16px;
+		border-bottom-left-radius: 4px;
+		background: var(--bg-surface-solid, var(--bg-surface));
 		border: 1px solid var(--border-subtle);
-		border-top: 1px solid var(--glass-border-t);
 	}
-
+	:global([data-theme='dark']) .typing-bubble,
+	:global([data-theme='midnight']) .typing-bubble {
+		background: rgba(255, 255, 255, 0.08);
+	}
 	.dot {
-		width: 5px;
-		height: 5px;
+		width: 6px;
+		height: 6px;
 		border-radius: 50%;
 		background: var(--accent-blue-base);
 		animation: wave 1.3s linear infinite;
 	}
-
 	.dot:nth-child(2) {
 		animation-delay: -1.1s;
 	}
 	.dot:nth-child(3) {
 		animation-delay: -0.9s;
 	}
-
 	@keyframes wave {
 		0%,
 		60%,
@@ -1342,38 +1415,214 @@
 			transform: translateY(0);
 		}
 		30% {
-			transform: translateY(-3px);
+			transform: translateY(-4px);
 		}
 	}
 
+	.message-group.peer.no-anim {
+		align-self: flex-start;
+		max-width: min(72%, 560px);
+	}
+	.message-bubble-row {
+		display: flex;
+		align-items: flex-end;
+		gap: 8px;
+	}
+	.peer-mini-avatar {
+		width: 28px;
+		height: 28px;
+		min-width: 28px;
+		min-height: 28px;
+		flex: 0 0 28px;
+		border-radius: 10px;
+		corner-shape: squircle;
+		background: linear-gradient(140deg, var(--aero-sky), var(--accent-blue-base));
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #ffffff;
+		font-weight: 700;
+		font-size: 0.7rem;
+		overflow: hidden;
+		flex-shrink: 0;
+		margin-bottom: 2px;
+	}
+	.peer-mini-avatar img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	/* ── Portal de reacciones: fixed, anclado al botón ────────
+	   Superficie sólida propia: el picker inline es transparente
+	   por diseño y es ESTE contenedor el que aporta el fondo. */
+	.reaction-portal {
+		position: fixed;
+		z-index: 60;
+		width: min(320px, calc(100vw - 16px));
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border: 1px solid var(--border-subtle);
+		border-radius: 14px;
+		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+		overflow: hidden;
+		padding: 6px;
+		box-sizing: border-box;
+	}
+	.reaction-portal.up {
+		transform: translateY(-100%);
+	}
+
+	/* ── Welcome card (sin chat activo) ─────────────────────── */
 	.no-chat-selected {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		padding: 32px;
+		padding: 32px 20px;
 		text-align: center;
+		height: 100%;
+		position: relative;
+		overflow: hidden;
+	}
+	.aero-welcome-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		max-width: 420px;
+		width: 100%;
+		padding: 36px 32px 32px;
+	}
+	.aero-orb-container {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 20px;
+	}
+	.aero-orb-halo {
+		position: absolute;
+		width: 96px;
+		height: 96px;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle,
+			rgba(var(--accent-blue-rgb), 0.28) 0%,
+			rgba(var(--aero-mint-rgb), 0.12) 55%,
+			transparent 75%
+		);
+		pointer-events: none;
+	}
+	.aero-orb {
+		position: relative;
+		z-index: 1;
+	}
+	.empty-icon-glow {
+		position: relative;
+		width: 64px;
+		height: 64px;
+		margin-bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.25);
+		border-radius: 20px;
+		corner-shape: squircle;
+	}
+	.empty-icon-glow.big {
+		width: 64px;
+		height: 64px;
+	}
+	.empty-icon-glow::before {
+		display: none;
+	}
+	.floating-icon {
+		font-size: 1.7rem !important;
+		color: var(--accent-blue-base) !important;
+		animation: float 4s ease-in-out infinite;
+	}
+	.aero-orb-sparkle {
+		position: absolute;
+		color: var(--aero-amber, #f5a623);
+		font-size: 15px !important;
+		pointer-events: none;
+	}
+	.aero-orb-sparkle.s1 {
+		top: -6px;
+		right: -14px;
+	}
+	.aero-orb-sparkle.s2 {
+		bottom: -2px;
+		left: -14px;
+		color: var(--aero-sky);
+		font-size: 13px !important;
 	}
 
 	.no-chat-title {
 		font-family: var(--font-display);
-		font-size: 1.5rem;
+		font-size: 1.45rem;
 		font-weight: 800;
 		color: var(--text-primary);
 		margin: 0 0 8px 0;
 		letter-spacing: -0.02em;
 	}
-
 	.no-chat-sub {
-		font-size: 0.8rem;
+		font-size: 0.84rem;
 		color: var(--text-muted);
-		max-width: 280px;
-		margin: 0 auto 16px auto;
+		max-width: 320px;
+		margin: 0 auto 22px auto;
+		line-height: 1.5;
+	}
+
+	.aero-feature-pills {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		justify-content: center;
+		margin-bottom: 24px;
+	}
+	.feature-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 12px;
+		border-radius: var(--radius-full);
+		background: transparent;
+		border: 1px solid var(--border-subtle);
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--text-secondary);
+	}
+	.feature-pill .pill-icon {
+		font-size: 14px !important;
+		color: var(--accent-blue-base);
 	}
 
 	.no-chat-cta {
-		padding: 10px 24px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 11px 26px;
+		font-size: 0.88rem;
+		font-weight: 800;
+		border-radius: var(--radius-full);
+		box-shadow: 0 6px 20px rgba(var(--accent-blue-rgb), 0.35);
+		transition:
+			transform 0.16s var(--ease-spring),
+			box-shadow 0.2s ease;
+	}
+	.no-chat-cta:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 26px rgba(var(--accent-blue-rgb), 0.45);
+	}
+	.no-chat-cta:active {
+		transform: scale(0.97);
+	}
+	.no-chat-cta .material-icons-round {
+		font-size: 19px;
 	}
 
 	@keyframes float {
@@ -1382,22 +1631,44 @@
 			transform: translateY(0);
 		}
 		50% {
-			transform: translateY(-8px);
+			transform: translateY(-6px);
 		}
 	}
 
+	/* ── Móvil: deslizamiento horizontal con visibilidad diferida ── */
 	@media (max-width: 768px) {
-		.chat-pane.hidden-mobile {
-			display: none;
+		.chat-pane {
+			/* Ocupa el ancho completo y se desliza ENCIMA de la sidebar:
+			   ambos paneles absolutos en el mismo hueco del chat-window. */
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			z-index: 2;
 		}
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.floating-icon,
-		.empty-icon-glow::before,
-		.dot,
-		.tdot {
-			animation: none !important;
+		.chat-pane.hidden-mobile {
+			transform: translateX(100%);
+			opacity: 0;
+			pointer-events: none;
+			visibility: hidden;
+			transition:
+				transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.25s ease,
+				visibility 0s linear 0.28s;
+		}
+		.chat-pane:not(.hidden-mobile) {
+			transform: translateX(0);
+			opacity: 1;
+			visibility: visible;
+			transition:
+				transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+				opacity 0.25s ease,
+				visibility 0s linear 0s;
+		}
+		.chat-pane {
+			will-change: transform, opacity;
+		}
+		.messages-area {
+			padding: 12px;
 		}
 	}
 
@@ -1416,5 +1687,36 @@
 	}
 	:global(.messages-area::-webkit-scrollbar-thumb:hover) {
 		background: var(--scrollbar-thumb-hover) !important;
+	}
+
+	/* Resaltado al saltar a un mensaje citado / resultado de búsqueda */
+	:global(.message-group.quote-highlight .message-bubble) {
+		animation: quote-flash 1.6s ease-out;
+	}
+	@keyframes quote-flash {
+		0% {
+			outline: 3px solid var(--accent-blue-base);
+			box-shadow: 0 0 24px rgba(var(--accent-blue-rgb), 0.55);
+		}
+		40% {
+			outline: 2px solid var(--aero-sky);
+			box-shadow: 0 0 14px rgba(var(--accent-blue-rgb), 0.3);
+		}
+		100% {
+			outline: 0px solid transparent;
+			box-shadow: none;
+		}
+	}
+
+	/* ── Perfiles de rendimiento ───────────────────────────── */
+	:global(:root[data-perf='eco']) .aero-orb-halo,
+	:global(:root[data-perf-profile='lite']) .aero-orb-halo,
+	:global(:root[data-perf-mode='true']) .aero-orb-halo {
+		display: none !important;
+	}
+	:global(:root[data-perf='eco']) .floating-icon,
+	:global(:root[data-perf-profile='lite']) .floating-icon,
+	:global(:root[data-perf-mode='true']) .floating-icon {
+		animation: none !important;
 	}
 </style>

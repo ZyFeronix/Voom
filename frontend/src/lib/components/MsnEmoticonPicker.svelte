@@ -9,6 +9,7 @@
 	let { onSelect, variant = 'absolute' } = $props();
 
 	const CATS = [
+		{ id: 'reacciones', label: 'Reacciones' },
 		{ id: 'caras', label: 'Caras' },
 		{ id: 'gestos', label: 'Gestos' },
 		{ id: 'amor', label: 'Amor' },

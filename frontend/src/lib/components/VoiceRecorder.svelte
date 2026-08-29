@@ -470,7 +470,7 @@
 
 	.custom-dropdown-menu {
 		width: 100%;
-		background: var(--bg-surface-solid, #ffffff);
+		background: var(--bg-surface-solid, var(--bg-surface));
 		backdrop-filter: blur(16px);
 		-webkit-backdrop-filter: blur(16px);
 		border: 1px solid var(--border-subtle);
