@@ -1,5 +1,5 @@
 /**
- * VSocial — Universal Database Adapter
+ * Voom! — Universal Database Adapter
  * Auto-detects available driver:
  *   1. @libsql/client (preferred — prebuilds, WAL, remote support)
  *   2. better-sqlite3 (fallback — already installed, native, WAL)
@@ -295,7 +295,12 @@ export function getRootDir() {
 }
 
 export function getUploadsDir(subfolder = '') {
-	const uploadsDir = resolve(rootDir, 'uploads', subfolder);
+	// UPLOAD_DIR (absoluta o relativa a rootDir) permite montar los archivos
+	// subidos en un volumen persistente (Docker); por defecto <root>/uploads.
+	const base = process.env.UPLOAD_DIR
+		? resolve(rootDir, process.env.UPLOAD_DIR)
+		: resolve(rootDir, 'uploads');
+	const uploadsDir = resolve(base, subfolder);
 	if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 	return uploadsDir;
 }

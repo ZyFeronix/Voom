@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { auth as authApi } from '$lib/api.js';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 
 	// ── State (Svelte 5 Runes) ───────────────────────────────────────────────
@@ -14,6 +15,10 @@
 	let birthDate = $state('');
 	let acceptedTerms = $state(false);
 	let showPass = $state(false);
+
+	// Beta cerrada: código de invitación (obligatorio solo si el servidor lo exige)
+	let inviteCode = $state('');
+	let requireInviteCode = $state(false);
 
 	// Step 2: Interests
 	const categories = [
@@ -59,7 +64,8 @@
 			passwordsMatch &&
 			!!birthDate &&
 			ageValid &&
-			acceptedTerms
+			acceptedTerms &&
+			(!requireInviteCode || inviteCode.trim().length >= 6)
 	);
 
 	let step2Valid = $derived(selectedInterests.length === 3);
@@ -75,7 +81,17 @@
 		mounted = true;
 		if (authStore.isAuthenticated) {
 			goto('/feed');
+			return;
 		}
+		// Flags públicos de registro: si el servidor exige invitación, mostrar el campo.
+		authApi
+			.config()
+			.then((cfg) => {
+				requireInviteCode = !!cfg?.require_invite_code;
+			})
+			.catch(() => {
+				// Sin respuesta asumimos registro libre; el backend valida de todas formas.
+			});
 	});
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
@@ -117,6 +133,7 @@
 				password,
 				birth_date: birthDate,
 				accepted_terms: acceptedTerms,
+				invite_code: inviteCode.trim() || undefined,
 				interests: selectedInterests,
 				category: selectedInterests[0] || '',
 				profile_type: profileType
@@ -137,10 +154,10 @@
 </script>
 
 <svelte:head>
-	<title>Crear Cuenta &mdash; VSocial</title>
+	<title>Crear Cuenta &mdash; Voom!</title>
 	<meta
 		name="description"
-		content="Únete a VSocial y crea tu identidad en la red social definitiva para creadores virtuales y comunidades creativas."
+		content="Únete a Voom! y crea tu identidad en la red social definitiva para creadores virtuales y comunidades creativas."
 	/>
 </svelte:head>
 
@@ -287,7 +304,7 @@
 						<span>VS</span>
 					</div>
 					<div class="vs-mobile-titles">
-						<span class="vs-mobile-name">VSocial</span>
+						<span class="vs-mobile-name">Voom!</span>
 						<span class="vs-mobile-sub">Creación de Cuenta</span>
 					</div>
 				</div>
@@ -521,6 +538,40 @@
 									{/if}
 								</div>
 
+								<!-- Invite Code Field (beta cerrada; solo visible si el servidor lo exige) -->
+								{#if requireInviteCode}
+									<div class="vs-form-group" in:fade={{ duration: 200 }}>
+										<label for="reg-invite-code" class="vs-form-label">
+											<span>Código de Invitación</span>
+											<span class="vs-form-required">*</span>
+										</label>
+										<div class="vs-input-wrapper">
+											<div
+												class="vs-input-lead-icon"
+												style="flex: 0 0 36px; min-width: 36px; min-height: 36px;"
+											>
+												<span class="material-icons-round" style="font-size: 17px;"
+													>confirmation_number</span
+												>
+											</div>
+											<input
+												id="reg-invite-code"
+												type="text"
+												name="invite_code"
+												placeholder="VOOM-XXXX-XXXX"
+												bind:value={inviteCode}
+												class="aero-input vs-custom-input"
+												style="text-transform: uppercase; letter-spacing: 1px;"
+												autocomplete="off"
+												required
+											/>
+										</div>
+										<p class="vs-field-hint">
+											La beta es cerrada: necesitas un código del servidor de Discord.
+										</p>
+									</div>
+								{/if}
+
 								<!-- RGPD Consent Checkbox -->
 								<div class="vs-rgpd-row">
 									<label class="vs-checkbox-label align-start">
@@ -623,7 +674,7 @@
 									<span class="material-icons-round" style="font-size: 14px;">tune</span>
 									<span>PASO 3</span>
 								</div>
-								<h2 class="vs-card-title">¿Cómo usarás VSocial?</h2>
+								<h2 class="vs-card-title">¿Cómo usarás Voom!?</h2>
 								<p class="vs-card-desc">
 									Elige tu perfil principal para calibrar tu estación inicial.
 								</p>
@@ -739,7 +790,7 @@
 
 <style>
 	/* ══════════════════════════════════════════════════════════════════════
-	   💎 V-SOCIAL REGISTER STATION — SURGICAL COMPACT PROPORTIONS
+	   💎 Voom! REGISTER STATION — SURGICAL COMPACT PROPORTIONS
 	   ══════════════════════════════════════════════════════════════════════ */
 
 	.vs-register-page {
@@ -1398,6 +1449,12 @@
 		font-size: 0.68rem;
 		color: #f87171;
 		font-weight: 600;
+		margin: 0.1rem 0 0 0;
+	}
+
+	.vs-field-hint {
+		font-size: 0.68rem;
+		color: var(--text-tertiary, var(--text-secondary));
 		margin: 0.1rem 0 0 0;
 	}
 

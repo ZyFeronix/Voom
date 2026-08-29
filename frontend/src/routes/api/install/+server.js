@@ -1,20 +1,27 @@
 /**
- * VSocial — Install API
+ * Voom! — Install API
  * GET  /api/install — status + requirements
  * POST /api/install — run installation
  *
  * Auto-detects available DB driver (same logic as db.js)
  */
 import { json } from '@sveltejs/kit';
-import { existsSync, writeFileSync, unlinkSync, mkdirSync, readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { existsSync, writeFileSync, unlinkSync, mkdirSync, readFileSync, readdirSync } from 'fs';
+import { resolve } from 'path';
 import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { initDb, closeDb } from '$lib/server/db.js';
+import { initDb, closeDb, getRootDir } from '$lib/server/db.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(__dirname, '..', '..', '..', '..', '..');
+// Resolución env-first del directorio de datos: en un bundle (Docker) el cálculo
+// por profundidad de fichero NO coincide con el layout dev, así que DATA_DIR
+// manda si está definida; en bare-metal se respeta el rootDir del adaptador BD.
+const ROOT = process.env.DATA_DIR || getRootDir();
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR || resolve(ROOT, 'migrations');
+const SCHEMA_CANDIDATES = [
+	process.env.SCHEMA_PATH,
+	resolve(ROOT, 'schema_sqlite.sql'),
+	resolve(getRootDir(), 'schema_sqlite.sql')
+].filter(Boolean);
 
 function getInstallStatus() {
 	return (
@@ -27,7 +34,7 @@ function getInstallStatus() {
 async function getRequirements() {
 	const nodeVersion = process.version;
 	const nodeMajor = parseInt(nodeVersion.slice(1));
-	const uploadsDir = resolve(ROOT, 'uploads');
+	const uploadsDir = process.env.UPLOAD_DIR || resolve(ROOT, 'uploads');
 	if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 
 	let dbDriver = 'none';
@@ -82,12 +89,12 @@ export async function POST({ request, url }) {
 		return json({ error: 'Datos incompletos' }, { status: 400 });
 	}
 
-	const schemaPath = resolve(ROOT, 'schema_sqlite.sql');
-	if (!existsSync(schemaPath)) {
+	const schemaPath = SCHEMA_CANDIDATES.find((p) => existsSync(p));
+	if (!schemaPath) {
 		return json({ error: 'No se encontro schema_sqlite.sql' }, { status: 500 });
 	}
 
-	const dbPath = resolve(ROOT, 'database.sqlite');
+	const dbPath = process.env.DB_PATH || resolve(ROOT, 'database.sqlite');
 
 	try {
 		// Close existing connection before deleting (Windows file lock)
@@ -120,13 +127,13 @@ export async function POST({ request, url }) {
 			await client.executeMultiple(schema);
 
 			const result = await client.execute({
-				sql: "INSERT INTO users (username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'admin')",
+				sql: "INSERT INTO users (username, email, password_hash, display_name, role, email_verified) VALUES (?, ?, ?, ?, 'super_admin', 1)",
 				args: [adminUser, data.admin_email, hash, adminUser]
 			});
 			const userId = result.lastInsertRowid;
 
 			await client.execute({
-				sql: "INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')",
+				sql: "INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'super_admin')",
 				args: [userId]
 			});
 			await client.execute({
@@ -144,7 +151,7 @@ export async function POST({ request, url }) {
 			if (data.allow_registration !== undefined) {
 				await client.execute({
 					sql: "INSERT OR REPLACE INTO system_settings (key, value) VALUES ('allow_registration', ?)",
-					args: [data.allow_registration ? 'true' : 'false']
+					args: [data.allow_registration ? '1' : '0']
 				});
 			}
 			if (data.theme) {
@@ -167,12 +174,12 @@ export async function POST({ request, url }) {
 				await db.exec(schema);
 
 				const stmt = await db.prepare(
-					"INSERT INTO users (username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, 'admin')"
+					"INSERT INTO users (username, email, password_hash, display_name, role, email_verified) VALUES (?, ?, ?, ?, 'super_admin', 1)"
 				);
 				const result = await stmt.run(adminUser, data.admin_email, hash, adminUser);
-				db.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')").run(
-					result.lastInsertRowid
-				);
+				db.prepare(
+					"INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'super_admin')"
+				).run(result.lastInsertRowid);
 				await db
 					.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)')
 					.run(result.lastInsertRowid);
@@ -185,7 +192,7 @@ export async function POST({ request, url }) {
 				if (data.allow_registration !== undefined) {
 					db.prepare(
 						"INSERT OR REPLACE INTO system_settings (key, value) VALUES ('allow_registration', ?)"
-					).run(data.allow_registration ? 'true' : 'false');
+					).run(data.allow_registration ? '1' : '0');
 				}
 				if (data.theme) {
 					db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('theme', ?)").run(
@@ -229,6 +236,29 @@ export async function POST({ request, url }) {
 
 		// Re-initialize the database connection for the running server process
 		await initDb();
+
+		// Stamp de migraciones: schema_sqlite.sql ya incluye el schema completo
+		// (equivalente a todas las migraciones aplicadas). Marcarlas evita que
+		// migrate-up.js re-aplique 001 (dialecto Postgres) en la primera upgrade.
+		try {
+			const { getDb } = await import('$lib/server/db.js');
+			const db = getDb();
+			await db
+				.prepare(
+					'CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)'
+				)
+				.run();
+			if (existsSync(MIGRATIONS_DIR)) {
+				const files = readdirSync(MIGRATIONS_DIR)
+					.filter((f) => f.endsWith('.sql') && !f.endsWith('.down.sql'))
+					.sort();
+				for (const name of files) {
+					await db.prepare('INSERT OR IGNORE INTO _migrations (name) VALUES (?)').run(name);
+				}
+			}
+		} catch (stampErr) {
+			console.error('[install] No se pudo stampar _migrations:', stampErr.message);
+		}
 
 		return json({
 			success: true,

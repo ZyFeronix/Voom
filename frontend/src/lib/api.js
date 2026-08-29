@@ -1,5 +1,5 @@
 /**
- * VSocial API Client
+ * Voom! API Client
  * Centralized HTTP client for all backend API calls.
  * Base URL: /api
  */
@@ -82,6 +82,10 @@ export const auth = {
 	login: (data) => post('/auth/login', data),
 	logout: () => post('/auth/logout', {}),
 	me: () => get('/auth/me'),
+	config: () => get('/auth/config'),
+	forgotPassword: (email) => post('/auth/forgot-password', { email }),
+	resetPassword: (token, password) => post('/auth/reset-password', { token, password }),
+	resendVerification: (email) => post('/auth/resend-verification', { email }),
 	changePassword: (data) => put('/auth/change-password', data),
 	sessions: {
 		list: () => get('/auth/sessions'),
@@ -313,6 +317,16 @@ export const tags = {
 };
 
 // ---------------------------------------------------------------------------
+// Invitaciones API (gestión staff de códigos de registro — beta cerrada)
+// ---------------------------------------------------------------------------
+export const invites = {
+	list: () => get('/invites'),
+	create: (data) => post('/invites', data),
+	update: (id, data) => put(`/invites/${id}`, data),
+	remove: (id) => del(`/invites/${id}`)
+};
+
+// ---------------------------------------------------------------------------
 // Notifications API
 // ---------------------------------------------------------------------------
 export const notifications = {
@@ -326,10 +340,23 @@ export const notifications = {
 };
 
 // ---------------------------------------------------------------------------
-// Admin API
+// Admin API (panel de staff — permisos por ruta, ver lib/server/roles.js)
 // ---------------------------------------------------------------------------
 export const admin = {
 	dashboard: () => get('/admin/dashboard'),
+	analytics: () => get('/admin/analytics'),
+	audit: {
+		list: (params = {}) => {
+			const qs = new URLSearchParams(params).toString();
+			return get(`/admin/audit${qs ? '?' + qs : ''}`);
+		}
+	},
+	announcements: {
+		list: () => get('/admin/announcements'),
+		create: (data) => post('/admin/announcements', data),
+		pin: (id) => post(`/admin/announcements/${id}/pin`),
+		delete: (id) => del(`/admin/announcements/${id}`)
+	},
 	users: {
 		list: (params = {}) => {
 			const qs = new URLSearchParams(params).toString();
@@ -377,8 +404,7 @@ export const admin = {
 	settings: {
 		get: () => get('/admin/settings'),
 		update: (data) => put('/admin/settings', data)
-	},
-	analytics: () => get('/admin/analytics')
+	}
 };
 
 // ---------------------------------------------------------------------------

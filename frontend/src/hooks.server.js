@@ -1,9 +1,10 @@
 /**
- * VSocial — Server Hooks
+ * Voom! — Server Hooks
  * Setup wizard guard · Cron workers · Security headers
  */
 import { initDb, getDb, getDriverInfo, getUploadsDir } from '$lib/server/db.js';
 import { decodeToken } from '$lib/server/jwt.js';
+import { getUserIdFromCookies } from '$lib/server/auth.js';
 import { existsSync, unlinkSync } from 'fs';
 import { resolve, basename } from 'path';
 import { batchUpdateReputations } from '$lib/server/author-reputation.js';
@@ -374,12 +375,13 @@ export async function handle({ event, resolve }) {
 							is_verified: user ? user.is_verified : 0
 						};
 
+						// Bypass de rate limit exclusivo del staff real. Los usuarios
+						// verificados NO quedan exentos: la insignia no es un privilegio.
 						if (
 							user &&
-							(['admin', 'super_admin', 'moderator', 'team', 'staff'].includes(
+							['admin', 'super_admin', 'moderator', 'support', 'team', 'staff'].includes(
 								user.effective_role
-							) ||
-								user.is_verified === 1)
+							)
 						) {
 							isStaff = true;
 						}
@@ -497,6 +499,103 @@ export async function handle({ event, resolve }) {
 			}
 		} catch (_e) {
 			// ignore DB errors during guard, fallback to allow
+		}
+	}
+
+	// ── Maintenance / Demo Guard ──
+	// `maintenance_mode` bloquea el tráfico no-staff (el panel /admin, la salud
+	// del sistema y el login del staff siguen operativos). `demo_mode` convierte
+	// la plataforma en solo lectura para no-staff (plataforma de exhibición).
+	if (
+		!pathname.startsWith('/_app/') &&
+		!pathname.startsWith('/admin') &&
+		pathname !== '/setup' &&
+		pathname !== '/install'
+	) {
+		try {
+			const db = getDb();
+			const modeRows = await db
+				.prepare(
+					"SELECT key, value FROM system_settings WHERE key IN ('maintenance_mode', 'demo_mode')"
+				)
+				.all();
+			const modes = {};
+			for (const r of modeRows) modes[r.key] = r.value;
+			const modeBool = (val) => val !== '0' && val !== false && val !== 'false';
+			const maintenanceOn = modeBool(modes.maintenance_mode);
+			const demoOn = modeBool(modes.demo_mode);
+
+			if (maintenanceOn || demoOn) {
+				const isApi = pathname.startsWith('/api/');
+				const route = isApi ? pathname.substring(4) : pathname;
+
+				// Staff: peticiones API ya traen locals.user (resuelto por el rate
+				// limiter vía Bearer); las navegaciones de página se resuelven con la
+				// cookie espejo vsocial_token (funciona en prod HTTPS; en dev http la
+				// cookie Secure no persiste y solo /admin queda exento).
+				let isStaffRequest = event.locals.user
+					? ['admin', 'super_admin', 'moderator', 'support', 'team', 'staff'].includes(
+							event.locals.user.role
+						)
+					: false;
+				if (!isStaffRequest && !isApi) {
+					const cookieUserId = await getUserIdFromCookies(event.cookies);
+					if (cookieUserId) {
+						const row = await db
+							.prepare(
+								"SELECT COALESCE((SELECT role FROM user_roles WHERE user_id = u.id), u.role, 'user') AS role FROM users u WHERE u.id = ?"
+							)
+							.get(cookieUserId);
+						isStaffRequest = row
+							? ['admin', 'super_admin', 'moderator', 'support', 'team', 'staff'].includes(row.role)
+							: false;
+					}
+				}
+
+				// Rutas mínimas siempre operativas durante mantenimiento/demo
+				const alwaysAllowed =
+					route === '/health' ||
+					route === '/auth/login' ||
+					route === '/auth/logout' ||
+					route === '/auth/config' ||
+					route === '/maintenance' ||
+					route.startsWith('/uploads/') ||
+					route.startsWith('/emoticons/') ||
+					route.startsWith('/fonts/') ||
+					route.startsWith('/sounds/') ||
+					route === '/favicon.svg' ||
+					route === '/favicon.ico' ||
+					route === '/robots.txt' ||
+					route === '/manifest.webmanifest';
+
+				if (!isStaffRequest && !alwaysAllowed) {
+					if (maintenanceOn) {
+						if (isApi) {
+							return new Response(
+								JSON.stringify({ error: 'Servicio en mantenimiento. Vuelve en unos minutos.' }),
+								{
+									status: 503,
+									headers: { 'Content-Type': 'application/json', 'Retry-After': '300' }
+								}
+							);
+						}
+						if (pathname !== '/maintenance') {
+							return new Response('', { status: 302, headers: { Location: '/maintenance' } });
+						}
+					} else if (
+						demoOn &&
+						isApi &&
+						(method === 'POST' || method === 'PUT' || method === 'DELETE')
+					) {
+						return new Response(
+							JSON.stringify({ error: 'Modo demostración: la plataforma es de solo lectura.' }),
+							{ status: 403, headers: { 'Content-Type': 'application/json' } }
+						);
+					}
+				}
+			}
+		} catch (_e) {
+			// Si la BD aún no está lista, el Setup Wizard Guard decide el flujo.
 		}
 	}
 

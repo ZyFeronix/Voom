@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { fade, fly, scale } from 'svelte/transition';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { auth as authApi } from '$lib/api.js';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 
 	// ── State (Svelte 5 Runes) ───────────────────────────────────────────────
@@ -15,6 +16,19 @@
 	let shakeError = $state(false);
 	let mounted = $state(false);
 	let helpModalOpen = $state(false);
+
+	// Verificación de email (?verified=1|0 desde el enlace del correo) y bloqueo
+	// de login por cuenta sin verificar (code EMAIL_NOT_VERIFIED).
+	let verifiedStatus = $state('');
+	let emailNotVerified = $state(false);
+	let resendLoading = $state(false);
+	let resendSent = $state(false);
+
+	// Flujo real de "¿Olvidaste tu contraseña?" dentro del modal de ayuda
+	let forgotEmail = $state('');
+	let forgotLoading = $state(false);
+	let forgotSent = $state(false);
+	let forgotError = $state('');
 
 	// ── Derived ──────────────────────────────────────────────────────────────
 	let canSubmit = $derived(identifier.trim().length >= 2 && password.length >= 1);
@@ -29,6 +43,11 @@
 	onMount(() => {
 		mounted = true;
 		try {
+			const params = new URLSearchParams(window.location.search);
+			verifiedStatus =
+				params.get('verified') === '1' || params.get('verified') === '0'
+					? params.get('verified')
+					: '';
 			const saved = localStorage.getItem('vsocial_saved_identifier');
 			if (saved) {
 				identifier = saved;
@@ -65,12 +84,45 @@
 			goto('/feed');
 		} catch (err) {
 			error = err?.message ?? 'Credenciales incorrectas o error en el servidor.';
+			if (err?.data?.code === 'EMAIL_NOT_VERIFIED') {
+				emailNotVerified = true;
+				resendSent = false;
+			}
 			shakeError = true;
 			setTimeout(() => {
 				shakeError = false;
 			}, 600);
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function handleResendVerification() {
+		if (resendLoading || !identifier.trim()) return;
+		resendLoading = true;
+		try {
+			await authApi.resendVerification(identifier.trim());
+			resendSent = true;
+		} catch {
+			// Respuesta neutra del servidor; cualquier fallo no revela datos.
+			resendSent = true;
+		} finally {
+			resendLoading = false;
+		}
+	}
+
+	async function handleForgot(e) {
+		e?.preventDefault();
+		if (!forgotEmail.trim() || forgotLoading) return;
+		forgotLoading = true;
+		forgotError = '';
+		try {
+			await authApi.forgotPassword(forgotEmail.trim());
+			forgotSent = true;
+		} catch (err) {
+			forgotError = err?.message || 'No se pudo enviar el email de recuperación.';
+		} finally {
+			forgotLoading = false;
 		}
 	}
 
@@ -82,10 +134,10 @@
 </script>
 
 <svelte:head>
-	<title>Acceder a tu Cuenta &mdash; VSocial</title>
+	<title>Acceder a tu Cuenta &mdash; Voom!</title>
 	<meta
 		name="description"
-		content="Inicia sesión en VSocial, el universo digital para creadores virtuales, VTubers y comunidades creativas."
+		content="Inicia sesión en Voom!, el universo digital para creadores virtuales, VTubers y comunidades creativas."
 	/>
 </svelte:head>
 
@@ -227,7 +279,7 @@
 						<span>VS</span>
 					</div>
 					<div class="vs-mobile-titles">
-						<span class="vs-mobile-name">VSocial</span>
+						<span class="vs-mobile-name">Voom!</span>
 						<span class="vs-mobile-sub">Acceso a la Red</span>
 					</div>
 				</div>
@@ -245,6 +297,52 @@
 							<a href="/register" class="vs-card-register-link">Regístrate gratis</a>
 						</p>
 					</div>
+
+					<!-- Banner: verificación desde el enlace del email -->
+					{#if verifiedStatus === '1'}
+						<div class="vs-alert-verified" in:fly={{ y: -8, duration: 250 }} role="status">
+							<span class="material-icons-round" style="font-size: 16px;">mark_email_read</span>
+							<span>¡Correo verificado! Ya puedes iniciar sesión.</span>
+						</div>
+					{:else if verifiedStatus === '0'}
+						<div class="vs-alert-error" in:fly={{ y: -8, duration: 250 }} role="alert">
+							<div
+								class="vs-alert-icon-box"
+								style="flex: 0 0 24px; min-width: 24px; min-height: 24px;"
+							>
+								<span class="material-icons-round" style="font-size: 15px;">error_outline</span>
+							</div>
+							<div class="vs-alert-text">
+								<strong>Enlace inválido</strong>
+								<span
+									>El enlace de verificación es inválido o ha expirado. Inicia sesión para recibir
+									uno nuevo.</span
+								>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Banner: cuenta sin verificar con reenvío -->
+					{#if emailNotVerified}
+						<div class="vs-alert-verified" in:fly={{ y: -8, duration: 250 }} role="status">
+							<span class="material-icons-round" style="font-size: 16px;">mark_email_unread</span>
+							<span style="flex:1">
+								{resendSent
+									? 'Te hemos enviado un nuevo enlace de verificación (revisa spam).'
+									: 'Tu correo aún no está verificado.'}
+							</span>
+							{#if !resendSent}
+								<button
+									type="button"
+									class="vs-resend-btn"
+									onclick={handleResendVerification}
+									disabled={resendLoading || !identifier.trim()}
+								>
+									{resendLoading ? 'Enviando…' : 'Reenviar'}
+								</button>
+							{/if}
+						</div>
+					{/if}
 
 					<!-- Error Notification Banner -->
 					{#if error}
@@ -387,7 +485,7 @@
 									>
 										water_drop
 									</span>
-									<span>Ingresar a VSocial</span>
+									<span>Ingresar a Voom!</span>
 								{/if}
 							</button>
 						</div>
@@ -472,24 +570,49 @@
 				</div>
 
 				<div class="vs-modal-body">
-					<div class="vs-help-step">
-						<div class="vs-help-step-number">1</div>
-						<div class="vs-help-step-content">
-							<strong>Verifica tu usuario o email</strong>
-							<p>Asegúrate de no incluir espacios antes o después de tus datos.</p>
+					{#if !forgotSent}
+						<p class="vs-forgot-intro">
+							Escribe el correo de tu cuenta y te enviaremos un enlace para crear una nueva
+							contraseña (expira en 15 minutos).
+						</p>
+						<form onsubmit={handleForgot} class="vs-forgot-form">
+							<input
+								type="email"
+								placeholder="correo@ejemplo.com"
+								bind:value={forgotEmail}
+								class="aero-input"
+								autocomplete="email"
+								required
+							/>
+							{#if forgotError}
+								<p class="vs-forgot-error" role="alert">{forgotError}</p>
+							{/if}
+							<button
+								type="submit"
+								class="btn-aero-primary vs-forgot-submit"
+								disabled={forgotLoading}
+							>
+								{#if forgotLoading}
+									<span class="material-icons-round spin" style="font-size: 16px;">sync</span>
+									<span>Enviando…</span>
+								{:else}
+									<span class="material-icons-round" style="font-size: 16px;">outgoing_mail</span>
+									<span>Enviar enlace de recuperación</span>
+								{/if}
+							</button>
+						</form>
+					{:else}
+						<div class="vs-forgot-sent" role="status">
+							<span class="material-icons-round">mark_email_read</span>
+							<p>
+								Si el email está registrado, recibirás un enlace de recuperación en
+								<strong>{forgotEmail}</strong> en unos minutos.
+							</p>
 						</div>
-					</div>
+					{/if}
 
-					<div class="vs-help-step">
-						<div class="vs-help-step-number">2</div>
-						<div class="vs-help-step-content">
-							<strong>Restablecimiento de contraseña</strong>
-							<p>Por seguridad y cifrado, puedes solicitar asistencia al equipo administrativo.</p>
-						</div>
-					</div>
-
-					<div class="vs-help-step">
-						<div class="vs-help-step-number">3</div>
+					<div class="vs-help-step" style="margin-top: 16px;">
+						<div class="vs-help-step-number">?</div>
 						<div class="vs-help-step-content">
 							<strong>Cuentas en periodo de gracia</strong>
 							<p>
@@ -516,7 +639,7 @@
 
 <style>
 	/* ══════════════════════════════════════════════════════════════════════
-	   💎 V-SOCIAL LOGIN STATION — SURGICAL COMPACT PROPORTIONS
+	   💎 Voom! LOGIN STATION — SURGICAL COMPACT PROPORTIONS
 	   ══════════════════════════════════════════════════════════════════════ */
 
 	.vs-login-page {
@@ -1048,6 +1171,99 @@
 		border: 1px solid rgba(239, 68, 68, 0.35);
 		color: #f87171;
 		box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+	}
+
+	/* Banner de verificación de email (éxito / reenvío) */
+	.vs-alert-verified {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.55rem 0.75rem;
+		border-radius: var(--radius-sm);
+		background: rgba(52, 211, 153, 0.12);
+		border: 1px solid rgba(52, 211, 153, 0.35);
+		color: var(--aero-mint, #34d399);
+		font-size: 0.8rem;
+		font-weight: 600;
+	}
+
+	.vs-resend-btn {
+		border: none;
+		padding: 5px 12px;
+		border-radius: var(--radius-full);
+		background: rgba(52, 211, 153, 0.18);
+		color: var(--aero-mint, #34d399);
+		font-size: 0.72rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+	.vs-resend-btn:hover:not(:disabled) {
+		background: rgba(52, 211, 153, 0.3);
+	}
+	.vs-resend-btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	/* Flujo de recuperación dentro del modal de ayuda */
+	.vs-forgot-intro {
+		margin: 0 0 12px;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--text-secondary);
+	}
+	.vs-forgot-form {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.vs-forgot-error {
+		margin: 0;
+		font-size: 0.7rem;
+		font-weight: 600;
+		color: #f87171;
+	}
+	.vs-forgot-submit {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		width: 100%;
+		padding: 10px 18px;
+	}
+	.vs-forgot-submit:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+	.vs-forgot-sent {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		padding: 14px;
+		border-radius: var(--radius-sm);
+		background: rgba(52, 211, 153, 0.1);
+		border: 1px solid rgba(52, 211, 153, 0.3);
+		color: var(--aero-mint, #34d399);
+	}
+	.vs-forgot-sent p {
+		margin: 0;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--text-secondary);
+	}
+	.spin {
+		animation: vsSpin 0.9s linear infinite;
+	}
+	@keyframes vsSpin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.spin {
+			animation: none;
+		}
 	}
 
 	.vs-alert-error.shake {

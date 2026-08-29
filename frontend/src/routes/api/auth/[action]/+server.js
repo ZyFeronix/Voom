@@ -1,5 +1,5 @@
 /**
- * VSocial — Auth API
+ * Voom! — Auth API
  * POST /api/auth/register, login, logout
  * GET  /api/auth/me, /api/auth/sessions
  * PUT  /api/auth/change-password
@@ -9,7 +9,18 @@ import { json } from '@sveltejs/kit';
 import bcrypt from 'bcryptjs';
 import { getDb } from '$lib/server/db.js';
 import { requireAuth, createSession } from '$lib/server/auth.js';
+import { validateCode, consumeCode } from '$lib/server/invites.js';
+import {
+	createEmailToken,
+	sendEmail,
+	renderVerifyEmail,
+	renderResetEmail,
+	consumeEmailToken
+} from '$lib/server/email.js';
 import crypto from 'crypto';
+
+// Cooldown en memoria anti-spam de reenvío (email/token endpoints): userId → ms.
+const resendCooldown = new Map();
 
 function describeUserAgent(ua) {
 	if (!ua || ua === 'unknown') return { device: 'Dispositivo desconocido', browser: '' };
@@ -70,6 +81,46 @@ export async function POST({ request, url }) {
 			.get(username, email);
 		if (existing) return json({ error: 'El usuario o email ya está en uso' }, { status: 409 });
 
+		// Beta cerrada: flags de registro (parse tolerante — el instalador escribe
+		// 'true'/'false' y el panel admin '1'/'0', nunca comparar con === '1').
+		const flagRows = await db
+			.prepare(
+				"SELECT key, value FROM system_settings WHERE key IN ('allow_registration', 'require_invite_code', 'email_verification_required')"
+			)
+			.all();
+		const flags = {};
+		for (const r of flagRows) flags[r.key] = r.value;
+		const isOn = (v) => v === 1 || v === '1' || v === true || v === 'true';
+
+		if (flags.allow_registration !== undefined && !isOn(flags.allow_registration)) {
+			return json({ error: 'El registro está deshabilitado actualmente' }, { status: 403 });
+		}
+
+		let pendingInviteCode = null;
+		if (isOn(flags.require_invite_code)) {
+			const rawCode = (body.invite_code || '').trim();
+			if (!rawCode) {
+				return json(
+					{ error: 'Se requiere un código de invitación para registrarte' },
+					{ status: 400 }
+				);
+			}
+			const { valid, reason } = await validateCode(rawCode);
+			if (!valid) {
+				const messages = {
+					invalid: 'El código de invitación no existe',
+					inactive: 'Este código de invitación está desactivado',
+					exhausted: 'Este código de invitación no tiene más usos disponibles',
+					expired: 'Este código de invitación ha expirado'
+				};
+				return json(
+					{ error: messages[reason] || 'Código de invitación inválido' },
+					{ status: 403 }
+				);
+			}
+			pendingInviteCode = rawCode;
+		}
+
 		const passwordHash = await bcrypt.hash(password, 10);
 		const result = await db
 			.prepare(
@@ -82,19 +133,60 @@ export async function POST({ request, url }) {
 			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'user')")
 			.run(userId);
 
+		await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(userId);
+
+		// Consumo atómico del código (ya con el usuario creado, para trazabilidad
+		// en invite_uses). Si una carrera paralela agotó el código, se deshace
+		// la cuenta recién creada (cascada sobre roles/settings/sesiones).
+		if (pendingInviteCode) {
+			const consumed = await consumeCode(pendingInviteCode, userId);
+			if (!consumed.ok) {
+				await db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+				return json({ error: 'Este código de invitación ya no está disponible' }, { status: 403 });
+			}
+		}
+
+		// Verificación de email (si el admin la exige). Best-effort: sin SMTP
+		// sendEmail es no-op con log y el registro sigue creando la cuenta.
+		let verificationPending = false;
+		if (isOn(flags.email_verification_required)) {
+			verificationPending = true;
+			const verifyToken = await createEmailToken(userId, 'verify');
+			const name = displayName || username;
+			sendEmail(
+				email,
+				'Verifica tu correo — Voom!',
+				renderVerifyEmail(verifyToken, name, url.origin)
+			).catch(() => {});
+		}
+
 		const token = await createSession(userId, request);
 		const user = await db
 			.prepare(
 				`
 			SELECT u.id, u.username, u.email, u.display_name, u.avatar_url, u.cover_url,
 				u.bio, u.category, u.is_verified, u.follower_count, u.following_count,
-				COALESCE(ur.role, u.role, 'user') AS role
+				COALESCE(ur.role, u.role, 'user') AS role,
+				(SELECT theme FROM user_settings WHERE user_id = u.id) AS preferred_theme,
+				(SELECT accent_color FROM user_settings WHERE user_id = u.id) AS preferred_accent_color,
+				(SELECT app_font FROM user_settings WHERE user_id = u.id) AS preferred_app_font,
+				(SELECT font_scale FROM user_settings WHERE user_id = u.id) AS preferred_font_scale,
+				(SELECT density FROM user_settings WHERE user_id = u.id) AS preferred_density,
+				(SELECT app_wallpaper_url FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_url,
+				(SELECT wallpaper_dim FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_dim,
+				(SELECT font_family FROM profile_customizations WHERE user_id = u.id) AS profile_font_family,
+				(SELECT custom_font_url FROM profile_customizations WHERE user_id = u.id) AS profile_custom_font_url,
+				(SELECT card_opacity FROM user_settings WHERE user_id = u.id) AS preferred_card_opacity,
+				(SELECT border_radius FROM user_settings WHERE user_id = u.id) AS preferred_border_radius,
+				(SELECT wallpaper_mode FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_mode,
+				(SELECT aero_gloss FROM user_settings WHERE user_id = u.id) AS preferred_aero_gloss,
+				(SELECT active_preset FROM user_settings WHERE user_id = u.id) AS preferred_active_preset
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id WHERE u.id = ? LIMIT 1
 		`
 			)
 			.get(userId);
 
-		return json({ token, user }, { status: 201 });
+		return json({ token, user, email_verification_required: verificationPending }, { status: 201 });
 	}
 
 	if (action === 'login') {
@@ -106,9 +198,23 @@ export async function POST({ request, url }) {
 			.prepare(
 				`
 			SELECT u.id, u.username, u.email, u.password_hash, u.display_name, u.avatar_url,
-				u.cover_url, u.bio, u.category, u.is_verified,
+				u.cover_url, u.bio, u.category, u.is_verified, u.email_verified,
 				u.follower_count, u.following_count, u.is_banned, u.is_active, u.deleted_at,
-				COALESCE(ur.role, u.role, 'user') AS role
+				COALESCE(ur.role, u.role, 'user') AS role,
+				(SELECT theme FROM user_settings WHERE user_id = u.id) AS preferred_theme,
+				(SELECT accent_color FROM user_settings WHERE user_id = u.id) AS preferred_accent_color,
+				(SELECT app_font FROM user_settings WHERE user_id = u.id) AS preferred_app_font,
+				(SELECT font_scale FROM user_settings WHERE user_id = u.id) AS preferred_font_scale,
+				(SELECT density FROM user_settings WHERE user_id = u.id) AS preferred_density,
+				(SELECT app_wallpaper_url FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_url,
+				(SELECT wallpaper_dim FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_dim,
+				(SELECT font_family FROM profile_customizations WHERE user_id = u.id) AS profile_font_family,
+				(SELECT custom_font_url FROM profile_customizations WHERE user_id = u.id) AS profile_custom_font_url,
+				(SELECT card_opacity FROM user_settings WHERE user_id = u.id) AS preferred_card_opacity,
+				(SELECT border_radius FROM user_settings WHERE user_id = u.id) AS preferred_border_radius,
+				(SELECT wallpaper_mode FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_mode,
+				(SELECT aero_gloss FROM user_settings WHERE user_id = u.id) AS preferred_aero_gloss,
+				(SELECT active_preset FROM user_settings WHERE user_id = u.id) AS preferred_active_preset
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
 			WHERE u.email = ? OR u.username = ? LIMIT 1
 		`
@@ -120,6 +226,22 @@ export async function POST({ request, url }) {
 
 		const valid = await bcrypt.compare(password, user.password_hash);
 		if (!valid) return json({ error: 'Credenciales incorrectas' }, { status: 401 });
+
+		// Verificación de email exigida: bloquear cuentas sin verificar. El admin
+		// creado por /setup e /install nace verificado (email_verified=1).
+		const verifyFlag = await db
+			.prepare("SELECT value FROM system_settings WHERE key = 'email_verification_required'")
+			.get();
+		const flagOn = (v) => v === 1 || v === '1' || v === true || v === 'true';
+		if (flagOn(verifyFlag?.value) && !user.email_verified) {
+			return json(
+				{
+					error: 'Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.',
+					code: 'EMAIL_NOT_VERIFIED'
+				},
+				{ status: 403 }
+			);
+		}
 
 		// RGPD: ventana de reactivación de cuenta borrada (soft-delete). Si el usuario
 		// inicia sesión dentro de los 30 días se reactiva; pasado ese plazo (el cron ya
@@ -154,11 +276,143 @@ export async function POST({ request, url }) {
 		return json({ success: true });
 	}
 
+	// ── POST /api/auth/forgot-password — solicita email de reset ──
+	// Respuesta SIEMPRE neutra: no revela si el email existe en la plataforma.
+	if (action === 'forgot-password') {
+		const email = (body.email || '').trim().toLowerCase();
+		if (!email) return json({ error: 'Email requerido' }, { status: 400 });
+
+		const user = await db
+			.prepare('SELECT id, display_name, username, email_verified FROM users WHERE email = ?')
+			.get(email);
+		if (user && user.email_verified) {
+			// Cooldown en memoria: 1 email por cuenta por minuto (anti-spam de buzón).
+			const now = Date.now();
+			const last = resendCooldown.get(`reset:${user.id}`) || 0;
+			if (now - last < 60_000) {
+				return json({ success: true, message: 'Si el email existe, te hemos enviado un enlace.' });
+			}
+			resendCooldown.set(`reset:${user.id}`, now);
+
+			// Invalida tokens reset anteriores: solo el último enlace es válido.
+			await db
+				.prepare(
+					"UPDATE email_tokens SET used = 1 WHERE user_id = ? AND type = 'reset' AND used = 0"
+				)
+				.run(user.id);
+			const resetToken = await createEmailToken(user.id, 'reset');
+			const name = user.display_name || user.username;
+			sendEmail(
+				email,
+				'Recupera tu contraseña — Voom!',
+				renderResetEmail(resetToken, name, url.origin)
+			).catch(() => {});
+		}
+		return json({ success: true, message: 'Si el email existe, te hemos enviado un enlace.' });
+	}
+
+	// ── POST /api/auth/reset-password — consume token y fija nueva contraseña ──
+	if (action === 'reset-password') {
+		const token = (body.token || '').trim();
+		const password = body.password || '';
+		if (!token) return json({ error: 'Token requerido' }, { status: 400 });
+		if (password.length < 8) {
+			return json({ error: 'La contraseña debe tener al menos 8 caracteres' }, { status: 400 });
+		}
+
+		const row = await consumeEmailToken(token);
+		if (!row || row.type !== 'reset') {
+			return json(
+				{ error: 'El enlace es inválido o ha expirado. Solicita otro.' },
+				{ status: 400 }
+			);
+		}
+
+		const passwordHash = await bcrypt.hash(password, 10);
+		const result = await db
+			.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+			.run(passwordHash, row.user_id);
+		if (!result.changes) {
+			return json({ error: 'Usuario no encontrado' }, { status: 404 });
+		}
+
+		// La contraseña cambió: cerrar todas las sesiones activas de la cuenta.
+		await db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(row.user_id);
+
+		return json({ success: true, message: 'Contraseña actualizada. Ya puedes iniciar sesión.' });
+	}
+
+	// ── POST /api/auth/resend-verification — reenvía el email de verificación ──
+	if (action === 'resend-verification') {
+		const loginId = (body.email || body.login || '').trim().toLowerCase();
+		if (!loginId) return json({ error: 'Email requerido' }, { status: 400 });
+
+		const user = await db
+			.prepare(
+				'SELECT id, display_name, username, email, email_verified FROM users WHERE email = ? OR username = ?'
+			)
+			.get(loginId, loginId);
+		if (user && !user.email_verified) {
+			const now = Date.now();
+			const last = resendCooldown.get(`verify:${user.id}`) || 0;
+			if (now - last >= 60_000) {
+				resendCooldown.set(`verify:${user.id}`, now);
+				await db
+					.prepare(
+						"UPDATE email_tokens SET used = 1 WHERE user_id = ? AND type = 'verify' AND used = 0"
+					)
+					.run(user.id);
+				const verifyToken = await createEmailToken(user.id, 'verify');
+				const name = user.display_name || user.username;
+				sendEmail(
+					user.email,
+					'Verifica tu correo — Voom!',
+					renderVerifyEmail(verifyToken, name, url.origin)
+				).catch(() => {});
+			}
+		}
+		return json({
+			success: true,
+			message: 'Si el email existe y está sin verificar, te hemos enviado un enlace.'
+		});
+	}
+
 	return json({ error: 'Endpoint no encontrado' }, { status: 404 });
 }
 
 export async function GET({ request, url, params }) {
 	const action = params?.action || url.pathname.replace(/\/+$/, '').split('/').pop();
+
+	// ── GET /api/auth/verify-email?token= — clic desde el email ──
+	// Navegación del usuario: redirige a /login con el resultado en la query.
+	if (action === 'verify-email') {
+		const token = url.searchParams.get('token') || '';
+		const db = getDb();
+		const row = token ? await consumeEmailToken(token) : null;
+		if (!row || row.type !== 'verify') {
+			return new Response('', { status: 302, headers: { Location: '/login?verified=0' } });
+		}
+		await db.prepare('UPDATE users SET email_verified = 1 WHERE id = ?').run(row.user_id);
+		return new Response('', { status: 302, headers: { Location: '/login?verified=1' } });
+	}
+
+	// ── GET /api/auth/config — flags públicos de registro (sin auth) ──
+	if (action === 'config') {
+		const db = getDb();
+		const rows = await db
+			.prepare(
+				"SELECT key, value FROM system_settings WHERE key IN ('allow_registration', 'require_invite_code')"
+			)
+			.all();
+		const flags = {};
+		for (const r of rows) flags[r.key] = r.value;
+		const isOn = (v) => v === 1 || v === '1' || v === true || v === 'true';
+		return json({
+			allow_registration:
+				flags.allow_registration === undefined ? true : isOn(flags.allow_registration),
+			require_invite_code: isOn(flags.require_invite_code)
+		});
+	}
 
 	if (action === 'me') {
 		const userId = await requireAuth(request);
@@ -170,7 +424,20 @@ export async function GET({ request, url, params }) {
 				COALESCE(ur.role, u.role, 'user') AS role,
 				u.is_verified, u.payment_link, u.follower_count, u.following_count, u.created_at,
 				u.level, u.xp_points, u.custom_status, u.custom_status_text, u.custom_status_expires_at,
-				(SELECT theme FROM user_settings WHERE user_id = u.id) AS preferred_theme
+				(SELECT theme FROM user_settings WHERE user_id = u.id) AS preferred_theme,
+				(SELECT accent_color FROM user_settings WHERE user_id = u.id) AS preferred_accent_color,
+				(SELECT app_font FROM user_settings WHERE user_id = u.id) AS preferred_app_font,
+				(SELECT font_scale FROM user_settings WHERE user_id = u.id) AS preferred_font_scale,
+				(SELECT density FROM user_settings WHERE user_id = u.id) AS preferred_density,
+				(SELECT app_wallpaper_url FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_url,
+				(SELECT wallpaper_dim FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_dim,
+				(SELECT font_family FROM profile_customizations WHERE user_id = u.id) AS profile_font_family,
+				(SELECT custom_font_url FROM profile_customizations WHERE user_id = u.id) AS profile_custom_font_url,
+				(SELECT card_opacity FROM user_settings WHERE user_id = u.id) AS preferred_card_opacity,
+				(SELECT border_radius FROM user_settings WHERE user_id = u.id) AS preferred_border_radius,
+				(SELECT wallpaper_mode FROM user_settings WHERE user_id = u.id) AS preferred_wallpaper_mode,
+				(SELECT aero_gloss FROM user_settings WHERE user_id = u.id) AS preferred_aero_gloss,
+				(SELECT active_preset FROM user_settings WHERE user_id = u.id) AS preferred_active_preset
 			FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
 			WHERE u.id = ? LIMIT 1
 		`
