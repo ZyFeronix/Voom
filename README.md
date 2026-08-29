@@ -1,12 +1,12 @@
-# VSocial — Red Social Full-Stack
+# Voom! — Red Social Full-Stack
 
-[![Version](https://img.shields.io/badge/version-0.6.0--beta.1-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
 
-**VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL, WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
+**Voom!** es una red social completa construida con SvelteKit 5, SQLite/libSQL, WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
 
-**VSOCIAL** nace un par de semanas después del retiro de WoWonder de CodeCanyon, no es un clon.
+**VOOM** nace un par de semanas después del retiro de WoWonder de CodeCanyon, no es un clon.
 
 Es una respuesta arquitectónica a una década de código procedural, vulnerabilidades y mala UX.
 
@@ -14,7 +14,7 @@ Desarrollado en casi tres meses mediante la orquestación e iteración continua 
 
 Para quienes buscan el futuro, no el pasado.
 
-**Estado:** Beta v0.6.0-beta.1 — Funcional completo, 18 módulos, 63 tablas, 25 grupos de API. En desarrollo activo.
+**Estado:** Beta v0.6.0-beta.2 — 19 módulos, 70 tablas, 27 grupos de API. En desarrollo activo.
 > 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
 > componentes, API, configuración, operaciones y roadmap.
 
@@ -30,20 +30,20 @@ Para quienes buscan el futuro, no el pasado.
 | **Custom Assets** | Emoticonos/stickers/emojis personalizados por rol + catálogo MSN (`/studio/emotes`) |
 | **Verificación de Creadores** | Solicitud por categoría, revisión admin (`/admin/verifications`) y strikes de moderación |
 | **Pagos P2P** | Sin billetera ni pasarelas: enlace PayPal/Patreon/Ko-fi por usuario (`payment_link`); marketplace = catálogo/contacto |
-| **Reels** | Videos cortos con likes, comentarios y métricas |
+| **Reels** | Videos cortos con likes, comentarios, métricas y **thumbnails automáticos con ffmpeg** + aspect-ratio sin CLS |
 | **Stories** | Historias efímeras (24h) + highlights permanentes |
 | **Mensajería** | Chat DM + grupos con media, voz, replies, reacciones, typing indicators |
 | **Notificaciones** | HTTP polling con cursor + push Socket.IO en tiempo real, pestañas inteligentes, optimistic UI |
 | **Marketplace** | Categorías, listings con precio/condición/ubicación, detección de fraude |
 | **Freelance Gigs** | Tablón de encargos y postulaciones |
 | **Grupos & Páginas** | Tablas en schema + feature flag (`groups_enabled`); sin UI/API todavía |
-| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas) |
-| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, verificación de creadores y strikes |
+| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas + skeleton) |
+| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, claves de APIs externas (`/admin/apis`), tags curados (`/admin/tags`), verificación de creadores y strikes |
 | **Notificaciones Push** | En tiempo real vía Socket.IO (`new_notification`). Tabla `web_push_subscriptions` en schema; envío Web Push (VAPID) pendiente |
 | **Legal & RGPD** | Páginas `/privacy` `/terms` `/cookies`, banner de cookies, consentimiento + age gate 13+, borrado de cuenta con ventana de 30 días, exportación de datos JSON |
 | **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting (1000 req/min por IP / 2000 por usuario), CSRF, headers HSTS, bloqueos, snooze, anti-bots (reputación + heurísticas) |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
-| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), perfiles customizables |
+| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado |
 
 ---
 
@@ -60,7 +60,7 @@ Para quienes buscan el futuro, no el pasado.
 | Tiempo real | Socket.io (chat, presencia, notificaciones push) + WebRTC (llamadas) |
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
-| Testing | Vitest (8 suites, 50 tests) |
+| Testing | Vitest (12 suites, 126 tests) |
 | DevOps | Docker + docker-compose + nginx + Husky hooks |
 
 ---
@@ -92,7 +92,7 @@ Primera visita → wizard de instalación en `/install` → crea tablas y admin 
 | `npm run dev` | Servidor de desarrollo (Vite) |
 | `npm run build` | Build de producción |
 | `npm start` | Servidor producción (adapter-node) |
-| `npm run test` | Vitest (8 suites, 50 tests) |
+| `npm run test` | Vitest (17 suites, 227 tests) |
 | `npm run lint` | ESLint + Prettier check |
 | `npm run format` | ESLint + Prettier fix |
 | `node scripts/migrate-up.js` | Aplicar migraciones pendientes |
@@ -101,14 +101,18 @@ Primera visita → wizard de instalación en `/install` → crea tablas y admin 
 
 ---
 
-## Docker
+## Docker / Portainer
+
+**Guía completa para no avanzados (15 min, HTTPS incluido): [`DEPLOY.md`](./DEPLOY.md)**
 
 ```bash
-# configurar .env con JWT_SECRET y variables de producción
-docker-compose up --build -d
+# rápida referencia: compilar y levantar localmente
+DOMAIN=localhost JWT_SECRET=$(openssl rand -hex 48) docker compose up --build -d
 ```
 
-Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
+Servicios: `voom` (SvelteKit + Socket.IO) y `caddy` (HTTPS automático).
+Volumen persistente `voom_data` (BD + uploads + secretos), healthcheck
+`/api/health`, backups opcionales con `--profile backup`.
 
 ---
 
@@ -120,7 +124,7 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Decisiones de diseño y filosofía del proyecto |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Historial de versiones |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Guía para contribuir al proyecto |
-| [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (949 líneas) |
+| [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (1039 líneas, 70 tablas) |
 | [`.env.example`](./.env.example) | Template de variables de entorno |
 
 ---

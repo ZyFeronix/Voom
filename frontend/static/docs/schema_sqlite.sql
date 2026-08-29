@@ -1,5 +1,5 @@
 -- =============================================================================
--- VSocial — Pure libSQL (SQLite-compatible) Canonical Schema
+-- Voom! — Pure libSQL (SQLite-compatible) Canonical Schema
 -- =============================================================================
 -- This file is the SINGLE source of truth for the database layout.
 -- `frontend/src/lib/server/db.js::runSchema()` executes it on every boot;
@@ -100,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    theme VARCHAR(10) DEFAULT 'auto',
+    theme VARCHAR(10) DEFAULT 'light',
     language VARCHAR(10) DEFAULT 'es',
     notification_email BOOLEAN DEFAULT 1,
     notification_push BOOLEAN DEFAULT 1,
@@ -120,6 +120,20 @@ CREATE TABLE IF NOT EXISTS user_settings (
     notify_comments BOOLEAN DEFAULT 1,
     notify_follows BOOLEAN DEFAULT 1,
     notify_dms BOOLEAN DEFAULT 1,
+    -- Apariencia global por usuario (migración 016); '' / 'default' / 1.0 /
+    -- 'cozy' = heredar del tema activo.
+    accent_color VARCHAR(7) DEFAULT '',
+    app_font VARCHAR(20) DEFAULT 'default',
+    font_scale REAL DEFAULT 1.0,
+    density VARCHAR(10) DEFAULT 'cozy',
+    app_wallpaper_url VARCHAR(500) DEFAULT '',
+    wallpaper_dim INTEGER DEFAULT 30,
+    -- Frutiger Aero Engine (migración 017): superficies Aero.
+    card_opacity INTEGER DEFAULT 100,
+    border_radius VARCHAR(10) DEFAULT 'rounded',
+    wallpaper_mode VARCHAR(10) DEFAULT 'cover',
+    aero_gloss BOOLEAN DEFAULT 1,
+    active_preset VARCHAR(30) DEFAULT '',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -344,6 +358,8 @@ CREATE TABLE IF NOT EXISTS reels (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     video_url VARCHAR(512) NOT NULL,
     thumbnail_url VARCHAR(512),
+    video_width INTEGER,
+    video_height INTEGER,
     caption TEXT,
     duration_seconds INTEGER,
     view_count INTEGER DEFAULT 0,
@@ -520,6 +536,37 @@ CREATE TABLE IF NOT EXISTS user_strikes (
 CREATE INDEX IF NOT EXISTS idx_strikes_user ON user_strikes(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_strikes_expires ON user_strikes(expires_at);
 
+-- -----------------------------------------------------------------------------
+-- Auditoría de acciones del staff (migración 018)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(64) NOT NULL,
+    entity_type VARCHAR(32),
+    entity_id VARCHAR(64),
+    details TEXT,
+    ip VARCHAR(64),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_logs(actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_action ON admin_audit_logs(action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_logs(created_at DESC);
+
+-- -----------------------------------------------------------------------------
+-- Tablón de anuncios internos del staff (migración 018)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS staff_announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    title VARCHAR(160) NOT NULL,
+    body TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON staff_announcements(pinned DESC, created_at DESC);
+
 
 -- =============================================================================
 -- DOMAIN 7: MARKETPLACE
@@ -556,6 +603,7 @@ CREATE TABLE IF NOT EXISTS listing_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
     media_url VARCHAR(512) NOT NULL,
+    thumb_url VARCHAR(512),
     position INTEGER DEFAULT 0
 );
 
@@ -783,6 +831,29 @@ CREATE TABLE IF NOT EXISTS email_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_email_tokens ON email_tokens(token, used);
 
+-- Códigos de invitación (beta cerrada): el registro exige un código válido
+-- cuando el setting `require_invite_code` está activo.
+CREATE TABLE IF NOT EXISTS invite_codes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code VARCHAR(32) NOT NULL UNIQUE,
+    label VARCHAR(120),
+    max_uses INTEGER,
+    uses_count INTEGER NOT NULL DEFAULT 0,
+    expires_at DATETIME,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_invite_codes_code ON invite_codes(code);
+
+CREATE TABLE IF NOT EXISTS invite_uses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_id INTEGER NOT NULL REFERENCES invite_codes(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    used_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_invite_uses_code ON invite_uses(code_id);
+
 CREATE TABLE IF NOT EXISTS blocked_users (
     blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -870,8 +941,9 @@ INSERT OR IGNORE INTO tags (name, slug, icon) VALUES
     ('Streaming', 'streaming', 'live_tv');
 
 INSERT OR IGNORE INTO system_settings (key, value) VALUES
-    ('site_name', 'VSocial'),
+    ('site_name', 'Voom!'),
     ('allow_registration', '1'),
+    ('require_invite_code', '0'),
     ('max_upload_size_mb', '50'),
     ('reels_enabled', '1'),
     ('marketplace_enabled', '1'),
@@ -888,7 +960,7 @@ INSERT OR IGNORE INTO system_settings (key, value) VALUES
     ('smtp_port', '587'),
     ('smtp_user', ''),
     ('smtp_pass', ''),
-    ('smtp_from', 'noreply@vsocial.app'),
+    ('smtp_from', 'noreply@voom.social'),
     ('tenor_api_key', '');
 
 CREATE TABLE IF NOT EXISTS activity_logs (

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VSocial - Documentación Oficial</title>
+    <title>Voom! - Documentación Oficial</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -16,16 +16,16 @@
     
     <style>
         :root {
-            --bg-base: #0f172a;
-            --primary: #00f2fe; /* Celeste aero */
-            --primary-glow: #1b85f3;
+            --bg-base: #040d17; /* Voom! Midnight Cyberspace */
+            --primary: #00d4aa; /* Voom! Aero Teal */
+            --primary-glow: #1b85f3; /* Voom! Electric Azure */
             --success: #10b981; /* Green esmeralda */
             
             /* Glassmorphism 2.0 Tokens */
-            --glass-surface: rgba(255, 255, 255, 0.08);
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --glass-highlight: rgba(255, 255, 255, 0.25);
-            --neon-primary: 0 0 15px rgba(27, 133, 243, 0.25);
+            --glass-surface: rgba(8, 27, 46, 0.65);
+            --glass-border: rgba(0, 212, 170, 0.3);
+            --glass-highlight: rgba(255, 255, 255, 0.45);
+            --neon-primary: 0 0 20px rgba(0, 212, 170, 0.4), 0 0 40px rgba(27, 133, 243, 0.2);
             --neon-success: 0 0 15px rgba(16, 185, 129, 0.25);
             
             --text-main: #f8fafc;
@@ -59,8 +59,8 @@
             width: 200%;
             height: 200%;
             background: 
-                radial-gradient(circle at 50% 50%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 30%);
+                radial-gradient(circle at 50% 50%, rgba(0, 212, 170, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 30%);
             z-index: -1;
             animation: liquid-rotate 30s linear infinite;
             pointer-events: none;
@@ -79,60 +79,111 @@
             z-index: 1;
         }
 
-        header {
+        .docs-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 3rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--glass-border);
+            justify-content: space-between;
+            gap: 20px;
+            padding: 12px 24px;
+            width: 100%;
+            box-sizing: border-box;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 2rem;
         }
 
-        .logo {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--text-main), var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: var(--neon-primary);
-            letter-spacing: -0.05em;
-        }
-
-        .tabs {
+        /* 1. MARCA */
+        .docs-brand {
             display: flex;
-            gap: 1rem;
-            background: var(--glass-surface);
-            padding: 0.5rem;
-            border-radius: 100px;
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            flex-direction: column;
+            gap: 2px;
+            flex-shrink: 0; /* 👈 Impide que se comprima */
         }
 
-        .tab-btn {
+        .docs-brand-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .docs-brand .logo {
+            font-size: 1.35rem;
+            font-weight: 900;
+            color: #00d2ff;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        .docs-brand .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 7px;
+            background: rgba(0, 210, 255, 0.08);
+            border: 1px solid rgba(0, 210, 255, 0.25);
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-family: var(--font-mono, monospace);
+            color: #7dd3fc;
+            white-space: nowrap;
+        }
+
+        .docs-brand .version-badge .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 5px #10b981;
+            flex-shrink: 0;
+        }
+
+        .docs-brand .docs-subtitle {
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        /* 2. CÁPSULA UNIFICADA DE PESTAÑAS */
+        .docs-nav-bar {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 5px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 999px; /* Cápsula contenedora */
+            backdrop-filter: blur(8px);
+            flex-shrink: 0; /* 👈 CRUCIAL: impide que caiga a segunda fila */
+            white-space: nowrap;
+        }
+
+        /* Pestaña individual */
+        .nav-tab {
             background: transparent;
             border: none;
-            color: var(--text-muted);
-            padding: 0.75rem 1.5rem;
-            border-radius: 100px;
-            font-family: inherit;
-            font-weight: 600;
-            font-size: 0.95rem;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.6);
             cursor: pointer;
-            transition: all 0.3s var(--ease-spring);
-            position: relative;
-            overflow: hidden;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
         }
 
-        .tab-btn:hover {
-            color: var(--text-main);
+        .nav-tab:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.06);
         }
 
-        .tab-btn.active {
-            color: var(--text-main);
+        /* Pestaña activa con Aqua Glow */
+        .nav-tab.active {
             background: rgba(255, 255, 255, 0.12);
-            box-shadow: var(--neon-primary), inset 0 1px 0 var(--glass-highlight);
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            color: #ffffff !important;
+            font-weight: 600;
+            border: 1px solid rgba(0, 210, 255, 0.4);
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
         }
 
         .content-panel {
@@ -311,29 +362,6 @@
             display: block;
         }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
-            padding: 0.5rem 1rem;
-            border-radius: 100px;
-            font-weight: 500;
-            font-size: 0.85rem;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            box-shadow: var(--neon-success);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--success);
-            animation: pulse-dot 2s infinite;
-        }
-
         @keyframes pulse-dot {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.2); }
@@ -341,9 +369,9 @@
         }
 
         @media (max-width: 768px) {
-            header { flex-direction: column; gap: 1.5rem; align-items: flex-start; }
-            .tabs { flex-wrap: wrap; width: 100%; justify-content: center; }
-            .tab-btn { flex: 1; text-align: center; }
+            .docs-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+            .docs-nav-bar { flex-wrap: wrap; gap: 4px; }
+            .nav-tab { flex: 1; text-align: center; font-size: 0.72rem; padding: 4px 8px; }
             .content-panel { padding: 1.5rem; }
             .license-pre { padding: 1.5rem; width: 100%; }
         }
@@ -351,40 +379,47 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <div>
-                <div class="logo">VSocial Docs</div>
-                <div style="margin-top: 0.5rem;">
-                    <div class="status-badge">
-                        <div class="status-dot"></div>
-                        Beta v0.6.0-beta.1 - Glassmorphism 2.0
-                    </div>
+        <header class="docs-header">
+            <!-- MARCA IZQUIERDA -->
+            <div class="docs-brand">
+                <div class="docs-brand-row">
+                    <span class="logo">Voom!</span>
+                    <span class="version-badge">
+                        <span class="dot"></span>
+                        <span>v0.6.0-beta.2</span>
+                    </span>
                 </div>
+                <span class="docs-subtitle">Documentación Oficial &amp; Guías</span>
             </div>
-            
-            <div class="tabs">
-                <button class="tab-btn active" data-target="readme">README</button>
-                <button class="tab-btn" data-target="docs">DOCS (Maestro)</button>
-                <button class="tab-btn" data-target="architecture">Arquitectura</button>
-                <button class="tab-btn" data-target="contributing">Contributing</button>
-                <button class="tab-btn" data-target="license">Licencia</button>
-            </div>
+
+            <!-- BARRA DE PESTAÑAS EN CÁPSULA (Derecha) -->
+            <nav class="docs-nav-bar">
+                <a href="#readme" class="nav-tab active">README</a>
+                <a href="#doc" class="nav-tab">Documentación</a>
+                <a href="#arch" class="nav-tab">Arquitectura</a>
+                <a href="#contrib" class="nav-tab">Contributing</a>
+                <a href="#changelog" class="nav-tab">Changelog</a>
+                <a href="#rebrand" class="nav-tab">Rebranding</a>
+                <a href="#licencia" class="nav-tab">Licencia</a>
+            </nav>
         </header>
 
-        <main>
+            <main>
             <div id="readme" class="content-panel active markdown-body"></div>
             <div id="docs" class="content-panel markdown-body"></div>
             <div id="architecture" class="content-panel markdown-body"></div>
             <div id="contributing" class="content-panel markdown-body"></div>
+            <div id="changelog" class="content-panel markdown-body"></div>
+            <div id="rebranding" class="content-panel markdown-body"></div>
             <div id="license" class="content-panel markdown-body">
                 <h1>Licencia y Protección Legal</h1>
-                <p>Acuerdo de usuario, términos de uso de V-SOCIAL y protecciones de propiedad intelectual.</p>
+                <p>Acuerdo de usuario, términos de uso de Voom! y protecciones de propiedad intelectual.</p>
 
                 <h2>Licencia AGPLv3</h2>
-                <p>V-SOCIAL es software libre bajo la Licencia Pública General Affero de GNU (AGPLv3). Esto garantiza libertades esenciales, pero impone obligaciones estrictamente respetadas:</p>
+                <p>Voom! es software libre bajo la Licencia Pública General Affero de GNU (AGPLv3). Esto garantiza libertades esenciales, pero impone obligaciones estrictamente respetadas:</p>
                 <ul>
                     <li><strong>Código Abierto:</strong> Si distribuyes o modificas esta plataforma, debes compartir el código fuente resultante bajo la misma licencia.</li>
-                    <li><strong>Uso en Red (cláusula §13):</strong> A diferencia de la GPLv3, la AGPLv3 exige que quien ponga una versión modificada de V-SOCIAL a disposición de usuarios a través de una red ofrezca también el código fuente a esos usuarios.</li>
+                    <li><strong>Uso en Red (cláusula §13):</strong> A diferencia de la GPLv3, la AGPLv3 exige que quien ponga una versión modificada de Voom! a disposición de usuarios a través de una red ofrezca también el código fuente a esos usuarios.</li>
                     <li><strong>Sin Garantía:</strong> El software se proporciona "tal cual", sin ninguna garantía implícita o explícita.</li>
                     <li><strong>Reconocimiento:</strong> Se debe mantener la atribución a los autores originales en todas las copias y derivados.</li>
                 </ul>
@@ -395,15 +430,15 @@
                 </div>
 
                 <h2>Protección Anti-Clonación (IP)</h2>
-                <p>Más allá de la lógica de negocio cubierta por AGPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de V-SOCIAL.</p>
+                <p>Más allá de la lógica de negocio cubierta por AGPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de Voom!.</p>
                 <ul>
-                    <li><strong>Identidad de Marca:</strong> No se permite el uso del nombre "V-SOCIAL", los logotipos, la tipografía distintiva ni el esquema de colores para engañar a usuarios o hacerse pasar por la plataforma oficial.</li>
+                    <li><strong>Identidad de Marca:</strong> No se permite el uso del nombre "Voom!", los logotipos, la tipografía distintiva ni el esquema de colores para engañar a usuarios o hacerse pasar por la plataforma oficial.</li>
                     <li><strong>Protección de Interfaz (Look & Feel):</strong> El clonado exacto de la interfaz de usuario con fines comerciales competidores está estrictamente prohibido sin autorización.</li>
                     <li><strong>Rate Limiting & Anti-Scraping:</strong> La infraestructura incluye protecciones activas. El scraping automatizado o la ingeniería inversa de los algoritmos de feeds privados se considerará un abuso de los términos de servicio.</li>
                 </ul>
 
                 <h2>Términos de Servicio (SLA)</h2>
-                <p>Al utilizar o alojar una instancia de V-SOCIAL, te comprometes a seguir los estándares de ingeniería y respeto al usuario (<em>Anti-Caja Negra</em>).</p>
+                <p>Al utilizar o alojar una instancia de Voom!, te comprometes a seguir los estándares de ingeniería y respeto al usuario (<em>Anti-Caja Negra</em>).</p>
                 <ul>
                     <li><strong>Privacidad del Usuario:</strong> Los feeds de Radar y Descubrimiento no deben ser manipulados con algoritmos ocultos.</li>
                     <li><strong>Uso Responsable:</strong> Queda prohibido el uso de la plataforma para distribuir malware, contenido ilícito o esquemas de fraude.</li>
@@ -420,15 +455,15 @@
 
     <!-- Raw Markdown Content (Escaped for JS Injection) -->
     <script type="text/markdown" id="md-readme">
-# VSocial — Red Social Full-Stack
+# Voom! — Red Social Full-Stack
 
-[![Version](https://img.shields.io/badge/version-0.6.0--beta.1-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
 
-**VSocial** es una red social completa construida con SvelteKit 5, SQLite/libSQL, WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
+**Voom!** es una red social completa construida con SvelteKit 5, SQLite/libSQL, WebSockets en tiempo real y un sistema de diseño Glassmorphism 2.0 propio.
 
-**VSOCIAL** nace un par de semanas después del retiro de WoWonder de CodeCanyon, no es un clon.
+**VOOM** nace un par de semanas después del retiro de WoWonder de CodeCanyon, no es un clon.
 
 Es una respuesta arquitectónica a una década de código procedural, vulnerabilidades y mala UX.
 
@@ -436,7 +471,7 @@ Desarrollado en casi tres meses mediante la orquestación e iteración continua 
 
 Para quienes buscan el futuro, no el pasado.
 
-**Estado:** Beta v0.6.0-beta.1 — Funcional completo, 18 módulos, 63 tablas, 25 grupos de API. En desarrollo activo.
+**Estado:** Beta v0.6.0-beta.2 — 19 módulos, 70 tablas, 27 grupos de API. En desarrollo activo.
 &gt; 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
 &gt; componentes, API, configuración, operaciones y roadmap.
 
@@ -452,20 +487,20 @@ Para quienes buscan el futuro, no el pasado.
 | **Custom Assets** | Emoticonos/stickers/emojis personalizados por rol + catálogo MSN (`/studio/emotes`) |
 | **Verificación de Creadores** | Solicitud por categoría, revisión admin (`/admin/verifications`) y strikes de moderación |
 | **Pagos P2P** | Sin billetera ni pasarelas: enlace PayPal/Patreon/Ko-fi por usuario (`payment_link`); marketplace = catálogo/contacto |
-| **Reels** | Videos cortos con likes, comentarios y métricas |
+| **Reels** | Videos cortos con likes, comentarios, métricas y **thumbnails automáticos con ffmpeg** + aspect-ratio sin CLS |
 | **Stories** | Historias efímeras (24h) + highlights permanentes |
 | **Mensajería** | Chat DM + grupos con media, voz, replies, reacciones, typing indicators |
 | **Notificaciones** | HTTP polling con cursor + push Socket.IO en tiempo real, pestañas inteligentes, optimistic UI |
 | **Marketplace** | Categorías, listings con precio/condición/ubicación, detección de fraude |
 | **Freelance Gigs** | Tablón de encargos y postulaciones |
 | **Grupos & Páginas** | Tablas en schema + feature flag (`groups_enabled`); sin UI/API todavía |
-| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas) |
-| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, verificación de creadores y strikes |
+| **Gamificación** | XP, niveles, check-ins diarios, rachas, títulos, leaderboard rediseñado (podio + pestañas + skeleton) |
+| **Admin Panel** | Dashboard, gestión de usuarios, reportes, moderación de contenido, settings, claves de APIs externas (`/admin/apis`), tags curados (`/admin/tags`), verificación de creadores y strikes |
 | **Notificaciones Push** | En tiempo real vía Socket.IO (`new_notification`). Tabla `web_push_subscriptions` en schema; envío Web Push (VAPID) pendiente |
 | **Legal & RGPD** | Páginas `/privacy` `/terms` `/cookies`, banner de cookies, consentimiento + age gate 13+, borrado de cuenta con ventana de 30 días, exportación de datos JSON |
 | **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting (1000 req/min por IP / 2000 por usuario), CSRF, headers HSTS, bloqueos, snooze, anti-bots (reputación + heurísticas) |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
-| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), perfiles customizables |
+| **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado |
 
 ---
 
@@ -482,7 +517,7 @@ Para quienes buscan el futuro, no el pasado.
 | Tiempo real | Socket.io (chat, presencia, notificaciones push) + WebRTC (llamadas) |
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
-| Testing | Vitest (8 suites, 50 tests) |
+| Testing | Vitest (12 suites, 126 tests) |
 | DevOps | Docker + docker-compose + nginx + Husky hooks |
 
 ---
@@ -514,7 +549,7 @@ Primera visita → wizard de instalación en `/install` → crea tablas y admin 
 | `npm run dev` | Servidor de desarrollo (Vite) |
 | `npm run build` | Build de producción |
 | `npm start` | Servidor producción (adapter-node) |
-| `npm run test` | Vitest (8 suites, 50 tests) |
+| `npm run test` | Vitest (17 suites, 227 tests) |
 | `npm run lint` | ESLint + Prettier check |
 | `npm run format` | ESLint + Prettier fix |
 | `node scripts/migrate-up.js` | Aplicar migraciones pendientes |
@@ -523,14 +558,18 @@ Primera visita → wizard de instalación en `/install` → crea tablas y admin 
 
 ---
 
-## Docker
+## Docker / Portainer
+
+**Guía completa para no avanzados (15 min, HTTPS incluido): [`DEPLOY.md`](./DEPLOY.md)**
 
 ```bash
-# configurar .env con JWT_SECRET y variables de producción
-docker-compose up --build -d
+# rápida referencia: compilar y levantar localmente
+DOMAIN=localhost JWT_SECRET=$(openssl rand -hex 48) docker compose up --build -d
 ```
 
-Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
+Servicios: `voom` (SvelteKit + Socket.IO) y `caddy` (HTTPS automático).
+Volumen persistente `voom_data` (BD + uploads + secretos), healthcheck
+`/api/health`, backups opcionales con `--profile backup`.
 
 ---
 
@@ -542,7 +581,7 @@ Expone `:3000`, volumen persistente `vsocial_data`, healthcheck `/api/health`.
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md) | Decisiones de diseño y filosofía del proyecto |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Historial de versiones |
 | [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Guía para contribuir al proyecto |
-| [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (949 líneas) |
+| [`schema_sqlite.sql`](./schema_sqlite.sql) | Esquema canónico de base de datos (1039 líneas, 70 tablas) |
 | [`.env.example`](./.env.example) | Template de variables de entorno |
 
 ---
@@ -559,7 +598,7 @@ GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE)
 
 </script>
     <script type="text/markdown" id="md-docs">
-# VSocial — Documentación Completa de Proyecto (Beta v0.6.0-beta.1)
+# Voom! — Documentación Completa de Proyecto (Beta v0.6.0-beta.2)
 
 &gt; Documento técnico maestro. Arquitectura, stack, módulos, API, base de datos, configuración,
 &gt; operaciones y guía de desarrollo. Todo en un solo archivo.
@@ -568,14 +607,14 @@ GNU AGPLv3. Ver el texto completo en [`LICENSE`](./LICENSE)
 
 ## 1. Visión General
 
-**VSocial** es una red social full-stack construida con SvelteKit 5, SQLite/LibSQL,
+**Voom!** es una red social full-stack construida con SvelteKit 5, SQLite/LibSQL,
 WebSockets y diseño Glassmorphism 2.0 propio. Cubre el espectro completo de una plataforma
 social moderna: feed, posts, reels, stories, marketplace, mensajería en tiempo real,
 grupos, notificaciones push, gamificación y panel administrativo.
 
-- **Versión:** Beta v0.6.0-beta.1
+- **Versión:** Beta v0.6.0-beta.2
 - **Licencia:** AGPLv3
-- **Estado:** Funcional completo — 18+ módulos implementados
+- **Estado:** Funcional completo — 19 módulos implementados
 
 ### Características Principales:
 - **Sistema de Feeds Transparentes (Anti-Caja Negra):** El usuario tiene control total sobre su contenido mediante tres algoritmos sin opacidad:
@@ -592,6 +631,15 @@ grupos, notificaciones push, gamificación y panel administrativo.
 - **Verificación de Creadores & VTubers:** Solicitud pública por categoría (`/about/verified/apply/[category]`), revisión administrativa (`/admin/verifications`) y sistema de strikes de moderación (migración `012`).
 - **Pagos P2P (sin billetera ni pasarelas):** Cada usuario publica su enlace personal PayPal/Patreon/Ko-fi en `users.payment_link`; el marketplace es catálogo/contacto y abre el enlace del vendedor en vez de comprar.
 - **Motor Anti-Abuso:** Reputación de autores (`author-reputation.js`, batch cada 6 h), heurísticas de spam/bots (`spam-heuristics.js`, batch cada 30 min) y escritor de lotes en memoria (`batch-writer.js`) para métricas de alta concurrencia.
+- **Perfiles de Rendimiento (lite / balanced / high):** El store `perf.svelte.js` gestiona un perfil de rendimiento por usuario (persistido en `localStorage`) que escala el efecto especular del cristal, el blur, las sombras, las transiciones y el fondo líquido según el tier del dispositivo. Incluye detección de hardware, benchmark de FPS con recomendación automática de perfil, HUD de FPS opcional y fuentes autoalojadas en `/fonts` (CSP `font-src 'self'`). Ver §10.2.
+- **Thumbnails Automáticos con ffmpeg:** Los reels generan thumbnail JPEG automáticamente al publicar (frame del 25% del vídeo vía `ffmpeg-static`, migración 015 añade `reels.video_width/video_height` para fijar aspect-ratio antes del primer render y eliminar CLS) y las imágenes de marketplace generan thumbnail de máximo 540px (`listing_media.thumb_url`). Ver §8 (`media.js`).
+- **Gestión de Sesiones Activas:** `GET /api/auth/sessions` lista las sesiones vivas del usuario (dispositivo/navegador parseados del user-agent, sesión actual marcada); `DELETE ?id=` revoca una y `?others=1` cierra todas las demás. UI en `/settings/security`. Un cron diario purga sesiones expiradas.
+- **Tags Curados Administrables:** La tabla `tags` (migración `013`) convierte los chips de `/explore` en datos reales gestionados desde `/admin/tags`; filtran el feed emparejando posts por hashtag `#slug`.
+- **Navegación con View Transitions API:** crossfade entre rutas gestionado en `onNavigate` (`+layout.svelte`), con grupos nombrados para el shell y modo root-only en cruces hacia/desde rutas sin shell (landing, login, admin). Las transiciones encadenadas se saltan para evitar cortes secos; configurable desde `/settings/algorithm`.
+- **Zumbido estilo MSN en el chat:** evento Socket.IO `zumbido` con cooldown de 10 s en el cliente; sonido `/sounds/nudge.mp3` (`utils/sound.js`) y burbuja animada `⚡ ¡ZUMBIDO!`.
+- **Códigos de Invitación (beta cerrada):** registro por invitación (migración `019`) con códigos `VOOM-XXXX-XXXX` gestionados en `/admin/invites` (lotes, usos máximos, expiración, trazabilidad por usuario en `invite_uses`). El consumo es atómico (`lib/server/invites.js`); el flag `require_invite_code` activa el gate del registro.
+- **Email Operativo:** `email.js` async sobre Nodemailer (SMTP desde `/admin/apis`): verificación de correo (`/api/auth/verify-email`, reenvío con cooldown), recuperación de contraseña (`forgot-password` → `/reset-password`, revoca todas las sesiones al cambiarla) y enforcement opcional de `email_verification_required` en el login. Sin SMTP configurado la plataforma funciona (los envíos son no-op con log).
+- **Modo Mantenimiento y Modo Demo con enforcement:** el guard de `hooks.server.js` bloquea el tráfico no-staff durante `maintenance_mode` (503 en API, página pública `/maintenance` para navegación; el staff entra normal vía Bearer o cookie) y convierte la plataforma en solo lectura con `demo_mode`.
 
 ---
 
@@ -623,7 +671,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Rate Limiting | In-memory en `hooks.server.js`: 1000 req/min por IP, 2000 req/min por usuario autenticado; exentos staff y localhost; `/api/gamification/heartbeat` y `/api/health` excluidos |
 | Email | Nodemailer (verificación, reset password) — SMTP configurado vía `system_settings` (admin), no vía env |
 | Logging | Pino + pino-pretty (structured JSON logs) |
-| Seguridad HTTP | Headers manuales en `hooks.server.js` (HSTS, X-Frame-Options: DENY, nosniff, Referrer-Policy, Permissions-Policy). Helmet está en `package.json` pero no se usa en runtime |
+| Seguridad HTTP | Headers manuales en `hooks.server.js` (HSTS, X-Frame-Options: DENY, nosniff, Referrer-Policy, Permissions-Policy) + **Content-Security-Policy** (§13). Helmet está en `package.json` pero no se usa en runtime |
 | CSRF | Validación de Origin/Referer en `hooks.server.js` |
 | Anti-abuso | Reputación de autores (`author-reputation.js`, batch 6 h) + heurísticas spam/bots (`spam-heuristics.js`, 30 min) + `batch-writer.js` |
 
@@ -643,7 +691,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Capa | Tecnología |
 |------|-----------|
 | WebSockets | `socket.io` (servidor + cliente): chat, presencia en memoria (`Map&lt;userId, Set&lt;socketId&gt;&gt;`), typing indicators, push de notificaciones |
-| Chat | Mensajería DM + grupos con media, voz, reacciones, replies |
+| Chat | Mensajería DM + grupos con media, voz, reacciones, replies y **zumbido** (evento `zumbido` estilo MSN: emite a la sala `conv_*` y a las salas `user_*` de los participantes; el cliente suena `/sounds/nudge.mp3` y anima la burbuja `⚡ ¡ZUMBIDO!`) |
 | WebRTC | Señalización para llamadas via `/api/rtc/signal` y eventos `rtc_signal` |
 | Notificaciones | HTTP polling con cursor (`GET /api/notifications`) + push en tiempo real via Socket.IO (`new_notification`) |
 
@@ -654,10 +702,10 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Contenedores | Docker + docker-compose (single service + healthcheck) |
 | Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
 | Redis | No usado (arquitectura in-memory local) |
-| Tests | Vitest — 8 suites en `tests/` (50 tests) |
-| Linting | ESLint 9 + Prettier 3 + plugin Svelte |
+| Tests | Vitest — 17 suites en `tests/` (227 tests, todos en verde) |
+| Linting | ESLint 9 + Prettier 3 + plugin Svelte — `npm run lint` sale verde |
 | Git hooks | Husky (`.husky/`) |
-| CI/CD | Pre-commit linting + build verification (Husky) + GitHub Actions (`lint` + `build` en cada push/PR, ver `.github/workflows/ci.yml`) |
+| CI/CD | Pre-commit linting + build verification (Husky) + GitHub Actions (`lint` + `build` en cada push/PR a `main`, ver `.github/workflows/ci.yml`) y mirror a GitLab (`.github/workflows/sync.yml`, limitado a `main` y cambios de contenido) |
 
 ---
 
@@ -673,7 +721,6 @@ Vsocial/                     ← raíz del proyecto
 ├── CHANGELOG.md             ← registro de versiones
 ├── DOCS.md                  ← este documento
 ├── README.md                ← overview rápido
-├── Personality-and-SOUL.md    ← identidad de la plataforma
 │
 ├── frontend/                ← aplicación SvelteKit principal
 │   ├── package.json         ← dependencias y scripts
@@ -686,40 +733,39 @@ Vsocial/                     ← raíz del proyecto
 │   ├── server.js            ← entrypoint de producción (node server.js)
 │   ├── src/
 │   │   ├── app.html         ← shell HTML raíz
-│   │   ├── hooks.server.js  ← middleware global (DB init, rate limit, CSRF, cron, security headers)
+│   │   ├── hooks.server.js  ← middleware global (DB init, rate limit, CSRF, CSP, cron, security headers)
 │   │   ├── service-worker.js← PWA cache-first (solo assets estáticos)
 │   │   ├── lib/
 │   │   │   ├── index.js     ← barrel placeholder
 │   │   │   ├── api.js       ← cliente HTTP unificado para llamadas al backend
 │   │   │   ├── rtc.js       ← lógica WebRTC cliente
-│   │   │   ├── components/  ← 31 componentes UI reutilizables + 8 de gamificación
+│   │   │   ├── components/  ← 36 componentes UI reutilizables + subcarpetas (gamification/, profile/, settings/, ui/)
+│   │   │   ├── design/      ← sanitize.js — sanitizador isomórfico de CSS custom de perfil
+│   │   │   ├── styles/      ← fonts.css (fuentes autoalojadas) + settings.css (layout de ajustes)
 │   │   │   ├── stores/      ← 10 stores reactivos Svelte 5
 │   │   │   ├── actions/     ← 2 Svelte actions (clickOutside, twemoji)
-│   │   │   ├── server/      ← 19 módulos server-side
-│   │   │   ├── utils/       ← utilidades compartidas
+│   │   │   ├── server/      ← 22 módulos server-side
+│   │   │   ├── utils/       ← utilidades compartidas (datetime UTC, xp, imageCompression…)
 │   │   │   └── assets/      ← recursos estáticos importables
 │   │   └── routes/          ← sistema de rutas SvelteKit (páginas + API)
-│   ├── static/              ← assets públicos (favicon, logo, manifest, robots.txt) + docs/ (portal generado)
+│   ├── static/              ← assets públicos (favicon, logo, manifest, robots.txt) + docs/ (portal generado) + fonts/ (autoalojadas)
 │   ├── build/               ← output de producción (generado)
 │   └── uploads/             ← archivos subidos (local dev)
 │
-├── schema_sqlite.sql        ← esquema canónico único (949 líneas, idempotente)
+├── schema_sqlite.sql        ← esquema canónico único (1039 líneas, idempotente)
 ├── database.sqlite          ← base de datos local (desarrollo)
-├── migrations/              ← registro histórico de cambios de schema
+├── migrations/              ← registro histórico de cambios de schema (001–019, sin 004)
 ├── scripts/                 ← utilidades CLI
 │   ├── migrate-up.js        ← aplicar migraciones pendientes
 │   ├── migrate-down.js      ← revertir última migración
+│   ├── build_docs.js        ← regenerar portal /docs (frontend/static/docs/)
 │   └── seed.js              ← sembrar datos iniciales
-├── tests/                   ← 8 suites de tests (50 tests)
-│   ├── auth.test.js         ← seguridad + conectividad DB
-│   ├── reposts.test.js, anonymous_posts.test.js, anon_identities.test.js,
-│   ├── custom_assets.test.js, feed-algorithm.test.js,
-│   └── moderation_strikes.test.js, verifications.test.js
+├── tests/                   ← 17 suites de tests (227 tests; carpeta gitignored — solo desarrollo local)
 ├── uploads/                 ← directorio de uploads (producción)
 ├── docker-compose.yml       ← orquestación Docker
 ├── Dockerfile               ← build multi-stage (alpine, precompress)
 ├── nginx.conf               ← proxy reverso (WebSocket, buffering off)
-└── (eslint.config.js vive en frontend/, ver abajo — sus deps están en frontend/node_modules)
+└── .github/workflows/       ← ci.yml (lint+build) y sync.yml (mirror GitLab)
 ```
 
 ---
@@ -736,23 +782,25 @@ Vsocial/                     ← raíz del proyecto
 - **Transacciones ACID**: WAL mode, foreign keys ON, busy_timeout 5000ms.
 - ** Índices estratégicos**: Cada tabla tiene índices para los patrones de consulta más frecuentes.
 
-### 4.2 Dominios del Esquema (14 dominios, 64 tablas)
+### 4.2 Dominios del Esquema (15 dominios, 70 tablas)
+
+&gt; Fuente: `grep -c "CREATE TABLE IF NOT EXISTS" schema_sqlite.sql` (1039 líneas).
 
 | Dominio | Tablas | Función |
 |---------|--------|---------|
 | **1. Users & Auth** | `users`, `user_roles`, `user_titles`, `user_sessions`, `user_settings` | Perfil, roles, sesiones, preferencias. `users` incluye columnas RGPD: `birth_date`, `deleted_at` (soft-delete + ventana 30 días), `terms_accepted_at`, `privacy_accepted_at` (migración `003_gdpr.sql`) |
 | **2. Posts & Content** | `posts`, `post_media`, `post_likes`, `post_reactions`, `comments`, `comment_reactions`, `saved_posts`, `hashtags`, `post_hashtags`, `check_ins`, `tags` | Publicaciones (con `mood` y encuesta serializada en `body`), media, reacciones, comentarios anidados, hashtags, check-ins geolocalizados, tags curados por administración (filtro real de `/explore` vía `#slug`) |
 | **3. Stories** | `stories`, `story_highlights`, `story_highlight_items` | Historias efímeras (24h) + highlights permanentes |
-| **4. Reels** | `reels`, `reel_likes`, `reel_comments` | Videos cortos estilo TikTok/Reels |
+| **4. Reels** | `reels`, `reel_likes`, `reel_comments` | Videos cortos estilo TikTok/Reels. `reels` incluye `thumbnail_url` (auto-generada con ffmpeg), `video_width`/`video_height` (aspect-ratio previo al render, migración `015`) |
 | **5. Messaging** | `conversations`, `conversation_participants`, `messages_new`, `message_reactions`, `message_read_receipts` | Chat DM + grupos, voz, media, replies, reacciones, recibos de lectura |
-| **6. Notifications** | `notifications` | Motor de actividad social (like, comment, follow, mention, system) |
-| **6b. Moderation** | `reports` | Reportes de contenido por usuarios |
-| **7. Marketplace** | `marketplace_categories`, `marketplace_listings`, `listing_media` | Categorías, anuncios con precio/condición/ubicación, detección de fraude |
+| **6. Notifications** | `notifications` | Motor de actividad social (like, comment, follow, mention, system). Creación centralizada en `notifications.js`: respeta los toggles del destinatario y evita auto-notificaciones |
+| **6b. Moderation** | `reports`, `user_strikes`, `verification_requests`, `admin_audit_logs`, `staff_announcements` | Reportes, strikes, verificaciones, auditoría del staff y anuncios internos (018) |
+| **7. Marketplace** | `marketplace_categories`, `marketplace_listings`, `listing_media`, `listing_offers`, `marketplace_reviews` | Categorías, anuncios con precio/condición/ubicación, thumbnails (`listing_media.thumb_url`, máx. 540px), ofertas, reseñas, detección de fraude |
 | **8. Gigs** | `gigs`, `gig_applications` | Tablón freelance: encargos y postulaciones |
 | **9. Push** | `web_push_subscriptions` | Suscripciones Web Push (tabla; el envío VAPID está pendiente de implementar) |
 | **10. System** | `system_settings`, `sponsored_posts`, `cms_pages` | Configuración global, anuncios, páginas CMS |
 | **11. Groups & Pages** | `groups`, `group_members`, `group_posts`, `group_events`, `pages`, `page_followers` | Comunidades, páginas públicas, eventos |
-| **12. Security** | `oauth_accounts`, `email_tokens`, `blocked_users`, `snoozed_users` | OAuth, verificación email, bloqueos, silenciados temporales |
+| **12. Security** | `oauth_accounts`, `email_tokens`, `blocked_users`, `snoozed_users`, `invite_codes`, `invite_uses` | OAuth, verificación email, bloqueos, silenciados, códigos de invitación |
 | **13. Aesthetics** | `profile_customizations` | Glassmorphism 2.0: colores, blur, opacidad, CSS custom, bloques |
 | **14. Infrastructure** | `system_cache`, `rtc_signals`, `daily_xp_limits`, `activity_logs` | Caché, señalización WebRTC, gamificación, registro de actividad |
 
@@ -776,20 +824,24 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 
 ## 5. Sistema de Rutas
 
-### 5.1 Páginas (Frontend) — 40 páginas .svelte + 2 layouts
+### 5.1 Páginas (Frontend) — 55 páginas .svelte + 3 layouts
+
+&gt; `/settings` se refactorizó en un **hub de sub-secciones** con layout compartido (`settings/+layout.svelte`, nav lateral + `settings.css`): cada área vive en su propia ruta con `SettingsMessage.svelte` como componente de feedback compartido.
 
 | Ruta | Archivo | Descripción |
 |------|---------|-------------|
 | `/` | `+page.svelte` | Home / feed principal |
-| `/login` | `login/+page.svelte` | Inicio de sesión |
-| `/register` | `register/+page.svelte` | Registro de usuario |
+| `/login` | `login/+page.svelte` | Inicio de sesión (banners de verificación de email + reenvío; modal de recuperación de contraseña) |
+| `/register` | `register/+page.svelte` | Registro de usuario (wizard de 3 pasos; campo de código de invitación cuando el servidor lo exige) |
+| `/reset-password` | `reset-password/+page.svelte` | Nueva contraseña desde el enlace del email (pública, sin shell) |
+| `/maintenance` | `maintenance/+page.svelte` | Página pública de mantenimiento (redirige aquí el guard de `maintenance_mode`) |
 | `/install` | `install/+page.svelte` | Wizard de instalación inicial |
 | `/setup` | `setup/+page.svelte` | Configuración inicial (primer admin) |
 | `/feed` | `feed/+page.svelte` | Feed de publicaciones |
 | `/explore` | `explore/+page.svelte` | Explorar / descubrir contenido — chips de **tags curados** (tabla `tags`, gestionados en `/admin/tags`) que filtran el feed por hashtag `#slug` |
 | `/following` | `following/+page.svelte` | Feed de seguidos |
 | `/notifications` | `notifications/+page.svelte` | Centro de notificaciones con pestañas |
-| `/messages` | `messages/+page.svelte` | Chat / mensajería |
+| `/messages` | `messages/+page.svelte` | Chat / mensajería — sidebar estilo MSN Messenger (`ConversationsSidebar` + `MsnContactCard`) con selector de estado personalizado (persistido en `PUT /api/users/me/status`), zumbido con cooldown, typing indicators, notas de voz y llamadas WebRTC (`RTCModals`) |
 | `/marketplace` | `marketplace/+page.svelte` | Marketplace catálogo/contacto — el botón "Contactar" abre el enlace P2P (PayPal/Patreon/Ko-fi) del vendedor |
 | `/reels` | `reels/+page.svelte` | Feed de Reels (videos cortos) |
 | `/reels/[id]` | `reels/[id]/+page.svelte` | Reel individual |
@@ -801,18 +853,31 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/u` | `u/+page.svelte` | Índice de perfiles |
 | `/u/[username]` | `u/[username]/+page.svelte` | Perfil de usuario público (muestra el enlace P2P del usuario) |
 | `/u/[username]/following` | `u/[username]/following/+page.svelte` | Lista de seguidos |
-| `/settings` | `settings/+page.svelte` | Configuración de cuenta (perfil, privacidad, notificaciones, algoritmo, **enlace P2P**, **Mis Datos RGPD**) |
-| `/settings/design` | `settings/design/+page.svelte` | Personalización de diseño/theme |
-| `/settings/activity` | `settings/activity/+page.svelte` | Registro de actividad personal |
+| `/settings` | `settings/+page.svelte` | Hub de configuración (tarjetas que enlazan cada sub-sección) |
+| `/settings/profile` | `settings/profile/+page.svelte` | Editar perfil: nombre, bio, ubicación, avatar/portada |
+| `/settings/design` | `settings/design/+page.svelte` | Editor inmersivo a pantalla completa del diseño del perfil (paridad WYSIWYG con `ProfileThemeShell`) |
+| `/settings/algorithm` | `settings/algorithm/+page.svelte` | Modo de feed, perfiles de rendimiento y pesos de personalización del algoritmo |
+| `/settings/privacy` | `settings/privacy/+page.svelte` | Visibilidad del perfil (`public`/`followers`/`friends`), política de DMs, estado de conexión |
+| `/settings/security` | `settings/security/+page.svelte` | Contraseña + **sesiones activas** (listar/revocar/cerrar otras) |
+| `/settings/blocked` | `settings/blocked/+page.svelte` | Usuarios bloqueados y silenciados (snooze) |
+| `/settings/notifications` | `settings/notifications/+page.svelte` | Toggles por tipo (likes, comentarios, follows, DMs) — respetados por `notifications.js` server-side |
+| `/settings/payments` | `settings/payments/+page.svelte` | Enlace P2P personal (PayPal/Patreon/Ko-fi) |
+| `/settings/performance` | `settings/performance/+page.svelte` | Perfiles de rendimiento lite/balanced/high, HUD de FPS, benchmark |
+| `/settings/data` | `settings/data/+page.svelte` | **Mis Datos RGPD**: exportación JSON y borrado de cuenta |
 | `/leaderboard` | `leaderboard/+page.svelte` | Tabla de clasificación |
 | `/admin` | `admin/+page.svelte` | Dashboard de administración (con layout propio) |
 | `/admin/users` | `admin/users/+page.svelte` | Gestión de usuarios |
 | `/admin/reports` | `admin/reports/+page.svelte` | Gestión de reportes |
 | `/admin/content` | `admin/content/+page.svelte` | Moderación de contenido |
 | `/admin/settings` | `admin/settings/+page.svelte` | Configuración del sistema |
+| `/admin/apis` | `admin/apis/+page.svelte` | Gestión de claves de APIs externas (Klipy, almacenada en `system_settings`) |
 | `/admin/tags` | `admin/tags/+page.svelte` | CRUD de tags curados (crear, renombrar, icono, eliminar; muestra posts por tag) |
+| `/admin/invites` | `admin/invites/+page.svelte` | Gestión de códigos de invitación de la beta cerrada (generar lotes, activar/desactivar, copiar, stats de uso) |
+| `/admin/team` | `admin/team/+page.svelte` | Equipo de staff: roles (admin/super_admin/moderador/soporte/equipo), anuncios internos |
+| `/admin/audit` | `admin/audit/+page.svelte` | Auditoría de acciones del staff (`admin_audit_logs`, migración 018) |
+| `/admin/strikes` | `admin/strikes/+page.svelte` | Sanciones y moderación disciplinaria (strikes, mutes) |
 | `/admin/verifications` | `admin/verifications/+page.svelte` | Revisión de solicitudes de verificación |
-| `/about` | `about/+page.svelte` | Acerca de VSocial |
+| `/about` | `about/+page.svelte` | Acerca de Voom! |
 | `/about/verified` | `about/verified/+page.svelte` | Info sobre verificación de creadores |
 | `/about/verified/apply` | `about/verified/apply/+page.svelte` | Solicitud de verificación |
 | `/about/verified/apply/[category]` | `about/verified/apply/[category]/+page.svelte` | Solicitud por categoría (VTuber, gobierno, etc.) |
@@ -823,18 +888,18 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/docs` | `static/docs/index.html` | Portal de documentación (README + DOCS + Contributing en pestañas). Generado por `scripts/build_docs.js` |
 | `/docs/license` | `static/docs/license.html` | Página de Licencia y Protección (AGPLv3) — HTML estático autocontenido, diseño Glassmorphism 2.0 |
 
-### 5.2 API Endpoints — 26 grupos de endpoints
+### 5.2 API Endpoints — 27 grupos de endpoints
 
 | Ruta API | Métodos | Función |
 |----------|---------|---------|
-| `/api/auth/[action]` | POST, GET, PUT | `register`, `login`, `logout`, `me`, `change-password`. *(reset-password/verify-email: maquinaria en `email.js`/`email_tokens`, sin ruta cableada)* |
+| `/api/auth/[action]` | POST, GET, PUT, DELETE | `register` (con **gate de código de invitación** cuando `require_invite_code=1`), `login` (bloquea cuentas sin verificar si `email_verification_required=1`), `logout`, `me`, `change-password`, **`sessions`** (`GET` lista, `DELETE ?id=` revoca, `?others=1` cierra las demás), **`config`** (`GET` público: flags de registro), **`forgot-password`** / **`reset-password`** (recuperación con `email_tokens`, revoca sesiones), **`verify-email?token=`** (GET desde el email) y **`resend-verification`** (con cooldown por cuenta) |
 | `/api/users/[...path]` | GET, POST, PUT, DELETE | Perfiles, follows/unfollow, bloquear/snoozear, búsqueda, avatar/cover, **`/export` (JSON portabilidad RGPD)**, **`/delete-account` (borrado soft + ventana 30 días)** |
 | `/api/health` | GET | Health check (`{ status: 'ok', uptime, db }`) |
 | `/api/install` | POST | Instalación inicial: crea tablas, admin user, system settings |
 | `/api/setup` | POST | Wizard post-instalación |
 | `/api/posts/[...path]` | GET, POST, PUT, DELETE | CRUD de posts + like/unlike + save/unsave + pin/unpin + `/:id/vote` (encuestas) + `/:id/restore` + **`/:id/share` / `/:id/repost`** + **comentarios anidados** (`/:id/comments`, `/:id/comments/:commentId`) + posts y comentarios **anónimos**. El POST de creación acepta `mood`, `scheduled_at`, `location_name` y `poll` (JSON con pregunta, opciones y duración) |
 | `/api/feed/[...path]` | GET | Feed inteligente, timeline, trending, explore. `GET /explore` acepta `?category=&lt;slug&gt;` para filtrar posts por hashtag `#slug` (tag curado) |
-| `/api/reels/[...path]` | GET, POST, PUT, DELETE | CRUD de reels + like/unlike + comentarios |
+| `/api/reels/[...path]` | GET, POST, PUT, DELETE | CRUD de reels + like/unlike + comentarios. En la creación genera **thumbnail automática** con ffmpeg si el cliente no envía una y captura `video_width`/`video_height` reales (migración `015`) |
 | `/api/stories/[...path]` | GET, POST, DELETE | CRUD de stories + highlights |
 | `/api/notifications/[...path]` | GET, PUT, PATCH | Lista con paginación de cursor, marcar leídas, marcar todas leídas (push en tiempo real vía Socket.IO `new_notification`) |
 | `/api/messages/[...path]` | GET, POST | Conversaciones, mensajes, media, creación de grupos |
@@ -852,10 +917,11 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `/api/gamification/heartbeat` | POST | Latido de actividad (tracking de sesión; excluido del rate limiter) |
 | `/api/activity/view` | POST | Registrar vista de contenido |
 | `/api/activity/history` | GET | Historial de actividad del usuario |
-| `/api/admin/[...path]` | GET, POST, PUT | Panel admin: dashboard, users, reports, content, settings, **verifications** (listar/aprobar), strikes |
+| `/api/admin/[...path]` | GET, POST, PUT | Panel admin: dashboard, users, reports, content, settings (incluye `klipy_api_key` para `/admin/apis`), **verifications** (listar/aprobar), strikes |
 | `/api/tags/[...path]` | GET, POST, PUT, DELETE | Tags curados: `GET /api/tags` (lista pública con `post_count`), `POST` / `PUT /:id` / `DELETE /:id` solo admin (crear, editar nombre/icono, eliminar) |
+| `/api/invites/[...path]` | GET, POST, PUT, DELETE | **Códigos de invitación (beta cerrada)**: `GET` (lista + stats), `POST` genera lotes (cantidad, usos máximos, expiración, nota), `PUT /:id` (activar/desactivar/editar), `DELETE /:id` — staff con `settings.manage` + auditoría `logAdminAction` |
 | `/api/cron` | GET, POST | Workers cron (publicación programada, limpiezas, recuerdos) — protegido con `CRON_SECRET` |
-| `/api/gifs/search` | GET | Proxy de búsqueda GIFs (Tenor) |
+| `/api/gifs/search` | GET | Proxy de búsqueda GIFs (Klipy; API key leída de `system_settings`, gestionada en `/admin/apis`) |
 
 &gt; Los archivos subidos se sirven **estáticamente** desde `/uploads/` (dev: `fs.allow: ['..']` en `vite.config.js`; prod: `server.js` con `Cache-Control: public, max-age=86400`). No existe `/api/uploads`.
 
@@ -876,7 +942,7 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | **anonIdentity** | `stores/anonIdentity.svelte.js` | Identidad anónima activa del usuario (alias exclusivo) |
 | **features** | `stores/features.svelte.js` | Feature flags del servidor (`reels_enabled`, `stories_enabled`, `groups_enabled`, `marketplace_enabled`, `gamification_enabled`) |
 | **mediaViewer** | `stores/mediaViewer.svelte.js` | Visor de medios a pantalla completa (`MediaLightbox`) |
-| **perf** | `stores/perf.svelte.js` | Métricas de rendimiento en cliente |
+| **perf** | `stores/perf.svelte.js` | Perfiles de rendimiento `lite`/`balanced`/`high`/`custom`: detección de hardware (cores, GPU, conexión, batería), benchmark de FPS con recomendación automática, HUD de FPS, control de blur/sombras/transiciones/fondo líquido/autoplay según red. Incluye luz ambiental reactiva de vídeo (`videoAmbientLight`, desactivada en lite), ahorro automático con batería baja ≤20% (restaura los ajustes previos al conectar) y saneamiento de `localStorage` con lista blanca. Persistido en `localStorage`, aplicado vía atributos `data-*` en `&lt;html&gt;` |
 
 ---
 
@@ -903,6 +969,11 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `CustomSelect.svelte` | Select/dropdown personalizado |
 | `PasswordMeter.svelte` | Medidor de fortaleza de contraseña |
 | `LiquidBackground.svelte` | Fondo animado con gradiente líquido |
+| `RouteProgress.svelte` | Barra de progreso de navegación entre rutas |
+| `Portal.svelte` | Montaje de contenido fuera del árbol DOM (para overlays) |
+| `FpsHud.svelte` | HUD flotante de FPS en tiempo real (activable desde `/settings/performance`) |
+| `QuoteCard.svelte` | Tarjeta embebida del post citado en reposts con cita |
+| `ThemeSelector.svelte` | Selector de tema (light / dark / midnight) |
 | `ActivityHistory.svelte` | Registro de actividad del usuario |
 | `AeroAvatar.svelte` | Avatar con estética aero/glass |
 | `AnonIdentityModal.svelte` | Modal para crear/gestionar la identidad anónima |
@@ -918,11 +989,21 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | `gamification/CheckinButton.svelte` | Botón de check-in diario |
 | `gamification/LevelBadge.svelte` | Insignia de nivel |
 | `gamification/PodiumCard.svelte` | Tarjeta de podium (top 3) en leaderboard |
-| `gamification/AuroraPillar.svelte` | Pilar aurora decorativo del leaderboard rediseñado |
+| `gamification/ArenaBackdrop.svelte` | Fondo de arena del leaderboard (reemplazó a `AuroraPillar`) |
+| `gamification/CountUp.svelte` | Contador numérico animado (XP/posición) |
+| `gamification/LeaderboardSkeleton.svelte` | Esqueleto de carga del leaderboard |
 | `gamification/LeaderboardTabs.svelte` | Pestañas para cambiar de ranking (nivel/XP/…) |
 | `gamification/LeaderboardRow.svelte` | Fila de usuario en el listado del leaderboard |
 | `gamification/CurrentUserCard.svelte` | Tarjeta del usuario actual con su posición |
+| `gamification/LevelUpModal.svelte` | Modal de celebración al subir de nivel |
 | `gamification/UserTitleBadge.svelte` | Insignia de título personalizado |
+| **Perfil (subcarpeta `profile/`):** | |
+| `profile/ProfileHeaderCard.svelte` | Cabecera del perfil (avatar, portada, stats, enlace P2P) |
+| `profile/ProfileBlocks.svelte` | Bloques customizables del perfil |
+| `profile/ProfileThemeShell.svelte` | Fuente única de verdad visual de la personalización: aplica variables CSS, contraste automático por luminancia e inyección segura de CSS custom sanitizado. Consumido por `/u/[username]` y el editor `/settings/design` (paridad WYSIWYG) |
+| **Otros:** | |
+| `settings/SettingsMessage.svelte` | Mensaje de feedback compartido de las sub-secciones de ajustes |
+| `ui/FancySlider.svelte` | Slider personalizado (pesos del algoritmo, etc.) |
 
 ---
 
@@ -947,8 +1028,15 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 | **spam-heuristics.js** | Heurísticas deterministas de spam/bots: desbalance followers/following, ráfagas de publicación, patrones de churn. Batch cada 30 min |
 | **batch-writer.js** | Escritor de lotes en memoria (impressions, progreso de video) con flush periódico a SQLite — evita contención de escritura WAL |
 | **diversity.js** | Motor de diversidad del feed: previene clustering del mismo creador (cuota máxima por autor y límite de autores consecutivos) |
-| **media.js** | Validación de seguridad de medios: verificación de magic numbers (firmas binarias) contra uploads maliciosos |
+| **media.js** | Pipeline de seguridad y procesado de medios: verificación de magic numbers (firmas binarias) contra uploads maliciosos + **generación de thumbnails con ffmpeg-static** (`generateVideoThumbnail` para reels, frame del 25%; `generateImageThumbnail` máx. 540px para marketplace) + lectura de dimensiones reales de vídeo |
 | **imageMeta.js** | Extractor de metadatos/dimensiones de imagen (PNG, GIF, WebP, JPEG) con parser binario puro |
+| **notifications.js** | Helper centralizado de creación de notificaciones: respeta las preferencias del destinatario (`notify_*` en `user_settings`) y evita auto-notificaciones; los avisos de sistema siempre se crean |
+| **roles.js** | Sistema multi-rol de staff (`ROLE_LEVEL`, `ROLE_PERMISSIONS`, `requirePerm`, `roleHasPerm`, `canManageRole`): admin/super_admin/moderador/soporte/equipo con guard server-side por permisos |
+| **audit.js** | Registro de auditoría del staff en `admin_audit_logs` (`logAdminAction`, best-effort, migración 018) |
+| **invites.js** | Códigos de invitación (migración 019): generación `VOOM-XXXX-XXXX`, validación y **consumo atómico** con reversión (`invite_codes` + `invite_uses`) |
+| **visibility.js** | Control de acceso por visibilidad de perfil (`getProfileAccess`): aplica `user_settings.profile_visibility` (`public`/`followers`/`friends`) del dueño del contenido; usado por `/api/users` y `/api/reels` |
+| **user-settings.js** | Validación y construcción de updates de `user_settings` (fuente única compartida con los tests): whitelist de campos, enums (`theme`, `profile_visibility`, `allow_dms`, `app_font`, `density`), colores hex (`accent_color`), URLs seguras (`app_wallpaper_url`) y números con clamp (`font_scale`, `wallpaper_dim`) |
+| **socket-plugin.js** | Plugin Vite que adjunta el servidor Socket.IO al dev server |
 
 ---
 
@@ -994,7 +1082,8 @@ Funcionalidades de creación añadidas sobre el núcleo social:
 - Atajos de teclado (espacio/k, f, m, flechas, Home/End) y *media session* del SO (controles de bloqueo/notificación).
 - *Autoplay* al entrar en el viewport (IntersectionObserver, umbral 35%) y pausa al salir; pausa cualquier otro reproductor activo (un solo audio/vídeo sonando a la vez).
 - *Tracking* de vistas: registra `activity.view` cuando el usuario reproduce más del 25% / 3s de un vídeo con `entityType`/`entityId`.
-- Panel "Acerca de este reproductor" con la versión del proyecto (v0.6.0-beta.1) y la nota de licencia AGPLv3.
+- Panel "Acerca de este reproductor" con la versión del proyecto (v0.6.0-beta.2) y la nota de licencia AGPLv3.
+- En reels, el contenedor fija el `aspect-ratio` desde `video_width`/`video_height` capturados en la BD **antes** del primer render, eliminando el reflujo del overlay cuando llega `loadedmetadata` (CLS medido: 0.307 → ~0).
 
 ### Personalización de Perfil
 
@@ -1003,8 +1092,45 @@ Tabla `profile_customizations` permite a cada usuario definir:
 - Imagen de fondo (`bg_image_url`)
 - Intensidad de blur (`glass_blur`) y opacidad (`glass_opacity`)
 - Fuente personalizada (`font_family`, `custom_font_url`)
-- CSS custom (`custom_css`)
+- CSS custom (`custom_css`) — **sanitizado** por `lib/design/sanitize.js` (isomórfico): reescribe `position: fixed`→`absolute`, acota `z-index`, solo acepta `url()` locales de `/uploads/`, prefija todo selector con `.profile-custom-wrapper` y neutraliza filas legacy maliciosas al renderizar
 - Layout de bloques (`blocks_layout`)
+
+El render lo centraliza `ProfileThemeShell.svelte` (ver §7), garantizando paridad WYSIWYG entre `/u/[username]` y el editor.
+
+### 10.2 Temas y Perfiles de Rendimiento
+
+**Temas (ciclo light → dark → midnight):** el store `theme.svelte.js` gestiona tres modos — Claro ("Aurora clara"), Oscuro ("Océano profundo") y Noche/Midnight ("Azul OLED"). El default válido en `user_settings.theme` es `light` (migración `014` eliminó el default inválido `'auto'` reconstruyendo la tabla y normalizando valores legacy).
+
+**Perfiles de rendimiento:** `/settings/performance` (store `perf.svelte.js`) ofrece tres tiers predefinidos:
+
+| Tier | Efecto |
+|------|--------|
+| `lite` | Bajo consumo: sin blur, sin ruido SVG, sombras simplificadas, fondo líquido desactivado, transiciones mínimas |
+| `balanced` | Default: efecto especular del cristal moderado, animaciones estándar |
+| `high` | Máximo fidelidad: efecto especular completo, todas las capas activas |
+
+Incluye detección de hardware (cores, GPU vía WebGL, conexión Network Information API, batería), benchmark de FPS con recomendación automática de perfil, HUD opcional (`FpsHud.svelte`) y preferencias finas (autoplay de vídeo según red, *data saver*, precarga de rutas al hover). Las fuentes (Outfit, Inter, Material Icons Round) están **autoalojadas** en `static/fonts/` con `fonts.css` — cero requests a Google Fonts y CSP `font-src 'self'`.
+
+### 10.3 Apariencia global por usuario (migración `016`)
+
+El editor `/settings/design` es un **hub dual** con pestañas «Perfil» (editor existente: presets, bloques, CSS custom) y «Aplicación» (apariencia global de la app). La pestaña «Aplicación» gestiona seis preferencias nuevas en `user_settings` — `accent_color`, `app_font`, `font_scale`, `density`, `app_wallpaper_url`, `wallpaper_dim` — validadas en `user-settings.js` (hex sólido sin alpha, URL http(s)/`/uploads/`, clamp de números) y expuestas por `/api/auth/me`, login y register como `preferred_*` para hidratar al arrancar.
+
+- **Store** (`lib/stores/appearance.svelte.js`): aplicación DOM instantánea sobre `&lt;html&gt;` (inline-style de `--accent-blue-base/-rgb` + paleta derivada HSL monocromática que cubre `--accent-blue-*`, `--accent-cyan`, `--accent-gradient`, `--grad-primary(-hover)`; `font-size` raíz para la escala 0.85–1.25; stacks de fuente; atributos `data-density` y `data-wallpaper`) + caché `vsocial_*` en localStorage + sincronización con el servidor **debouncada 500ms** con flush `keepalive` en `pagehide` (sesión por header Bearer). La fuente «custom» reutiliza el archivo subido al perfil vía un `&lt;style id="voom-custom-app-font"&gt;` idempotente.
+- **Anti-flash**: el script bloqueante de `app.html` aplica pre-paint solo lo crítico del primer fotograma (`data-density`, `data-wallpaper`, `font-size`, `--accent-blue-base/-rgb`); la paleta extendida la monta el store tras hidratar.
+- **CSS**: `layout.css` define `[hidden]{display:none!important}`, la capa fija de wallpaper `body::before` (con dim; una imagen rota degrada a transparente) y overrides `html[data-density]` sobre selectores de alto tráfico.
+- **UI**: `AccentPicker.svelte` (paleta derivada en vivo + badges de contraste WCAG reales contra texto-blanco-sobre-acento y acento-como-enlace por modo), `TypographyDensityPanel.svelte`, `WallpaperPicker.svelte`; en la pestaña «Perfil», `SnippetGallery.svelte` inserta fragmentos seguros en el cursor del modal CSS y un lint suave avisa de llaves desbalanceadas, URLs externas o abuso de `!important` (el gate real sigue siendo `sanitizeCss`).
+- JetBrains Mono se autoaloja (`jetbrains-mono-latin-{400,700}-normal.woff2`) y alimenta el nuevo token global `--font-mono`.
+
+### 10.4 Frutiger Aero Engine — superficies Aero (migración `017`)
+
+Cinco preferencias más en `user_settings` — `card_opacity` (40–100), `border_radius`, `wallpaper_mode`, `aero_gloss` (bool) y `active_preset` (id corto `[a-z0-9_-]`) — con la misma tubería (validador → `preferred_*` → store → DOM).
+
+- **Presets 1-clic** (`PresetVault.svelte`): cinco estéticas Aero (Aqua OS 2004, Frutiger Eco, Aero Glass 7, Neo-Aero Orb, Abismo Bio) exportadas como `APP_PRESETS`; `applyPreset(id)` aplica acento+cristal+geometría+gloss+fuente+densidad+modo de fondo coalescido a UN PUT. Cualquier ajuste manual limpia el tracking del preset activo.
+- **Cristal translúcido**: `html[data-card-glass='true']` aplica `color-mix(in srgb, var(--bg-surface) var(--card-opacity), transparent)` sobre `.aero-glass/.glass-panel/.glass-card/.aero-post-card` (patrón de `ProfileThemeShell`). El blur lo aporta el sistema de cristal existente (`--glass-blur`); los perfiles lite/perf-mode/glass-blur=none ya fuerzan sólido con `!important`, sin conflicto.
+- **Geometría**: `html[data-border-radius='sharp|modern|bubble']` redefine la escala existente `--radius-xs…xl/squircle/superellipse`; `--radius-full` queda intacto (avatares/píldoras circulares).
+- **Brillo especular**: variable `--gloss-strength` amplifica el `::after` de las superficies con el reflejo curvo Aqua/Win7 (0 = invisible; look base sin cambios). El bisel/inset ya existía en botones y superficies.
+- **Modos de wallpaper**: tile (`repeat + image-rendering: pixelated`, para patrones/pixel art) y fit (`contain`) bajo `html[data-wallpaper-mode]`.
+- Anti-flash frame-0 en `app.html` extendido con radios/cristal/gloss/modo de wallpaper.
 
 ---
 
@@ -1069,7 +1195,7 @@ npm start            # → http://localhost:3000 (usa adapter-node + server.js)
 docker-compose up --build -d
 ```
 
-El contenedor expone puerto `3000`, monta un volumen `vsocial_data` en `/data` (DB + uploads),
+El contenedor expone puerto `3000`, monta un volumen `voom_data` en `/data` (DB + uploads),
 y tiene healthcheck cada 30s contra `/api/health`.
 
 #### Opción C: Nginx + Node.js
@@ -1101,21 +1227,20 @@ node scripts/seed.js            # insertar system_settings + marketplace_categor
 **Documentación y utilidades raíz:**
 ```bash
 node scripts/build_docs.js      # regenerar portal /docs (frontend/static/docs/index.html)
-node debug_db.js                # diagnóstico detallado (ad-hoc)
-node update_db.js               # actualizar datos (ad-hoc)
-node migrate_status.js          # estado de migraciones (ad-hoc)
 ```
 
 ### 12.4 Tests
 
 ```bash
 cd frontend
-npm run test                    # vitest run — 8 suites (50 tests) en tests/ (raíz del repo)
+npm run test                    # vitest run — 17 suites (227 tests) en tests/ (raíz del repo)
 npm run test:watch              # vitest en modo watch
 # suite individual desde la raíz del repo:
 npx vitest run tests/auth.test.js
 npx vitest run tests/reposts.test.js -t "&lt;nombre&gt;"   # filtrar por nombre
 ```
+
+&gt; **Nota:** el directorio raíz `tests/` está en `.gitignore` (solo desarrollo local); las suites viven en cada máquina y no se distribuyen en el repo público ni en el `.zip` de release.
 
 ### 12.5 Linting y Formato
 
@@ -1135,6 +1260,7 @@ npm run format                  # prettier --write + eslint --fix
 | **Anti-bots / Spam** | Reputación de autores (batch 6 h) + heurísticas spam/bots (batch 30 min) + `batch-writer.js` para escritura de métricas sin contención WAL |
 | **CSRF** | Validación de headers `Origin`/`Referer` contra host en POST/PUT/DELETE. 403 si no coinciden. |
 | **Headers HTTP** | Manuales en `hooks.server.js`: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Strict-Transport-Security` (max-age=63072000 + includeSubDomains + preload), `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (cámara off, mic/geolocalización self). Helmet está en `package.json` pero no se usa |
+| **CSP** | Content-Security-Policy aplicada solo a respuestas HTML (no API JSON ni assets): `default-src 'self'`, `script/style-src 'self' 'unsafe-inline'` (requerido por SSR/hydratación de SvelteKit), `font-src 'self'` (fuentes autoalojadas), `img-src 'self' data: blob: https:`, `media-src 'self' blob:`, `connect-src 'self' ws: wss:` (Socket.IO), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri`/`form-action` `'self'`. Ajustar `connect-src` con `wss://dominio.com` si se despliega con dominio custom |
 | **Auth** | JWT en `localStorage` + cookie client-side `SameSite=Strict; Secure` (duración default 365 días). Hash del token (SHA-256) almacenado en `user_sessions` con IP + user-agent. `requireAuth`/`optionalAuth` verifican JWT + sesión no expirada en cada petición. |
 | **Passwords** | bcryptjs con coste de hashing (cost 10) |
 | **Input** | Validación con expresiones regulares y sanitización propia (`lib/server/security.js`). Sanitización de entidades y HTML seguro (`lib/server/entities.js`). |
@@ -1144,7 +1270,7 @@ npm run format                  # prettier --write + eslint --fix
 
 ### 13.1 Cumplimiento RGPD (UE)
 
-VSocial implementa los derechos del interesado (arts. 15-21 RGPD) de forma self-service:
+Voom! implementa los derechos del interesado (arts. 15-21 RGPD) de forma self-service:
 
 | Derecho | Implementación |
 |---------|----------------|
@@ -1154,8 +1280,9 @@ VSocial implementa los derechos del interesado (arts. 15-21 RGPD) de forma self-
 | **Cookies** | `CookieBanner.svelte` muestra consentimiento en la primera visita; elección en `localStorage` + cookie `vsocial_cookie_consent` (`Secure; SameSite=Strict`). Sin analítica/publicidad de terceros — solo cookies esenciales de auth. |
 | **Acceso / Portabilidad (art. 20)** | `GET /api/users/export` → JSON descargable (`Content-Disposition: attachment`) con perfil, posts, comentarios, mensajes, reacciones, follows, stories, reels, marketplace, gigs, notificaciones, activity_logs, check_ins, oauth. Omite `password_hash` y tokens OAuth. Botón en Ajustes → Mis Datos. |
 | **Supresión / olvido (art. 17)** | `POST /api/users/delete-account` (confirmación con contraseña) → soft-delete (`deleted_at=now`, `is_active=0`) + cierre de todas las sesiones. Reactivación al login dentro de 30 días; pasado ese plazo, el cron diario hard-deletea en cascada + limpia ficheros huérfanos. |
+| **Gestión de sesiones** | El usuario puede ver y revocar sus sesiones activas desde `/settings/security` (`GET/DELETE /api/auth/sessions`) — cubre el "cerrar todas las sesiones" que estaba pendiente en el MVP anterior. |
 
-**Notas y límites del MVP:** el consentimiento de cookies se registra solo en cliente (sin log server-side). Quedan pendientes: verificación de email (código muerto en `email.js`), cambio de email, "cerrar todas las sesiones" self-service, purga/retención general de `activity_logs`, refactor a cookies httpOnly.
+**Notas y límites del MVP:** el consentimiento de cookies se registra solo en cliente (sin log server-side). Quedan pendientes: verificación de email (código muerto en `email.js`), cambio de email, purga/retención general de `activity_logs`, refactor a cookies httpOnly.
 
 ---
 
@@ -1165,15 +1292,17 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 
 | Worker | Intervalo | Función |
 |--------|-----------|---------|
-| **Scheduled Post Publisher** | 60s | Publica posts con `scheduled_at &lt;= now`, envía notificaciones a seguidores |
-| **Daily Memories** | 00:01 cada día | Busca posts "en este día" de años anteriores, envía notificación de recuerdo |
-| **Expired Stories Cleanup** | 5 min | Elimina stories con `expires_at &lt; now` |
-| **Expired Snooze Cleanup** | 1 hora | Limpia snoozes expirados |
-| **Rate Limiter GC** | 2 min | Elimina entradas expiradas del Map de rate limiting |
-| **GDPR Erasure** | 24 h | Hard-deletea en cascada (`ON DELETE CASCADE`) los usuarios con `deleted_at` &gt; 30 días y borra sus ficheros huérfanos de `uploads/avatars` y `uploads/covers` |
-| **Author Reputation Refresh** | 6 h | Recalcula la reputación de autores activos (`batchUpdateReputations`) |
-| **Spam & Bot Scanning** | 30 min | Escanea señales de spam/bots en usuarios activos recientes (`batchScanSpamSignals`) |
-| **Feed Impressions Cleanup** | 24 h | Purga `feed_impressions` con `seen_at` anterior a 7 días |
+| **1. Scheduled Post Publisher** | 60s | Publica posts con `scheduled_at &lt;= now`, envía notificaciones a seguidores |
+| **2. Daily Memories** | 00:01 cada día | Busca posts "en este día" de años anteriores, envía notificación de recuerdo |
+| **3. Expired Stories Cleanup** | 5 min | Elimina stories con `expires_at &lt; now` |
+| **4. Expired Snooze Cleanup** | 1 hora | Limpia snoozes expirados |
+| **5. Rate Limiter GC** | 2 min | Elimina entradas expiradas del Map de rate limiting |
+| **6. GDPR Erasure** | 24 h | Hard-deletea en cascada (`ON DELETE CASCADE`) los usuarios con `deleted_at` &gt; 30 días y borra sus ficheros huérfanos de `uploads/avatars` y `uploads/covers` |
+| **7. Author Reputation Refresh** | 6 h | Recalcula la reputación de autores activos (`batchUpdateReputations`) |
+| **8. Spam & Bot Scanning** | 30 min | Escanea señales de spam/bots en usuarios activos recientes (`batchScanSpamSignals`) |
+| **9. Feed Impressions Cleanup** | 24 h | Purga `feed_impressions` con `seen_at` anterior a 7 días |
+| **10. Activity Logs Retention** | 24 h | Purga `activity_logs` con más de 90 días |
+| **11. Expired Sessions Cleanup** | 24 h | Elimina filas de `user_sessions` con token expirado (evita crecimiento indefinido de la tabla) |
 
 ---
 
@@ -1207,6 +1336,11 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 | `author-reputation.js` | Reputación determinista de autores (batch 6 h). |
 | `batch-writer.js` | Búfer de escritura en memoria para métricas de alta concurrencia. |
 | `spam-heuristics.js` | Heurísticas deterministas de spam/bots (batch 30 min). |
+| `notifications.js` | Creación centralizada de notificaciones (respeta preferencias del destinatario). |
+| `visibility.js` | Acceso por visibilidad de perfil (`public`/`followers`/`friends`). |
+| `user-settings.js` | Validación de updates de `user_settings` (compartida con tests). |
+| `design/sanitize.js` | Sanitizador isomórfico del CSS custom de perfil. |
+| `utils/sound.js` | Sonido de zumbido del chat (`/sounds/nudge.mp3`), precalentado tras el primer gesto del usuario. |
 | `features.svelte.js` | Store de feature flags servidos por `system_settings`. |
 | `svelte.config.js` | Runes mode forzado (excepto node_modules), adapter-node con precompress. |
 | `Dockerfile` | Multi-stage build (alpine), output precomprimido. |
@@ -1216,28 +1350,30 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 
 ---
 
-## 17. Roadmap (Beta v0.1.0)
+## 17. Roadmap
 
-Pendiente para el salto de Alpha → Beta:
+Pendiente:
 
 - [ ] Sincronización in-memory para múltiples instancias Node
 - [ ] Cola de workers interna para emails, push, thumbnails
 - [ ] Optimización continua en Turso/SQLite
-- [x] CI/CD pipeline (GitHub Actions) — `.github/workflows/ci.yml` corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`, con cancelación de runs obsoletos y subida del artifact `build/`.
-- [x] Suites de tests Vitest — 8 suites (50 tests) en `tests/`: auth, reposts, anonymous posts, anon identities, custom assets, feed algorithm, moderation strikes y verifications. Se ejecutan con `cd frontend && npm run test` (vitest resuelve `tests/` de la raíz).
+- [x] CI/CD pipeline (GitHub Actions) — `.github/workflows/ci.yml` corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`, con cancelación de runs obsoletos y subida del artifact `build/`. Mirror a GitLab en `.github/workflows/sync.yml` (solo `main`, solo cambios de contenido).
+- [x] Suites de tests Vitest — 17 suites (227 tests, todos en verde) en `tests/`: auth, settings, feed-algorithm (con regresión anti-gaming del council), messages_adversarial, appearance_adversarial, moderation_strikes, verifications, voomojis, invites, email, reposts, anonymous posts, anon identities, custom assets, design, gamification y marketplace. Se ejecutan con `cd frontend && npm run test`.
 - [ ] Tests de integración y e2e (Playwright)
+- [x] Gestión self-service de sesiones activas (`/settings/security`)
+- [ ] Web Push real (VAPID): la tabla `web_push_subscriptions` existe; falta el envío
 
 ---
 
-&gt; **VSocial Beta v0.6.0-beta.1** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
-&gt; WebSockets y diseño Glassmorphism propio. 40 páginas .svelte, 25 grupos de API, 63 tablas,
-&gt; 19 módulos server-side. Lista para crecer.
+&gt; **Voom! Beta v0.6.0-beta.2** — Una maquinaria completa construida sobre SvelteKit 5, SQLite/LibSQL,
+&gt; WebSockets y diseño Glassmorphism propio. 55 páginas .svelte, 27 grupos de API, 70 tablas,
+&gt; 22 módulos server-side. Lista para crecer.
 </script>
     <script type="text/markdown" id="md-architecture">
-# V-Social: Documentación Exhaustiva y Registro Arquitectónico (Beta v0.6.0-beta.1)
+# Voom!: Documentación Exhaustiva y Registro Arquitectónico (Beta v0.6.0-beta.2)
 
 &gt; [!NOTE]
-&gt; Este documento técnico refleja el **espectro completo** del desarrollo, decisiones de arquitectura, módulos implementados, ideologías de diseño, optimizaciones algorítmicas y configuraciones de infraestructura de la plataforma **V-Social**. Es el plano maestro de la aplicación actualizado con todas las implementaciones, rediseños y optimizaciones.
+&gt; Este documento técnico refleja el **espectro completo** del desarrollo, decisiones de arquitectura, módulos implementados, ideologías de diseño, optimizaciones algorítmicas y configuraciones de infraestructura de la plataforma **Voom!**. Es el plano maestro de la aplicación actualizado con todas las implementaciones, rediseños y optimizaciones.
 
 ---
 
@@ -1303,7 +1439,7 @@ erDiagram
 
 ## 3. Algoritmos Transparentes de Feed (Mecanismos Anti-Caja Negra)
 
-VSocial rechaza los algoritmos opacos de retención tóxica diseñados para maximizar la adicción. En su lugar, implementa un motor de descubrimiento transparente y configurable por el usuario con tres modos bien definidos:
+Voom! rechaza los algoritmos opacos de retención tóxica diseñados para maximizar la adicción. En su lugar, implementa un motor de descubrimiento transparente y configurable por el usuario con tres modos bien definidos:
 
 ### 3.1 Radar en Vivo (Línea de Tiempo Estricta)
 - **Mecánica:** Ordenamiento cronológico 100% estricto (`ORDER BY created_at DESC`).
@@ -1361,7 +1497,7 @@ VSocial rechaza los algoritmos opacos de retención tóxica diseñados para maxi
 
 ## 5. Sistema de Diseño: Glassmorphism 2.0 & Neo-Aero
 
-El diseño de V-Social está construido desde cero en **CSS puro tokenizado** en `routes/layout.css`.
+El diseño de Voom! está construido desde cero en **CSS puro tokenizado** en `routes/layout.css`.
 
 ### 5.1 Tokens Canónicos Vivos
 ```css
@@ -1398,13 +1534,27 @@ Aplicado obligatoriamente en avatares, píldoras de acción, botones críticos y
 - Fondo ambiental generado por CSS con tres blobs radiales bioluminiscentes en movimiento continuo y rayos de luz cónicos (*god rays*).
 - Optimizado para GPU con `contain: strict`, `pointer-events: none` y detector de visibilidad (`document.hidden`) para pausar animaciones cuando la pestaña está en segundo plano.
 
+### 5.4 Apariencia global por usuario (migración `016`)
+El editor `/settings/design` es un hub dual: «Perfil» (editor existente sobre `profile_customizations`) y «Aplicación», que personaliza la app completa mediante seis columnas nuevas de `user_settings` (`accent_color`, `app_font`, `font_scale`, `density`, `app_wallpaper_url`, `wallpaper_dim`) validadas en `lib/server/user-settings.js`.
+- **Runtime:** el store `lib/stores/appearance.svelte.js` aplica inline-style en `&lt;html&gt;` — acento + paleta derivada HSL (los inline ganan a las hojas `[data-theme]`), escala tipográfica vía `font-size` raíz, stacks de fuente y atributos `data-density`/`data-wallpaper`. Persistencia debouncada 500 ms a `PUT /api/users/settings` con flush `keepalive` en `pagehide`; el script bloqueante de `app.html` aplica pre-paint solo lo crítico del primer fotograma.
+- **CSS:** `[hidden]{display:none!important}`, capa fija de wallpaper en `body::before` (degrada a transparente si la imagen falla) y overrides por densidad en selectores de alto tráfico, todo al final de `routes/layout.css`.
+
+### 5.5 Frutiger Aero Engine — superficies Aero (migración `017`)
+Cinco columnas más en `user_settings` (`card_opacity`, `border_radius`, `wallpaper_mode`, `aero_gloss`, `active_preset`) sobre la misma tubería del store de apariencia:
+- **Presets 1-clic** (`PresetVault.svelte`): cinco estéticas Aero aplicadas en lote vía `applyPreset()` (coalesce a un solo PUT debouncado); el ajuste manual posterior limpia el tracking.
+- **Cristal translúcido:** `html[data-card-glass='true']` + `color-mix(in srgb, var(--bg-surface) var(--card-opacity), transparent)` sobre las clases reales del sistema de vidrio; los perfiles lite/perf-mode ya fuerzan sólido con `!important` → sin conflicto y sin coste en gama baja.
+- **Geometría:** redefinición de los tokens `--radius-xs…xl` bajo `html[data-border-radius]` (sharp/modern/rounded/bubble); `--radius-full` intacto para círculos/píldoras.
+- **Brillo especular:** variable `--gloss-strength` que amplifica el `::after` de las superficies con el reflejo curvo Aqua/Win7 (default invisible).
+
 ---
 
 ## 6. Gamificación & Leaderboard Rediseñado
 
-- **Podio Visual Aurora:** Los tres primeros puestos se renderizan en tarjetas de podio (`PodiumCard.svelte`) con pilares de luz animados (`AuroraPillar.svelte`).
+- **Podio Visual:** Los tres primeros puestos se renderizan en tarjetas de podio (`PodiumCard.svelte`) sobre un fondo de arena animado (`ArenaBackdrop.svelte`).
+- **Carga y Animación:** Esqueleto de carga (`LeaderboardSkeleton.svelte`), contadores numéricos animados (`CountUp.svelte`) y modal de celebración al subir de nivel (`LevelUpModal.svelte`).
 - **Pestañas Reactivas:** Cambio instantáneo entre categorías de clasificación (`LeaderboardTabs.svelte`) con caché en cliente.
 - **Tarjeta de Posición Personal:** `CurrentUserCard.svelte` fija la posición del usuario en tiempo real con respecto a la comunidad.
+- **Curva de XP Compartida:** `lib/utils/xp.js` replica exactamente en cliente la fórmula del servidor (`level = floor(sqrt(XP/100)) + 1`, cap 20) para alimentar las visualizaciones de progreso.
 - **Economía de XP & Rachas:** Puntos por publicaciones, comentarios, reacciones y check-in diario con racha consecutiva (`CheckinButton.svelte`). Límites en `daily_xp_limits` para evitar abusos o grinding automatizado.
 - **Títulos Honoríficos:** Asignación de insignias con colores personalizados (`UserTitleBadge.svelte`).
 
@@ -1443,9 +1593,20 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 - **Reputación de Autores & Anti-Bots:** Motor determinista de reputación 0–100 (`author-reputation.js`, batch 6 h) + heurísticas de spam/bots (`spam-heuristics.js`, batch 30 min) + diversidad de feed (`diversity.js`).
 - **Flujo de Verificaciones:** Workflow administrativo para asignación de insignias oficiales a creadores y VTubers.
 - **Pagos P2P:** Enlaces personales PayPal/Patreon/Ko-fi (`users.payment_link`) en perfil, ajustes y marketplace (catálogo/contacto).
+- **Tags Curados Administrables (migración `013`):** tabla `tags` gestionada desde `/admin/tags`; el feed de `/explore` filtra por hashtag `#slug`.
+- **Thumbnails Automáticos con ffmpeg-static:** reels (frame del 25%) e imágenes de marketplace (máx. 540px); migración `015` añade dimensiones reales de vídeo (`video_width`/`video_height`) para eliminar CLS.
+- **Gestión de Sesiones Activas:** listado/revocación self-service (`/api/auth/sessions`, UI en `/settings/security`) + cron de purga de sesiones expiradas.
+- **Notificaciones Centralizadas** (`notifications.js`) **y Visibilidad de Perfil** (`visibility.js`): creación que respeta preferencias del destinatario y acceso a perfiles gobernado por el dueño (`public`/`followers`/`friends`).
+- **Sanitizador Isomórfico de CSS Custom** (`lib/design/sanitize.js` + `ProfileThemeShell.svelte`): defensa anti-overlay/exfiltración con paridad WYSIWYG perfil/editor.
+- **Zumbido estilo MSN Messenger:** evento Socket.IO `zumbido` (emite a la sala de la conversación y a las salas personales de los participantes), botón con cooldown de 10 s en `ChatPane`, burbuja animada `⚡ ¡ZUMBIDO!` en `MessageBubble` y sonido precalentado vía `utils/sound.js`.
+- **Navegación con View Transitions API:** crossfade global en `onNavigate` (`+layout.svelte`) con grupos nombrados del shell; modo root-only al cruzar hacia/desde rutas sin shell (landing, login, admin) y salto de transiciones encadenadas para evitar cortes secos.
 
 ### 🎨 Rediseños y Overhauls (Redesigned)
 - **Sistema de Diseño Glassmorphism 2.0 / Neo-Aero:** Migración a CSS puro tokenizado en `layout.css`, sombras de neón primario y bordes translúcidos reflectivos.
+- **Ajustes Modularizados:** `/settings` dividido en un hub con 10 sub-secciones (perfil, diseño, algoritmo, privacidad, seguridad, bloqueados, notificaciones, pagos, rendimiento, datos) con layout compartido; perfil `/u/[username]` refactorizado en `profile/*`.
+- **Perfiles de Rendimiento lite/balanced/high:** efecto especular escalado por tier, benchmark de FPS, HUD opcional y fuentes autoalojadas (`static/fonts/`).
+- **Feed, Posts, Reels y Mensajería:** overhaul visual completo (MediaPlayer, MediaLightbox, TopBar/SideNav/MobileNav, QuoteCard para citas, RouteProgress).
+- **Mensajería estilo MSN Messenger:** sidebar de conversaciones rehecha (`ConversationsSidebar` + `MsnContactCard`) con selector de estado personalizado (persistido en `PUT /api/users/me/status`), agrupación de contactos por estado y composer/burbujas/modales RTC alineados con el lenguaje Neo-Aero.
 - **Centro de Notificaciones:** Pestañas reactivas inteligentes, optimistic UI en marcado de lectura y corrección de enlaces a perfiles.
 - **Página de Licencia y Protección (`/docs/license.html`):** Transformada en portal estático independiente con visor de texto oficial AGPLv3.
 - **Portal de Documentación (`/docs/index.html`):** Arquitectura de pestañas unificada con renderizado de Markdown en cliente, resaltado de sintaxis y soporte deep-link.
@@ -1453,7 +1614,10 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 ### ⚡ Optimizaciones y Rendimiento (Improved / Perf)
 - **Adaptador Universal DB 100% Async:** Compatibilidad absoluta con `@libsql/client` sin bloqueos de event-loop.
 - **Rate Limiting Escalamiento:** Elevado límite a 1000 req/min por IP con bypass inteligente en memoria.
-- **Optimización de Renderizado a 60 FPS:** Uso de `contain: strict/layout`, aceleración por hardware (`translateZ(0)`) y deshabilitación de animaciones en pestañas ocultas (`LiquidBackground.svelte`).
+- **Aspect-Ratio Pre-Render en Reels:** dimensiones de vídeo persistidas en BD eliminan el reflujo de overlays (CLS ~0).
+- **Thumbnails de Media:** grids de marketplace sirven JPEG de máx. 540px; reels generan su póster automáticamente.
+- **Fuentes Autoalojadas + CSP:** cero requests a Google Fonts; `font-src 'self'`.
+- **Optimización de Renderizado a 60 FPS:** Uso de `contain: strict/layout`, aceleración por hardware (`translateZ(0)`) y deshabilitación de animaciones en pestañas ocultas (`LiquidBackground.svelte`), escalables por perfil lite/balanced/high.
 - **Escudos Volumétricos:** Protección anti-colapso `flex: 0 0 44px` en más de 12 componentes críticos.
 
 ### 🗑️ Eliminaciones y Limpieza de Deuda Técnica (Removed / Deprecated)
@@ -1470,12 +1634,15 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 - **Bug de `undefined` en Notificaciones:** Interceptor para sanitizar datos heredados y evitar crashes en la renderización de actores.
 - **Manejo de Transiciones Svelte:** Corregidos imports faltantes (`fade`, `scale`, `backOut`) en modales y comentarios.
 - **Seguridad en Cookies:** Adición estricta de flags `Secure; SameSite=Strict` en el token de autenticación.
+- **Migraciones bajo el adaptador libsql:** `scripts/migrate-up.js` consumía la API async como síncrona y no aplicaba migraciones pendientes; corregido con `await` en todo el flujo.
+- **Doble barra de búsqueda:** el buscador global del TopBar se oculta en `/explore` (buscador hero propio) y `/marketplace` (filtro "Buscar en la tienda").
+- **Store de rendimiento endurecido:** saneamiento de `localStorage` con lista blanca de valores legítimos por clave (evita controles segmentados sin opción activa heredados de versiones anteriores).
 
 </script>
     <script type="text/markdown" id="md-contributing">
-# Contributing to VSocial
+# Contributing to Voom!
 
-Thanks for your interest in contributing to VSocial. This document outlines the
+Thanks for your interest in contributing to Voom!. This document outlines the
 rules, conventions, and workflow for submitting changes.
 
 ---
@@ -1490,10 +1657,9 @@ rules, conventions, and workflow for submitting changes.
 
 ## Project Philosophy (Read Before Coding)
 
-VSocial has strong architectural convictions documented in:
+Voom! has strong architectural convictions documented in:
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — design decisions and ideology
 - [`DOCS.md`](./DOCS.md) — complete technical reference
-- [`Personality-and-SOUL.md`](./Personality-and-SOUL.md) — engineering standards
 
 Key principles you must respect:
 
@@ -1615,7 +1781,7 @@ npm run test:watch  # watch mode
 
 - Unit tests for server modules and utilities.
 - Integration tests for API endpoints.
-- Current suites (8, 50 tests) in `tests/`: `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`.
+- Current suites (12, 126 tests) in `tests/` (note: the folder is gitignored — local development only): `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`, `design.test.js`, `settings.test.js`, `gamification.test.js`, `marketplace.test.js`.
 - Run a single suite from the repo root: `npx vitest run tests/auth.test.js` (or filter with `-t "&lt;name&gt;"`).
 - Add tests in `tests/` with `.test.js` extension.
 
@@ -1654,10 +1820,10 @@ Husky pre-commit hooks will also run lint checks automatically.
 
 Good first contributions:
 
-1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
+1. **Add tests** — coverage can always improve. Add Vitest tests for API endpoints and DB queries.
 2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
 3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Testing** – 8 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
+4. **Testing** – 12 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
 6. **Email templates** — improve verification and password reset email HTML.
 
 ---
@@ -1666,6 +1832,153 @@ Good first contributions:
 
 Open an issue or discuss in the repository. For architectural decisions,
 consult [`ARCHITECTURE.md`](./ARCHITECTURE.md) first.
+</script>
+    <script type="text/markdown" id="md-changelog">
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [RELEASED]
+
+## [Unreleased]
+
+### Added
+- **Frutiger Aero Engine — superficies Aero (migración `017`):** la pestaña «Aplicación» de `/settings/design` gana la bóveda de presets de 1 clic (`PresetVault.svelte`: Aqua OS 2004, Frutiger Eco, Aero Glass 7, Neo-Aero Orb y Abismo Bio — aplican acento+cristal+geometría+gloss+fuente+densidad+modo de fondo en un solo PUT), control de superficies (`SurfacePanel.svelte`: opacidad de tarjetas 40–100% con cristal `color-mix` sobre las clases reales del sistema de vidrio; geometría de bordes Brutalista/Moderno/Redondeado/Bubble redefiniendo los tokens `--radius-*` sin tocar `--radius-full`; brillo especular curvo Aqua/Win7 vía variable `--gloss-strength`) y modos de wallpaper Cover/Mosaico/Ajustar (tile con `image-rendering: pixelated` para patrones y pixel art). Cinco columnas nuevas en `user_settings`; en perfiles lite el cristal vuelve a sólido automáticamente. Snippets Frutiger Aero añadidos a la galería de CSS del perfil.
+- **Apariencia global por usuario (migración `016`):** `/settings/design` se convierte en hub dual con pestañas «Perfil» (editor existente) y «Aplicación»: acento global con paleta derivada HSL automática y badges de contraste WCAG, escala tipográfica 0.85–1.25, densidad compacta/cómoda/amplia, fuente global (Outfit/Inter/JetBrains Mono autoalojada/fuente propia del perfil, inyección idempotente) y wallpaper de la app con oscurecimiento para legibilidad. Seis columnas nuevas en `user_settings` validadas en `user-settings.js`; sincronización multi-dispositivo debouncada (500 ms) con flush `keepalive` al cerrar; anti-flash pre-paint en `app.html` solo con lo crítico del primer fotograma; hidratación desde cuenta (`preferred_*` en `/api/auth/me`, login y register). La pestaña «Perfil» añade galería de snippets CSS insertables en cursor y lint suave del CSS custom.
+- **Tags curados administrables (migración `013`):** la tabla `tags` convierte los chips de `/explore` en datos reales gestionados desde `/admin/tags` (crear, renombrar, icono, eliminar). El feed de `/explore` filtra por hashtag `#slug` vía `/api/feed/explore?category=&lt;slug&gt;` y `/api/tags` (lista pública + CRUD admin).
+- **Thumbnails automáticos para reels:** al publicar, si el cliente no envía thumbnail se genera un JPEG con `ffmpeg-static` (frame del 25% del vídeo). La migración `015` añade `reels.video_width`/`video_height` para fijar el aspect-ratio antes del primer render y eliminar el reflujo de overlays (CLS 0.307 → ~0).
+- **Thumbnails de marketplace:** `listing_media.thumb_url` (máx. 540px) generado en upload; los grids de `/marketplace` sirven el thumbnail en vez del original (LCP medido: 13.1s).
+- **Perfiles de rendimiento lite / balanced / high** (`perf.svelte.js`, página `/settings/performance`): efecto especular del cristal escalado por tier, detección de hardware, benchmark de FPS con recomendación automática, HUD de FPS (`FpsHud.svelte`) y preferencias finas (autoplay según red, data saver, precarga al hover). Fuentes autoalojadas (`static/fonts/` + `fonts.css`) y CSP `font-src 'self'`.
+- **Gestión de sesiones activas:** `GET/DELETE /api/auth/sessions` (listar, revocar una, cerrar todas las demás) con dispositivo/navegador parseados del user-agent. UI en `/settings/security`. Cron diario que purga sesiones expiradas.
+- **Notificaciones centralizadas y respetuosas** (`lib/server/notifications.js`): punto único de creación que respeta los toggles del destinatario (`notify_likes/comments/follows/dms`) y evita auto-notificaciones.
+- **Visibilidad de perfil aplicada server-side** (`lib/server/visibility.js`): `profile_visibility` (`public`/`followers`/`friends`) del dueño gobierna el acceso a perfiles y reels vía `getProfileAccess`.
+- **Sanitizador isomórfico de CSS custom** (`lib/design/sanitize.js`): reescribe `position:fixed`, acota `z-index`, solo permite `url()` locales, prefija selectores con `.profile-custom-wrapper`. Render centralizado en `ProfileThemeShell.svelte` con paridad WYSIWYG entre perfil público y editor.
+- **Página admin `/admin/apis`:** gestión de claves de APIs externas (Klipy) almacenadas en `system_settings`.
+- **Curva de XP compartida** (`lib/utils/xp.js`): espejo exacto cliente de la fórmula de niveles del servidor (cap 20).
+- **Zumbido estilo MSN Messenger en el chat:** botón en la barra de la conversación (`ChatPane`) con cooldown de 10 s; evento Socket.IO `zumbido` que emite a la sala de la conversación y a las salas personales de los participantes. El mensaje especial `⚡ ¡ZUMBIDO!` se renderiza como burbuja animada propia (`MessageBubble`) y suena vía `lib/utils/sound.js` (`/sounds/nudge.mp3`, precalentado tras el primer gesto para sortear las políticas de autoplay).
+
+### Changed
+- **Mensajería rediseñada al estilo MSN Messenger:** sidebar de conversaciones rehecha con tarjetas de contacto (`MsnContactCard`), selector de estado personalizado (online/ocupado/aparecer sin conexión + texto libre, persistido en `PUT /api/users/me/status`), búsqueda de contactos y agrupación por estado; composer, burbujas y modales RTC alineados con el nuevo lenguaje visual.
+- **Ajustes modularizados** (`refactor(settings)`): `/settings` pasó de una página monolítica a un **hub** con 10 sub-secciones (`profile`, `design`, `algorithm`, `privacy`, `security`, `blocked`, `notifications`, `payments`, `performance`, `data`) con layout compartido (`+layout.server.js` + `settings.css`). Se eliminó la antigua `/settings/activity`.
+- **Perfil modular**: `/u/[username]` refactorizado en componentes reutilizables (`ProfileHeaderCard`, `ProfileBlocks`, `ProfileThemeShell`).
+- **Leaderboard rediseñado de nuevo**: fondo `ArenaBackdrop` (sustituye a `AuroraPillar`), esqueleto de carga (`LeaderboardSkeleton`), contadores animados (`CountUp`) y modal de subida de nivel (`LevelUpModal`).
+- **Tema default corregido (migración `014`)**: `user_settings.theme` solo acepta `light|dark|midnight`; se reconstruyó la tabla y se normalizaron valores legacy `'auto'`.
+- **Rediseño UI general** (`ui:`): feed, posts, reels, mensajería, TopBar/SideNav/MobileNav, MediaPlayer (overhaul), MediaLightbox, QuickChatWidget y separación de items en navegación/selects/chats/pickers. Nuevo `QuoteCard` para reposts con cita y `RouteProgress`/`Portal`.
+- Tests ampliados a **15 suites / 208 tests** (nuevas: design, settings, gamification, marketplace, appearance, appearance_adversarial, messages_adversarial, moderation_strikes, verifications, voomojis); vitest vuelve a ejecutarse sin errores.
+- CI `.github/workflows/sync.yml` limitado a la rama `main` y a cambios de contenido del proyecto.
+- **Navegación con View Transitions API** (`+layout.svelte`): crossfade entre rutas con grupos nombrados para el shell; en cruces hacia/desde rutas sin shell (landing, login, admin) la transición se hace root-only para evitar el montaje fragmentado. Las VT encadenadas se saltan (`skipTransition`) para impedir cortes secos y el splash de arranque hereda los tokens del tema activo para fundir sin salto de color.
+- **Store de rendimiento ampliado:** luz ambiental reactiva de vídeo (`videoAmbientLight`, glow por fotograma desactivado en lite), ahorro automático con batería baja ≤20% que restaura exactamente los ajustes previos al conectar el cargador, y saneamiento de `localStorage` con lista blanca de valores legítimos (evita estados híbridos de versiones anteriores).
+
+### Fixed
+- **Doble barra de búsqueda en `/explore` y `/marketplace`:** el buscador global del TopBar se oculta en las rutas con buscador propio (hero de explore / filtro de la tienda).
+- **Migraciones bajo el adaptador libsql:** `scripts/migrate-up.js` no aplicaba migraciones pendientes porque consumía la API async como si fuera síncrona; corregido con `await` en todo el flujo.
+
+## [Unreleased]
+
+_Saldrá como **v0.6.0-beta.2** — hito de beta cerrada (invitaciones, email operativo, despliegue Docker pegar-y-listo)._
+
+### Added (beta cerrada voom.social)
+- **Códigos de invitación (migración `019`):** registro por invitación para la beta cerrada. Nueva tabla `invite_codes` (formato `VOOM-XXXX-XXXX`, usos máximos, expiración, activación, nota interna) + `invite_uses` (trazabilidad de qué usuario entró con cada código). Consumo **atómico** con reversión (`lib/server/invites.js`): tolera registros concurrentes con el último cupo. Gate en la rama `register` con parse tolerante de flags; panel **/admin/invites** (generación por lotes, activar/desactivar, copiar, stats) + toggle «Registro Solo con Invitación» en /admin/settings + endpoint público `GET /api/auth/config`. Suite `tests/invites.test.js` (10 tests).
+- **Email operativo — verificación y reset de contraseña:** `lib/server/email.js` reescrito a async (el adaptador async de BD lo tenía roto/latente: nadie lo importaba). Nuevos endpoints: `POST /api/auth/forgot-password` (respuesta neutra + cooldown por cuenta), `POST /api/auth/reset-password` (consume token, revoca todas las sesiones), `GET /api/auth/verify-email?token=` (redirige a /login con resultado) y `POST /api/auth/resend-verification` (acepta email o usuario). Enforcement de `email_verification_required` en login (403 con `code: EMAIL_NOT_VERIFIED`); banners de verificación en /login con botón de reenvío; flujo real de recuperación en el modal de ayuda; nueva página `/reset-password`. Las plantillas renderizan enlaces **absolutos** (el origen llega del request). El transporter se invalida al cambiar SMTP en /admin/apis. Suite `tests/email.test.js`.
+- **Modo Mantenimiento y Modo Demo enforcement:** nuevo bloque en `hooks.server.js` — con `maintenance_mode` el tráfico no-staff recibe 503 (API) o la nueva página pública `/maintenance` (el panel /admin, salud, login del staff y assets siguen operativos; bypass staff por Bearer o cookie espejo). Con `demo_mode` las mutaciones de no-staff reciben 403 (plataforma de exhibición de solo lectura). Los toggles de /admin/settings ya son editables (el de mantenimiento estaba deshabilitado como «pendiente»).
+- **Despliegue Docker pegar-y-listo (voom.social):** Dockerfile rehecho — layout espejo del dev (rootDir correcto en el bundle), CMD sobre `frontend/server.js` para que **Socket.IO vuelva a funcionar en el contenedor**, dependencias de runtime recortadas (`npm ci --omit=dev`), healthcheck sin wget. `docker-entrypoint.sh`: genera y **persiste** JWT_SECRET en el volumen y aplica migraciones solo en upgrades. Rutas env-first: `getUploadsDir()` honra `UPLOAD_DIR`, el instalador respeta `DB_PATH`/`DATA_DIR`/`SCHEMA_PATH` y **stampa `_migrations`** al instalar (sin ello, la primera upgrade re-aplicaría la migración 001 de dialecto Postgres); `migrate-up.js` hace baseline-stamp de BDs preexistentes. Stack `docker-compose.yml` con **Caddy (HTTPS automático)**, `ORIGIN`/`TRUST_PROXY`/`BODY_SIZE_LIMIT` correctos (el default de 512 KB rechazaba los uploads de 50 MB) y servicio opcional de backups diarios (`scripts/backup.sh`, snapshot WAL-safe + uploads, rotación 7). CI `docker-publish.yml` publica `ghcr.io/&lt;owner&gt;/voom` en cada tag. Guía para no avanzados **DEPLOY.md**. `.dockerignore` nuevo.
+- **Validación de dimensiones en /api/upload** (REQUERIMIENTOS 1.3): avatar cuadrado ≥100px y portada banner (2:1–8:1, ≥800px) validados server-side con `image-size`; el servidor es fuente de verdad aunque el crop sea client-side.
+
+### Fixed (beta cerrada voom.social)
+- **Regresión anti-gaming del feed asida con tests** (veredicto del council): suite nueva que verifica vía endpoint real que el autor NO suma `author_replies_count` con comentarios top-level propios ni auto-respuestas, y que SÍ suma al responder a comentarios de terceros (+ trazabilidad del decremento). Over-fetch de candidatos subido a `min(80, limit*4)` (rango 60-80 que pedía el council).
+- **Instalador alineado:** la cuenta admin creada por /api/install ahora es `super_admin` (igual que /api/setup, era `admin` sin permisos completos en el panel multi-rol) y nace con `email_verified=1`; los flags se escriben como `'1'/'0'` (antes `'true'/'false'` — inconsistencia con el resto de lectores).
+- **Mensajería móvil:** `.chat-pane` en ≤768px pasa a overlay absoluto (`inset:0`) que se desliza ENCIMA de la sidebar — cierra el pendiente de la pasada de fixes (el deslizamiento por transform con retención de layout empujaba el panel fuera de pantalla).
+- **CustomSelect:** `backdrop-filter` migrado al token `--glass-blur` (respetaba perfiles lite/subtle al abrir el dropdown; antes usaba blur(18px) hardcoded).
+
+### Changed (beta cerrada voom.social)
+- **Página /reset-password y /maintenance:** nuevas rutas públicas sin shell, registradas en `SHELLLESS_ROUTES`/`publicExact` del layout raíz (VT root-only en cruces).
+- **TwemojiPicker:** buscador con keywords ES/EN + renderizado por lotes («Ver más», 64 por página) — reduce los nodos DOM iniciales de cada picker (feed/chat/lightbox montan varios a la vez).
+- **Like:** press del botón de like más profundo y rápido (`scale(0.82)`, 90 ms) según REQUERIMIENTOS 2.3.
+
+## [0.6.0-beta.1] - 2026-08-16
+
+### Added
+- **Identidades Anónimas y Publicaciones Anónimas:** soporte completo para identidades anónimas persistentes y exclusivas, protección estricta de privacidad y flags de anonimato en publicaciones.
+- **Mejoras del Algoritmo de Feed y Reputación de Autores:** motor de reputación de autores, mitigación heurística de bots/spam, escritor de lotes en memoria (*In-Memory Batch Writer*) y sub-caps de popularidad.
+- **Sistema de Reposts y Shares:** funcionalidad de republicaciones y citas con conteo optimizado en tiempo real.
+- **Custom Assets & Emojis Clásicos:** soporte para activos personalizados por rol y catálogo ampliado de emoticonos retro estilo MSN.
+- **Flujo de Verificaciones de Creadores y VTubers:** workflow administrativo para aprobación/rechazo de insignias de verificación y control de strikes de moderación.
+
+## [0.5] - 2026-07-23
+
+### Added
+- **Sistema de Moods (estados de ánimo) en posts:** el creador de publicaciones (`/posts/create`) incluye un carrusel de 10 moods (Feliz, Creativo, Jugando, Música, Pensando, Emocionado, Viajando, Celebrando, Trabajando, Comiendo) que se persiste en la columna `posts.mood` (VARCHAR(30)) y se muestra en el feed. El carrusel usa física de *drag-to-scroll* con inercia, *overscroll* elástico y *edge fading*, replicando el comportamiento del carrusel de la landing.
+- **Encuestas (polls) en posts:** el creador permite añadir una pregunta con 2-6 opciones y duración (1h / 6h / 24h / 3 días / 7 días). La encuesta se serializa como JSON en un bloque `\n[METADATA]` al final del `body` del post. Votación vía `POST /api/posts/:id/vote` (un voto por usuario, registrado en `voted_user_ids`). `PostCard.svelte` renderiza el widget con barras de porcentaje, total de votos y confirmación "Voto registrado".
+- **Reescritura completa de `/stories/create`:** la página pasó de mockup no funcional a plenamente operativa — *drag & drop* de archivos, historias de solo texto (caption + fondo de color + tipografía), previsualización en vivo dentro de un marco de teléfono, texto arrastrable con alineación, colores de fondo/texto y cinco familias tipográficas, mapeo real a la API de stories.
+- **Unificación del reproductor multimedia (`MediaPlayer.svelte`):** se eliminó la dependencia de Vidstack y se reemplazó el `&lt;video&gt;` nativo del navegador por el `MediaPlayer` propio de la plataforma en todas las páginas de creación (`stories/create`, `reels/create`) y en el feed. Reproductor con PiP, *Picture-in-Picture*, velocidades, atajos de teclado, *autoplay* al entrar en viewport y *media session* del SO. La versión mostrada en su panel "Acerca de" ahora refleja la versión del proyecto.
+- **Página de Licencia y Protección independiente:** se trasladó la licencia a una página HTML estática autocontenida en `/docs/license.html` con diseño Glassmorphism 2.0; la ruta SvelteKit anterior quedó retirada. El *service worker* excluye los HTML de documentación de la caché para evitar versiones stale.
+- **Cumplimiento RGPD (UE):** páginas legales públicas `/privacy` `/terms` `/cookies` (en `publicRoutes` del layout, enlaces en footer, login y registro); banner de consentimiento de cookies (`CookieBanner.svelte`) con elección en `localStorage` + cookie `vsocial_cookie_consent` (`Secure; SameSite=Strict`); registro con consentimiento obligatorio de Términos + Privacidad + age gate 13+ (sellado con `terms_accepted_at` / `privacy_accepted_at`, validación autoritativa en servidor); borrado de cuenta self-service (`POST /api/users/delete-account`, confirmación con contraseña) → soft-delete + cierre de sesiones, reactivación al login dentro de 30 días; exportación de datos (portabilidad, art. 20 RGPD) vía `GET /api/users/export` → JSON descargable; pestaña "Mis Datos" en Ajustes; migración `003_gdpr.sql`; cron diario de erasure que hard-deletea en cascada los usuarios con `deleted_at` &gt; 30 días y limpia ficheros huérfanos.
+- **Leaderboard rediseñado (rama `feature/leaderboard-redesign`):** podio top-3 (`PodiumCard`), filas para el resto (`LeaderboardRow`), pestañas entre tipos de ranking (`LeaderboardTabs`), tarjeta del usuario actual (`CurrentUserCard`) y caché en cliente para transiciones instantáneas. Nuevos componentes: `AuroraPillar`, `LeaderboardTabs`, `LeaderboardRow`, `CurrentUserCard`.
+- **CI de GitHub Actions (`.github/workflows/ci.yml`):** job `lint-and-build` que corre `npm run lint` + `npm run build` en Node 22 sobre cada push/PR a `main`, con cancelación de runs obsoletos y subida del artifact `build/`. El job de tests queda deshabilitado hasta arreglar el entorno de test (vitest roto + better-sqlite3 no instalado).
+
+### Changed
+- `eslint.config.js` reubicado de la raíz del repo a `frontend/` (sus dependencias viven en `frontend/node_modules`); ahora ESLint carga correctamente. Config actualizado para reconocer las runas de Svelte 5 (`$state`, `$derived`, etc.) en los módulos `*.svelte.js` y afinar reglas (`no-unused-vars` con prefijo `_`, `allowEmptyCatch`, `svelte/no-at-html-tags` off por saneamiento DOMPurify server-side). `.prettierignore` ampliado (`style_dump.css`, scripts de debug ad-hoc).
+- Flag `Secure` añadido a la cookie del token de auth (`auth.svelte.js`).
+- **Versión del proyecto bumpada de `0.0.2` a `0.5`** en `frontend/package.json`, `frontend/src/routes/api/health/+server.js`, el panel "Acerca de" del `MediaPlayer` y la cabecera del portal de documentación, alineando el código con la convención de releases (`voom-vX.Y.zip`).
+- Eliminadas las menciones a criptomonedas de la landing; eliminadas dependencias de Redis y PostgreSQL para reforzar la arquitectura pura SQLite; badges de gamificación rediseñadas a Glassmorphism 2.0; feeds transparentes movidos del roadmap a características implementadas (tres algoritmos: Radar en Vivo cronológico global, Feed Inteligente personalizado, Descubrimiento por tendencia/frescura).
+
+### Fixed
+- Lint del proyecto: estaba completamente roto (ESLint no podía cargar el config por resolución de módulos). Corregido + limpiados ~200 errores preexistentes (imports no usados, variables muertas, a11y, catch vacíos). `npm run lint` pasa limpio (exit 0).
+- Bugs reales que el lint recién funcionando sacó a la luz: `ReportModal.svelte` y `CommentItem.svelte` usaban transiciones (`fade`/`scale`/`backOut`/`expoOut`) sin importarlas; `QuickChatWidget.svelte` llamaba a `handleReact` inexistente (ahora implementada con toggle optimista + `messagesApi.react`).
+- Enlaces "Términos"/"Privacidad" de login y registro que apuntaban a `/` (rotos) → ahora a `/terms` y `/privacy`.
+- **Recorte de vídeo en el feed:** se eliminó el `aspect-ratio` forzado y se envolvió el vídeo en un contenedor 16:9 con `object-fit: contain`, de modo que el `MediaPlayer` se auto-dimensione a sus proporciones nativas sin recortar.
+- **Creador de posts (`/posts/create`):** *overhaul* de Glassmorphism 2.0 con corrección de bugs severos de flex-squash, recorte del picker de emojis y refuerzo de los escudos volumétricos anti-colapso WebKit/Blink; recorte duro de las *mood pills* resuelto moviendo la máscara CSS al contenedor padre estático; las flechas de navegación del mood scroller se reemplazaron por la física de *drag-scroll* con inercia de la landing.
+- Espacios irregulares U+2001 en varios títulos/etiquetas.
+
+## [0.0.2] - 2026-06-22
+
+### Added
+- Initial release of Voom!, a full-stack social network application.
+- User authentication (JWT, local and OAuth), registration, and profile management.
+- Core social features: posts, comments, likes, stories, reels, and follows.
+- Real-time messaging (DMs and group chats) with media and voice notes.
+- Marketplace for buying and selling with category listings.
+- Gigs / Freelance board for posting and applying to commissions.
+- Groups and Pages functionality with events.
+- Wallet and transaction system for in-app monetization.
+- Notifications system with push support and read receipts.
+- Admin panel and moderation tools (reports, user management).
+- Structured logging with Pino.
+- Database migration system (`_migrations` table) for versioned schema updates.
+- Basic security module (rate limiting, input sanitization, validation).
+- Health check endpoint at `/api/health`.
+- Unit tests setup using Vitest for core utilities and database connectivity.
+- Docker and docker-compose configuration for containerized deployment.
+- CI/CD hooks with pre-commit linting and build verification.
+- `.env.example` with comprehensive production configuration.
+
+</script>
+    <script type="text/markdown" id="md-rebranding">
+# Rebranding: VSocial → Voom!
+
+**Voom!** es el nuevo nombre de la plataforma anteriormente conocida como **VSocial** (o **V-SOCIAL**). El rebranding se completó en agosto de 2026.
+
+## Qué cambió
+
+- **Nombre de marca**: "VSocial" / "V-SOCIAL" → **"Voom!"** en toda la interfaz de usuario, documentación, emails y metadatos.
+- **Dominio**: `vsocial.app` → `voom.social` (emails: `noreply@voom.social`).
+- **Assets**: Nuevo logo.svg con tipografía Outfit y efecto glassmorphism Neo-Aero; favicon actualizado.
+- **Configuración**: `package.json` nombra ahora `voom`; contenedores y volúmenes Docker pasan a llamarse `voom_app` / `voom_data`.
+- **Docs**: Todos los archivos .md, el manual de marca (DOCS_BRAND_ZYFERONYX.md) y el portal de documentación reflejan el nuevo nombre.
+
+## Qué se preservó (para compatibilidad)
+
+- **Claves de localStorage**: Las ~50 claves con prefijo `vsocial_*` (incluyendo `vsocial_token` para auth) **no se migraron**. Se conservaron para mantener la compatibilidad con usuarios existentes — renombrarlas requeriría una migración en el cliente que rompería sesiones activas.
+- **Clases CSS**: Los selectores `.vsocial`, `.vs-brand__logo`, `.vsocial-col` etc. permanecen sin cambios para no romper el sistema de estilos existente.
+- **Migraciones históricas**: Los archivos en `migrations/*.sql` conservan las menciones originales a VSocial como registro histórico.
+- **Cache del service worker**: El nombre de caché `vsocial-cache-{version}` se preserva para evitar crear caches obsoletas en navegadores de usuarios existentes.
+- **Cookie de consentimiento**: `vsocial_cookie_consent` mantiene su nombre técnico por cumplimiento RGPD.
+
+&gt; **ZyFeronyx DevStudio** sigue siendo el estudio creador. La identidad visual pasa de verde cian eléctrico a un esquema de neón azul-eléctrico con acentos de menta, manteniendo la estética **Glassmorphism 2.0 + Neo-Aero**.
+
 </script>
     <script type="text/plain" id="raw-license-content">
               GNU AFFERO GENERAL PUBLIC LICENSE
@@ -2396,6 +2709,8 @@ For more information on this, and how to apply and follow the GNU AGPL, see
                 renderMd('docs');
                 renderMd('architecture');
                 renderMd('contributing');
+                renderMd('changelog');
+                renderMd('rebranding');
 
                 // Populate raw license code block
                 const rawLic = document.getElementById('raw-license-content');
@@ -2404,16 +2719,28 @@ For more information on this, and how to apply and follow the GNU AGPL, see
                     if (codeEl) codeEl.textContent = decodeHtml(rawLic.innerHTML).trim();
                 }
 
-                const switchTab = (tabId, anchorId = '') => {
-                    const tabBtn = document.querySelector(`.tab-btn[data-target="${tabId}"]`);
-                    if (!tabBtn) return;
+                // Map hrefs abreviados → IDs de content-panel
+                const tabMap = {
+                    'readme': 'readme',
+                    'doc': 'docs',
+                    'arch': 'architecture',
+                    'contrib': 'contributing',
+                    'changelog': 'changelog',
+                    'rebrand': 'rebranding',
+                    'licencia': 'license'
+                };
 
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    tabBtn.classList.add('active');
+                const switchTab = (tabId, anchorId = '') => {
+                    const panelId = tabMap[tabId] || tabId;
+                    const navTab = document.querySelector(`.nav-tab[href="#${tabId}"]`);
+                    if (!navTab) return;
+
+                    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+                    navTab.classList.add('active');
 
                     document.querySelectorAll('.content-panel').forEach(p => {
                         p.classList.remove('active');
-                        if (p.id === tabId) {
+                        if (p.id === panelId) {
                             p.style.animation = 'none';
                             p.offsetHeight;
                             p.style.animation = null;
@@ -2456,7 +2783,7 @@ For more information on this, and how to apply and follow the GNU AGPL, see
                                 let anchorId = '';
 
                                 if (isLicenseLink) {
-                                    targetTab = 'license';
+                                    targetTab = 'licencia';
                                 } else if (isHashLink) {
                                     anchorId = href.substring(1);
                                     const targetElem = document.getElementById(anchorId);
@@ -2467,10 +2794,18 @@ For more information on this, and how to apply and follow the GNU AGPL, see
                                         targetTab = document.querySelector('.content-panel.active')?.id || 'readme';
                                     }
                                 } else {
-                                    const match = href.match(/^\.?\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING)\.md(#.*)?$/i);
+                                    const match = href.match(/^\.?\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING|CHANGELOG)\.md(#.*)?$/i);
                                     if (match) {
                                         const name = match[1].toLowerCase();
-                                        targetTab = name === 'readme' ? 'readme' : name === 'docs' ? 'docs' : name === 'architecture' ? 'architecture' : 'contributing';
+                                        // Map panel IDs to nav-tab hrefs
+                                        const panelToHref = {
+                                            'readme': 'readme',
+                                            'docs': 'doc',
+                                            'architecture': 'arch',
+                                            'contributing': 'contrib',
+                                            'changelog': 'changelog'
+                                        };
+                                        targetTab = panelToHref[name] || name;
                                         if (match[2]) anchorId = match[2].substring(1);
                                     }
                                 }
@@ -2486,10 +2821,11 @@ For more information on this, and how to apply and follow the GNU AGPL, see
 
                 setupLinks();
 
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const target = btn.getAttribute('data-target');
-                        switchTab(target);
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const href = tab.getAttribute('href').substring(1);
+                        switchTab(href);
                     });
                 });
 
@@ -2497,8 +2833,20 @@ For more information on this, and how to apply and follow the GNU AGPL, see
                     const hash = window.location.hash.substring(1);
                     if (!hash) return;
 
-                    if (['readme', 'docs', 'architecture', 'contributing', 'license'].includes(hash)) {
-                        switchTab(hash);
+                    // Check if hash matches a nav-tab href (abreviado) or panel ID
+                    const validTabs = ['readme', 'doc', 'docs', 'arch', 'architecture', 'contrib', 'contributing', 'changelog', 'rebrand', 'rebranding', 'licencia', 'license'];
+                    if (validTabs.includes(hash)) {
+                        // Convert panel ID to nav-tab href
+                        const panelToHref = {
+                            'readme': 'readme',
+                            'docs': 'doc',
+                            'architecture': 'arch',
+                            'contributing': 'contrib',
+                            'changelog': 'changelog',
+                            'rebranding': 'rebrand',
+                            'license': 'licencia'
+                        };
+                        switchTab(panelToHref[hash] || hash);
                         return;
                     }
 

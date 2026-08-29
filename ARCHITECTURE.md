@@ -1,7 +1,7 @@
-# V-Social: Documentación Exhaustiva y Registro Arquitectónico (Beta v0.6.0-beta.1)
+# Voom!: Documentación Exhaustiva y Registro Arquitectónico (Beta v0.6.0-beta.2)
 
 > [!NOTE]
-> Este documento técnico refleja el **espectro completo** del desarrollo, decisiones de arquitectura, módulos implementados, ideologías de diseño, optimizaciones algorítmicas y configuraciones de infraestructura de la plataforma **V-Social**. Es el plano maestro de la aplicación actualizado con todas las implementaciones, rediseños y optimizaciones.
+> Este documento técnico refleja el **espectro completo** del desarrollo, decisiones de arquitectura, módulos implementados, ideologías de diseño, optimizaciones algorítmicas y configuraciones de infraestructura de la plataforma **Voom!**. Es el plano maestro de la aplicación actualizado con todas las implementaciones, rediseños y optimizaciones.
 
 ---
 
@@ -67,7 +67,7 @@ erDiagram
 
 ## 3. Algoritmos Transparentes de Feed (Mecanismos Anti-Caja Negra)
 
-VSocial rechaza los algoritmos opacos de retención tóxica diseñados para maximizar la adicción. En su lugar, implementa un motor de descubrimiento transparente y configurable por el usuario con tres modos bien definidos:
+Voom! rechaza los algoritmos opacos de retención tóxica diseñados para maximizar la adicción. En su lugar, implementa un motor de descubrimiento transparente y configurable por el usuario con tres modos bien definidos:
 
 ### 3.1 Radar en Vivo (Línea de Tiempo Estricta)
 - **Mecánica:** Ordenamiento cronológico 100% estricto (`ORDER BY created_at DESC`).
@@ -125,7 +125,7 @@ VSocial rechaza los algoritmos opacos de retención tóxica diseñados para maxi
 
 ## 5. Sistema de Diseño: Glassmorphism 2.0 & Neo-Aero
 
-El diseño de V-Social está construido desde cero en **CSS puro tokenizado** en `routes/layout.css`.
+El diseño de Voom! está construido desde cero en **CSS puro tokenizado** en `routes/layout.css`.
 
 ### 5.1 Tokens Canónicos Vivos
 ```css
@@ -162,13 +162,27 @@ Aplicado obligatoriamente en avatares, píldoras de acción, botones críticos y
 - Fondo ambiental generado por CSS con tres blobs radiales bioluminiscentes en movimiento continuo y rayos de luz cónicos (*god rays*).
 - Optimizado para GPU con `contain: strict`, `pointer-events: none` y detector de visibilidad (`document.hidden`) para pausar animaciones cuando la pestaña está en segundo plano.
 
+### 5.4 Apariencia global por usuario (migración `016`)
+El editor `/settings/design` es un hub dual: «Perfil» (editor existente sobre `profile_customizations`) y «Aplicación», que personaliza la app completa mediante seis columnas nuevas de `user_settings` (`accent_color`, `app_font`, `font_scale`, `density`, `app_wallpaper_url`, `wallpaper_dim`) validadas en `lib/server/user-settings.js`.
+- **Runtime:** el store `lib/stores/appearance.svelte.js` aplica inline-style en `<html>` — acento + paleta derivada HSL (los inline ganan a las hojas `[data-theme]`), escala tipográfica vía `font-size` raíz, stacks de fuente y atributos `data-density`/`data-wallpaper`. Persistencia debouncada 500 ms a `PUT /api/users/settings` con flush `keepalive` en `pagehide`; el script bloqueante de `app.html` aplica pre-paint solo lo crítico del primer fotograma.
+- **CSS:** `[hidden]{display:none!important}`, capa fija de wallpaper en `body::before` (degrada a transparente si la imagen falla) y overrides por densidad en selectores de alto tráfico, todo al final de `routes/layout.css`.
+
+### 5.5 Frutiger Aero Engine — superficies Aero (migración `017`)
+Cinco columnas más en `user_settings` (`card_opacity`, `border_radius`, `wallpaper_mode`, `aero_gloss`, `active_preset`) sobre la misma tubería del store de apariencia:
+- **Presets 1-clic** (`PresetVault.svelte`): cinco estéticas Aero aplicadas en lote vía `applyPreset()` (coalesce a un solo PUT debouncado); el ajuste manual posterior limpia el tracking.
+- **Cristal translúcido:** `html[data-card-glass='true']` + `color-mix(in srgb, var(--bg-surface) var(--card-opacity), transparent)` sobre las clases reales del sistema de vidrio; los perfiles lite/perf-mode ya fuerzan sólido con `!important` → sin conflicto y sin coste en gama baja.
+- **Geometría:** redefinición de los tokens `--radius-xs…xl` bajo `html[data-border-radius]` (sharp/modern/rounded/bubble); `--radius-full` intacto para círculos/píldoras.
+- **Brillo especular:** variable `--gloss-strength` que amplifica el `::after` de las superficies con el reflejo curvo Aqua/Win7 (default invisible).
+
 ---
 
 ## 6. Gamificación & Leaderboard Rediseñado
 
-- **Podio Visual Aurora:** Los tres primeros puestos se renderizan en tarjetas de podio (`PodiumCard.svelte`) con pilares de luz animados (`AuroraPillar.svelte`).
+- **Podio Visual:** Los tres primeros puestos se renderizan en tarjetas de podio (`PodiumCard.svelte`) sobre un fondo de arena animado (`ArenaBackdrop.svelte`).
+- **Carga y Animación:** Esqueleto de carga (`LeaderboardSkeleton.svelte`), contadores numéricos animados (`CountUp.svelte`) y modal de celebración al subir de nivel (`LevelUpModal.svelte`).
 - **Pestañas Reactivas:** Cambio instantáneo entre categorías de clasificación (`LeaderboardTabs.svelte`) con caché en cliente.
 - **Tarjeta de Posición Personal:** `CurrentUserCard.svelte` fija la posición del usuario en tiempo real con respecto a la comunidad.
+- **Curva de XP Compartida:** `lib/utils/xp.js` replica exactamente en cliente la fórmula del servidor (`level = floor(sqrt(XP/100)) + 1`, cap 20) para alimentar las visualizaciones de progreso.
 - **Economía de XP & Rachas:** Puntos por publicaciones, comentarios, reacciones y check-in diario con racha consecutiva (`CheckinButton.svelte`). Límites en `daily_xp_limits` para evitar abusos o grinding automatizado.
 - **Títulos Honoríficos:** Asignación de insignias con colores personalizados (`UserTitleBadge.svelte`).
 
@@ -207,9 +221,20 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 - **Reputación de Autores & Anti-Bots:** Motor determinista de reputación 0–100 (`author-reputation.js`, batch 6 h) + heurísticas de spam/bots (`spam-heuristics.js`, batch 30 min) + diversidad de feed (`diversity.js`).
 - **Flujo de Verificaciones:** Workflow administrativo para asignación de insignias oficiales a creadores y VTubers.
 - **Pagos P2P:** Enlaces personales PayPal/Patreon/Ko-fi (`users.payment_link`) en perfil, ajustes y marketplace (catálogo/contacto).
+- **Tags Curados Administrables (migración `013`):** tabla `tags` gestionada desde `/admin/tags`; el feed de `/explore` filtra por hashtag `#slug`.
+- **Thumbnails Automáticos con ffmpeg-static:** reels (frame del 25%) e imágenes de marketplace (máx. 540px); migración `015` añade dimensiones reales de vídeo (`video_width`/`video_height`) para eliminar CLS.
+- **Gestión de Sesiones Activas:** listado/revocación self-service (`/api/auth/sessions`, UI en `/settings/security`) + cron de purga de sesiones expiradas.
+- **Notificaciones Centralizadas** (`notifications.js`) **y Visibilidad de Perfil** (`visibility.js`): creación que respeta preferencias del destinatario y acceso a perfiles gobernado por el dueño (`public`/`followers`/`friends`).
+- **Sanitizador Isomórfico de CSS Custom** (`lib/design/sanitize.js` + `ProfileThemeShell.svelte`): defensa anti-overlay/exfiltración con paridad WYSIWYG perfil/editor.
+- **Zumbido estilo MSN Messenger:** evento Socket.IO `zumbido` (emite a la sala de la conversación y a las salas personales de los participantes), botón con cooldown de 10 s en `ChatPane`, burbuja animada `⚡ ¡ZUMBIDO!` en `MessageBubble` y sonido precalentado vía `utils/sound.js`.
+- **Navegación con View Transitions API:** crossfade global en `onNavigate` (`+layout.svelte`) con grupos nombrados del shell; modo root-only al cruzar hacia/desde rutas sin shell (landing, login, admin) y salto de transiciones encadenadas para evitar cortes secos.
 
 ### 🎨 Rediseños y Overhauls (Redesigned)
 - **Sistema de Diseño Glassmorphism 2.0 / Neo-Aero:** Migración a CSS puro tokenizado en `layout.css`, sombras de neón primario y bordes translúcidos reflectivos.
+- **Ajustes Modularizados:** `/settings` dividido en un hub con 10 sub-secciones (perfil, diseño, algoritmo, privacidad, seguridad, bloqueados, notificaciones, pagos, rendimiento, datos) con layout compartido; perfil `/u/[username]` refactorizado en `profile/*`.
+- **Perfiles de Rendimiento lite/balanced/high:** efecto especular escalado por tier, benchmark de FPS, HUD opcional y fuentes autoalojadas (`static/fonts/`).
+- **Feed, Posts, Reels y Mensajería:** overhaul visual completo (MediaPlayer, MediaLightbox, TopBar/SideNav/MobileNav, QuoteCard para citas, RouteProgress).
+- **Mensajería estilo MSN Messenger:** sidebar de conversaciones rehecha (`ConversationsSidebar` + `MsnContactCard`) con selector de estado personalizado (persistido en `PUT /api/users/me/status`), agrupación de contactos por estado y composer/burbujas/modales RTC alineados con el lenguaje Neo-Aero.
 - **Centro de Notificaciones:** Pestañas reactivas inteligentes, optimistic UI en marcado de lectura y corrección de enlaces a perfiles.
 - **Página de Licencia y Protección (`/docs/license.html`):** Transformada en portal estático independiente con visor de texto oficial AGPLv3.
 - **Portal de Documentación (`/docs/index.html`):** Arquitectura de pestañas unificada con renderizado de Markdown en cliente, resaltado de sintaxis y soporte deep-link.
@@ -217,7 +242,10 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 ### ⚡ Optimizaciones y Rendimiento (Improved / Perf)
 - **Adaptador Universal DB 100% Async:** Compatibilidad absoluta con `@libsql/client` sin bloqueos de event-loop.
 - **Rate Limiting Escalamiento:** Elevado límite a 1000 req/min por IP con bypass inteligente en memoria.
-- **Optimización de Renderizado a 60 FPS:** Uso de `contain: strict/layout`, aceleración por hardware (`translateZ(0)`) y deshabilitación de animaciones en pestañas ocultas (`LiquidBackground.svelte`).
+- **Aspect-Ratio Pre-Render en Reels:** dimensiones de vídeo persistidas en BD eliminan el reflujo de overlays (CLS ~0).
+- **Thumbnails de Media:** grids de marketplace sirven JPEG de máx. 540px; reels generan su póster automáticamente.
+- **Fuentes Autoalojadas + CSP:** cero requests a Google Fonts; `font-src 'self'`.
+- **Optimización de Renderizado a 60 FPS:** Uso de `contain: strict/layout`, aceleración por hardware (`translateZ(0)`) y deshabilitación de animaciones en pestañas ocultas (`LiquidBackground.svelte`), escalables por perfil lite/balanced/high.
 - **Escudos Volumétricos:** Protección anti-colapso `flex: 0 0 44px` en más de 12 componentes críticos.
 
 ### 🗑️ Eliminaciones y Limpieza de Deuda Técnica (Removed / Deprecated)
@@ -234,3 +262,6 @@ Resumen exhaustivo de todas las evoluciones, adiciones, rediseños y limpiezas t
 - **Bug de `undefined` en Notificaciones:** Interceptor para sanitizar datos heredados y evitar crashes en la renderización de actores.
 - **Manejo de Transiciones Svelte:** Corregidos imports faltantes (`fade`, `scale`, `backOut`) en modales y comentarios.
 - **Seguridad en Cookies:** Adición estricta de flags `Secure; SameSite=Strict` en el token de autenticación.
+- **Migraciones bajo el adaptador libsql:** `scripts/migrate-up.js` consumía la API async como síncrona y no aplicaba migraciones pendientes; corregido con `await` en todo el flujo.
+- **Doble barra de búsqueda:** el buscador global del TopBar se oculta en `/explore` (buscador hero propio) y `/marketplace` (filtro "Buscar en la tienda").
+- **Store de rendimiento endurecido:** saneamiento de `localStorage` con lista blanca de valores legítimos por clave (evita controles segmentados sin opción activa heredados de versiones anteriores).

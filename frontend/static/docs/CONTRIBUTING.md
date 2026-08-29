@@ -1,6 +1,6 @@
-# Contributing to VSocial
+# Contributing to Voom!
 
-Thanks for your interest in contributing to VSocial. This document outlines the
+Thanks for your interest in contributing to Voom!. This document outlines the
 rules, conventions, and workflow for submitting changes.
 
 ---
@@ -15,10 +15,9 @@ rules, conventions, and workflow for submitting changes.
 
 ## Project Philosophy (Read Before Coding)
 
-VSocial has strong architectural convictions documented in:
+Voom! has strong architectural convictions documented in:
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — design decisions and ideology
 - [`DOCS.md`](./DOCS.md) — complete technical reference
-- [`Personality & SOUL.md`](./Personality-and-SOUL.md) — engineering standards
 
 Key principles you must respect:
 
@@ -140,7 +139,7 @@ npm run test:watch  # watch mode
 
 - Unit tests for server modules and utilities.
 - Integration tests for API endpoints.
-- Current suites (8, 50 tests) in `tests/`: `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`.
+- Current suites (12, 126 tests) in `tests/` (note: the folder is gitignored — local development only): `auth.test.js` (security + DB connectivity), `reposts.test.js`, `anonymous_posts.test.js`, `anon_identities.test.js`, `custom_assets.test.js`, `feed-algorithm.test.js`, `moderation_strikes.test.js`, `verifications.test.js`, `design.test.js`, `settings.test.js`, `gamification.test.js`, `marketplace.test.js`.
 - Run a single suite from the repo root: `npx vitest run tests/auth.test.js` (or filter with `-t "<name>"`).
 - Add tests in `tests/` with `.test.js` extension.
 
@@ -179,10 +178,10 @@ Husky pre-commit hooks will also run lint checks automatically.
 
 Good first contributions:
 
-1. **Add tests** — coverage is minimal. Add Vitest tests for API endpoints and DB queries.
+1. **Add tests** — coverage can always improve. Add Vitest tests for API endpoints and DB queries.
 2. **Improve error handling** — many endpoints have basic try/catch. Add structured error responses.
 3. **Document API** — add OpenAPI/Swagger annotations or a dedicated API reference.
-4. **Testing** – 8 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
+4. **Testing** – 12 suites exist (`tests/`); add more Vitest unit tests and Playwright E2E for critical flows (messaging, reels).
 6. **Email templates** — improve verification and password reset email HTML.
 
 ---
