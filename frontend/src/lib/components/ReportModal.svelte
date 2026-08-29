@@ -68,7 +68,7 @@
 				<span class="material-icons-round success-icon">check_circle</span>
 				<h3 class="success-title">Reporte enviado</h3>
 				<p class="success-text">
-					Gracias por ayudar a mantener VSocial seguro. Lo revisaremos pronto.
+					Gracias por ayudar a mantener Voom! seguro. Lo revisaremos pronto.
 				</p>
 			</div>
 		{:else}

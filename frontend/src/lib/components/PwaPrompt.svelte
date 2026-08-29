@@ -63,14 +63,14 @@
 				<div class="pwa-icon">
 					<img
 						src="/logo.svg"
-						alt="V-SOCIAL Logo"
+						alt="Voom! Logo"
 						class="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(var(--accent-blue-rgb),0.5)]"
 					/>
 				</div>
 				<div class="flex flex-col min-w-0">
 					<span
 						class="font-bold text-[var(--text-main)] text-sm md:text-base leading-tight truncate"
-						>Instalar V-SOCIAL</span
+						>Instalar Voom!</span
 					>
 					<span class="text-xs text-[var(--text-muted)] truncate"
 						>La experiencia completa en tu pantalla de inicio</span

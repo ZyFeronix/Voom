@@ -1,10 +1,11 @@
 /**
- * VSocial — Authentication Middleware
+ * Voom! — Authentication Middleware
  * DB-backed session validation for server endpoints
  * All functions are async (compatible with @libsql/client and better-sqlite3 wrapper)
  */
 import { getDb } from './db.js';
 import { getBearerToken, decodeToken, encodeToken } from './jwt.js';
+import { getEffectiveRole, roleHasPerm, ROLE_LEVEL } from './roles.js';
 import { error } from '@sveltejs/kit';
 import crypto from 'crypto';
 
@@ -169,47 +170,47 @@ export async function createSession(userId, request) {
 }
 
 /**
- * Require admin role. Returns userId or throws 403.
+ * Require admin role (rol EFECTIVO: user_roles → users.role). Returns userId or throws 403.
  */
 export async function requireAdmin(request) {
-	const userId = await requireAuth(request);
-	const db = getDb();
-
-	const user = await db.prepare('SELECT role FROM users WHERE id = ?').get(userId);
-	if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
-		throw error(403, 'Acceso denegado. Se requiere nivel de administrador.');
-	}
-
+	const { userId } = await requirePerm(request, '*');
 	return userId;
 }
 
 /**
- * Require Team V-SOCIAL badge role or higher staff level.
- * Allowed roles: 'team', 'support', 'moderator', 'admin', 'super_admin', 'staff'
+ * Require un permiso del sistema de staff (lib/server/roles.js).
+ * Devuelve { userId, role } o lanza 401/403. '*' equivale a requireAdmin.
+ */
+export async function requirePerm(request, perm) {
+	const userId = await requireAuth(request);
+	const db = getDb();
+
+	const role = await getEffectiveRole(db, userId);
+	const ok = perm === '*' ? ROLE_LEVEL[role] >= 40 : roleHasPerm(role, perm);
+	if (!ok) {
+		throw error(403, 'Acceso denegado. No tienes permisos para esta acción del panel.');
+	}
+
+	return { userId, role };
+}
+
+/**
+ * Require Team Voom! badge role or higher staff level.
  * Explicitly rejects regular users (even if verified) and government/institutional roles.
  */
 export async function requireTeamOrHigher(request) {
 	const userId = await requireAuth(request);
 	const db = getDb();
 
-	const user = await db
-		.prepare(
-			`SELECT u.id, COALESCE(ur.role, u.role, 'user') AS role
-			 FROM users u
-			 LEFT JOIN user_roles ur ON ur.user_id = u.id
-			 WHERE u.id = ? LIMIT 1`
-		)
-		.get(userId);
-
-	const allowedRoles = ['team', 'support', 'moderator', 'admin', 'super_admin', 'staff'];
-	if (!user || !allowedRoles.includes(user.role)) {
+	const role = await getEffectiveRole(db, userId);
+	if (ROLE_LEVEL[role] < 10) {
 		throw error(
 			403,
-			'Acceso denegado. Función experimental exclusiva para usuarios con insignia "Equipo V-SOCIAL" y rangos superiores.'
+			'Acceso denegado. Función experimental exclusiva para usuarios con insignia "Equipo Voom!" y rangos superiores.'
 		);
 	}
 
-	return { userId, role: user.role };
+	return { userId, role };
 }
 
 export default {
@@ -218,5 +219,6 @@ export default {
 	optionalAuth,
 	createSession,
 	requireAdmin,
+	requirePerm,
 	requireTeamOrHigher
 };

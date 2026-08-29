@@ -6,6 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { reels as reelsApi, users as usersApi } from '$lib/api.js';
 	import { authStore } from '$lib/stores/auth.svelte.js';
+	import { emoteFor, parseMsnEmotes } from '$lib/data/msnEmoticons.js';
 	import { generateLikeSparkles } from '$lib/utils/likeSparkles.js';
 	import ProfileHoverCard from '$lib/components/ProfileHoverCard.svelte';
 
@@ -1830,8 +1831,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		if (navigator.share) {
 			try {
 				await navigator.share({
-					title: `Reel de @${reel.username} en VSocial`,
-					text: reel.caption || '¡Mira este reel en VSocial!',
+					title: `Reel de @${reel.username} en Voom!`,
+					text: reel.caption || '¡Mira este reel en Voom!!',
 					url
 				});
 				showShareModal = false;
@@ -2100,7 +2101,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 </script>
 
 <svelte:head>
-	<title>Reels | VSocial</title>
+	<title>Reels | Voom!</title>
 </svelte:head>
 
 <div class="reels-master-viewport" class:comments-open={showCommentsModal}>
@@ -2247,9 +2248,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 							></canvas>
 						{/if}
 
-						<div class="vignette-overlay-top"></div>
-						<div class="vignette-overlay-bottom"></div>
-
 						<!-- Core Video Card Frame -->
 						<div
 							class="reel-frame-wrapper"
@@ -2270,6 +2268,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 								onpointercancel={(e) => handlePointerCancel(e, reel, i)}
 								oncontextmenu={(e) => e.preventDefault()}
 							>
+								<div class="vignette-overlay-top"></div>
+								<div class="vignette-overlay-bottom"></div>
+
 								{#if Math.abs(i - activeReelIndex) <= 1}
 									<video
 										src={reel.video_url}
@@ -2417,7 +2418,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 										<span class="material-icons-round music-icon">music_note</span>
 										<div class="marquee-track">
 											<span class="marquee-text">
-												Sonido original — @{reel.username} • VSocial Sound Audio Track
+												Sonido original — @{reel.username} • Voom! Sound Audio Track
 											</span>
 										</div>
 									</div>
@@ -2611,7 +2612,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				<div class="comments-scroll-body">
 					{#if loadingComments}
 						<div class="comments-loader">
-							<span class="loading loading-spinner text-primary"></span>
+							<div class="comments-spinner-icon">
+								<span class="material-icons-round spin-slow">sync</span>
+							</div>
 							<p>Cargando opiniones...</p>
 						</div>
 					{:else if threadedComments.length === 0}
@@ -2646,7 +2649,20 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 												>@{node.reply_to_username}</a
 											>{' '}
 										{/if}
-										{node.body || node.comment}
+										{#each parseMsnEmotes(node.body || node.comment) as part (part)}
+											{#if part.type === 'emote'}
+												<img
+													class="msn-emoji-render"
+													src={part.url}
+													alt={part.code}
+													title={part.code}
+													loading="lazy"
+													decoding="async"
+												/>
+											{:else}
+												{part.content}
+											{/if}
+										{/each}
 									</p>
 
 									<div class="comment-footer-actions">
@@ -2704,8 +2720,23 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 					<!-- Quick 1-Tap Emoji Row -->
 					<div class="quick-emojis-bar">
 						{#each QUICK_EMOJIS as emoji}
-							<button class="quick-emoji-btn" onclick={() => appendEmoji(emoji)}>
-								{emoji}
+							<button
+								class="quick-emoji-btn"
+								onclick={() => appendEmoji(emoji)}
+								aria-label="Insertar {emoji}"
+							>
+								{#if emoteFor(emoji)}
+									<img
+										class="msn-emoji-render"
+										src={emoteFor(emoji).url}
+										alt={emoji}
+										title={emoteFor(emoji).name}
+										loading="lazy"
+										decoding="async"
+									/>
+								{:else}
+									{emoji}
+								{/if}
 							</button>
 						{/each}
 					</div>
@@ -2790,7 +2821,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 
 					<a
 						href="https://api.whatsapp.com/send?text={encodeURIComponent(
-							`¡Mira este reel en VSocial! ${typeof window !== 'undefined' ? window.location.origin : ''}/reels?id=${activeReel.id}`
+							`¡Mira este reel en Voom!! ${typeof window !== 'undefined' ? window.location.origin : ''}/reels?id=${activeReel.id}`
 						)}"
 						target="_blank"
 						rel="noopener noreferrer"
@@ -2805,7 +2836,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 					<a
 						href="https://t.me/share/url?url={encodeURIComponent(
 							`${typeof window !== 'undefined' ? window.location.origin : ''}/reels?id=${activeReel.id}`
-						)}&text={encodeURIComponent(activeReel.caption || 'Reel en VSocial')}"
+						)}&text={encodeURIComponent(activeReel.caption || 'Reel en Voom!')}"
 						target="_blank"
 						rel="noopener noreferrer"
 						class="share-platform-btn"
@@ -2818,7 +2849,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 
 					<a
 						href="https://twitter.com/intent/tweet?text={encodeURIComponent(
-							`Mira este reel en VSocial: ${typeof window !== 'undefined' ? window.location.origin : ''}/reels?id=${activeReel.id}`
+							`Mira este reel en Voom!: ${typeof window !== 'undefined' ? window.location.origin : ''}/reels?id=${activeReel.id}`
 						)}"
 						target="_blank"
 						rel="noopener noreferrer"
@@ -3081,7 +3112,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 				in:scale={{ duration: 250, start: 0.9 }}
 			>
 				<div class="shortcuts-header">
-					<span class="material-icons-round text-primary">keyboard</span>
+					<span class="material-icons-round shortcuts-title-icon">keyboard</span>
 					<h3>Atajos de Teclado</h3>
 					<button class="btn-close-round" onclick={() => (showShortcutsModal = false)}>
 						<span class="material-icons-round">close</span>
@@ -3178,11 +3209,10 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		--aero-blue: #1b85f3;
 		--aero-sky: #2eb4ff;
 		--aero-rose: #f43f5e;
-		--bg-dark-void: #060b11;
 
 		position: absolute;
 		inset: 0;
-		background: var(--bg-dark-void);
+		background: transparent;
 		display: flex;
 		overflow: hidden;
 		user-select: none;
@@ -3346,7 +3376,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		border-radius: 50%;
 		background: rgba(var(--accent-blue-rgb), 0.12);
 		border: none;
-		color: var(--text-primary);
+		color: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -3612,7 +3642,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	.nav-chevron-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
-		color: var(--text-muted);
+		color: rgba(255, 255, 255, 0.35);
 		background: rgba(15, 23, 42, 0.4);
 		border-color: rgba(255, 255, 255, 0.08);
 		box-shadow: none;
@@ -3707,7 +3737,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		overflow: hidden;
 		display: flex;
 		justify-content: center;
-		background: #000000;
+		background: transparent;
 		transition: margin-right 0.35s var(--ease-spring);
 	}
 	@media (min-width: 769px) {
@@ -3740,7 +3770,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		background: #000000;
+		background: transparent;
 		position: relative;
 		overflow: hidden;
 	}
@@ -3785,20 +3815,27 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		top: 0;
 		left: 0;
 		width: 100%;
-		height: 140px;
-		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+		height: 100px;
+		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, transparent 100%);
 		z-index: 2;
 		pointer-events: none;
+		border-radius: inherit;
 	}
 	.vignette-overlay-bottom {
 		position: absolute;
 		bottom: 0;
 		left: 0;
 		width: 100%;
-		height: 280px;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+		height: 220px;
+		background: linear-gradient(
+			to top,
+			rgba(0, 0, 0, 0.75) 0%,
+			rgba(0, 0, 0, 0.3) 60%,
+			transparent 100%
+		);
 		z-index: 2;
 		pointer-events: none;
+		border-radius: inherit;
 	}
 
 	/* Core Reel Frame Wrapper */
@@ -3925,7 +3962,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		background: transparent;
+		background: #000000;
 		cursor: pointer;
 	}
 
@@ -4459,18 +4496,15 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		}
 		35% {
 			transform: scale(1.4);
-			filter: drop-shadow(0 0 12px rgba(244, 63, 94, 0.8));
 		}
 		60% {
 			transform: scale(0.86);
-			filter: drop-shadow(0 0 5px rgba(244, 63, 94, 0.45));
 		}
 		78% {
 			transform: scale(1.12);
 		}
 		100% {
 			transform: scale(1);
-			filter: drop-shadow(0 0 3px rgba(236, 72, 153, 0.35));
 		}
 	}
 	.action-bubble-btn .material-icons-round {
@@ -4480,14 +4514,14 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		background: rgba(244, 63, 94, 0.2);
 		border-color: rgba(244, 63, 94, 0.5);
 		color: var(--aero-rose);
-		box-shadow: 0 0 20px rgba(244, 63, 94, 0.5);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 	}
 	.action-count,
 	.action-label {
 		font-size: 0.8rem;
 		font-weight: 800;
 		color: #ffffff;
-		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+		text-shadow: none;
 	}
 
 	/* Spinning Vinyl Record */
@@ -4722,6 +4756,26 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		color: var(--text-muted);
 		padding: 60px 0;
 		text-align: center;
+	}
+	.comments-spinner-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accent-blue-base);
+	}
+	.comments-spinner-icon .material-icons-round {
+		font-size: 32px;
+	}
+	.spin-slow {
+		animation: spin-slow 2s linear infinite;
+	}
+	@keyframes spin-slow {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
 	}
 	.comments-empty-state h4 {
 		margin: 0;
@@ -5097,6 +5151,10 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		font-weight: 800;
 		font-size: 1.15rem;
 	}
+	.shortcuts-title-icon {
+		color: var(--accent-blue-base);
+		font-size: 1.4rem;
+	}
 
 	.btn-close-round {
 		background: rgba(255, 255, 255, 0.1);
@@ -5124,7 +5182,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		flex-direction: column;
 		align-items: center;
 		gap: 8px;
-		color: #ffffff;
+		color: inherit;
 		cursor: pointer;
 		text-decoration: none;
 		font-size: 0.8rem;
@@ -5389,11 +5447,93 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	:global([data-theme='light']) .share-card-modal,
 	:global([data-theme='light']) .options-card-modal,
 	:global([data-theme='light']) .shortcuts-card-modal,
-	:global([data-theme='light']) .confirm-dialog-card {
+	:global([data-theme='light']) .confirm-dialog-card,
+	:global([data-theme='light']) .tiktok-menu-card,
+	:global([data-theme='light']) .tiktok-context-menu {
 		background: rgba(255, 255, 255, 0.95);
 		border-color: rgba(14, 165, 233, 0.25);
 		color: #0f172a;
-		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+		box-shadow:
+			0 20px 60px rgba(0, 0, 0, 0.15),
+			0 0 20px rgba(14, 165, 233, 0.1);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-section,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-section {
+		background: rgba(235, 248, 250, 0.85);
+		border-color: rgba(14, 165, 233, 0.2);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-row-label,
+	:global([data-theme='light']) .tiktok-context-menu .tt-row-label {
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-row-label .material-icons-round,
+	:global([data-theme='light']) .tiktok-context-menu .tt-row-label .material-icons-round {
+		color: var(--accent-blue-base);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-current-badge,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-current-badge {
+		color: var(--accent-blue-base);
+		background: rgba(27, 133, 243, 0.1);
+		border-color: rgba(27, 133, 243, 0.25);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-pills-bar,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-pills-bar {
+		background: rgba(255, 255, 255, 0.9);
+		border-color: rgba(14, 165, 233, 0.2);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-pill-btn,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-pill-btn {
+		color: #475569;
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-pill-btn:hover,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-pill-btn:hover {
+		color: #0f172a;
+		background: rgba(14, 165, 233, 0.12);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-speed-pill-btn.active,
+	:global([data-theme='light']) .tiktok-context-menu .tt-speed-pill-btn.active {
+		background: var(--accent-blue-base);
+		color: #ffffff;
+		box-shadow: 0 2px 8px rgba(27, 133, 243, 0.35);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-menu-item,
+	:global([data-theme='light']) .tiktok-context-menu .tt-menu-item {
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-menu-item:hover,
+	:global([data-theme='light']) .tiktok-context-menu .tt-menu-item:hover {
+		background: rgba(14, 165, 233, 0.1);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-item-left .material-icons-round,
+	:global([data-theme='light']) .tiktok-context-menu .tt-item-left .material-icons-round {
+		color: #475569;
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-item-right {
+		color: var(--accent-blue-base);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-menu-divider,
+	:global([data-theme='light']) .tiktok-context-menu .tt-menu-divider {
+		background: rgba(14, 165, 233, 0.18);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-menu-item.danger,
+	:global([data-theme='light']) .tiktok-context-menu .tt-menu-item.danger {
+		color: var(--aero-rose);
+	}
+	:global([data-theme='light']) .tiktok-menu-card .tt-menu-item.danger:hover,
+	:global([data-theme='light']) .tiktok-context-menu .tt-menu-item.danger:hover {
+		background: rgba(244, 63, 94, 0.1);
+	}
+	:global([data-theme='light'])
+		.tiktok-menu-card
+		.tt-menu-item.danger
+		.tt-item-left
+		.material-icons-round,
+	:global([data-theme='light'])
+		.tiktok-context-menu
+		.tt-menu-item.danger
+		.tt-item-left
+		.material-icons-round {
+		color: var(--aero-rose);
 	}
 	:global([data-theme='light']) .btn-close-round {
 		background: rgba(0, 0, 0, 0.06);
@@ -5402,16 +5542,397 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 	:global([data-theme='light']) .btn-close-round:hover {
 		background: rgba(0, 0, 0, 0.12);
 	}
+	:global([data-theme='light']) .shortcuts-header h3 {
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .shortcuts-title-icon {
+		color: var(--accent-blue-base);
+	}
 	:global([data-theme='light']) .shortcut-item kbd {
 		background: rgba(0, 0, 0, 0.06);
 		border-color: rgba(0, 0, 0, 0.15);
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .shortcut-item span {
 		color: #0f172a;
 	}
 	:global([data-theme='light']) .btn-cancel {
 		background: rgba(0, 0, 0, 0.07);
 		color: #0f172a;
 	}
+	:global([data-theme='light']) .btn-cancel:hover {
+		background: rgba(0, 0, 0, 0.12);
+	}
+	:global([data-theme='light']) .confirm-dialog-card h4 {
+		color: #0f172a;
+	}
+
+	/* Action Rail on Desktop in Light Theme */
+	@media (min-width: 769px) {
+		:global([data-theme='light']) .right-action-sidebar .action-bubble-btn .icon-wrap {
+			background: rgba(255, 255, 255, 0.85);
+			border-color: rgba(14, 165, 233, 0.25);
+			border-top-color: rgba(255, 255, 255, 0.95);
+			color: #0f172a;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+		}
+		:global([data-theme='light']) .right-action-sidebar .action-bubble-btn:hover .icon-wrap {
+			background: rgba(255, 255, 255, 0.98);
+			color: var(--accent-blue-base);
+			border-color: rgba(27, 133, 243, 0.4);
+			box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+		}
+		:global([data-theme='light']) .right-action-sidebar .action-bubble-btn.active .icon-wrap {
+			background: rgba(244, 63, 94, 0.12);
+			border-color: rgba(244, 63, 94, 0.4);
+			color: var(--aero-rose);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+		}
+		:global([data-theme='light']) .right-action-sidebar .action-count,
+		:global([data-theme='light']) .right-action-sidebar .action-label {
+			color: #0f172a;
+			text-shadow: none;
+		}
+		:global([data-theme='light']) .right-action-sidebar .creator-avatar-bubble {
+			background: #ebf8fa;
+			border-color: rgba(255, 255, 255, 0.95);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+		}
+		:global([data-theme='light']) .right-action-sidebar .avatar-letter {
+			color: #0f172a;
+			text-shadow: none;
+		}
+		:global([data-theme='light']) .right-action-sidebar .spinning-disc-container .vinyl-disc {
+			background: radial-gradient(circle, #334155 30%, #0f172a 70%);
+			border-color: rgba(255, 255, 255, 0.9);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		}
+	}
+
 	:global([data-theme='light']) .confirm-dialog-card p {
 		color: #475569;
+	}
+	:global([data-theme='light']) .pip-disabled-glass-card {
+		background: rgba(255, 255, 255, 0.92);
+		border-color: rgba(14, 165, 233, 0.28);
+		color: #0f172a;
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+	}
+	:global([data-theme='light']) .pip-disabled-glass-card .pip-subtext {
+		color: #475569;
+	}
+	:global([data-theme='light']) .reels-global-toast {
+		background: rgba(255, 255, 255, 0.95);
+		border-color: rgba(14, 165, 233, 0.25);
+		color: #0f172a;
+		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+	}
+	:global([data-theme='light']) .reels-comments-drawer {
+		background: #ebf8fa;
+		border-color: rgba(14, 165, 233, 0.25);
+	}
+
+	/* Top Bar in Light Theme */
+	:global([data-theme='light']) .volume-pill-capsule {
+		background: rgba(255, 255, 255, 0.82);
+		border-color: rgba(14, 165, 233, 0.25);
+		border-top-color: rgba(255, 255, 255, 0.95);
+		box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+	}
+	:global([data-theme='light']) .volume-pill-capsule:hover {
+		background: rgba(255, 255, 255, 0.95);
+		border-color: rgba(27, 133, 243, 0.45);
+		box-shadow:
+			0 6px 20px rgba(14, 165, 233, 0.22),
+			0 0 14px rgba(27, 133, 243, 0.2);
+	}
+	:global([data-theme='light']) .vol-icon-btn {
+		color: #0f172a;
+		background: rgba(27, 133, 243, 0.12);
+	}
+	:global([data-theme='light']) .vol-icon-btn:hover {
+		background: rgba(27, 133, 243, 0.22);
+		color: var(--accent-blue-base);
+	}
+	:global([data-theme='light']) .aero-vol-slider {
+		background: linear-gradient(
+			to right,
+			var(--aero-sky, #2eb4ff) 0%,
+			var(--accent-blue-base, #1b85f3) var(--vol-pct, 50%),
+			rgba(14, 165, 233, 0.18) var(--vol-pct, 50%),
+			rgba(14, 165, 233, 0.18) 100%
+		);
+	}
+	:global([data-theme='light']) .aero-pill-btn {
+		background: rgba(255, 255, 255, 0.82);
+		border-color: rgba(14, 165, 233, 0.25);
+		border-top-color: rgba(255, 255, 255, 0.95);
+		color: #0f172a;
+		box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+	}
+	:global([data-theme='light']) .aero-pill-btn:hover {
+		background: rgba(255, 255, 255, 0.95);
+		color: var(--accent-blue-base);
+		border-color: rgba(27, 133, 243, 0.45);
+		box-shadow:
+			0 6px 20px rgba(14, 165, 233, 0.22),
+			0 0 14px rgba(27, 133, 243, 0.2);
+	}
+
+	/* Navigation Chevrons in Light Theme */
+	:global([data-theme='light']) .nav-chevron-btn {
+		background: rgba(255, 255, 255, 0.82);
+		border-color: rgba(14, 165, 233, 0.25);
+		border-top-color: rgba(255, 255, 255, 0.95);
+		color: #0f172a;
+		box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+	}
+	:global([data-theme='light']) .nav-chevron-btn:not(:disabled):hover {
+		background: rgba(255, 255, 255, 0.95);
+		color: var(--accent-blue-base);
+		border-color: rgba(27, 133, 243, 0.45);
+		box-shadow:
+			0 6px 20px rgba(14, 165, 233, 0.22),
+			0 0 14px rgba(27, 133, 243, 0.25);
+	}
+	:global([data-theme='light']) .nav-chevron-btn:disabled {
+		color: #94a3b8;
+		background: rgba(255, 255, 255, 0.45);
+		border-color: rgba(14, 165, 233, 0.12);
+	}
+
+	/* Progress Scrubber and Empty States in Light Theme */
+	:global([data-theme='light']) .progress-bar-interactive .track-bg {
+		background: rgba(14, 165, 233, 0.22);
+	}
+	:global([data-theme='light']) .time-preview-tooltip {
+		background: rgba(255, 255, 255, 0.95);
+		border-color: rgba(14, 165, 233, 0.25);
+		color: #0f172a;
+		box-shadow: 0 4px 14px rgba(14, 165, 233, 0.15);
+	}
+	:global([data-theme='light']) .reels-loading-screen,
+	:global([data-theme='light']) .reels-empty-screen {
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .reels-empty-screen h3 {
+		color: #0f172a;
+	}
+	:global([data-theme='light']) .reels-empty-screen p {
+		color: #475569;
+	}
+
+	/* ── Midnight Theme Adaptations ───────────────────────────────────────── */
+	:global([data-theme='midnight']) .share-card-modal,
+	:global([data-theme='midnight']) .options-card-modal,
+	:global([data-theme='midnight']) .shortcuts-card-modal,
+	:global([data-theme='midnight']) .confirm-dialog-card,
+	:global([data-theme='midnight']) .tiktok-menu-card,
+	:global([data-theme='midnight']) .tiktok-context-menu {
+		background: rgba(6, 12, 24, 0.96);
+		border-color: rgba(160, 210, 255, 0.15);
+		color: #ffffff;
+		box-shadow:
+			0 20px 60px rgba(0, 0, 0, 0.9),
+			0 0 25px rgba(77, 200, 255, 0.12);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-section,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-section {
+		background: rgba(10, 20, 38, 0.6);
+		border-color: rgba(160, 210, 255, 0.08);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-row-label,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-row-label {
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-row-label .material-icons-round,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-row-label .material-icons-round {
+		color: var(--aero-sky);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-current-badge,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-current-badge {
+		color: var(--aero-sky);
+		background: rgba(46, 180, 255, 0.12);
+		border-color: rgba(46, 180, 255, 0.25);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-pills-bar,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-pills-bar {
+		background: rgba(2, 4, 8, 0.65);
+		border-color: rgba(160, 210, 255, 0.08);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-pill-btn,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-pill-btn {
+		color: rgba(255, 255, 255, 0.65);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-pill-btn:hover,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-pill-btn:hover {
+		color: #ffffff;
+		background: rgba(255, 255, 255, 0.1);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-speed-pill-btn.active,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-speed-pill-btn.active {
+		background: var(--accent-blue-base);
+		color: #ffffff;
+		box-shadow: 0 2px 10px rgba(46, 180, 255, 0.4);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-menu-item,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-menu-item {
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-menu-item:hover,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-menu-item:hover {
+		background: rgba(255, 255, 255, 0.08);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-item-left .material-icons-round,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-item-left .material-icons-round {
+		color: #cbd5e1;
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-item-right {
+		color: var(--aero-sky);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-menu-divider,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-menu-divider {
+		background: rgba(160, 210, 255, 0.1);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-menu-item.danger,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-menu-item.danger {
+		color: var(--aero-rose);
+	}
+	:global([data-theme='midnight']) .tiktok-menu-card .tt-menu-item.danger:hover,
+	:global([data-theme='midnight']) .tiktok-context-menu .tt-menu-item.danger:hover {
+		background: rgba(244, 63, 94, 0.15);
+	}
+	:global([data-theme='midnight'])
+		.tiktok-menu-card
+		.tt-menu-item.danger
+		.tt-item-left
+		.material-icons-round,
+	:global([data-theme='midnight'])
+		.tiktok-context-menu
+		.tt-menu-item.danger
+		.tt-item-left
+		.material-icons-round {
+		color: var(--aero-rose);
+	}
+	:global([data-theme='midnight']) .btn-close-round {
+		background: rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .btn-close-round:hover {
+		background: rgba(255, 255, 255, 0.2);
+	}
+	:global([data-theme='midnight']) .shortcut-item kbd {
+		background: rgba(255, 255, 255, 0.1);
+		border-color: rgba(160, 210, 255, 0.2);
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .shortcut-item span {
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .btn-cancel {
+		background: rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .btn-cancel:hover {
+		background: rgba(255, 255, 255, 0.18);
+	}
+	:global([data-theme='midnight']) .confirm-dialog-card h4 {
+		color: #ffffff;
+	}
+	:global([data-theme='midnight']) .confirm-dialog-card p {
+		color: #cbd5e1;
+	}
+	:global([data-theme='midnight']) .pip-disabled-glass-card {
+		background: rgba(6, 12, 24, 0.95);
+		border-color: rgba(160, 210, 255, 0.15);
+		color: #ffffff;
+		box-shadow:
+			0 16px 40px rgba(0, 0, 0, 0.85),
+			0 0 20px rgba(77, 200, 255, 0.1);
+	}
+	:global([data-theme='midnight']) .pip-disabled-glass-card .pip-subtext {
+		color: #cbd5e1;
+	}
+	:global([data-theme='midnight']) .reels-global-toast {
+		background: rgba(6, 12, 24, 0.95);
+		border-color: rgba(160, 210, 255, 0.15);
+		color: #ffffff;
+		box-shadow:
+			0 10px 30px rgba(0, 0, 0, 0.7),
+			0 0 15px rgba(77, 200, 255, 0.1);
+	}
+	:global([data-theme='midnight']) .reels-comments-drawer {
+		background: #050a14;
+		border-color: rgba(160, 210, 255, 0.1);
+	}
+
+	/* Top Bar in Midnight Theme */
+	:global([data-theme='midnight']) .volume-pill-capsule {
+		background: rgba(6, 12, 24, 0.85);
+		border-color: rgba(160, 210, 255, 0.15);
+		border-top-color: rgba(160, 210, 255, 0.3);
+		box-shadow:
+			0 4px 16px rgba(0, 0, 0, 0.6),
+			0 0 12px rgba(77, 200, 255, 0.1);
+	}
+	:global([data-theme='midnight']) .volume-pill-capsule:hover {
+		background: rgba(8, 16, 32, 0.95);
+		border-color: rgba(27, 133, 243, 0.5);
+		box-shadow:
+			0 6px 20px rgba(0, 0, 0, 0.7),
+			0 0 16px rgba(77, 200, 255, 0.2);
+	}
+	:global([data-theme='midnight']) .aero-pill-btn {
+		background: rgba(6, 12, 24, 0.85);
+		border-color: rgba(160, 210, 255, 0.15);
+		border-top-color: rgba(160, 210, 255, 0.3);
+		color: #ffffff;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+	}
+	:global([data-theme='midnight']) .aero-pill-btn:hover {
+		background: rgba(8, 16, 32, 0.95);
+		border-color: rgba(27, 133, 243, 0.5);
+		color: var(--aero-sky);
+		box-shadow:
+			0 6px 20px rgba(0, 0, 0, 0.7),
+			0 0 16px rgba(77, 200, 255, 0.25);
+	}
+
+	/* Navigation Chevrons in Midnight Theme */
+	:global([data-theme='midnight']) .nav-chevron-btn {
+		background: rgba(6, 12, 24, 0.85);
+		border-color: rgba(160, 210, 255, 0.15);
+		border-top-color: rgba(160, 210, 255, 0.3);
+		color: #ffffff;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+	}
+	:global([data-theme='midnight']) .nav-chevron-btn:not(:disabled):hover {
+		background: rgba(8, 16, 32, 0.95);
+		border-color: rgba(27, 133, 243, 0.5);
+		color: var(--aero-sky);
+		box-shadow:
+			0 6px 20px rgba(0, 0, 0, 0.7),
+			0 0 16px rgba(77, 200, 255, 0.25);
+	}
+
+	/* Action Rail on Desktop in Midnight Theme */
+	@media (min-width: 769px) {
+		:global([data-theme='midnight']) .right-action-sidebar .action-bubble-btn .icon-wrap {
+			background: rgba(6, 12, 24, 0.85);
+			border-color: rgba(160, 210, 255, 0.15);
+			border-top-color: rgba(160, 210, 255, 0.28);
+			color: #ffffff;
+			box-shadow:
+				0 4px 16px rgba(0, 0, 0, 0.6),
+				0 0 12px rgba(77, 200, 255, 0.08);
+		}
+		:global([data-theme='midnight']) .right-action-sidebar .action-bubble-btn:hover .icon-wrap {
+			background: rgba(8, 16, 32, 0.95);
+			border-color: rgba(27, 133, 243, 0.5);
+			color: var(--aero-sky);
+			box-shadow:
+				0 6px 20px rgba(0, 0, 0, 0.7),
+				0 0 16px rgba(77, 200, 255, 0.25);
+		}
 	}
 </style>

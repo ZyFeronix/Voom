@@ -1,5 +1,5 @@
 /**
- * VSocial — Control de acceso por visibilidad de perfil.
+ * Voom! — Control de acceso por visibilidad de perfil.
  *
  * Respeta user_settings.profile_visibility del DUEÑO del contenido:
  *  - 'public'    → cualquiera

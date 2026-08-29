@@ -55,7 +55,7 @@
 </script>
 
 <svelte:head>
-	<title>Ajustes — VSocial</title>
+	<title>Ajustes — Voom!</title>
 </svelte:head>
 
 {#if !data.authed}

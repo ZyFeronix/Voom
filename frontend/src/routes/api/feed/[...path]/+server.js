@@ -1,5 +1,5 @@
 /**
- * VSocial — Feed API
+ * Voom! — Feed API
  * GET /api/feed — Personalized home feed
  * GET /api/feed/explore — Public explore feed
  * GET /api/feed/preferences — Get feed preferences
@@ -518,8 +518,9 @@ export async function GET({ request, url, params }) {
 			} else {
 				queryParams.push(cursorScore, cursorScore, cursorId);
 			}
-			// Fetch extra candidate batch for diversity filtering (3x limit ensures ample headroom)
-			queryParams.push(limit * 3);
+			// Over-fetch para applyDiversityFilters: rango 60-80 candidatos
+			// (veredicto del council) con tope para no sobre-consultar.
+			queryParams.push(Math.min(80, limit * 4));
 
 			const rawCandidates = await db.prepare(query).all(...queryParams);
 			posts = applyDiversityFilters(rawCandidates, limit);

@@ -1,5 +1,5 @@
 /**
- * VSocial — Users API
+ * Voom! — Users API
  * GET    /api/users/me, /api/users/suggested, /api/users/search, /api/users/settings
  * GET    /api/users/me/blocked, /api/users/:username, /api/users/:username/followers, /api/users/:username/following, /api/users/:username/posts, /api/users/:username/reposts
  * POST   /api/users/:username/follow, /api/users/:username/block, /api/users/avatar, /api/users/cover
@@ -1071,6 +1071,10 @@ export async function PUT({ request, _url, params }) {
 		}
 
 		if (!updates.length) return json({ error: 'No valid settings provided' }, { status: 400 });
+
+		// Asegurar que la fila de user_settings existe para el usuario antes de actualizar
+		await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(userId);
+
 		vals.push(userId);
 		await db
 			.prepare(

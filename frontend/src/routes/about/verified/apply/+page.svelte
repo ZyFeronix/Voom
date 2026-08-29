@@ -111,10 +111,10 @@
 </script>
 
 <svelte:head>
-	<title>Portal de Auditoría y Verificación - V-SOCIAL</title>
+	<title>Portal de Auditoría y Verificación - Voom!</title>
 	<meta
 		name="description"
-		content="Selecciona el canal de verificación correspondiente para iniciar tu proceso de auditoría oficial de identidad en V-SOCIAL."
+		content="Selecciona el canal de verificación correspondiente para iniciar tu proceso de auditoría oficial de identidad en Voom!."
 	/>
 </svelte:head>
 
@@ -140,8 +140,8 @@
 			Portal Oficial de <span class="gradient-text">Auditoría & Verificación</span>
 		</h1>
 		<p class="hub-subtitle">
-			En V-SOCIAL, las insignias no se compran. Cada distintivo es emitido tras una auditoría
-			rigurosa adaptada a las características y evidencias de cada sector.
+			En Voom!, las insignias no se compran. Cada distintivo es emitido tras una auditoría rigurosa
+			adaptada a las características y evidencias de cada sector.
 		</p>
 
 		<div class="hub-guarantees glass-panel">

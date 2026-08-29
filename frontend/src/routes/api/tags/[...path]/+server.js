@@ -1,5 +1,5 @@
 /**
- * VSocial — Tags API
+ * Voom! — Tags API
  *
  * Tags curados por administración que alimentan los filtros de /explore.
  * La lectura es pública; la escritura exige rol de administrador.

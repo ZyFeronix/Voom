@@ -22,6 +22,13 @@
 			{ href: '/messages', icon: 'chat_bubble', label: 'Mensajes', show: true }
 		].filter((i) => i.show)
 	);
+
+	function isActive(href) {
+		const path = page.url.pathname;
+		if (href === '/reels' && path === '/reels/create') return false;
+		if (href === '/feed') return path === '/feed';
+		return path === href || path.startsWith(href + '/');
+	}
 </script>
 
 <nav class="vs-mobile-nav">
@@ -34,9 +41,9 @@
 			>
 				<a
 					href={item.href}
-					class="vs-mobile-item {page.url.pathname.startsWith(item.href) && !item.accent
-						? 'active'
-						: ''} {item.accent ? 'accent-item' : ''}"
+					class="vs-mobile-item {isActive(item.href) && !item.accent ? 'active' : ''} {item.accent
+						? 'accent-item'
+						: ''}"
 					aria-label={item.label}
 				>
 					{#if item.accent}

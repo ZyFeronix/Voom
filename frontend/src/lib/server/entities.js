@@ -1,5 +1,5 @@
 /**
- * VSocial — Entity Parser
+ * Voom! — Entity Parser
  * Converts #hashtags, @mentions, URLs into styled <a> tags.
  * XSS-safe: escapes all HTML before parsing.
  */

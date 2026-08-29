@@ -1,5 +1,5 @@
 /**
- * VSocial — OAuth 2.0 (Google + Apple)
+ * Voom! — OAuth 2.0 (Google + Apple)
  */
 import { getDb } from './db.js';
 import { createSession } from './auth.js';

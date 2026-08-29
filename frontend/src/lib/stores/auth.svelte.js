@@ -31,10 +31,25 @@ const isAdmin = $derived(
 	_user?.role === 'admin' || _user?.role === 'super_admin' || _user?.is_admin
 );
 const isModerator = $derived(_user?.role === 'moderator' || isAdmin);
+const isSupport = $derived(_user?.role === 'support' || isModerator);
 const isTeamOrHigher = $derived(
 	['team', 'support', 'moderator', 'admin', 'super_admin', 'staff'].includes(_user?.role) ||
 		!!_user?.is_admin
 );
+// isStaff == isTeamOrHigher: acceso al panel /admin según rol efectivo del servidor.
+
+/** Etiqueta en español del rol de staff (para chips del panel). */
+const ROLE_LABELS = {
+	user: 'Usuario',
+	team: 'Equipo Voom!',
+	staff: 'Staff',
+	support: 'Soporte',
+	moderator: 'Moderador',
+	admin: 'Administrador',
+	super_admin: 'Super Admin',
+	government: 'Institución'
+};
+const roleLabel = $derived(ROLE_LABELS[_user?.role] || _user?.role || 'Usuario');
 
 // Level computed from xp_points (sync with backend formula in gamification.js)
 function computeLevel(xp) {
@@ -52,6 +67,33 @@ function isValidThemeValue(value) {
 const userLevel = $derived(_user ? _user.level || computeLevel(_user.xp_points || 0) : 1);
 
 let _initPromise = null;
+
+/**
+ * Aplica la apariencia global guardada en cuenta (servidor manda sobre la
+ * caché local). No-op seguro si el usuario no trae preferencias.
+ */
+async function hydrateAppearance(user) {
+	if (!user || typeof user !== 'object') return;
+	try {
+		const { applyAll, initAppearance } = await import('./appearance.svelte.js');
+		initAppearance();
+		applyAll({
+			accentColor: user.preferred_accent_color,
+			appFont: user.preferred_app_font,
+			fontScale: user.preferred_font_scale,
+			density: user.preferred_density,
+			wallpaperUrl: user.preferred_wallpaper_url,
+			wallpaperDim: user.preferred_wallpaper_dim,
+			cardOpacity: user.preferred_card_opacity,
+			borderRadius: user.preferred_border_radius,
+			wallpaperMode: user.preferred_wallpaper_mode,
+			aeroGloss: user.preferred_aero_gloss,
+			activePreset: user.preferred_active_preset ?? '',
+			customFontFamily: user.profile_font_family ?? '',
+			customFontUrl: user.profile_custom_font_url ?? ''
+		});
+	} catch {}
+}
 
 /**
  * Initialize auth from localStorage (called on app boot).
@@ -77,6 +119,9 @@ async function initialize() {
 							setTheme(user.preferred_theme);
 						}
 					}
+					// Apariencia global (acento/escala/densidad/fuente/wallpaper):
+					// la cuenta manda sobre la caché local. applyAll NO dispara red.
+					await hydrateAppearance(user);
 				} else {
 					_token = null;
 					_user = null;
@@ -116,6 +161,7 @@ async function login(loginId, password) {
 		localStorage.setItem('vsocial_user', JSON.stringify(user));
 		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
 	}
+	await hydrateAppearance(user);
 	return user;
 }
 
@@ -133,6 +179,7 @@ async function register(data) {
 		localStorage.setItem('vsocial_user', JSON.stringify(user));
 		document.cookie = `vsocial_token=${token}; path=/; max-age=31536000; SameSite=Strict; Secure`;
 	}
+	await hydrateAppearance(user);
 	return user;
 }
 
@@ -208,8 +255,14 @@ export const authStore = {
 	get isModerator() {
 		return isModerator;
 	},
+	get isSupport() {
+		return isSupport;
+	},
 	get isTeamOrHigher() {
 		return isTeamOrHigher;
+	},
+	get roleLabel() {
+		return roleLabel;
 	},
 	get userLevel() {
 		return userLevel;

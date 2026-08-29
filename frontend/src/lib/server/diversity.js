@@ -1,5 +1,5 @@
 /**
- * VSocial — Feed Diversity Engine
+ * Voom! — Feed Diversity Engine
  * Prevents clustering of content by the same creator.
  * Enforces maximum per-author quota and consecutive author limits.
  */

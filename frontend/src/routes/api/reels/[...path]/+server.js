@@ -1,5 +1,5 @@
 /**
- * VSocial — Reels API
+ * Voom! — Reels API
  */
 import { json } from '@sveltejs/kit';
 import { getDb, getUploadsDir } from '$lib/server/db.js';

@@ -1859,7 +1859,7 @@
 		width: 400px;
 		max-width: 400px;
 		height: 100%;
-		background: var(--bg-surface-solid, #ffffff);
+		background: var(--bg-surface-solid, var(--bg-surface));
 		backdrop-filter: var(--glass-blur);
 		-webkit-backdrop-filter: var(--glass-blur);
 		border-left: 1px solid var(--border-subtle);

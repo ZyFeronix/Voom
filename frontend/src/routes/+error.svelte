@@ -37,7 +37,7 @@
 </script>
 
 <svelte:head>
-	<title>{status} · {errorTitle} — VSocial</title>
+	<title>{status} · {errorTitle} — Voom!</title>
 </svelte:head>
 
 <main class="error-page-container">
@@ -93,7 +93,7 @@
 		<div class="error-footer-links">
 			<a href="/about" class="footer-link">
 				<span class="material-icons-round text-sm">info</span>
-				<span>Acerca de VSocial</span>
+				<span>Acerca de Voom!</span>
 			</a>
 			<span class="footer-dot">·</span>
 			<a href="/feed" class="footer-link">

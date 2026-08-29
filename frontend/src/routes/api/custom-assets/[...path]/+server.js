@@ -1,7 +1,7 @@
 /**
- * VSocial — Custom Assets API (Emotes, Stickers, Emojis, GIFs)
+ * Voom! — Custom Assets API (Emotes, Stickers, Emojis, GIFs)
  * PRE-PRODUCTION EXPERIMENTAL FEATURE
- * Exclusively for 'team' (Equipo V-SOCIAL) and higher staff roles.
+ * Exclusively for 'team' (Equipo Voom!) and higher staff roles.
  *
  * GET    /api/custom-assets       — List custom assets (with filters)
  * GET    /api/custom-assets/specs — Technical dimensions and rules

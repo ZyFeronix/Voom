@@ -1,8 +1,16 @@
 <script>
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
+
+	// En /explore la página trae su propio buscador protagonista (hero) y en
+	// /marketplace hay un filtro propio "Buscar en la tienda": ocultamos el
+	// buscador global ahí para no mostrar dos search bars en la misma pantalla.
+	let hideSearch = $derived(
+		page.url.pathname.startsWith('/explore') || page.url.pathname.startsWith('/marketplace')
+	);
 
 	let searchQuery = $state('');
 	let searchFocused = $state(false);
@@ -104,48 +112,146 @@
 	});
 </script>
 
-<header class="vs-topbar" class:search-active={searchFocused}>
+<header class="vs-topbar" class:search-active={searchFocused} class:no-search={hideSearch}>
 	<!-- Search -->
-	<div class="vs-search-wrap" bind:this={searchWrapRef}>
-		<div class="vs-search-inner" class:focused={searchFocused}>
-			<span class="material-icons-round vs-search-icon">search</span>
-			<input
-				type="search"
-				id="global_search_input"
-				name="global_search_input"
-				bind:value={searchQuery}
-				onfocus={() => (searchFocused = true)}
-				onkeydown={handleSearch}
-				placeholder={searchFocused ? 'Buscar' : 'Buscar creadores, posts, hashtags…'}
-				class="vs-search-input"
-				autocomplete="off"
-			/>
-		</div>
+	{#if !hideSearch}
+		<div class="vs-search-wrap" bind:this={searchWrapRef}>
+			<div class="vs-search-inner" class:focused={searchFocused}>
+				<span class="material-icons-round vs-search-icon">search</span>
+				<input
+					type="search"
+					id="global_search_input"
+					name="global_search_input"
+					bind:value={searchQuery}
+					onfocus={() => (searchFocused = true)}
+					onkeydown={handleSearch}
+					placeholder={searchFocused ? 'Buscar' : 'Buscar creadores, posts, hashtags…'}
+					class="vs-search-input"
+					autocomplete="off"
+				/>
+			</div>
 
-		{#if searchFocused}
-			<div class="vs-search-dropdown glass-panel" transition:fly={{ y: -10, duration: 250 }}>
-				{#if searchQuery.trim().length > 1}
-					{#if isSearching}
-						<div class="vs-search-empty">Buscando...</div>
-					{:else if (!searchResults?.users || searchResults.users.length === 0) && (!searchResults?.posts || searchResults.posts.length === 0)}
-						<div class="vs-search-empty">No se encontraron resultados para "{searchQuery}"</div>
+			{#if searchFocused}
+				<div class="vs-search-dropdown glass-panel" transition:fly={{ y: -10, duration: 250 }}>
+					{#if searchQuery.trim().length > 1}
+						{#if isSearching}
+							<div class="vs-search-empty">Buscando...</div>
+						{:else if (!searchResults?.users || searchResults.users.length === 0) && (!searchResults?.posts || searchResults.posts.length === 0)}
+							<div class="vs-search-empty">No se encontraron resultados para "{searchQuery}"</div>
+						{:else}
+							{#if searchResults?.users && searchResults.users.length > 0}
+								<div class="vs-search-recent-header"><span>Personas</span></div>
+								<div class="vs-search-recent-list">
+									{#each searchResults.users as user}
+										<a
+											href={`/u/${user.username}`}
+											class="vs-search-recent-item"
+											onclick={() => {
+												saveToRecent({ type: 'user', ...user });
+												searchFocused = false;
+											}}
+										>
+											{#if user.avatar_url}
+												<img
+													src={user.avatar_url}
+													alt={user.username}
+													style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
+													width="36"
+													height="36"
+													loading="lazy"
+													decoding="async"
+												/>
+											{:else}
+												<div
+													style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
+												>
+													{(user.display_name || user.username)[0].toUpperCase()}
+												</div>
+											{/if}
+											<div class="vs-search-user-info">
+												<span class="vs-search-user-name">{user.display_name || user.username}</span
+												>
+												<span class="vs-search-user-handle">@{user.username}</span>
+											</div>
+										</a>
+									{/each}
+								</div>
+							{/if}
+							{#if searchResults?.posts && searchResults.posts.length > 0}
+								<div
+									class="vs-search-recent-header"
+									style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 12px;"
+								>
+									<span>Publicaciones</span>
+								</div>
+								<div class="vs-search-recent-list">
+									{#each searchResults.posts as post}
+										<a
+											href={`/posts/${post.id}`}
+											class="vs-search-recent-item"
+											onclick={() => (searchFocused = false)}
+										>
+											<span
+												class="material-icons-round text-muted"
+												style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: var(--radius-squircle); corner-shape: squircle;"
+												>article</span
+											>
+											<span class="vs-search-item-text"
+												>{post.body.substring(0, 50)}{post.body.length > 50 ? '...' : ''}</span
+											>
+										</a>
+									{/each}
+								</div>
+							{/if}
+							<div class="vs-search-footer">
+								<button class="vs-search-view-all" onclick={() => triggerSearch(searchQuery)}>
+									Ver todos los resultados para "{searchQuery}"
+								</button>
+							</div>
+						{/if}
+					{:else if recentSearches.length === 0}
+						<div class="vs-search-empty">Prueba a buscar personas, listas o palabras clave</div>
 					{:else}
-						{#if searchResults?.users && searchResults.users.length > 0}
-							<div class="vs-search-recent-header"><span>Personas</span></div>
-							<div class="vs-search-recent-list">
-								{#each searchResults.users as user}
-									<a
-										href={`/u/${user.username}`}
+						<div class="vs-search-recent-header">
+							<span>Recientes</span>
+							<button class="vs-search-clear-btn" onclick={clearRecent}>Borrar todo</button>
+						</div>
+						<div class="vs-search-recent-list">
+							{#each recentSearches as item, idx}
+								{#if typeof item === 'string'}
+									<div
 										class="vs-search-recent-item"
-										onclick={() => {
-											saveToRecent({ type: 'user', ...user });
-											searchFocused = false;
-										}}
+										role="button"
+										tabindex="0"
+										onclick={() => triggerSearch(item)}
+										onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
 									>
-										{#if user.avatar_url}
+										<span
+											class="material-icons-round text-muted"
+											style="font-size: 18px; margin-right: 12px;">search</span
+										>
+										<span class="vs-search-item-text">{item}</span>
+										<button
+											class="vs-search-item-remove"
+											onclick={(e) => removeRecent(idx, e)}
+											title="Eliminar de recientes"
+										>
+											<span class="material-icons-round" style="font-size: 16px;">close</span>
+										</button>
+									</div>
+								{:else if item.type === 'user'}
+									<div
+										class="vs-search-recent-item"
+										style="position:relative;"
+										role="button"
+										tabindex="0"
+										onclick={() => triggerSearch(item)}
+										onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
+									>
+										{#if item.avatar_url}
 											<img
-												src={user.avatar_url}
-												alt={user.username}
+												src={item.avatar_url}
+												alt={item.username}
 												style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
 												width="36"
 												height="36"
@@ -156,125 +262,30 @@
 											<div
 												style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
 											>
-												{(user.display_name || user.username)[0].toUpperCase()}
+												{(item.display_name || item.username)[0].toUpperCase()}
 											</div>
 										{/if}
 										<div class="vs-search-user-info">
-											<span class="vs-search-user-name">{user.display_name || user.username}</span>
-											<span class="vs-search-user-handle">@{user.username}</span>
+											<span class="vs-search-user-name">{item.display_name || item.username}</span>
+											<span class="vs-search-user-handle">@{item.username}</span>
 										</div>
-									</a>
-								{/each}
-							</div>
-						{/if}
-						{#if searchResults?.posts && searchResults.posts.length > 0}
-							<div
-								class="vs-search-recent-header"
-								style="margin-top: 12px; border-top: 1px solid var(--border-subtle); padding-top: 12px;"
-							>
-								<span>Publicaciones</span>
-							</div>
-							<div class="vs-search-recent-list">
-								{#each searchResults.posts as post}
-									<a
-										href={`/posts/${post.id}`}
-										class="vs-search-recent-item"
-										onclick={() => (searchFocused = false)}
-									>
-										<span
-											class="material-icons-round text-muted"
-											style="font-size: 20px; margin-right: 12px; padding: 6px; background: var(--bg-overlay); border-radius: var(--radius-squircle); corner-shape: squircle;"
-											>article</span
+										<button
+											class="vs-search-item-remove"
+											style="position:absolute; right:16px;"
+											onclick={(e) => removeRecent(idx, e)}
+											title="Eliminar de recientes"
 										>
-										<span class="vs-search-item-text"
-											>{post.body.substring(0, 50)}{post.body.length > 50 ? '...' : ''}</span
-										>
-									</a>
-								{/each}
-							</div>
-						{/if}
-						<div class="vs-search-footer">
-							<button class="vs-search-view-all" onclick={() => triggerSearch(searchQuery)}>
-								Ver todos los resultados para "{searchQuery}"
-							</button>
+											<span class="material-icons-round" style="font-size: 16px;">close</span>
+										</button>
+									</div>
+								{/if}
+							{/each}
 						</div>
 					{/if}
-				{:else if recentSearches.length === 0}
-					<div class="vs-search-empty">Prueba a buscar personas, listas o palabras clave</div>
-				{:else}
-					<div class="vs-search-recent-header">
-						<span>Recientes</span>
-						<button class="vs-search-clear-btn" onclick={clearRecent}>Borrar todo</button>
-					</div>
-					<div class="vs-search-recent-list">
-						{#each recentSearches as item, idx}
-							{#if typeof item === 'string'}
-								<div
-									class="vs-search-recent-item"
-									role="button"
-									tabindex="0"
-									onclick={() => triggerSearch(item)}
-									onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
-								>
-									<span
-										class="material-icons-round text-muted"
-										style="font-size: 18px; margin-right: 12px;">search</span
-									>
-									<span class="vs-search-item-text">{item}</span>
-									<button
-										class="vs-search-item-remove"
-										onclick={(e) => removeRecent(idx, e)}
-										title="Eliminar de recientes"
-									>
-										<span class="material-icons-round" style="font-size: 16px;">close</span>
-									</button>
-								</div>
-							{:else if item.type === 'user'}
-								<div
-									class="vs-search-recent-item"
-									style="position:relative;"
-									role="button"
-									tabindex="0"
-									onclick={() => triggerSearch(item)}
-									onkeydown={(e) => e.key === 'Enter' && triggerSearch(item)}
-								>
-									{#if item.avatar_url}
-										<img
-											src={item.avatar_url}
-											alt={item.username}
-											style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;object-fit:cover;border:1px solid var(--border-subtle);"
-											width="36"
-											height="36"
-											loading="lazy"
-											decoding="async"
-										/>
-									{:else}
-										<div
-											style="width:36px;height:36px;border-radius: var(--radius-squircle); corner-shape: squircle;margin-right:12px;background:var(--grad-primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;border:1px solid rgba(255,255,255,0.2);"
-										>
-											{(item.display_name || item.username)[0].toUpperCase()}
-										</div>
-									{/if}
-									<div class="vs-search-user-info">
-										<span class="vs-search-user-name">{item.display_name || item.username}</span>
-										<span class="vs-search-user-handle">@{item.username}</span>
-									</div>
-									<button
-										class="vs-search-item-remove"
-										style="position:absolute; right:16px;"
-										onclick={(e) => removeRecent(idx, e)}
-										title="Eliminar de recientes"
-									>
-										<span class="material-icons-round" style="font-size: 16px;">close</span>
-									</button>
-								</div>
-							{/if}
-						{/each}
-					</div>
-				{/if}
-			</div>
-		{/if}
-	</div>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Right actions -->
 	<div class="vs-actions">
@@ -317,6 +328,24 @@
 
 	:global([data-theme='midnight']) .vs-topbar {
 		background: rgba(4, 10, 20, 0.75);
+	}
+
+	/* Sin buscador (/explore trae el suyo en el hero): el grid se colapsa a dos
+	   columnas y las acciones pasan a la segunda para no dejar el centro vacío. */
+	.vs-topbar.no-search {
+		grid-template-columns: 1fr auto;
+	}
+	.vs-topbar.no-search .vs-actions {
+		grid-column: 2;
+	}
+
+	/* Sin buscador (/explore tiene el suyo en el hero): 2 columnas y las
+	   acciones ancladas a la derecha, sin hueco central vacío. */
+	.vs-topbar.no-search {
+		grid-template-columns: 1fr auto;
+	}
+	.vs-topbar.no-search .vs-actions {
+		grid-column: 2;
 	}
 
 	/* ─── Search ────────────────────────────────── */
@@ -522,33 +551,48 @@
 		background: rgba(74, 171, 223, 0.1);
 	}
 
-	/* Mobile Search Expandable */
+	/* Mobile Search - Desplegable No Invasivo */
 	@media (max-width: 639px) {
 		.vs-topbar {
 			display: flex;
 		}
 		.vs-search-wrap {
 			flex: 0 0 40px;
-		}
-		.vs-search-wrap:focus-within {
-			flex: 1;
+			height: 40px;
+			position: static; /* Permite que el inner absoluto se guíe por el topbar */
 		}
 		.vs-search-inner {
+			position: absolute;
+			top: 9px;
+			left: 18px;
+			width: 40px;
+			height: 40px;
+			transition: all var(--t-spring);
 			cursor: pointer;
+			z-index: 101;
 		}
 		.vs-search-input {
 			opacity: 0;
 			cursor: pointer;
 		}
+		/* Al enfocar, se expande elegantemente sobre el header sin causar saltos en el layout */
+		.vs-search-wrap:focus-within .vs-search-inner {
+			width: calc(100% - 36px);
+			background: var(--bg-surface-solid);
+			box-shadow: var(--shadow-lg), var(--shadow-glow);
+			border-color: var(--aero-sky);
+		}
 		.vs-search-wrap:focus-within .vs-search-input {
 			opacity: 1;
 			cursor: text;
 		}
-		.vs-topbar.search-active .vs-actions {
-			display: none;
-		}
-		.vs-topbar.search-active .vs-search-wrap {
-			max-width: 100%;
+		/* El contenedor de resultados se ancla al topbar gracias al position: static del wrap */
+		.vs-search-dropdown {
+			left: 18px;
+			right: 18px;
+			width: auto;
+			top: 64px; /* Debajo del topbar */
+			z-index: 100;
 		}
 	}
 

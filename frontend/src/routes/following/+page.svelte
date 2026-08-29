@@ -217,10 +217,10 @@
 </script>
 
 <svelte:head>
-	<title>Mi Red Social | VSocial</title>
+	<title>Mi Red Social | Voom!</title>
 	<meta
 		name="description"
-		content="Gestiona tus seguidores, creadores que sigues y comunidad verificada en VSocial."
+		content="Gestiona tus seguidores, creadores que sigues y comunidad verificada en Voom!."
 	/>
 </svelte:head>
 

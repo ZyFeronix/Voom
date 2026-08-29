@@ -128,7 +128,7 @@
 </script>
 
 <svelte:head>
-	<title>Notificaciones — VSocial</title>
+	<title>Notificaciones — Voom!</title>
 </svelte:head>
 
 <div class="notif-page">

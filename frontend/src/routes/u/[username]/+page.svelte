@@ -158,9 +158,9 @@
 				id: 99,
 				username,
 				display_name: username.charAt(0).toUpperCase() + username.slice(1),
-				bio: 'Creador de contenido virtual oficial en VSocial. ¡Bienvenidos a mi perfil!',
+				bio: 'Creador de contenido virtual oficial en Voom!. ¡Bienvenidos a mi perfil!',
 				location: 'Internet',
-				website: 'https://vsocial.app',
+				website: 'https://voom.social',
 				joined_at: new Date().toISOString(),
 				avatar_url: null,
 				cover_url: null,
@@ -410,7 +410,7 @@
 </script>
 
 <svelte:head>
-	<title>{user ? user.display_name : 'Cargando perfil...'} — VSocial</title>
+	<title>{user ? user.display_name : 'Cargando perfil...'} — Voom!</title>
 </svelte:head>
 
 <ProfileThemeShell customization={user?.customization}>

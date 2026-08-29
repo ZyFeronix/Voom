@@ -1,4 +1,4 @@
-/* VSocial — Ajustes: estilos compartidos por todas las subpáginas de /settings */
+/* Voom! — Ajustes: estilos compartidos por todas las subpáginas de /settings */
 .settings-container {
 	max-width: 1000px;
 	margin: 0 auto;
@@ -783,32 +783,97 @@ form .btn-aero-primary {
 	line-height: 1.3;
 }
 
+/* ── Slider Neo-Aero (.aero-range) ────────────────────────────────────
+   El "fill" de progreso se pinta con un gradiente de dos paradas duras
+   sobre el propio rail; la posición de corte se fija inline desde cada
+   página (style="--range-pct: 62%") o por defecto via var(--value, 50%).
+   Soporta WebKit/Blink y Firefox (::-moz-range-*). */
 .aero-range {
-	-webkit-appearance: none;
+	--range-fill: linear-gradient(
+		90deg,
+		var(--accent-blue-base, var(--aero-blue)),
+		var(--accent-blue-light, var(--aero-sky))
+	);
 	appearance: none;
+	-webkit-appearance: none;
 	width: 100%;
-	height: 4px;
-	border-radius: var(--radius-xs);
-	background: var(--border-subtle);
+	height: 18px; /* zona táctil; el rail visual mide 6px */
+	background: transparent;
 	outline: none;
 	margin-top: 6px;
+	cursor: pointer;
+}
+
+.aero-range::-webkit-slider-runnable-track {
+	height: 6px;
+	border-radius: 999px;
+	background:
+		var(--range-fill) 0 / var(--range-pct, var(--value, 50%)) 100% no-repeat,
+		color-mix(in srgb, var(--text-main) 12%, transparent);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.14);
 }
 
 .aero-range::-webkit-slider-thumb {
-	-webkit-appearance: none;
 	appearance: none;
-	width: 14px;
-	height: 14px;
-	border-radius: var(--radius-squircle);
-	corner-shape: squircle;
-	background: var(--aero-sky);
-	cursor: pointer;
-	box-shadow: 0 0 8px color-mix(in srgb, var(--aero-sky) 40%, transparent);
+	-webkit-appearance: none;
+	width: 16px;
+	height: 16px;
+	margin-top: -5px; /* centra el thumb en el track de 6px */
+	border-radius: 999px;
+	background: #ffffff;
+	border: 2px solid var(--accent-blue-base, var(--aero-blue));
+	box-shadow:
+		0 2px 8px rgba(0, 0, 0, 0.25),
+		0 0 12px color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 40%, transparent);
+	transition:
+		transform var(--t-fast),
+		box-shadow var(--t-fast);
+}
+
+.aero-range:hover::-webkit-slider-thumb {
+	transform: scale(1.15);
+}
+
+.aero-range:active::-webkit-slider-thumb {
+	transform: scale(0.95);
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.3),
+		0 0 16px color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 55%, transparent);
+}
+
+.aero-range:focus-visible {
+	box-shadow: 0 0 0 3px
+		color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 35%, transparent);
+	border-radius: 999px;
+}
+
+.aero-range::-moz-range-track {
+	height: 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-main) 12%, transparent);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+
+.aero-range::-moz-range-progress {
+	height: 6px;
+	border-radius: 999px;
+	background: var(--range-fill);
+}
+
+.aero-range::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
+	border-radius: 999px;
+	background: #ffffff;
+	border: 2px solid var(--accent-blue-base, var(--aero-blue));
+	box-shadow:
+		0 2px 8px rgba(0, 0, 0, 0.25),
+		0 0 12px color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 40%, transparent);
 	transition: transform var(--t-fast);
 }
 
-.aero-range::-webkit-slider-thumb:hover {
-	transform: scale(1.25);
+.aero-range:hover::-moz-range-thumb {
+	transform: scale(1.15);
 }
 
 .algo-footer {
@@ -857,12 +922,30 @@ form .btn-aero-primary {
 	align-items: center;
 	justify-content: center;
 	transition: all var(--t-fast);
+	flex: 0 0 16px; /* escudo volumétrico anti-colapso */
+}
+
+.radio-option input[type='radio']:hover {
+	border-color: color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 60%, transparent);
 }
 
 .radio-option input[type='radio']:checked {
-	border-color: var(--aero-sky);
-	background: var(--aero-sky);
-	box-shadow: 0 0 8px rgba(74, 171, 223, 0.4);
+	border-color: var(--accent-blue-base, var(--aero-sky));
+	background:
+		radial-gradient(
+			circle at center,
+			var(--accent-blue-base, var(--aero-blue)) 0 4px,
+			transparent 4.5px
+		),
+		color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 12%, transparent);
+	box-shadow:
+		0 0 8px color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 40%, transparent),
+		inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.radio-option input[type='radio']:focus-visible {
+	box-shadow: 0 0 0 3px
+		color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 35%, transparent);
 }
 
 .toggle-settings-group {
@@ -1529,7 +1612,7 @@ form .btn-aero-primary {
 
 .seg-btn {
 	background: transparent;
-	border: none;
+	border: 1px solid transparent;
 	padding: 5px 10px;
 	font-size: 0.74rem;
 	font-weight: 600;
@@ -1538,16 +1621,22 @@ form .btn-aero-primary {
 	cursor: pointer;
 	transition: all var(--t-fast);
 	white-space: nowrap;
+	outline: none;
 }
 
 .seg-btn:hover {
 	color: var(--text-main);
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.seg-btn:focus-visible {
+	border-color: var(--aero-sky);
 }
 
 .seg-btn.active {
 	background: var(--aero-sky);
 	color: #ffffff;
-	box-shadow: 0 2px 6px rgba(46, 180, 255, 0.35);
+	border-color: var(--aero-sky);
 }
 
 /* Estado de la refracción líquida bajo la descripción del ajuste */

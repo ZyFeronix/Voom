@@ -80,7 +80,7 @@
 </script>
 
 <svelte:head>
-	<title>Ajustes — VSocial</title>
+	<title>Ajustes — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card">

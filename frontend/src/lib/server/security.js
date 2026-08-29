@@ -1,5 +1,5 @@
 /**
- * VSocial Security Module
+ * Voom! Security Module
  * Input validation and security helpers.
  * NOTA: El rate limiting centralizado vive en hooks.server.js (sliding window por IP/usuario).
  * Esta función ha sido eliminada aquí para evitar contadores duplicados desincronizados.

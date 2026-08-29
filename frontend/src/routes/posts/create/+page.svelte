@@ -866,7 +866,7 @@
 </script>
 
 <svelte:head>
-	<title>Crear Publicación — V-SOCIAL</title>
+	<title>Crear Publicación — Voom!</title>
 </svelte:head>
 
 <svelte:window
@@ -1895,7 +1895,7 @@
 										onchange={triggerDraftSave}
 									/>
 									<span class="text-[11px] text-sky-400 mt-1 block">
-										Se publicará automáticamente mediante el cron de V-SOCIAL.
+										Se publicará automáticamente mediante el cron de Voom!.
 									</span>
 								</div>
 							{/if}

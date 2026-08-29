@@ -1,5 +1,5 @@
 /**
- * VSocial — Media Security & Validation Pipeline
+ * Voom! — Media Security & Validation Pipeline
  * Validates binary magic numbers (file signatures) to prevent malicious upload masquerading.
  */
 

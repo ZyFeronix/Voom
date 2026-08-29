@@ -1,5 +1,5 @@
 /**
- * VSocial — WebRTC Peer Manager
+ * Voom! — WebRTC Peer Manager
  * Handles audio, video, and screen-share peer-to-peer connections.
  *
  * ICE strategy:

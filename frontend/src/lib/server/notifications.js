@@ -1,5 +1,5 @@
 /**
- * VSocial — Helper centralizado de notificaciones.
+ * Voom! — Helper centralizado de notificaciones.
  *
  * Único punto de creación de notificaciones: respeta las preferencias del
  * DESTINATARIO (toggles de /settings/notifications) y evita auto-notificaciones.

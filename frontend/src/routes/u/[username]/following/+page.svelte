@@ -196,7 +196,7 @@
 </script>
 
 <svelte:head>
-	<title>{user ? user.display_name : username} - Red | VSocial</title>
+	<title>{user ? user.display_name : username} - Red | Voom!</title>
 </svelte:head>
 
 <div

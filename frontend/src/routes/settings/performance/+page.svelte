@@ -56,7 +56,7 @@
 </script>
 
 <svelte:head>
-	<title>Rendimiento — VSocial</title>
+	<title>Rendimiento — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card">
@@ -493,6 +493,24 @@
 					aria-label="Efectos de Brillo en Hover"
 				/>
 			</div>
+
+			<div class="perf-setting-row">
+				<div class="perf-setting-meta">
+					<div class="perf-setting-name">Luz Ambiental de Vídeo (Glow Reactivo)</div>
+					<div class="perf-setting-desc">
+						El reproductor proyecta el color del vídeo hacia los márgenes redibujando un canvas por
+						cada fotograma. Desactivarlo elimina ese coste continuo de GPU/CPU en feeds con varios
+						vídeos.
+					</div>
+				</div>
+				<input
+					type="checkbox"
+					class="aero-toggle-switch"
+					checked={perfStore.videoAmbientLight}
+					onchange={(e) => perfStore.setVideoAmbientLight(e.currentTarget.checked)}
+					aria-label="Luz Ambiental de Vídeo"
+				/>
+			</div>
 		</div>
 
 		<!-- Grupo 2: Animaciones & CPU -->
@@ -523,7 +541,7 @@
 				<div class="perf-setting-meta">
 					<div class="perf-setting-name">Transiciones entre Páginas (View Transitions)</div>
 					<div class="perf-setting-desc">
-						Velocidad de transición y fundido de pantalla al cambiar de sección o ruta en VSocial.
+						Velocidad de transición y fundido de pantalla al cambiar de sección o ruta en Voom!.
 					</div>
 				</div>
 				<div class="perf-segmented-control">
@@ -638,8 +656,8 @@
 				<div class="perf-setting-meta">
 					<div class="perf-setting-name">Modo Ahorro de Datos en Imágenes y Video</div>
 					<div class="perf-setting-desc">
-						Pospone la precarga de videos en segundo plano (`preload="none"`) y optimiza la descarga
-						de medios pesados.
+						Pospone la descarga de vídeos hasta que pulses reproducir (`preload="none"`), evitando
+						la precarga de medios pesados.
 					</div>
 				</div>
 				<input
@@ -648,6 +666,24 @@
 					checked={perfStore.dataSaver}
 					onchange={(e) => perfStore.setDataSaver(e.currentTarget.checked)}
 					aria-label="Ahorro de Datos"
+				/>
+			</div>
+
+			<div class="perf-setting-row">
+				<div class="perf-setting-meta">
+					<div class="perf-setting-name">Ahorro Automático con Batería Baja (≤20%)</div>
+					<div class="perf-setting-desc">
+						Sin cargador y con batería crítica activa el perfil Lite automáticamente y, al conectar
+						corriente o recargar, restaura exactamente tu configuración anterior. Requiere soporte
+						de la API de batería del navegador.
+					</div>
+				</div>
+				<input
+					type="checkbox"
+					class="aero-toggle-switch"
+					checked={perfStore.batterySaverAuto}
+					onchange={(e) => perfStore.setBatterySaverAuto(e.currentTarget.checked)}
+					aria-label="Ahorro Automático con Batería Baja"
 				/>
 			</div>
 		</div>

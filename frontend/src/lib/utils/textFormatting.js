@@ -2,6 +2,8 @@
  * Escapes HTML special characters to prevent XSS injection.
  * Must be applied before any HTML rendering of user content.
  */
+import { emoteFor } from '$lib/data/msnEmoticons.js';
+
 export function escapeHtml(unsafe) {
 	if (!unsafe) return '';
 	return unsafe
@@ -18,6 +20,8 @@ export function escapeHtml(unsafe) {
  * - Wraps URLs in styled anchor links (opens in new tab)
  * - Wraps #hashtags in styled anchor links pointing to /explore
  * - Wraps @mentions in styled anchor links pointing to /u/[username]
+ * - Replaces emojis with emote propio del set Voom! (img con alt=unicode,
+ *   así el texto se conserva al copiar/pegar)
  *
  * Safe to use with {@html} after this function.
  */
@@ -43,5 +47,21 @@ export function formatHashtags(text) {
 		return `${prefix}<a href="/u/${encodeURIComponent(user)}" class="mention-link hashtag-link" onclick="event.stopPropagation()">@${user}</a>`;
 	});
 
+	// Emojis con emote propio del set Voom! (post-escape: el HTML ya es seguro)
+	escaped = replaceVoomEmotes(escaped);
+
 	return escaped;
+}
+
+// Un solo grapheme emoji: pictográfico + VS16 + secuencias ZWJ + skin tones.
+const EMOJI_SEQ =
+	/(\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])(\uFE0F)?(\u200D(?:\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])(\uFE0F)?)*/gu;
+
+function replaceVoomEmotes(html) {
+	if (!/[\p{Extended_Pictographic}]/u.test(html)) return html;
+	return html.replace(EMOJI_SEQ, (seq) => {
+		const meta = emoteFor(seq);
+		if (!meta) return seq;
+		return `<img class="msn-emoji-render" src="${meta.url}" alt="${meta.emoji}" title="${meta.name}" loading="lazy" decoding="async" />`;
+	});
 }

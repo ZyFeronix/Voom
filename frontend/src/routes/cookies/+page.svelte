@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Política de Cookies - V-SOCIAL</title>
+	<title>Política de Cookies - Voom!</title>
 </svelte:head>
 
 <div class="legal-container" in:fade={{ duration: 500 }}>
@@ -16,8 +16,7 @@
 			<p>
 				Las cookies y los mecanismos de almacenamiento del navegador (como localStorage) son
 				pequeños ficheros o datos que el sitio guarda en tu dispositivo para mantener tu sesión,
-				recordar preferencias o mejorar tu experiencia. Esta política explica cuáles utiliza
-				V-SOCIAL.
+				recordar preferencias o mejorar tu experiencia. Esta política explica cuáles utiliza Voom!.
 			</p>
 		</section>
 
@@ -75,7 +74,7 @@
 			<h2>4. Gestión y revocación del consentimiento</h2>
 			<p>
 				Puedes aceptar o rechazar las cookies no esenciales desde el banner que se muestra en tu
-				primera visita. Como V-SOCIAL solo emplea cookies esenciales para la autenticación, la
+				primera visita. Como Voom! solo emplea cookies esenciales para la autenticación, la
 				plataforma sigue funcionando incluso si rechazas el consentimiento, aunque no se guardará tu
 				preferencia. Para revocar o modificar tu elección puedes borrar la cookie <code
 					>vsocial_cookie_consent</code

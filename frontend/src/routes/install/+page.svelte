@@ -19,14 +19,14 @@
 	});
 
 	// Step 2: Site Settings
-	let siteName = $state('VSocial');
+	let siteName = $state('Voom!');
 	let siteTagline = $state('Red Social para Creadores Virtuales');
 	let allowRegistration = $state(true);
 	let selectedTheme = $state('dark');
 
 	// Step 3: Admin Credentials
 	let adminUsername = $state('admin');
-	let adminEmail = $state('admin@vsocial.app');
+	let adminEmail = $state('admin@voom.social');
 	let adminPassword = $state('');
 	let confirmPassword = $state('');
 	let showPassword = $state(false);
@@ -179,7 +179,7 @@
 </script>
 
 <svelte:head>
-	<title>Asistente de Instalación — VSocial</title>
+	<title>Asistente de Instalación — Voom!</title>
 </svelte:head>
 
 <div class="install-container">
@@ -452,7 +452,7 @@
 								id="sitename"
 								bind:value={siteName}
 								class="aero-input w-full"
-								placeholder="Ej: VSocial"
+								placeholder="Ej: Voom!"
 								required
 							/>
 						</div>
@@ -602,7 +602,7 @@
 								id="admin_email"
 								bind:value={adminEmail}
 								class="aero-input w-full"
-								placeholder="admin@vsocial.app"
+								placeholder="admin@voom.social"
 								required
 								autocomplete="email"
 							/>
@@ -702,7 +702,7 @@
 						disabled={!step3Valid || installing}
 						style="flex: 0 0 auto; min-width: 180px; min-height: 44px;"
 					>
-						<span>Instalar VSocial</span>
+						<span>Instalar Voom!</span>
 						<span class="material-icons-round action-icon">rocket_launch</span>
 					</button>
 				</div>
@@ -720,7 +720,7 @@
 						>
 							<span class="material-icons-round radar-icon">settings</span>
 						</div>
-						<h2 class="installing-title">Instalando VSocial</h2>
+						<h2 class="installing-title">Instalando Voom!</h2>
 						<p class="installing-progress">{installProgressText}</p>
 						<div class="progress-track squircle">
 							<div class="progress-bar-glow"></div>
@@ -737,7 +737,7 @@
 
 						<h2 class="section-title text-success">¡Instalación Completada!</h2>
 						<p class="section-desc">
-							VSocial se ha configurado e instalado con éxito. Base de datos SQLite y WAL activos.
+							Voom! se ha configurado e instalado con éxito. Base de datos SQLite y WAL activos.
 						</p>
 
 						<!-- Access Summary Card -->
@@ -805,7 +805,7 @@
 								style="min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px;"
 							>
 								<span class="material-icons-round">login</span>
-								<span>Iniciar Sesión en VSocial</span>
+								<span>Iniciar Sesión en Voom!</span>
 							</a>
 						</div>
 					</div>

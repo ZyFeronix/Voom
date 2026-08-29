@@ -136,12 +136,12 @@
 <nav class="vs-sidenav" aria-label="Navegación principal" onscroll={hideTooltip}>
 	<!-- ══ MARCA ══ -->
 	<div class="vs-brand">
-		<a href="/feed" class="vs-brand__logo" title="VSocial">
+		<a href="/feed" class="vs-brand__logo" title="Voom!">
 			<div class="vs-brand__icon">
 				<span class="material-icons-round">hub</span>
 			</div>
 			<div class="vs-brand__text">
-				<span class="vs-brand__name">VSocial</span>
+				<span class="vs-brand__name">Voom!</span>
 				<span class="vs-brand__tagline">Virtual Network</span>
 			</div>
 		</a>
@@ -231,7 +231,7 @@
 			</ul>
 		</div>
 
-		<!-- ══ EQUIPO V-SOCIAL / EXP ══ -->
+		<!-- ══ EQUIPO Voom! / EXP ══ -->
 		{#if authStore.isTeamOrHigher}
 			<div class="vs-nav-section vs-nav-section--team">
 				<span class="vs-nav-section__label">Equipo</span>
@@ -262,21 +262,23 @@
 			</div>
 		{/if}
 
-		<!-- ══ ADMIN ══ -->
-		{#if authStore.isAdmin}
+		<!-- ══ STAFF: panel propio según rol (admin, moderador, soporte, equipo) ══ -->
+		{#if authStore.isTeamOrHigher}
 			<div class="vs-nav-section vs-nav-section--admin">
-				<span class="vs-nav-section__label">Admin</span>
+				<span class="vs-nav-section__label">Staff</span>
 				<ul class="vs-nav-list" role="list">
 					<li>
 						<a
 							href="/admin"
 							class="vs-nav-item"
 							class:vs-nav-item--active={page.url.pathname.startsWith('/admin')}
-							aria-label="Panel Admin"
-							title="Panel de Administración"
-							onmouseenter={(e) => showTooltip(e, 'Panel Admin')}
+							aria-label="Panel Staff"
+							title={authStore.roleLabel === 'Usuario'
+								? 'Panel Staff'
+								: `Panel ${authStore.roleLabel}`}
+							onmouseenter={(e) => showTooltip(e, 'Panel Staff')}
 							onmouseleave={hideTooltip}
-							onfocus={(e) => showTooltip(e, 'Panel Admin')}
+							onfocus={(e) => showTooltip(e, 'Panel Staff')}
 							onblur={hideTooltip}
 							onclick={() => {
 								hideTooltip();
@@ -286,7 +288,7 @@
 							<div class="vs-nav-item__icon">
 								<span class="material-icons-round">admin_panel_settings</span>
 							</div>
-							<span class="vs-nav-item__label">Panel Admin</span>
+							<span class="vs-nav-item__label">Panel Staff</span>
 						</a>
 					</li>
 				</ul>
@@ -320,7 +322,7 @@
 			<div class="vs-user-card">
 				<a href={profileUrl} class="vs-user-card__link" title="Ver mi perfil">
 					<AeroAvatar
-						src={authStore.user.avatar_url}
+						src={authStore.user.avatar_url || authStore.user.avatar}
 						alt={authStore.user.username}
 						size="md"
 						online={authStore.user.custom_status === 'online' || !authStore.user.custom_status}

@@ -21,7 +21,7 @@
 	import { perfStore } from '$lib/stores/perf.svelte.js';
 
 	/**
-	 * MediaPlayer — Reproductor unificado de VSocial (Glassmorphism 2.0 / Neo-Aero).
+	 * MediaPlayer — Reproductor unificado de Voom! (Glassmorphism 2.0 / Neo-Aero).
 	 *
 	 * API pública (drop-in compatible con feed, lightbox, stories y chat):
 	 *   src, type ('video'|'audio'), poster, class, autoplay, entityId, entityType.
@@ -44,6 +44,10 @@
 	} = $props();
 
 	let effectiveAutoplay = $derived(autoplay && perfStore.allowsAutoplay());
+	// Ahorro de datos: pospone la descarga hasta que el usuario pulse reproducir.
+	// 'metadata' (por defecto) descarga cabeceras + primer fotograma; 'none' no
+	// descarga nada hasta play() explícito.
+	let effectivePreload = $derived(perfStore.dataSaver ? 'none' : 'metadata');
 
 	// Normalizar el ratio de aspecto pasado por props (ej. '16:9', '9:16', '1/1', etc.)
 	function formatAspect(val) {
@@ -115,10 +119,14 @@
 	let stageAspect = $state('');
 
 	// ── Iluminación ambiental reactiva (Ultra-fluida a 60 FPS, bajo consumo) ──
+	// Ajuste "Luz ambiental de vídeo": cada fotograma reproducido se redibuja en
+	// un canvas por cada player visible. En feeds con varios vídeos eso es GPU/CPU
+	// continua; desactivarlo lo elimina sin tocar los controles del reproductor.
 	let ambientCanvas = $state();
 	let activeAmbientCallback = null;
 
 	function startAmbientSync() {
+		if (!perfStore.videoAmbientLight) return;
 		if (!videoElement || !ambientCanvas) return;
 		stopAmbientSync();
 
@@ -179,6 +187,7 @@
 	}
 
 	function drawSingleAmbientFrame() {
+		if (!perfStore.videoAmbientLight) return;
 		if (!videoElement || !ambientCanvas) return;
 		try {
 			const w = videoElement.videoWidth || 32;
@@ -891,7 +900,7 @@
 					if (videoElement?.paused) drawSingleAmbientFrame();
 				}}
 				class="v-native-video"
-				preload="metadata"
+				preload={effectivePreload}
 				playsinline
 			></video>
 		</div>
@@ -1158,7 +1167,7 @@
 				bind:paused
 				bind:volume
 				bind:muted
-				preload="metadata"
+				preload={effectivePreload}
 				crossorigin="anonymous"
 			></audio>
 
@@ -1217,7 +1226,7 @@
 				<div class="v-about-logo">
 					<span class="material-icons-round">play_circle</span>
 				</div>
-				<div class="v-about-title">Reproductor de VSocial</div>
+				<div class="v-about-title">Reproductor de Voom!</div>
 				<div class="v-about-sub">Neo-Aero · Glassmorphism 2.0</div>
 				<div class="v-about-shortcuts">
 					<span class="v-about-kbd"><kbd>Espacio/K</kbd> Reproducir</span>
@@ -1227,8 +1236,8 @@
 					<span class="v-about-kbd"><kbd>Doble toque</kbd> ±10 s</span>
 				</div>
 				<div class="v-about-info" class:closing={aboutClosing}>
-					<div class="v-about-version">Versión v0.6.0-beta.1</div>
-					<div class="v-about-copy">© 2026 VSocial · AGPLv3</div>
+					<div class="v-about-version">Versión v0.6.0-beta.2</div>
+					<div class="v-about-copy">© 2026 Voom! · AGPLv3</div>
 				</div>
 			</div>
 		</div>

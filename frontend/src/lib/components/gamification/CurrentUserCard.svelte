@@ -6,7 +6,7 @@
 	import { levelProgress } from '$lib/utils/xp.js';
 
 	/**
-	 * CurrentUserCard.svelte — HUD de mando "estás aquí" de la Arena V-SOCIAL.
+	 * CurrentUserCard.svelte — HUD de mando "estás aquí" de la Arena Voom!.
 	 *
 	 * - Glassmorphism 2.0 y estética Neo-Aero.
 	 * - Adaptación multitema completa (Light, Dark, Midnight).

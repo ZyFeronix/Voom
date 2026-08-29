@@ -106,7 +106,7 @@
 </script>
 
 <svelte:head>
-	<title>Seguridad y Sesiones — VSocial</title>
+	<title>Seguridad y Sesiones — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card" class:is-saving={saving}>

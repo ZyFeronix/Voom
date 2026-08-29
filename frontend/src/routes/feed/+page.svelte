@@ -100,7 +100,7 @@
 	});
 
 	// ── Frutiger Aqua / Eco Algorithm State & Presets ────────────────────────
-	let showAlgorithmModal = $state(false);
+	let showAlgorithmPanel = $state(false);
 	let showCustomSliders = $state(false);
 
 	const ALGO_PRESETS = [
@@ -606,7 +606,7 @@
 						uiStore.showLevelUp({
 							level: data.newLevel,
 							xpGained: data.xpAwarded,
-							message: `¡Increíble! Tu racha diaria te ha llevado al Nivel ${data.newLevel} en V-SOCIAL.`
+							message: `¡Increíble! Tu racha diaria te ha llevado al Nivel ${data.newLevel} en Voom!.`
 						});
 					}, 1600);
 				}
@@ -1131,7 +1131,7 @@
 </script>
 
 <svelte:head>
-	<title>Feed - VSocial</title>
+	<title>Feed - Voom!</title>
 </svelte:head>
 
 <div class="feed-shell mx-auto px-4 lg:px-8 pt-3 pb-6">
@@ -1179,9 +1179,10 @@
 		<button
 			type="button"
 			class="aqua-algo-btn"
-			class:active={showAlgorithmModal}
-			onclick={() => (showAlgorithmModal = true)}
+			class:active={showAlgorithmPanel}
+			onclick={() => (showAlgorithmPanel = !showAlgorithmPanel)}
 			title="Sintonizador de Algoritmo (Frutiger Aqua/Eco)"
+			aria-expanded={showAlgorithmPanel}
 		>
 			<span class="material-icons-round text-base aqua-icon">water_drop</span>
 			<span class="hidden sm:inline">Algoritmo</span>
@@ -1197,6 +1198,12 @@
 				{:else}
 					Eco
 				{/if}
+			</span>
+			<span
+				class="material-icons-round text-xs transition-transform duration-200"
+				style="transform: rotate({showAlgorithmPanel ? '180deg' : '0deg'}); opacity: 0.7;"
+			>
+				expand_more
 			</span>
 		</button>
 	</nav>
@@ -1229,7 +1236,7 @@
 							>Condiciones</a
 						>
 					</div>
-					<p class="opacity-50 text-[10px]">© 2026 VSocial Inc.</p>
+					<p class="opacity-50 text-[10px]">© 2026 Voom! Inc.</p>
 				</div>
 			</div>
 			<!-- close sticky wrapper -->
@@ -1237,6 +1244,203 @@
 
 		<!-- Center Column (Feed posts & Create Box) -->
 		<div class="feed-col-center feed-main-column space-y-4 min-w-0">
+			<!-- Frutiger Aqua / Eco Algorithm Inline Tuner Panel -->
+			{#if showAlgorithmPanel}
+				<section
+					class="aqua-inline-panel custom-scrollbar"
+					transition:slide={{ duration: 280 }}
+					aria-label="Sintonizador de Algoritmo"
+				>
+					<!-- Aqua Glossy Header -->
+					<div
+						class="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-cyan-500/20"
+					>
+						<div class="flex items-center gap-2.5">
+							<div class="aqua-panel-icon-badge">
+								<span class="material-icons-round text-xl text-cyan-400">water_drop</span>
+							</div>
+							<div>
+								<h2 class="text-sm font-bold text-main flex items-center gap-1.5 font-display">
+									Sintonizador de Algoritmo
+									<span class="aqua-eco-tag">Frutiger Aqua</span>
+								</h2>
+								<p class="text-[11px] text-muted">
+									Sintoniza el equilibrio de tu feed: novedad, intereses, tu círculo social y
+									tendencias
+								</p>
+							</div>
+						</div>
+						<button
+							type="button"
+							class="aqua-close-btn"
+							onclick={() => (showAlgorithmPanel = false)}
+							aria-label="Cerrar panel de algoritmo"
+							title="Ocultar panel"
+						>
+							<span class="material-icons-round text-base">expand_less</span>
+						</button>
+					</div>
+
+					<!-- Presets Section -->
+					<div class="space-y-2 mb-4">
+						<div
+							class="text-[10px] font-bold uppercase tracking-wider text-muted px-1 flex items-center gap-1.5"
+						>
+							<span class="material-icons-round text-xs text-cyan-400">tune</span>
+							Modos & Presets de Feed
+						</div>
+						<p class="text-[9px] text-muted leading-tight m-0 px-1">
+							Elige un modo listo para usar o afina tu mezcla a mano más abajo.
+						</p>
+
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+							{#each ALGO_PRESETS as preset}
+								{@const isSelected =
+									(preset.mode === 'radar' && globalFeedMode === 'radar') ||
+									(preset.id === 'eco' &&
+										globalFeedMode === 'intelligent' &&
+										userWeights.interests === 50 &&
+										userWeights.recency === 55) ||
+									(preset.id === 'smart' &&
+										globalFeedMode === 'intelligent' &&
+										userWeights.interests === 80) ||
+									(preset.id === 'viral' &&
+										globalFeedMode === 'intelligent' &&
+										userWeights.popularity === 90)}
+								<button
+									type="button"
+									class="aqua-preset-card"
+									class:active={isSelected}
+									onclick={() => selectPreset(preset)}
+								>
+									<div class="flex items-center justify-between mb-1">
+										<span
+											class="flex items-center gap-1.5 font-bold text-xs"
+											style="color: {preset.color};"
+										>
+											<span class="material-icons-round text-sm">{preset.icon}</span>
+											{preset.name}
+										</span>
+										{#if isSelected}
+											<span class="active-dot"></span>
+										{:else}
+											<span
+												class="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-muted font-semibold"
+											>
+												{preset.tag}
+											</span>
+										{/if}
+									</div>
+									<p class="text-[10px] text-muted leading-tight m-0">
+										{preset.desc}
+									</p>
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Custom Weight Sliders Collapsible (Frutiger Aqua) -->
+					<div class="aqua-custom-box mb-4">
+						<button
+							type="button"
+							class="w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold text-main bg-transparent border-none cursor-pointer hover:bg-white/5 transition"
+							onclick={() => (showCustomSliders = !showCustomSliders)}
+						>
+							<span class="flex items-center gap-1.5 text-cyan-400">
+								<span class="material-icons-round text-sm">tune</span>
+								<span>Ajuste Fino de Porcentajes</span>
+							</span>
+							<span
+								class="material-icons-round text-sm text-muted transition-transform duration-200"
+								style="transform: rotate({showCustomSliders ? '180deg' : '0deg'});"
+							>
+								expand_more
+							</span>
+						</button>
+						<p class="text-[9px] text-muted leading-tight m-0 px-2 pb-1">
+							Arrastra cada barra para dar más o menos peso a cada factor de tu feed.
+						</p>
+
+						{#if showCustomSliders}
+							<div class="pt-2 px-1 space-y-2.5" transition:slide={{ duration: 250 }}>
+								{#each WEIGHT_STATS as stat}
+									<div class="flex flex-col gap-1 group">
+										<div
+											class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider px-1"
+										>
+											<span class="flex items-center gap-1.5 text-muted">
+												<span
+													class="w-2 h-2 squircle"
+													style="background: {stat.color}; box-shadow: 0 0 6px {stat.color};"
+												></span>
+												{stat.label}
+											</span>
+											<span class="font-mono text-[10px] font-bold" style="color: {stat.color};">
+												{userWeights[stat.id]}%
+											</span>
+										</div>
+										<p class="text-[9px] text-muted leading-tight m-0 px-1">
+											{stat.desc}
+										</p>
+										<div class="aqua-slider-track">
+											<div
+												class="aqua-slider-fill"
+												style="width: {userWeights[
+													stat.id
+												]}%; background: {stat.color}; box-shadow: 0 0 8px {stat.color};"
+											></div>
+											<input
+												type="range"
+												min="0"
+												max="100"
+												value={userWeights[stat.id]}
+												oninput={(e) => {
+													userWeights[stat.id] = parseInt(e.target.value);
+												}}
+												onchange={updateWeightsAndReload}
+												class="aqua-range-input"
+											/>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Panel Footer: Reset, Link to /settings, and Done -->
+					<div
+						class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-cyan-500/20"
+					>
+						<div class="flex items-center gap-2">
+							<button
+								type="button"
+								class="aqua-text-btn"
+								onclick={resetWeights}
+								title="Restablecer a valores óptimos de fábrica"
+							>
+								<span class="material-icons-round text-xs">restart_alt</span>
+								<span>Restablecer</span>
+							</button>
+							<a
+								href="/settings"
+								class="aqua-text-btn text-decoration-none"
+								onclick={() => (showAlgorithmPanel = false)}
+							>
+								<span class="material-icons-round text-xs">settings</span>
+								<span>Ajustes Completos</span>
+							</a>
+						</div>
+
+						<button
+							type="button"
+							class="btn-aero-primary text-xs py-1.5 px-4 shadow-md font-bold"
+							onclick={() => (showAlgorithmPanel = false)}
+						>
+							Listo
+						</button>
+					</div>
+				</section>
+			{/if}
 			<div
 				class="stories-container-wrap transition-all duration-500 ease-in-out overflow-hidden {storiesEnabled
 					? ''
@@ -2567,7 +2771,7 @@
 					class="text-[10px] text-center font-bold tracking-wide"
 					style="color: rgba(255, 255, 255, 0.5);"
 				>
-					Historias de VSocial • Desaparecen en 24h
+					Historias de Voom! • Desaparecen en 24h
 				</p>
 			</div>
 		</div>
@@ -2677,213 +2881,6 @@
 					}}
 				>
 					Eliminar
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Frutiger Aqua / Eco Algorithm Tuner Modal -->
-{#if showAlgorithmModal}
-	<div
-		class="aqua-modal-backdrop"
-		transition:fade={{ duration: 200 }}
-		onclick={(e) => {
-			if (e.target === e.currentTarget) showAlgorithmModal = false;
-		}}
-		role="dialog"
-		aria-modal="true"
-		tabindex="-1"
-		onkeydown={(e) => {
-			if (e.key === 'Escape') showAlgorithmModal = false;
-		}}
-	>
-		<div
-			class="aqua-modal-card custom-scrollbar"
-			transition:scale={{ duration: 240, start: 0.94, easing: backOut }}
-		>
-			<!-- Aqua Glossy Header -->
-			<div class="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-cyan-500/20">
-				<div class="flex items-center gap-2.5">
-					<div class="aqua-modal-icon-badge">
-						<span class="material-icons-round text-xl text-cyan-400">water_drop</span>
-					</div>
-					<div>
-						<h2 class="text-sm font-bold text-main flex items-center gap-1.5 font-display">
-							Sintonizador de Algoritmo
-							<span class="aqua-eco-tag">Frutiger Aqua</span>
-						</h2>
-						<p class="text-[11px] text-muted">
-							Sintoniza el equilibrio de tu feed: novedad, intereses, tu círculo social y tendencias
-						</p>
-					</div>
-				</div>
-				<button
-					type="button"
-					class="aqua-close-btn"
-					onclick={() => (showAlgorithmModal = false)}
-					aria-label="Cerrar"
-				>
-					<span class="material-icons-round text-base">close</span>
-				</button>
-			</div>
-
-			<!-- Presets Section -->
-			<div class="space-y-2 mb-4">
-				<div
-					class="text-[10px] font-bold uppercase tracking-wider text-muted px-1 flex items-center gap-1.5"
-				>
-					<span class="material-icons-round text-xs text-cyan-400">tune</span>
-					Modos & Presets de Feed
-				</div>
-				<p class="text-[9px] text-muted leading-tight m-0 px-1">
-					Elige un modo listo para usar o afina tu mezcla a mano más abajo.
-				</p>
-
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-					{#each ALGO_PRESETS as preset}
-						{@const isSelected =
-							(preset.mode === 'radar' && globalFeedMode === 'radar') ||
-							(preset.id === 'eco' &&
-								globalFeedMode === 'intelligent' &&
-								userWeights.interests === 50 &&
-								userWeights.recency === 55) ||
-							(preset.id === 'smart' &&
-								globalFeedMode === 'intelligent' &&
-								userWeights.interests === 80) ||
-							(preset.id === 'viral' &&
-								globalFeedMode === 'intelligent' &&
-								userWeights.popularity === 90)}
-						<button
-							type="button"
-							class="aqua-preset-card"
-							class:active={isSelected}
-							onclick={() => selectPreset(preset)}
-						>
-							<div class="flex items-center justify-between mb-1">
-								<span
-									class="flex items-center gap-1.5 font-bold text-xs"
-									style="color: {preset.color};"
-								>
-									<span class="material-icons-round text-sm">{preset.icon}</span>
-									{preset.name}
-								</span>
-								{#if isSelected}
-									<span class="active-dot"></span>
-								{:else}
-									<span
-										class="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-muted font-semibold"
-									>
-										{preset.tag}
-									</span>
-								{/if}
-							</div>
-							<p class="text-[10px] text-muted leading-tight m-0">
-								{preset.desc}
-							</p>
-						</button>
-					{/each}
-				</div>
-			</div>
-
-			<!-- Custom Weight Sliders Collapsible (Frutiger Aqua) -->
-			<div class="aqua-custom-box mb-4">
-				<button
-					type="button"
-					class="w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold text-main bg-transparent border-none cursor-pointer hover:bg-white/5 transition"
-					onclick={() => (showCustomSliders = !showCustomSliders)}
-				>
-					<span class="flex items-center gap-1.5 text-cyan-400">
-						<span class="material-icons-round text-sm">tune</span>
-						<span>Ajuste Fino de Porcentajes</span>
-					</span>
-					<span
-						class="material-icons-round text-sm text-muted transition-transform duration-200"
-						style="transform: rotate({showCustomSliders ? '180deg' : '0deg'});"
-					>
-						expand_more
-					</span>
-				</button>
-				<p class="text-[9px] text-muted leading-tight m-0 px-2 pb-1">
-					Arrastra cada barra para dar más o menos peso a cada factor de tu feed.
-				</p>
-
-				{#if showCustomSliders}
-					<div class="pt-2 px-1 space-y-2.5" transition:slide={{ duration: 250 }}>
-						{#each WEIGHT_STATS as stat}
-							<div class="flex flex-col gap-1 group">
-								<div
-									class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider px-1"
-								>
-									<span class="flex items-center gap-1.5 text-muted">
-										<span
-											class="w-2 h-2 squircle"
-											style="background: {stat.color}; box-shadow: 0 0 6px {stat.color};"
-										></span>
-										{stat.label}
-									</span>
-									<span class="font-mono text-[10px] font-bold" style="color: {stat.color};">
-										{userWeights[stat.id]}%
-									</span>
-								</div>
-								<p class="text-[9px] text-muted leading-tight m-0 px-1">
-									{stat.desc}
-								</p>
-								<div class="aqua-slider-track">
-									<div
-										class="aqua-slider-fill"
-										style="width: {userWeights[
-											stat.id
-										]}%; background: {stat.color}; box-shadow: 0 0 8px {stat.color};"
-									></div>
-									<input
-										type="range"
-										min="0"
-										max="100"
-										value={userWeights[stat.id]}
-										oninput={(e) => {
-											userWeights[stat.id] = parseInt(e.target.value);
-										}}
-										onchange={updateWeightsAndReload}
-										class="aqua-range-input"
-									/>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			<!-- Modal Footer: Reset, Link to /settings, and Done -->
-			<div
-				class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-cyan-500/20"
-			>
-				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						class="aqua-text-btn"
-						onclick={resetWeights}
-						title="Restablecer a valores óptimos de fábrica"
-					>
-						<span class="material-icons-round text-xs">restart_alt</span>
-						<span>Restablecer</span>
-					</button>
-					<a
-						href="/settings"
-						class="aqua-text-btn text-decoration-none"
-						onclick={() => (showAlgorithmModal = false)}
-					>
-						<span class="material-icons-round text-xs">settings</span>
-						<span>Ajustes Completos</span>
-					</a>
-				</div>
-
-				<button
-					type="button"
-					class="btn-aero-primary text-xs py-1.5 px-4 shadow-md font-bold"
-					onclick={() => (showAlgorithmModal = false)}
-				>
-					Listo
 				</button>
 			</div>
 		</div>
@@ -4287,36 +4284,33 @@
 		border-color: rgba(6, 182, 212, 0.4);
 	}
 
-	/* Aqua Modal Container */
-	.aqua-modal-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 1050;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(12px) saturate(1.25);
-		-webkit-backdrop-filter: blur(12px) saturate(1.25);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1rem;
-	}
-	.aqua-modal-card {
+	/* Aqua Inline Tuner Panel */
+	.aqua-inline-panel {
 		width: 100%;
-		max-width: 520px;
-		max-height: 90vh;
-		overflow-y: auto;
 		background: var(--bg-surface);
-		border: 1px solid rgba(6, 182, 212, 0.35);
+		border: 1px solid rgba(6, 182, 212, 0.32);
 		border-radius: var(--radius-xl, 24px);
 		box-shadow:
-			0 20px 50px rgba(0, 0, 0, 0.35),
-			0 0 35px rgba(6, 182, 212, 0.15),
-			inset 0 1px 2px rgba(255, 255, 255, 0.5);
-		padding: 1.5rem;
+			0 10px 30px rgba(0, 0, 0, 0.15),
+			0 0 24px rgba(6, 182, 212, 0.12),
+			inset 0 1px 2px rgba(255, 255, 255, 0.4);
+		padding: 1.25rem 1.5rem;
 		position: relative;
+		backdrop-filter: var(--glass-blur);
+		-webkit-backdrop-filter: var(--glass-blur);
+		overflow: hidden;
+		transition: border-color 0.3s var(--ease-out);
+	}
+	:global([data-theme='light']) .aqua-inline-panel {
+		background: rgba(242, 255, 252, 0.85);
+		border-color: rgba(6, 182, 212, 0.35);
+		box-shadow:
+			0 10px 26px rgba(6, 182, 212, 0.1),
+			0 2px 8px rgba(0, 0, 0, 0.04),
+			inset 0 1px 2px rgba(255, 255, 255, 0.8);
 	}
 
-	.aqua-modal-icon-badge {
+	.aqua-panel-icon-badge {
 		width: 36px;
 		height: 36px;
 		border-radius: var(--radius-squircle);

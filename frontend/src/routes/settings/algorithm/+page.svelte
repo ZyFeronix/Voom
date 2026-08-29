@@ -238,7 +238,7 @@
 </script>
 
 <svelte:head>
-	<title>Feed y Algoritmo — VSocial</title>
+	<title>Feed y Algoritmo — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card" class:is-saving={saving}>
@@ -336,7 +336,14 @@
 						<span class="slider-value-text">{wInterests}</span>
 					</div>
 					<p class="slider-desc">Prioriza contenido con hashtags que sueles disfrutar.</p>
-					<input type="range" min="0" max="100" bind:value={wInterests} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wInterests}
+						class="aero-range"
+						style="--range-pct: {wInterests}%"
+					/>
 				</div>
 
 				<div class="slider-group">
@@ -345,7 +352,14 @@
 						<span class="slider-value-text">{wInteractions}</span>
 					</div>
 					<p class="slider-desc">Publicaciones de creadores con los que sueles reaccionar.</p>
-					<input type="range" min="0" max="100" bind:value={wInteractions} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wInteractions}
+						class="aero-range"
+						style="--range-pct: {wInteractions}%"
+					/>
 				</div>
 
 				<div class="slider-group">
@@ -354,7 +368,14 @@
 						<span class="slider-value-text">{wSocial}</span>
 					</div>
 					<p class="slider-desc">Prioriza publicaciones de personas que sigues directamente.</p>
-					<input type="range" min="0" max="100" bind:value={wSocial} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wSocial}
+						class="aero-range"
+						style="--range-pct: {wSocial}%"
+					/>
 				</div>
 
 				<div class="slider-group">
@@ -363,7 +384,14 @@
 						<span class="slider-value-text">{wPopularity}</span>
 					</div>
 					<p class="slider-desc">Favorece publicaciones virales con mucha actividad en la red.</p>
-					<input type="range" min="0" max="100" bind:value={wPopularity} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wPopularity}
+						class="aero-range"
+						style="--range-pct: {wPopularity}%"
+					/>
 				</div>
 
 				<div class="slider-group">
@@ -372,7 +400,14 @@
 						<span class="slider-value-text">{wRecency}</span>
 					</div>
 					<p class="slider-desc">Favorece publicaciones de las últimas horas.</p>
-					<input type="range" min="0" max="100" bind:value={wRecency} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wRecency}
+						class="aero-range"
+						style="--range-pct: {wRecency}%"
+					/>
 				</div>
 
 				<div class="slider-group">
@@ -383,7 +418,14 @@
 					<p class="slider-desc">
 						Evita mostrar demasiadas publicaciones seguidas del mismo usuario.
 					</p>
-					<input type="range" min="0" max="100" bind:value={wDiversity} class="aero-range" />
+					<input
+						type="range"
+						min="0"
+						max="100"
+						bind:value={wDiversity}
+						class="aero-range"
+						style="--range-pct: {wDiversity}%"
+					/>
 				</div>
 			</div>
 

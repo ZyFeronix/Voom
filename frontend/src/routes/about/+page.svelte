@@ -81,27 +81,27 @@
 
 	const faqs = [
 		{
-			q: '¿Qué es V-SOCIAL y por qué nació?',
-			a: 'V-SOCIAL es una red social y plataforma de creadores de próxima generación, concebida específicamente para VTubers, streamers, ilustradores, modeladores 3D y comunidades virtuales. Nació como respuesta al minimalismo estéril de las redes tradicionales y a las políticas abusivas de comisiones y algoritmos opacos.'
+			q: '¿Qué es Voom! y por qué nació?',
+			a: 'Voom! es una red social y plataforma de creadores de próxima generación, concebida específicamente para VTubers, streamers, ilustradores, modeladores 3D y comunidades virtuales. Nació como respuesta al minimalismo estéril de las redes tradicionales y a las políticas abusivas de comisiones y algoritmos opacos.'
 		},
 		{
 			q: '¿Cómo funciona la economía de creadores y comisiones?',
-			a: 'V-SOCIAL opera bajo un modelo de economía 100% P2P (Peer-to-Peer) sin intermediación financiera ni custodia de fondos. Los creadores y artistas conectan directamente sus métodos de cobro externos (PayPal, Ko-fi, Patreon) en su perfil y reciben el 100% de sus ingresos directos con 0% de comisiones por parte de la plataforma.'
+			a: 'Voom! opera bajo un modelo de economía 100% P2P (Peer-to-Peer) sin intermediación financiera ni custodia de fondos. Los creadores y artistas conectan directamente sus métodos de cobro externos (PayPal, Ko-fi, Patreon) en su perfil y reciben el 100% de sus ingresos directos con 0% de comisiones por parte de la plataforma.'
 		},
 		{
 			q: '¿Cómo obtengo una insignia de verificación?',
 			a: 'Contamos con una jerarquía de verificación transparente y pública con categorías especializadas para Creadores/Artistas, Streamers/VTubers, Organizaciones y Personalidades. Puedes consultar los requisitos y postularte desde nuestro portal de verificación en /about/verified.'
 		},
 		{
-			q: '¿Qué tecnologías impulsan la velocidad extrema de V-SOCIAL?',
+			q: '¿Qué tecnologías impulsan la velocidad extrema de Voom!?',
 			a: 'Utilizamos SvelteKit 5 con Runes nativos ($state, $derived) para una reactividad quirúrgica en el DOM sin sobrecarga de Virtual DOM, acoplado a SQLite 3 en modo WAL (Write-Ahead Logging) para lecturas O(1) concurrentes, Socket.IO para eventos en tiempo real y WebRTC para llamadas P2P de voz y video en alta fidelidad.'
 		},
 		{
-			q: '¿Cómo protege V-SOCIAL mi privacidad y datos personales?',
+			q: '¿Cómo protege Voom! mi privacidad y datos personales?',
 			a: 'Adoptamos arquitectura Zero-Trust y cumplimiento estricto del RGPD europeo: cero cookies de rastreo publicitario de terceros, derecho a la portabilidad (exportación de todos tus datos en JSON en 1 clic) y derecho al olvido con eliminación irreversible automatizada.'
 		},
 		{
-			q: '¿V-SOCIAL funciona en dispositivos móviles?',
+			q: '¿Voom! funciona en dispositivos móviles?',
 			a: 'Sí. Toda la interfaz está construida con diseño responsive fluido, escudos volumétricos contra el colapso táctil y soporte PWA (Progressive Web App) para instalarse como aplicación nativa en iOS, Android y escritorio con rendimiento de 60 FPS.'
 		}
 	];
@@ -122,10 +122,10 @@
 </script>
 
 <svelte:head>
-	<title>Sobre V-SOCIAL - Manifiesto, Ecosistema y Arquitectura</title>
+	<title>Sobre Voom! - Manifiesto, Ecosistema y Arquitectura</title>
 	<meta
 		name="description"
-		content="Conoce V-SOCIAL: la red social de próxima generación para VTubers, streamers, artistas y comunidades virtuales con estética Glassmorphism 2.0, Svelte 5 y rendimiento extremo."
+		content="Conoce Voom!: la red social de próxima generación para VTubers, streamers, artistas y comunidades virtuales con estética Glassmorphism 2.0, Svelte 5 y rendimiento extremo."
 	/>
 </svelte:head>
 
@@ -202,7 +202,7 @@
 			<div class="hero-badge-pill">
 				<span class="badge-dot"></span>
 				<span class="badge-text font-bold"
-					>V-SOCIAL v3.0 • Ecosistema Digital de Próxima Generación</span
+					>Voom! v3.0 • Ecosistema Digital de Próxima Generación</span
 				>
 			</div>
 
@@ -619,7 +619,7 @@
 								<h3 class="tab-title">Marketplace & Pagos P2P Directos</h3>
 								<p class="tab-desc">
 									Publica ofertas de rigging Live2D, diseño de overlays, emotes personalizados o
-									música para directos. V-SOCIAL opera bajo un modelo 100% P2P:
+									música para directos. Voom! opera bajo un modelo 100% P2P:
 									<strong>100% para ti</strong> mediante tu PayPal, Ko-fi o Patreon, con
 									<strong>0% de comisión</strong> por parte de la plataforma.
 								</p>
@@ -641,7 +641,7 @@
 
 									<div class="calc-comparison">
 										<div class="calc-side vsocial">
-											<span class="calc-platform-name">V-SOCIAL (0% P2P)</span>
+											<span class="calc-platform-name">Voom! (0% P2P)</span>
 											<span class="calc-payout">${creatorGets}</span>
 											<span class="calc-sub">Recibes directo (comisión: ${vsocialTake})</span>
 										</div>
@@ -771,7 +771,7 @@
 								<span class="pill-mini text-cyan">Autenticidad & Prestigio</span>
 								<h3 class="tab-title">Jerarquía de Verificación Transparente</h3>
 								<p class="tab-desc">
-									En V-SOCIAL, las insignias no se compran con suscripciones vacías. Cada insignia
+									En Voom!, las insignias no se compran con suscripciones vacías. Cada insignia
 									representa un rol verificado en la comunidad con estándares y revisión humana.
 								</p>
 								<div class="verification-ctas">
@@ -1153,7 +1153,7 @@
 
 				<div class="cta-content-wrap">
 					<span class="cta-tag font-bold">✨ Forma Parte del Futuro</span>
-					<h2 class="cta-main-title">Únete a la Revolución de V-SOCIAL</h2>
+					<h2 class="cta-main-title">Únete a la Revolución de Voom!</h2>
 					<p class="cta-main-desc">
 						Crea tu cuenta en segundos, personaliza tu perfil con estética Neo-Aero y conecta con
 						miles de creadores y fans en un entorno pensado para ti.

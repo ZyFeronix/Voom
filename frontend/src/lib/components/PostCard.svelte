@@ -1644,6 +1644,13 @@
 	.action-btn:active {
 		transform: scale(0.92);
 	}
+	/* Like: press más profundo con respuesta rápida (REQUERIMIENTOS 2.3) */
+	.like-btn-wrapper .action-btn {
+		transition-duration: 90ms;
+	}
+	.like-btn-wrapper .action-btn:active {
+		transform: scale(0.82);
+	}
 	.action-btn:hover {
 		background: var(--bg-overlay);
 		color: var(--aero-blue);

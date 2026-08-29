@@ -12,7 +12,7 @@
 	let agreed = $state(false);
 
 	// Step 2: Site Config
-	let siteName = $state('VSocial');
+	let siteName = $state('Voom!');
 	let allowRegistration = $state(true);
 	let defaultTheme = $state('dark');
 
@@ -86,7 +86,7 @@
 </script>
 
 <svelte:head>
-	<title>Setup Wizard — VSocial</title>
+	<title>Setup Wizard — Voom!</title>
 </svelte:head>
 
 <div class="setup-container">
@@ -119,8 +119,8 @@
 				<div class="step-icon">🚀</div>
 				<h1 class="step-title">Bienvenido al Setup</h1>
 				<p class="step-desc">
-					Este asistente configurará tu plataforma VSocial en 4 pasos simples. Se creará tu cuenta
-					de Super Administrador y los parámetros base del sistema.
+					Este asistente configurará tu plataforma Voom! en 4 pasos simples. Se creará tu cuenta de
+					Super Administrador y los parámetros base del sistema.
 				</p>
 
 				<div class="info-box">
@@ -248,7 +248,7 @@
 				<div class="success-icon">✅</div>
 				<h1 class="step-title">¡Setup Completado!</h1>
 				<p class="step-desc">
-					VSocial está listo. Tu cuenta <strong>@{adminUsername}</strong> tiene privilegios de Super Administrador.
+					Voom! está listo. Tu cuenta <strong>@{adminUsername}</strong> tiene privilegios de Super Administrador.
 				</p>
 
 				<div class="info-box success-info">
@@ -285,7 +285,7 @@
 						{#if loading}
 							<span class="loading-spinner" style="width:16px;height:16px;border-width:2px;"></span> Configurando...
 						{:else}
-							<span class="material-icons-round">rocket_launch</span> Instalar VSocial
+							<span class="material-icons-round">rocket_launch</span> Instalar Voom!
 						{/if}
 					</button>
 				{/if}

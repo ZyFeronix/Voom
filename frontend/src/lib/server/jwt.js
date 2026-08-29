@@ -1,5 +1,5 @@
 /**
- * VSocial — JWT Utilities
+ * Voom! — JWT Utilities
  * Token encoding/decoding using jsonwebtoken
  */
 import jwt from 'jsonwebtoken';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '..', '..', '..', '..', '.env') });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'VSOCIAL_SUPER_SECRET_KEY_2026_!@#$';
+const JWT_SECRET = process.env.JWT_SECRET || 'VOOM_SUPER_SECRET_KEY_2026_!@#$';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '365d';
 
 /**

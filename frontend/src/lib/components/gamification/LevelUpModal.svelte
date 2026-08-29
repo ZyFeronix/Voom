@@ -1,6 +1,6 @@
 <script>
 	/**
-	 * LevelUpModal.svelte - V-SOCIAL Level Up Celebration Modal
+	 * LevelUpModal.svelte - Voom! Level Up Celebration Modal
 	 * Muestra una tarjeta inmersiva Glassmorphic + Neo-Aero cuando el usuario sube de nivel,
 	 * con física de resorte, partículas de neón y fanfarria Web Audio API.
 	 */
@@ -101,7 +101,7 @@
 			<div class="levelup-body">
 				<p class="levelup-message">
 					{activeData.message ||
-						`¡Felicidades! Has alcanzado el Nivel ${activeData.level} en V-SOCIAL.`}
+						`¡Felicidades! Has alcanzado el Nivel ${activeData.level} en Voom!.`}
 				</p>
 				{#if activeData.xpGained > 0}
 					<div class="levelup-xp-pill">

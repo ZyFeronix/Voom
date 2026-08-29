@@ -117,7 +117,7 @@
 </script>
 
 <svelte:head>
-	<title>Pagos y Enlaces — VSocial</title>
+	<title>Pagos y Enlaces — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card">

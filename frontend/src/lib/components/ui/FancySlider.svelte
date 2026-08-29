@@ -2,39 +2,61 @@
 	/**
 	 * FancySlider — deslizador 100% personalizado (cero <input type="range">).
 	 *
-	 * - Pointer Events con captura: ratón y táctil idénticos.
+	 * - Pointer Events con captura sobre el riel: ratón y táctil idénticos.
 	 * - Teclado accesible: role="slider", flechas, PageUp/Down, Home/End.
 	 * - Fill con gradiente del acento + thumb con glow; todo con tokens.
 	 *
+	 * Medimos getBoundingClientRect() sobre el propio riel (trackEl), NUNCA sobre
+	 * un contenedor padre que pueda incluir botones [-]/[+] o paddings. La
+	 * matemática de conversión respeta estrictamente min/max/step.
+	 *
 	 * Uso: <FancySlider min={0} max={40} step={1} bind:value={blur} label="Difuminado" />
 	 */
-	let { min = 0, max = 100, step = 1, value = $bindable(0), label = '', id = null } = $props();
+	let {
+		min = 0,
+		max = 100,
+		step = 1,
+		value = $bindable(0),
+		label = '',
+		id = null,
+		labelledby = null
+	} = $props();
 
-	let el = $state(null);
+	let trackEl = $state(null);
 	let dragging = $state(false);
 
+	// 1. Porcentaje visual EXACTO del riel (0% a 100%)
 	let pct = $derived.by(() => {
 		const span = max - min || 1;
 		return Math.min(100, Math.max(0, ((Number(value) - min) / span) * 100));
 	});
 
 	function clamp(raw) {
-		const snapped = Math.round((raw - min) / step) * step;
-		const v = Math.min(max, Math.max(min, Number(snapped.toFixed(6))));
-		return v;
+		const snapped = Math.round(raw / step) * step;
+		return Math.min(max, Math.max(min, Number(snapped.toFixed(6))));
 	}
 
+	/**
+	 * 2. Ratio normalizado (0.0 a 1.0) usando clientX contra el RIEL REAL.
+	 *    La medición se hace sobre trackEl (.fancy-slider) que, gracias a
+	 *    width:100%, abarca exactamente el ancho del riel visible.
+	 */
 	function setFromPointer(e) {
-		if (!el) return;
-		const rect = el.getBoundingClientRect();
-		const ratio = rect.width ? (e.clientX - rect.left) / rect.width : 0;
-		value = clamp(min + Math.min(1, Math.max(0, ratio)) * (max - min));
+		if (!trackEl) return;
+		const rect = trackEl.getBoundingClientRect();
+		if (rect.width <= 0) return;
+
+		const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+		// 3. Conversión matemática respetando MIN y MAX
+		const rawValue = min + ratio * (max - min);
+		value = clamp(rawValue);
 	}
 
 	function onPointerDown(e) {
 		dragging = true;
+		// Captura de puntero: el arrastre no se corta si el ratón sale del riel
 		try {
-			el?.setPointerCapture(e.pointerId);
+			trackEl?.setPointerCapture(e.pointerId);
 		} catch {}
 		setFromPointer(e);
 	}
@@ -81,13 +103,14 @@
 </script>
 
 <div
-	bind:this={el}
+	bind:this={trackEl}
 	{id}
 	class="fancy-slider"
 	class:dragging
 	role="slider"
 	tabindex="0"
 	aria-label={label}
+	aria-labelledby={labelledby}
 	aria-valuemin={min}
 	aria-valuemax={max}
 	aria-valuenow={value}
@@ -105,6 +128,7 @@
 <style>
 	.fancy-slider {
 		position: relative;
+		width: 100%;
 		height: 26px;
 		touch-action: none;
 		cursor: pointer;
@@ -118,6 +142,7 @@
 			color-mix(in srgb, var(--accent-blue-base, var(--aero-blue)) 35%, transparent);
 	}
 
+	/* El riel REAL — aquí se mide getBoundingClientRect() — ocupa 100% del track */
 	.fs-rail,
 	.fs-fill,
 	.fs-thumb {

@@ -1,5 +1,5 @@
 /**
- * VSocial — Reports API
+ * Voom! — Reports API
  * POST /api/reports — Create report
  * GET  /api/reports — List user's reports
  */

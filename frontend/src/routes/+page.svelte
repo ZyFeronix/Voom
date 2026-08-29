@@ -8,7 +8,19 @@
 
 	$effect(() => {
 		if (authStore.isAuthenticated && authStore.user) {
-			goto('/feed');
+			// La redirección espera al primer pintado del landing (doble rAF):
+			// la View Transition necesita un documento ya pintado para capturar
+			// el snapshot "old"; si navega antes, el fundido arranca desde un
+			// lienzo vacío y se ve como un parpadeo oscuro en vez de la
+			// transición hacia el feed.
+			let raf2 = 0;
+			const raf1 = requestAnimationFrame(() => {
+				raf2 = requestAnimationFrame(() => goto('/feed'));
+			});
+			return () => {
+				cancelAnimationFrame(raf1);
+				cancelAnimationFrame(raf2);
+			};
 		}
 	});
 
@@ -293,7 +305,7 @@
 	<!-- ═══════════════════════════════════ HEADER ══════════════════════════════════ -->
 	<header class="aero-header">
 		<div class="nav-container">
-			<a href="/" class="nav-logo" aria-label="VSocial Inicio">
+			<a href="/" class="nav-logo" aria-label="Voom! Inicio">
 				<span class="logo-prism">VS</span>ocial
 				<span class="nav-live-badge">
 					<span class="live-dot"></span>LIVE
@@ -456,7 +468,7 @@
 						<div class="window-controls" style="flex: 0 0 54px; min-width: 54px;">
 							<span class="close"></span><span class="min"></span><span class="max"></span>
 						</div>
-						<div class="window-title">VSocial Dashboard — Open Core Node</div>
+						<div class="window-title">Voom! Dashboard — Open Core Node</div>
 						<div class="window-status" style="flex: 0 0 84px; min-width: 84px;">
 							<span class="ws-dot"></span> WAL: ON
 						</div>
@@ -896,7 +908,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 					<h3>Marketplace 0% Fee</h3>
 					<p>
 						Vende assets digitales, modelos 3D, encargos e ilustraciones sin peajes de plataforma.
-						V-SOCIAL retiene <strong>0%</strong>. Los pagos se procesan de forma directa (P2P) a tus
+						Voom! retiene <strong>0%</strong>. Los pagos se procesan de forma directa (P2P) a tus
 						enlaces personales (PayPal, Ko-fi o Patreon).
 					</p>
 					<div class="card-footer-tech">
@@ -1005,9 +1017,9 @@ export const getFeed = async (limit = 20, offset = 0) =>
 				<div class="section-eyebrow">Arquitectura</div>
 				<h2 class="section-title text-left">SQLite WAL:<br />Rendimiento sin intermediarios</h2>
 				<p class="desc">
-					En V-SOCIAL apostamos por la simplicidad radical. <strong>@libsql/client</strong> en modo WAL
-					permite lecturas concurrentes ilimitadas mientras las escrituras ocurren atómicamente en el
-					Write-Ahead Log. Un solo archivo, cero sobrecarga distribuida y código 100% auditable.
+					En Voom! apostamos por la simplicidad radical. <strong>@libsql/client</strong> en modo WAL permite
+					lecturas concurrentes ilimitadas mientras las escrituras ocurren atómicamente en el Write-Ahead
+					Log. Un solo archivo, cero sobrecarga distribuida y código 100% auditable.
 				</p>
 
 				<div class="performance-indicators">
@@ -1398,7 +1410,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 			<div class="section-eyebrow">Comunidad</div>
 			<h2 class="section-title">Creadores en movimiento</h2>
 			<p class="section-subtitle">
-				Artistas 3D, ilustradores, VTubers y productores que crean y comparten en V-SOCIAL.
+				Artistas 3D, ilustradores, VTubers y productores que crean y comparten en Voom!.
 			</p>
 		</div>
 
@@ -1692,7 +1704,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 	<footer class="aero-footer">
 		<div class="footer-container">
 			<div class="footer-brand">
-				<a href="/" class="nav-logo footer-logo" aria-label="VSocial Inicio">
+				<a href="/" class="nav-logo footer-logo" aria-label="Voom! Inicio">
 					<span class="logo-prism">VS</span>ocial
 				</a>
 				<p>
@@ -1806,7 +1818,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 	}
 
 	/* ═══════════════════════════════════════════════════════════════
-     VSOCIAL LANDING — LiquidglassUI 2.0 + Glassmorphism Premium
+     VOOM LANDING — LiquidglassUI 2.0 + Glassmorphism Premium
      ═══════════════════════════════════════════════════════════════ */
 
 	.aero-wrapper {

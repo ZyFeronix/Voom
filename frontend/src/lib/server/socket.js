@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import crypto from 'crypto';
 import { decodeToken } from './jwt.js';
 import { getDb, initDb } from './db.js';
+import { getEffectiveRole, ROLE_LEVEL } from './roles.js';
 
 /**
  * Socket.IO global instance
@@ -182,6 +183,16 @@ export function initSocketIO(httpServer) {
 		sockets.add(socket.id);
 
 		const db = getDb();
+
+		// Sala de staff: notificaciones internas (verificaciones, reportes).
+		// Rol efectivo nivel team o superior (user/roles con jerarquía 10+).
+		try {
+			const effRole = await getEffectiveRole(db, userId);
+			if (ROLE_LEVEL[effRole] >= 10) socket.join('staff');
+		} catch {
+			// Sin sala de staff si la consulta falla; no bloquea la conexión.
+		}
+
 		// Refrescar last_seen_at al conectar (marca "visto ahora").
 		try {
 			await db.prepare("UPDATE users SET last_seen_at = datetime('now') WHERE id = ?").run(userId);

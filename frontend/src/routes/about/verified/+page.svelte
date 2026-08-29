@@ -53,10 +53,10 @@
 			name: 'Administrador del Sistema',
 			username: 'admin',
 			badge: 'admin',
-			bio: '👑 Administrador Principal & Arquitectura de V-SOCIAL. Gestión de infraestructura y directrices globales.',
+			bio: '👑 Administrador Principal & Arquitectura de Voom!. Gestión de infraestructura y directrices globales.',
 			postText:
 				'Mantenimiento y optimización de infraestructura completados. Toda la red opera con latencia mínima y máxima seguridad. 👑⚡',
-			hashtag: '#VSocialUpdate #Infrastructure',
+			hashtag: '#Voom!Update #Infrastructure',
 			commentText: 'Infraestructura y seguridad operando con parámetros óptimos.',
 			avatar: BASE_AVATAR
 		},
@@ -64,30 +64,30 @@
 			name: 'Moderador Oficial',
 			username: 'moderador',
 			badge: 'moderator',
-			bio: '🛡️ Equipo Oficial de Moderación de V-SOCIAL. Salvaguardando la seguridad y la convivencia comunitaria.',
+			bio: '🛡️ Equipo Oficial de Moderación de Voom!. Salvaguardando la seguridad y la convivencia comunitaria.',
 			postText:
 				'Recordatorio a la comunidad: cuidemos la convivencia en el feed. Reporta cualquier conducta inapropiada o sospecha de suplantación. 🛡️✨',
-			hashtag: '#SeguridadComunitaria #VSocialSafe',
+			hashtag: '#SeguridadComunitaria #Voom!Safe',
 			commentText: 'Reporte revisado y resuelto conforme a las directrices comunitarias.',
 			avatar: BASE_AVATAR
 		},
 		support: {
-			name: 'Soporte V-SOCIAL',
+			name: 'Soporte Voom!',
 			username: 'soporte',
 			badge: 'support',
 			bio: '🎧 Centro Oficial de Asistencia y Atención al Usuario. Resolución de tickets y verificación de identidades.',
 			postText:
 				'El equipo de Soporte y Verificación de Identidad está activo. Responderemos a tus solicitudes en un plazo de 24 a 48 horas hábiles. 🎧',
-			hashtag: '#VSocialHelp #SoporteOficial',
+			hashtag: '#Voom!Help #SoporteOficial',
 			commentText:
 				'Ticket de asistencia recibido. Estamos revisando tu caso con el equipo técnico.',
 			avatar: BASE_AVATAR
 		},
 		team: {
-			name: 'Equipo V-SOCIAL',
+			name: 'Equipo Voom!',
 			username: 'team',
 			badge: 'team',
-			bio: '⚡ Miembro del equipo de ingeniería, diseño UI/UX y desarrollo central de V-SOCIAL.',
+			bio: '⚡ Miembro del equipo de ingeniería, diseño UI/UX y desarrollo central de Voom!.',
 			postText:
 				'Nueva actualización de interfaz con Glassmorphism 2.0 y aceleración por hardware ya desplegada en toda la plataforma. 💎⚡',
 			hashtag: '#NeoAero #DevTeam #Glassmorphism',
@@ -109,10 +109,10 @@
 			name: 'Creador Verificado',
 			username: 'creador_oficial',
 			badge: 'verified',
-			bio: '✨ Creador de contenido oficial y personalidad con identidad verificada en V-SOCIAL.',
+			bio: '✨ Creador de contenido oficial y personalidad con identidad verificada en Voom!.',
 			postText:
 				'¡Muchas gracias a toda la comunidad por el apoyo constante! Ya está disponible el nuevo contenido y proyectos en mi perfil. ✨🎨',
-			hashtag: '#CreadorOficial #VSocial #VirtualCreator',
+			hashtag: '#CreadorOficial #Voom! #VirtualCreator',
 			commentText: 'Totalmente de acuerdo. La fluidez y estética del sistema es impresionante.',
 			avatar: BASE_AVATAR
 		}
@@ -413,7 +413,7 @@
 			color: 'var(--badge-admin)',
 			glowRgba: 'rgba(251, 191, 36, 0.25)',
 			tag: 'Staff Global',
-			desc: 'La cúpula de gobernanza de V-SOCIAL. Cuentas con acceso integral a la infraestructura, seguridad de datos y directrices operativas globales.',
+			desc: 'La cúpula de gobernanza de Voom!. Cuentas con acceso integral a la infraestructura, seguridad de datos y directrices operativas globales.',
 			criteria: 'Asignado estrictamente a directores y arquitectos de sistemas.',
 			perks: [
 				'Acceso a Panel de Control Global y Auditoría',
@@ -449,7 +449,7 @@
 			category: 'core',
 			level: 'Nivel 2 — Asistencia',
 			badgeLevel: 'NIVEL 2',
-			title: 'Soporte V-SOCIAL',
+			title: 'Soporte Voom!',
 			badgeLabel: 'SOPORTE',
 			icon: 'support_agent',
 			color: 'var(--badge-support)',
@@ -470,13 +470,13 @@
 			category: 'core',
 			level: 'Nivel 3 — Innovación',
 			badgeLevel: 'NIVEL 3',
-			title: 'Equipo V-SOCIAL',
+			title: 'Equipo Voom!',
 			badgeLabel: 'TEAM',
 			icon: 'military_tech',
 			color: 'var(--badge-team)',
 			glowRgba: 'rgba(125, 211, 252, 0.25)',
 			tag: 'Staff Core',
-			desc: 'Cuentas de ingenieros, diseñadores de producto y colaboradores del núcleo de desarrollo y diseño de V-SOCIAL.',
+			desc: 'Cuentas de ingenieros, diseñadores de producto y colaboradores del núcleo de desarrollo y diseño de Voom!.',
 			criteria: 'Desarrolladores activos, diseñadores UI/UX y staff interno.',
 			perks: [
 				'Acceso Temprano a Funciones Experimentales',
@@ -537,8 +537,8 @@
 
 	const faqs = [
 		{
-			q: '¿Cuánto cuesta obtener la insignia de verificación en V-SOCIAL?',
-			a: 'La verificación en V-SOCIAL es 100% gratuita. A diferencia de otras plataformas, nosotros no vendemos insignias como suscripción de vanidad. Cada insignia representa una autenticación genuina otorgada por mérito, identidad comprobable o pertenencia al staff.'
+			q: '¿Cuánto cuesta obtener la insignia de verificación en Voom!?',
+			a: 'La verificación en Voom! es 100% gratuita. A diferencia de otras plataformas, nosotros no vendemos insignias como suscripción de vanidad. Cada insignia representa una autenticación genuina otorgada por mérito, identidad comprobable o pertenencia al staff.'
 		},
 		{
 			q: '¿Qué requisitos debo cumplir como creador, VTuber o artista?',
@@ -614,10 +614,10 @@
 </script>
 
 <svelte:head>
-	<title>Jerarquía e Insignias de Verificación - V-SOCIAL</title>
+	<title>Jerarquía e Insignias de Verificación - Voom!</title>
 	<meta
 		name="description"
-		content="Conoce el sistema de verificación, insignias y jerarquía oficial de V-SOCIAL. Autenticidad, protección para creadores y autoridad sin suscripciones de pago."
+		content="Conoce el sistema de verificación, insignias y jerarquía oficial de Voom!. Autenticidad, protección para creadores y autoridad sin suscripciones de pago."
 	/>
 </svelte:head>
 
@@ -647,8 +647,8 @@
 			Jerarquía de <span class="gradient-text">Verificación</span>
 		</h1>
 		<p class="header-subtitle">
-			En V-SOCIAL, la autoridad se gana y la identidad se protege. Distintivos oficiales
-			criptográficos para creadores, personalidades y el equipo directivo.
+			En Voom!, la autoridad se gana y la identidad se protege. Distintivos oficiales criptográficos
+			para creadores, personalidades y el equipo directivo.
 		</p>
 
 		<!-- Trust Pillars Grid -->
@@ -1148,7 +1148,7 @@
 			<span class="material-icons-round text-sm">compare_arrows</span>
 			<span>Diferenciación Fundamental</span>
 		</div>
-		<h2 class="section-title">¿Por qué el Modelo de V-SOCIAL es Superior?</h2>
+		<h2 class="section-title">¿Por qué el Modelo de Voom! es Superior?</h2>
 
 		<div class="comparison-grid">
 			<div class="comparison-column glass-card vsocial-col">
@@ -1156,7 +1156,7 @@
 					<span class="material-icons-round header-icon" style="color: var(--aero-blue);"
 						>verified_user</span
 					>
-					<h3>V-SOCIAL</h3>
+					<h3>Voom!</h3>
 					<span class="col-tag pro">Modelo de Autenticidad Real</span>
 				</div>
 				<ul class="comparison-features">
@@ -1265,7 +1265,7 @@
 			<h2 class="apply-title">¿Eres una figura pública, creador destacado o artista?</h2>
 			<p class="apply-desc">
 				Protege tu identidad, obtén tu distintivo oficial y destaca con prestigio en el feed de
-				V-SOCIAL.
+				Voom!.
 			</p>
 
 			<div class="apply-actions">
@@ -1275,7 +1275,7 @@
 				</a>
 				<a href="/about" class="btn-aero-secondary learn-more-btn">
 					<span class="material-icons-round text-xl">info</span>
-					<span>Conocer Más Sobre V-SOCIAL</span>
+					<span>Conocer Más Sobre Voom!</span>
 				</a>
 			</div>
 		</div>
@@ -1393,7 +1393,7 @@
 					<!-- Common Identity Fields -->
 					<div class="form-row-2col">
 						<div class="form-group">
-							<label for="app-username">Usuario en V-SOCIAL *</label>
+							<label for="app-username">Usuario en Voom! *</label>
 							<div class="input-with-prefix">
 								<span class="input-prefix">@</span>
 								<input
@@ -1461,7 +1461,7 @@
 							<input
 								id="creator-proof"
 								type="url"
-								placeholder="URL a post en X/Bluesky/ArtStation mencionando @tu_usuario en V-SOCIAL"
+								placeholder="URL a post en X/Bluesky/ArtStation mencionando @tu_usuario en Voom!"
 								bind:value={creatorProofLink}
 								class="modal-input"
 							/>
@@ -1482,7 +1482,7 @@
 								</li>
 								<li>
 									<span class="material-icons-round text-xs text-mint">check</span> Perfil completo en
-									V-SOCIAL con avatar y portada
+									Voom! con avatar y portada
 								</li>
 							</ul>
 						</div>
@@ -1870,7 +1870,7 @@
 						<div class="sla-row">
 							<span class="material-icons-round text-sm text-mint">mail</span>
 							<span
-								><strong>Resolución:</strong> Notificación en tu bandeja de V-SOCIAL y al correo registrado</span
+								><strong>Resolución:</strong> Notificación en tu bandeja de Voom! y al correo registrado</span
 							>
 						</div>
 					</div>

@@ -1,12 +1,23 @@
 /* ══════════════════════════════════════════════════════════════════════
-   🎬 VSOCIAL — ESTÉTICA NEO-AERO & MODO RENDIMIENTO
-   VSocial combina Glassmorphism 2.0 y Neo-Aero con un sistema de alto
+   🎬 VOOM! — ESTÉTICA NEO-AERO & MODO RENDIMIENTO
+   Voom! combina Glassmorphism 2.0 y Neo-Aero con un sistema de alto
    rendimiento adaptable: soporta modo estándar con aceleración GPU,
    Modo Rendimiento para PCs modestos y compatibilidad con
    prefers-reduced-motion según las preferencias del usuario/SO.
    ══════════════════════════════════════════════════════════════════════ */
 :root {
 	--motion-ok: 1;
+
+	/* Tokens de navegación móvil (definidos globalmente para componentes mensajería) */
+	--mobile-nav-height: 5rem;
+
+	/* Tokens volumétricos anti-colapso (Unified Volumetric Collapse Shield) */
+	--vol-avatar: 44px;
+	--vol-avatar-sm: 28px;
+	--vol-avatar-lg: 56px;
+
+	/* Radio squircle secundario para avatars miniatura */
+	--radius-squircle-sm: 18%;
 }
 
 /* ── Theming Variables ────────────────────────── */
@@ -132,9 +143,20 @@
 	--bg-overlay: rgba(224, 242, 254, 0.6);
 	--glass-bg: var(--bg-surface);
 	--glass-border: rgba(255, 255, 255, 0.82);
+	--glass-border-t: rgba(255, 255, 255, 0.45);
 	--glass-shadow: none;
 	--glass-inset: none;
 	--glass-inset-highlight: none;
+
+	/* Specular Refraction & Aero Glass Sheen (Light / Frutiger Aqua) */
+	--specular-line: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.7) 15%,
+		rgba(255, 255, 255, 0.95) 50%,
+		rgba(255, 255, 255, 0.7) 85%,
+		transparent 100%
+	);
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #ffffff;
@@ -238,9 +260,20 @@
 	--bg-overlay: rgba(11, 26, 46, 0.7);
 	--glass-bg: var(--bg-surface);
 	--glass-border: rgba(255, 255, 255, 0.12); /* Contraste en bordes */
+	--glass-border-t: rgba(255, 255, 255, 0.25);
 	--glass-shadow: none;
 	--glass-inset: none;
 	--glass-inset-highlight: none;
+
+	/* Specular Refraction & Aero Glass Sheen (Dark / Windows 7 Oceanic Aero) */
+	--specular-line: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.15) 15%,
+		rgba(255, 255, 255, 0.45) 50%,
+		rgba(255, 255, 255, 0.15) 85%,
+		transparent 100%
+	);
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0f2136;
@@ -350,9 +383,20 @@
 	--bg-overlay: rgba(6, 11, 20, 0.85);
 	--glass-bg: var(--bg-surface);
 	--glass-border: rgba(160, 210, 255, 0.09); /* Reflejo índigo/cyan visible */
+	--glass-border-t: rgba(160, 210, 255, 0.2);
 	--glass-shadow: none;
 	--glass-inset: none;
 	--glass-inset-highlight: none;
+
+	/* Specular Refraction & Aero Glass Sheen (Midnight / Abyssal Obsidian) */
+	--specular-line: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgba(160, 210, 255, 0.12) 15%,
+		rgba(255, 255, 255, 0.35) 50%,
+		rgba(160, 210, 255, 0.12) 85%,
+		transparent 100%
+	);
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0d131c;
@@ -449,7 +493,7 @@ html {
 }
 
 ::view-transition-old(root) {
-	animation: vt-crossfade-old 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	animation: vt-crossfade-old 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
@@ -469,14 +513,14 @@ html {
 	}
 	to {
 		opacity: 0;
-		transform: translateY(-18px) scale(0.99);
+		transform: translateY(-6px) scale(0.996);
 	}
 }
 
 @keyframes vt-crossfade-new {
 	from {
 		opacity: 0;
-		transform: translateY(26px) scale(0.99);
+		transform: translateY(6px) scale(0.996);
 	}
 	to {
 		opacity: 1;
@@ -484,7 +528,7 @@ html {
 	}
 }
 
-/* ── MOTOR DE RENDIMIENTO & OPTIMIZACIÓN VISUAL (VSOCIAL GPU/CPU ACCEL) ── */
+/* ── MOTOR DE RENDIMIENTO & OPTIMIZACIÓN VISUAL (VOOM! GPU/CPU ACCEL) ── */
 
 /* 1. Control de Desenfoque de Cristal (Backdrop-Filter) por Niveles */
 :root[data-glass-blur='none'],
@@ -524,6 +568,14 @@ html {
 :root[data-glass-blur='none'] .vs-mobile-container,
 :root[data-glass-blur='none'] .vs-theme-dropdown,
 :root[data-glass-blur='none'] .aero-modal-content,
+:root[data-glass-blur='none'] .messages-container,
+:root[data-glass-blur='none'] .chat-window,
+:root[data-glass-blur='none'] .chat-pane,
+:root[data-glass-blur='none'] .conversations-sidebar,
+:root[data-glass-blur='none'] .chat-header,
+:root[data-glass-blur='none'] .sidebar-header,
+:root[data-glass-blur='none'] .input-pane,
+:root[data-glass-blur='none'] .composer-container,
 :root[data-perf-mode='true'] .aero-glass,
 :root[data-perf-mode='true'] .glass-panel,
 :root[data-perf-mode='true'] .glass-card,
@@ -538,6 +590,14 @@ html {
 :root[data-perf-mode='true'] .vs-mobile-container,
 :root[data-perf-mode='true'] .vs-theme-dropdown,
 :root[data-perf-mode='true'] .aero-modal-content,
+:root[data-perf-mode='true'] .messages-container,
+:root[data-perf-mode='true'] .chat-window,
+:root[data-perf-mode='true'] .chat-pane,
+:root[data-perf-mode='true'] .conversations-sidebar,
+:root[data-perf-mode='true'] .chat-header,
+:root[data-perf-mode='true'] .sidebar-header,
+:root[data-perf-mode='true'] .input-pane,
+:root[data-perf-mode='true'] .composer-container,
 :root[data-perf-profile='lite'] .aero-glass,
 :root[data-perf-profile='lite'] .glass-panel,
 :root[data-perf-profile='lite'] .glass-card,
@@ -551,9 +611,18 @@ html {
 :root[data-perf-profile='lite'] .vs-sidenav,
 :root[data-perf-profile='lite'] .vs-mobile-container,
 :root[data-perf-profile='lite'] .vs-theme-dropdown,
-:root[data-perf-profile='lite'] .aero-modal-content {
+:root[data-perf-profile='lite'] .aero-modal-content,
+:root[data-perf-profile='lite'] .messages-container,
+:root[data-perf-profile='lite'] .chat-window,
+:root[data-perf-profile='lite'] .chat-pane,
+:root[data-perf-profile='lite'] .conversations-sidebar,
+:root[data-perf-profile='lite'] .chat-header,
+:root[data-perf-profile='lite'] .sidebar-header,
+:root[data-perf-profile='lite'] .input-pane,
+:root[data-perf-profile='lite'] .composer-container {
 	backdrop-filter: none !important;
 	-webkit-backdrop-filter: none !important;
+	background: var(--bg-surface, var(--bg-surface)) !important;
 }
 
 /* 2. Supresión de Ruido SVG feTurbulence (Ahorro crítico de CPU/GPU Rasterizer) */
@@ -746,36 +815,6 @@ html.vt-root-only .vs-shell__canvas {
 	animation-duration: 0.28s;
 	animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
-::view-transition-old(vs-topbar) {
-	animation: vt-topbar-out 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-	will-change: opacity, transform;
-}
-::view-transition-new(vs-topbar) {
-	animation: vt-topbar-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-	will-change: opacity, transform;
-}
-
-@keyframes vt-topbar-out {
-	from {
-		opacity: 1;
-		transform: translateY(0);
-	}
-	to {
-		opacity: 0;
-		transform: translateY(-100%);
-	}
-}
-
-@keyframes vt-topbar-in {
-	from {
-		opacity: 0;
-		transform: translateY(-100%);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
 
 /* ── Transición Global y Canvas (Perfil High / Enabled ~0.32s) ── */
 ::view-transition-group(vs-canvas),
@@ -809,14 +848,14 @@ html.vt-root-only .vs-shell__canvas {
 }
 [data-view-transitions='fast']::view-transition-old(vs-canvas),
 [data-view-transitions='fast']::view-transition-old(root) {
-	animation: vt-crossfade-old-fast 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-old 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
 }
 [data-view-transitions='fast']::view-transition-new(vs-canvas),
 [data-view-transitions='fast']::view-transition-new(root) {
-	animation: vt-crossfade-new-fast 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-new 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 2;
@@ -834,7 +873,7 @@ html.vt-root-only .vs-shell__canvas {
 [data-view-transitions='lite']::view-transition-old(root),
 [data-perf-mode='true']::view-transition-old(vs-canvas),
 [data-perf-mode='true']::view-transition-old(root) {
-	animation: vt-crossfade-old-lite 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-old 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 1;
@@ -843,7 +882,7 @@ html.vt-root-only .vs-shell__canvas {
 [data-view-transitions='lite']::view-transition-new(root),
 [data-perf-mode='true']::view-transition-new(vs-canvas),
 [data-perf-mode='true']::view-transition-new(root) {
-	animation: vt-crossfade-new-lite 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: vt-crossfade-new 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 	will-change: opacity, transform;
 	contain: paint;
 	z-index: 2;
@@ -888,25 +927,239 @@ html.vt-root-only .vs-shell__canvas {
 	}
 }
 
-@keyframes vt-crossfade-old-fast {
+/* ══════════════════════════════════════════════════════════════════════
+   Deslizamiento de Tarjeta / Canvas según Dirección de Navegación
+   Si vas bajando en secciones (to > from): la tarjeta va para abajo.
+   Si vas subiendo en secciones (to < from): la tarjeta va para arriba.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Bajando en secciones (Down): la tarjeta va para abajo ── */
+html[data-vt-direction='down']::view-transition-old(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='enabled']::view-transition-old(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='enabled']::view-transition-old(root) {
+	animation: vt-card-slide-down-old 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='down']::view-transition-new(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='enabled']::view-transition-new(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='enabled']::view-transition-new(root) {
+	animation: vt-card-slide-down-new 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+html[data-vt-direction='down'][data-view-transitions='fast']::view-transition-old(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='fast']::view-transition-old(root) {
+	animation: vt-card-slide-down-old-fast 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='down'][data-view-transitions='fast']::view-transition-new(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='fast']::view-transition-new(root) {
+	animation: vt-card-slide-down-new-fast 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+html[data-vt-direction='down'][data-view-transitions='lite']::view-transition-old(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='lite']::view-transition-old(root),
+html[data-vt-direction='down'][data-perf-mode='true']::view-transition-old(vs-canvas),
+html[data-vt-direction='down'][data-perf-mode='true']::view-transition-old(root) {
+	animation: vt-card-slide-down-old-lite 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='down'][data-view-transitions='lite']::view-transition-new(vs-canvas),
+html[data-vt-direction='down'][data-view-transitions='lite']::view-transition-new(root),
+html[data-vt-direction='down'][data-perf-mode='true']::view-transition-new(vs-canvas),
+html[data-vt-direction='down'][data-perf-mode='true']::view-transition-new(root) {
+	animation: vt-card-slide-down-new-lite 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+/* ── Subiendo en secciones (Up): la tarjeta va para arriba ── */
+html[data-vt-direction='up']::view-transition-old(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='enabled']::view-transition-old(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='enabled']::view-transition-old(root) {
+	animation: vt-card-slide-up-old 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='up']::view-transition-new(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='enabled']::view-transition-new(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='enabled']::view-transition-new(root) {
+	animation: vt-card-slide-up-new 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+html[data-vt-direction='up'][data-view-transitions='fast']::view-transition-old(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='fast']::view-transition-old(root) {
+	animation: vt-card-slide-up-old-fast 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='up'][data-view-transitions='fast']::view-transition-new(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='fast']::view-transition-new(root) {
+	animation: vt-card-slide-up-new-fast 0.26s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+html[data-vt-direction='up'][data-view-transitions='lite']::view-transition-old(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='lite']::view-transition-old(root),
+html[data-vt-direction='up'][data-perf-mode='true']::view-transition-old(vs-canvas),
+html[data-vt-direction='up'][data-perf-mode='true']::view-transition-old(root) {
+	animation: vt-card-slide-up-old-lite 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 1;
+}
+html[data-vt-direction='up'][data-view-transitions='lite']::view-transition-new(vs-canvas),
+html[data-vt-direction='up'][data-view-transitions='lite']::view-transition-new(root),
+html[data-vt-direction='up'][data-perf-mode='true']::view-transition-new(vs-canvas),
+html[data-vt-direction='up'][data-perf-mode='true']::view-transition-new(root) {
+	animation: vt-card-slide-up-new-lite 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	will-change: opacity, transform;
+	contain: paint;
+	z-index: 2;
+}
+
+/* Keyframes Perfil High (~48px) */
+@keyframes vt-card-slide-down-old {
 	from {
 		opacity: 1;
 		transform: translateY(0) scale(1);
 	}
 	to {
 		opacity: 0;
-		transform: translateY(-14px) scale(0.994);
+		transform: translateY(48px) scale(0.995);
+	}
+}
+@keyframes vt-card-slide-down-new {
+	from {
+		opacity: 0;
+		transform: translateY(-48px) scale(0.995);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+@keyframes vt-card-slide-up-old {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-48px) scale(0.995);
+	}
+}
+@keyframes vt-card-slide-up-new {
+	from {
+		opacity: 0;
+		transform: translateY(48px) scale(0.995);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
 	}
 }
 
-@keyframes vt-crossfade-new-fast {
+/* Keyframes Perfil Fast (~40px) */
+@keyframes vt-card-slide-down-old-fast {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(40px) scale(0.997);
+	}
+}
+@keyframes vt-card-slide-down-new-fast {
 	from {
 		opacity: 0;
-		transform: translateY(20px) scale(0.994);
+		transform: translateY(-40px) scale(0.997);
 	}
 	to {
 		opacity: 1;
 		transform: translateY(0) scale(1);
+	}
+}
+@keyframes vt-card-slide-up-old-fast {
+	from {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-40px) scale(0.997);
+	}
+}
+@keyframes vt-card-slide-up-new-fast {
+	from {
+		opacity: 0;
+		transform: translateY(40px) scale(0.997);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* Keyframes Perfil Lite (~28px, solo aceleración GPU, cero scale) */
+@keyframes vt-card-slide-down-old-lite {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(28px);
+	}
+}
+@keyframes vt-card-slide-down-new-lite {
+	from {
+		opacity: 0;
+		transform: translateY(-28px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+@keyframes vt-card-slide-up-old-lite {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-28px);
+	}
+}
+@keyframes vt-card-slide-up-new-lite {
+	from {
+		opacity: 0;
+		transform: translateY(28px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
 	}
 }
 
@@ -960,7 +1213,7 @@ html.theme-transitioning *::after {
 		stroke 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Keyframes de navegación completa (perfil 'lite' / hardware económico) */
+/* Keyframes de navegación completa (perfil 'enabled' / 'balanced') */
 @keyframes vt-crossfade-old-lite {
 	from {
 		opacity: 1;
@@ -968,13 +1221,13 @@ html.theme-transitioning *::after {
 	}
 	to {
 		opacity: 0;
-		transform: translateY(-10px);
+		transform: translateY(-4px);
 	}
 }
 @keyframes vt-crossfade-new-lite {
 	from {
 		opacity: 0;
-		transform: translateY(14px);
+		transform: translateY(6px);
 	}
 	to {
 		opacity: 1;
@@ -1084,6 +1337,7 @@ body,
 	--bg-input: #091a2c;
 	--border-subtle: rgba(255, 255, 255, 0.16);
 	--border-glass: rgba(255, 255, 255, 0.14);
+	--glass-border-t: rgba(255, 255, 255, 0.25);
 	--text-primary: #ffffff;
 	--text-secondary: #e2e8f0;
 	--text-muted: #cbd5e1;
@@ -1100,6 +1354,7 @@ body,
 	--bg-input: #060d1b;
 	--border-subtle: rgba(46, 180, 255, 0.24);
 	--border-glass: rgba(255, 255, 255, 0.14);
+	--glass-border-t: rgba(160, 210, 255, 0.2);
 	--text-primary: #ffffff;
 	--text-secondary: #f1f5f9;
 	--text-muted: #94a3b8;
@@ -1214,6 +1469,27 @@ a {
 	text-decoration: none;
 }
 
+/* ── MSN Emoticonos / Twemoji Global Render ────────────────────
+   Tamaño, alineación y line-height unificados para evitar
+   inconsistencias entre ConversationsSidebar, MessageBubble y pickers. */
+.msn-emoji-render,
+.twemoji-render {
+	display: inline-block;
+	width: 1.25em;
+	height: 1.25em;
+	min-width: 1.25em;
+	min-height: 1.25em;
+	margin: 0 0.12em;
+	vertical-align: -0.22em;
+	line-height: 1;
+	object-fit: contain;
+	image-rendering: -webkit-optimize-contrast;
+	/* user-select:text conserva la sensación de texto; sin pointer-events:none
+	   el title (nombre del emote) muestra su tooltip. */
+	user-select: text;
+	pointer-events: auto;
+}
+
 /* ── Neo-Aero Glass Panel ───────────────────────────────────── */
 .aero-glass,
 .glass-panel,
@@ -1250,7 +1526,7 @@ a {
 	z-index: 1;
 }
 
-/* Top specular highlight (glass thickness refraction) */
+/* Top specular highlight (glass thickness refraction — crisp 1px bevel) */
 .aero-glass::after,
 .glass-panel::after,
 .glass-card::after,
@@ -1263,16 +1539,11 @@ a {
 	height: 1px;
 	border-top-left-radius: inherit;
 	border-top-right-radius: inherit;
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		rgba(255, 255, 255, 0.15) 30%,
-		rgba(255, 255, 255, 0.35) 50%,
-		rgba(255, 255, 255, 0.15) 70%,
-		transparent 100%
-	);
+	background: var(--specular-line);
 	pointer-events: none;
 	z-index: 2;
+	opacity: var(--gloss-strength, 1);
+	transition: opacity var(--t-base);
 }
 
 /* Desactivar pseudo-elementos absolutos en contenedores con scroll horizontal para evitar desbordamiento y puntas afiladas */
@@ -3769,7 +4040,7 @@ select,
 	);
 }
 
-/* [VSocial: reduced-motion override removido — lb-motion siempre animado] */
+/* [Voom!: reduced-motion override removido — lb-motion siempre animado] */
 
 /* ═══════════════════════════════════════════════════════════════
    Modos de Plataforma — reinterpreta el /feed en vivo
@@ -3779,7 +4050,7 @@ select,
 
    PRINCIPIO: los modos NUNCA rompen el lenguaje Aero-glass. No se
    tocan fondo, blur ni borde base de las tarjetas — esa es la
-   identidad de VSocial. Cada modo se diferencia por PROPORCIÓN,
+   identidad de Voom!. Cada modo se diferencia por PROPORCIÓN,
    DENSIDAD, LAYOUT, ACENTO (paleta Aero) y una ANIMACIÓN de
    entrada característica. El glow de hover es ADITIVO: tinta la
    sombra existente con el acento del tema, nunca la reemplaza.
@@ -4161,7 +4432,7 @@ select,
 }
 
 /* Respeto a usuarios con movimiento reducido */
-/* [VSocial: reduced-motion override removido — feed-shell/cards siempre animados] */
+/* [Voom!: reduced-motion override removido — feed-shell/cards siempre animados] */
 
 /* ── Optimización móvil sutil: blur más ligero (sin romper la estética glass) ── */
 /* En pantallas ≤768px se reduce el radio del backdrop-filter y se quita saturate() para
@@ -4418,17 +4689,63 @@ select,
 }
 
 /* =========================================================================
-   APARIENCIA GLOBAL POR USUARIO (migración 016 — /settings/design «Aplicación»)
-   El appearance store (lib/stores/appearance.svelte.js) escribe inline-style
-   en <html> para acento/escala/fuente/wallpaper; aquí solo viven los ejes que
-   necesitan hoja de estilos: densidad (data-density), capa de wallpaper y
-   la garantía de que [hidden] vence a cualquier display:flex/grid.
+   APARIENCIA GLOBAL POR USUARIO (migraciones 016+017 — /settings/design
+   «Aplicación»). El appearance store escribe inline-style en <html> para
+   acento/escala/fuente/wallpaper/opacidad; aquí viven los ejes que necesitan
+   hoja de estilos: densidad, radios Aero, cristal translúcido, gloss
+   especular, modos de wallpaper y la garantía de que [hidden] gana.
    ========================================================================= */
 
 /* Los paneles del hub se alternan con hidden + clases display:flex/grid:
    sin esta regla el atributo perdería por especificidad. */
 [hidden] {
 	display: none !important;
+}
+
+/* ── Frutiger Aero Engine: geometría de bordes (migración 017) ──
+   Redefine la escala de radios EXISTENTE para que la geometría llegue a toda
+   la UI (84+ consumos de --radius-*). --radius-full NO se toca: avatares,
+   toggles y píldoras siguen circulares. El default 'rounded' no define nada. */
+html[data-border-radius='sharp'] {
+	--radius-xs: 0px;
+	--radius-sm: 0px;
+	--radius-md: 2px;
+	--radius-lg: 3px;
+	--radius-xl: 4px;
+	--radius-squircle: 0%;
+	--radius-superellipse: 2px / 2px;
+}
+html[data-border-radius='modern'] {
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius-lg: 10px;
+	--radius-xl: 12px;
+}
+html[data-border-radius='bubble'] {
+	--radius-xs: 10px;
+	--radius-sm: 14px;
+	--radius-md: 18px;
+	--radius-lg: 24px;
+	--radius-xl: 28px;
+	--radius-squircle: 26%;
+	--radius-superellipse: 20px / 26px;
+}
+
+/* ── Frutiger Aero Engine: cristal translúcido (card_opacity < 100) ──
+   Usa var(--bg-surface-solid) (color hex sólido válido en todos los temas:
+   #ebf8fa en light, #0d1f33 en dark, #050a14 en midnight) con color-mix()
+   para modular limpiamente la opacidad del cristal sobre el fondo/wallpaper.
+   Se acompaña de backdrop-filter para un desenfoque de cristal líquido real. */
+html[data-card-glass='true']
+	:is(.aero-glass, .glass-panel, .glass-card, .aero-post-card, .sample-card) {
+	background: color-mix(
+		in srgb,
+		var(--bg-surface-solid) var(--card-opacity, 85%),
+		transparent
+	) !important;
+	backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2)) !important;
+	-webkit-backdrop-filter: var(--glass-blur, blur(16px) saturate(1.2)) !important;
 }
 
 /* ── Wallpaper global: capa fija detrás del contenido ──
@@ -4443,11 +4760,26 @@ html[data-wallpaper='true'] body::before {
 	z-index: -1;
 	pointer-events: none;
 	background-image:
-		linear-gradient(rgba(0, 0, 0, var(--wallpaper-dim, 0.3)), rgba(0, 0, 0, var(--wallpaper-dim, 0.3))),
+		linear-gradient(
+			rgba(0, 0, 0, var(--wallpaper-dim, 0.3)),
+			rgba(0, 0, 0, var(--wallpaper-dim, 0.3))
+		),
 		var(--app-wallpaper);
 	background-size: cover;
 	background-position: center center;
 	background-repeat: no-repeat;
+}
+
+/* Modos de renderizado del wallpaper (migración 017):
+   tile = mosaico para burbujas/gotas/pixel art/patrones repetidos;
+   fit = imagen completa contenida, sin recorte. */
+html[data-wallpaper-mode='tile'][data-wallpaper='true'] body::before {
+	background-size: auto;
+	background-repeat: repeat;
+	image-rendering: pixelated;
+}
+html[data-wallpaper-mode='fit'][data-wallpaper='true'] body::before {
+	background-size: contain;
 }
 
 /* ── Densidad: compacta / cómoda / amplia ──

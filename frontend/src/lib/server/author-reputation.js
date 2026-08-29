@@ -1,5 +1,5 @@
 /**
- * VSocial — Author Reputation Engine (TweepCred equivalent)
+ * Voom! — Author Reputation Engine (TweepCred equivalent)
  * Computes deterministic creator reputation score (0–100)
  * based on social graph balance, account maturity, engagement metrics,
  * gamification status and negative feedback signals.

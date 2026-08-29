@@ -1,5 +1,5 @@
 // ============================================================================
-// GET /api/gamification/leaderboard — Clasificaciones de la Arena V-SOCIAL
+// GET /api/gamification/leaderboard — Clasificaciones de la Arena Voom!
 // ============================================================================
 // Query params:
 //   type  = 'level' | 'streak' | 'creators'  (default 'level')

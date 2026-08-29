@@ -165,7 +165,7 @@
 </script>
 
 <svelte:head>
-	<title>{urlQuery ? `Buscar: ${urlQuery}` : 'Explorar'} — VSocial</title>
+	<title>{urlQuery ? `Buscar: ${urlQuery}` : 'Explorar'} — Voom!</title>
 </svelte:head>
 
 <div class="explore-container">

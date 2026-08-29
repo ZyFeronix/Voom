@@ -1,5 +1,5 @@
 /**
- * VSocial — In-Memory Batch Writer
+ * Voom! — In-Memory Batch Writer
  * Buffers high-frequency write events (impressions, video progress)
  * and flushes them to SQLite in periodic bulk transactions.
  * Prevents SQLite WAL write contention.

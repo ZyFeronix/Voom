@@ -46,7 +46,7 @@
 </script>
 
 <svelte:head>
-	<title>Notificaciones — VSocial</title>
+	<title>Notificaciones — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card" class:is-saving={saving}>
@@ -75,7 +75,7 @@
 				<div class="toggle-details">
 					<span class="toggle-title">Notificaciones Push</span>
 					<span class="toggle-desc">
-						Avisos en tiempo real del navegador cuando no tienes VSocial abierto.
+						Avisos en tiempo real del navegador cuando no tienes Voom! abierto.
 					</span>
 				</div>
 				<input type="checkbox" bind:checked={notifyPush} class="aero-toggle-switch" />

@@ -1,5 +1,5 @@
 /**
- * VSocial — Validators compartidos (cliente + servidor)
+ * Voom! — Validators compartidos (cliente + servidor)
  *
  * validatePaymentLink: valida el enlace de cobro externo (P2P) de un usuario.
  * Reglas:

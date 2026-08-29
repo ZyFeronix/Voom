@@ -1,5 +1,5 @@
 /**
- * VSocial — Setup Wizard API
+ * Voom! — Setup Wizard API
  * GET  /api/setup — Check if setup needed
  * POST /api/setup — Create Super Admin + base config
  */
@@ -48,9 +48,8 @@ export async function POST({ request }) {
 		await db
 			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'super_admin')")
 			.run(userId);
-		await db
-			.prepare("INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, 'admin')")
-			.run(userId);
+		// Una única fila en user_roles: dos roles harían no-determinista el
+		// COALESCE(user_roles.role, users.role) que resuelve el rol efectivo.
 		await db.prepare('INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)').run(userId);
 
 		const upsert = await db.prepare(

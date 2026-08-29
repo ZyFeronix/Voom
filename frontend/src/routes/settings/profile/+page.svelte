@@ -114,7 +114,7 @@
 </script>
 
 <svelte:head>
-	<title>Editar Perfil — VSocial</title>
+	<title>Editar Perfil — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card" class:is-saving={saving}>
@@ -123,7 +123,7 @@
 	<div class="section-content">
 		<div>
 			<h3 class="section-title">Editar Perfil</h3>
-			<p class="section-subtitle">Controla tu identidad pública y fotos en VSocial.</p>
+			<p class="section-subtitle">Controla tu identidad pública y fotos en Voom!.</p>
 		</div>
 
 		<!-- Visual Identity Studio (Avatar & Cover) -->

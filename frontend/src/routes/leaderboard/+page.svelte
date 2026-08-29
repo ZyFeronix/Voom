@@ -11,7 +11,7 @@
 	import { authStore } from '$lib/stores/auth.svelte.js';
 
 	/**
-	 * /leaderboard — ARENA V-SOCIAL (Salón de la Fama v2)
+	 * /leaderboard — ARENA Voom! (Salón de la Fama v2)
 	 * Tres rankings (Niveles · Rachas · Creadores), podio de pedestals,
 	 * búsqueda client-side, franja "Tu vecindario" cuando estás fuera del top,
 	 * deltas ▲▼ vs la última visita (localStorage) y beacon fijo con progreso.
@@ -262,7 +262,7 @@
 </script>
 
 <svelte:head>
-	<title>Salón de la Fama · VSocial</title>
+	<title>Salón de la Fama · Voom!</title>
 </svelte:head>
 
 <main class="lb-page" class:has-beacon={showBeacon}>
@@ -270,7 +270,7 @@
 
 	<!-- ══ Cabecera ceremonial ══ -->
 	<header class="lb-header">
-		<p class="lb-eyebrow">Arena VSocial</p>
+		<p class="lb-eyebrow">Arena Voom!</p>
 		<h1 class="lb-title">Salón de la Fama</h1>
 		<p class="lb-subtitle">{copy.subtitle}</p>
 

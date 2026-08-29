@@ -4,7 +4,7 @@
 	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
 
 	/**
-	 * PodiumCard.svelte — podio físico de la Arena V-SOCIAL.
+	 * PodiumCard.svelte — podio físico de la Arena Voom!.
 	 * El avatar sobre pedestal de cristal cuya altura codifica el puesto;
 	 * la cara frontal lleva la posición grabada y la placa de estadísticas.
 	 *

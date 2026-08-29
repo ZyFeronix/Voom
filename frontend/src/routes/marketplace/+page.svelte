@@ -6,6 +6,7 @@
 	import { authStore } from '$lib/stores/auth.svelte.js';
 	import { goto } from '$app/navigation';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
+	import LiquidBackground from '$lib/components/LiquidBackground.svelte';
 
 	// ── Runes State ──────────────────────────────────────────────────────────
 	let listings = $state([]);
@@ -250,16 +251,34 @@
 			uploadingCreateFile = false;
 		}
 	}
+
+	function portal(node) {
+		const target = document.body;
+		target.appendChild(node);
+		return {
+			destroy() {
+				if (node.parentNode) {
+					node.parentNode.removeChild(node);
+				}
+			}
+		};
+	}
 </script>
 
 <svelte:head>
-	<title>Marketplace — VSocial</title>
+	<title>Marketplace — Voom!</title>
 </svelte:head>
 
 <div class="marketplace-container">
 	<!-- Header Banner -->
-	<div class="glass-card market-header">
-		<div class="bubble-decoration"></div>
+	<div class="aero-glass market-header">
+		<div
+			style="position: absolute; inset: 0; z-index: 0; border-radius: inherit; overflow: hidden; opacity: 0.85;"
+		>
+			<LiquidBackground />
+		</div>
+		<div class="glass-inset-highlight"></div>
+
 		<div class="header-content">
 			<h1 class="header-title">Marketplace Creativo</h1>
 			<p class="header-subtitle">
@@ -276,7 +295,7 @@
 				type="text"
 				placeholder="Buscar en la tienda..."
 				bind:value={searchQuery}
-				class="aero-input"
+				class="aero-input glass-input"
 			/>
 		</div>
 	</div>
@@ -360,7 +379,7 @@
 			{:else}
 				<div class="listings-grid">
 					{#each filteredListings as item}
-						<div class="glass-card market-item-card">
+						<div class="aero-glass market-item-card">
 							<!-- Thumbnail -->
 							<div class="item-thumbnail">
 								{#if item.thumbnail_url || item.media_url || item.image_url}
@@ -376,8 +395,8 @@
 										<span class="material-icons-round">design_services</span>
 									</div>
 								{/if}
-								<span class="price-tag">
-									${item.price} USD
+								<span class="price-tag aero-glass">
+									${item.price} <span class="usd">USD</span>
 								</span>
 							</div>
 
@@ -385,9 +404,9 @@
 							<div class="item-details">
 								<div>
 									<div class="item-header-meta">
-										<span class="aero-badge" style="font-size: 0.65rem;"
-											>{item.category_name || 'General'}</span
-										>
+										<span class="aero-badge category-badge">
+											{item.category_name || 'General'}
+										</span>
 										<span class="rating-badge">
 											<span class="material-icons-round">star</span>
 											<span>{item.ratings_avg ? item.ratings_avg.toFixed(1) : '5.0'}</span>
@@ -398,15 +417,20 @@
 								</div>
 
 								<div class="item-footer">
-									<span class="seller-tag"
-										>Por <span style="color: var(--text-main); font-weight: 700;"
-											>@{item.seller_username || item.username}</span
-										></span
-									>
+									<div class="seller-info">
+										<div
+											class="seller-mini-avatar"
+											style="flex: 0 0 24px; min-width: 24px; min-height: 24px;"
+										>
+											{(item.seller_username || item.username || '?')[0].toUpperCase()}
+										</div>
+										<span class="seller-tag">
+											@{item.seller_username || item.username}
+										</span>
+									</div>
 									<button
 										onclick={() => openItemDetails(item)}
-										class="btn-aero-primary"
-										style="padding: 6px 12px; font-size: 0.75rem;"
+										class="btn-aero-primary btn-sm details-btn"
 									>
 										Ver detalles
 									</button>
@@ -436,6 +460,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
+		use:portal
 		class="modal-backdrop"
 		onclick={(e) => {
 			if (e.target === e.currentTarget) {
@@ -567,107 +592,180 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
+		use:portal
 		class="modal-backdrop"
 		onclick={(e) => {
 			if (e.target === e.currentTarget) selectedItem = null;
 		}}
-		transition:fade={{ duration: 150 }}
+		transition:fade={{ duration: 180 }}
 	>
 		<div
-			class="glass-card detail-modal"
-			transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
+			class="glass-panel detail-modal"
+			transition:scale={{ duration: 300, start: 0.94, easing: backOut }}
 		>
-			<!-- Left: media/visual -->
+			<!-- Left: Product Showcase Gallery -->
 			<div class="detail-media-pane">
-				{#if selectedItem.media_url || selectedItem.image_url}
-					<img src={selectedItem.media_url || selectedItem.image_url} alt={selectedItem.title} />
-				{:else}
-					<div class="detail-media-placeholder">
-						<span class="material-icons-round">design_services</span>
-					</div>
-				{/if}
+				<div class="detail-img-frame">
+					{#if selectedItem.media_url || selectedItem.image_url}
+						<img
+							src={selectedItem.media_url || selectedItem.image_url}
+							alt={selectedItem.title}
+							class="showcase-img"
+						/>
+					{:else}
+						<div class="detail-media-placeholder">
+							<span class="material-icons-round">design_services</span>
+						</div>
+					{/if}
+				</div>
+
+				<div class="media-footer-meta">
+					<span class="aero-badge category-badge">
+						<span class="material-icons-round" style="font-size: 0.85rem; margin-right: 4px;"
+							>category</span
+						>
+						{selectedItem.category_name || 'General'}
+					</span>
+					<span class="asset-id-badge">#{selectedItem.id.toString().padStart(4, '0')}</span>
+				</div>
 			</div>
 
-			<!-- Right: details and offer/reviews -->
+			<!-- Right: Product Details, Seller & Interaction -->
 			<div class="detail-info-pane">
-				<!-- Header -->
-				<div class="detail-header">
-					<div class="detail-title-row">
-						<h3 class="detail-title">{selectedItem.title}</h3>
-						<button onclick={() => (selectedItem = null)} class="close-btn">
-							<span class="material-icons-round">close</span>
-						</button>
+				<!-- Header Row: Price & Close Button -->
+				<div class="detail-top-row">
+					<div class="price-showcase">
+						<span class="price-currency">$</span>
+						<span class="price-number">{selectedItem.price}</span>
+						<span class="price-unit">USD</span>
 					</div>
-					<p class="detail-price">${selectedItem.price} USD</p>
+
+					<button
+						type="button"
+						onclick={() => (selectedItem = null)}
+						class="close-btn modal-close-btn"
+						aria-label="Cerrar ventana"
+					>
+						<span class="material-icons-round">close</span>
+					</button>
+				</div>
+
+				<!-- Product Title -->
+				<h2 class="detail-title">{selectedItem.title}</h2>
+
+				<!-- Seller Showcase Card -->
+				<div class="seller-showcase-card">
+					<div class="seller-left-meta">
+						<div
+							class="seller-avatar-shield"
+							style="flex: 0 0 40px; min-width: 40px; min-height: 40px;"
+						>
+							<span
+								>{(selectedItem.seller_username ||
+									selectedItem.username ||
+									'?')[0].toUpperCase()}</span
+							>
+						</div>
+						<div class="seller-text-info">
+							<span class="seller-display-name">
+								{selectedItem.seller_display_name ||
+									selectedItem.seller_username ||
+									selectedItem.username}
+							</span>
+							<span class="seller-handle"
+								>@{selectedItem.seller_username || selectedItem.username}</span
+							>
+						</div>
+					</div>
+					<div class="seller-verified-tag">
+						<span class="material-icons-round">verified</span>
+						<span>Vendedor</span>
+					</div>
+				</div>
+
+				<!-- Description Box -->
+				<div class="detail-desc-box">
 					<p class="detail-desc-text">{selectedItem.description}</p>
 				</div>
 
-				<!-- Buy / Contact Form -->
-				<div class="detail-section">
-					<h4 class="section-subtitle-mini">Comprar o consultar</h4>
+				<!-- P2P Guarantee & Action Buttons -->
+				<div class="detail-action-container">
+					<div class="p2p-trust-pill">
+						<span class="material-icons-round trust-icon">security</span>
+						<span>Economía P2P directa · Cero comisiones · Pago 100% al creador</span>
+					</div>
 
-					<p
-						class="contact-seller-desc"
-						style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;"
+					<div
+						class="action-btn-wrapper"
+						class:has-two-buttons={Boolean(selectedItem.payment_link)}
 					>
-						Economía 100% P2P: todos los pagos se envían directamente al creador (0% comisiones).
-					</p>
-
-					{#if selectedItem.payment_link}
+						{#if selectedItem.payment_link}
+							<a
+								href={selectedItem.payment_link}
+								target="_blank"
+								rel="noopener noreferrer nofollow"
+								class="btn-aero-primary buy-action-btn"
+							>
+								<span class="material-icons-round">payments</span>
+								<span>Pagar / Comprar</span>
+							</a>
+						{/if}
 						<a
-							href={selectedItem.payment_link}
-							target="_blank"
-							rel="noopener noreferrer nofollow"
-							class="btn-aero-primary"
-							style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; margin-bottom: 10px;"
+							href={`/messages?peer=${encodeURIComponent(selectedItem.seller_username || selectedItem.username)}&product=${selectedItem.id}`}
+							class={selectedItem.payment_link
+								? 'btn-aero-secondary contact-action-btn'
+								: 'btn-aero-primary contact-action-btn full-width'}
 						>
-							<span class="material-icons-round">payments</span>
-							Pagar / Apoyar al Vendedor
+							<span class="material-icons-round">chat</span>
+							<span>Mensaje al Vendedor</span>
 						</a>
-					{/if}
-
-					<a
-						href={`/messages?peer=${encodeURIComponent(selectedItem.seller_username || selectedItem.username)}&product=${selectedItem.id}`}
-						class={selectedItem.payment_link
-							? 'btn-aero-secondary contact-btn'
-							: 'btn-aero-primary contact-btn'}
-						style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none;"
-					>
-						<span class="material-icons-round">chat</span>
-						Mensaje al Vendedor
-					</a>
+					</div>
 				</div>
 
-				<!-- Reviews List (Simulated) -->
-				<div
-					class="detail-section"
-					style="flex: 1; display: flex; flex-direction: column; min-height: 180px;"
-				>
-					<h4 class="section-subtitle-mini">Opiniones de clientes</h4>
+				<!-- Reviews / Ratings Section -->
+				<div class="detail-reviews-wrapper">
+					<div class="reviews-header-row">
+						<h4 class="reviews-section-title">
+							<span class="material-icons-round" style="font-size: 1rem; color: var(--aero-amber);"
+								>star</span
+							>
+							Opiniones de la Comunidad
+						</h4>
+						{#if localReviews.length > 0}
+							<span class="reviews-count-badge">
+								{localReviews.length}
+								{localReviews.length === 1 ? 'reseña' : 'reseñas'}
+							</span>
+						{/if}
+					</div>
 
-					<div class="reviews-list-container">
+					<div class="reviews-scroll-list">
 						{#if localReviews.length === 0}
-							<p class="empty-reviews-text">No hay calificaciones todavía.</p>
+							<div class="empty-reviews-card">
+								<span class="material-icons-round">rate_review</span>
+								<p>Aún no hay calificaciones para este producto.</p>
+							</div>
 						{:else}
 							{#each localReviews as rev}
-								<div class="review-item">
-									<div class="review-meta">
-										<span class="review-author">@{rev.username}</span>
-										<span class="review-rating">
-											<span class="material-icons-round">star</span>
-											<span>{rev.rating}</span>
-										</span>
+								<div class="review-bubble">
+									<div class="review-bubble-header">
+										<span class="review-author-name">@{rev.username}</span>
+										<div class="review-stars-row">
+											{#each Array(Number(rev.rating || 5)) as _}
+												<span class="material-icons-round star-filled">star</span>
+											{/each}
+										</div>
 									</div>
-									<p class="review-comment">{rev.comment}</p>
+									<p class="review-bubble-comment">{rev.comment}</p>
 								</div>
 							{/each}
 						{/if}
 					</div>
 
 					{#if authStore.isAuthenticated}
-						<form onsubmit={handlePostReview} class="review-form">
-							<div class="review-input-row" style="align-items: center;">
-								<div style="width: 80px;">
+						<form onsubmit={handlePostReview} class="review-composer-form">
+							<div class="review-composer-row">
+								<div class="review-rating-select">
 									<CustomSelect
 										bind:value={reviewRating}
 										options={[
@@ -682,39 +780,21 @@
 								<input
 									type="text"
 									required
-									placeholder="Escribe tu reseña..."
+									placeholder="Escribe una opinión sobre el creador..."
 									bind:value={reviewText}
-									class="aero-input"
-									style="font-size: 0.75rem; padding-top: 6px; padding-bottom: 6px;"
+									class="aero-input glass-input review-input-field"
 								/>
 								<button
 									type="submit"
 									disabled={submittingReview}
-									class="btn-aero-primary btn-sm"
-									style="padding: 6px 12px;"
+									class="btn-aero-primary review-submit-btn"
+									title="Publicar reseña"
 								>
-									Publicar
+									<span class="material-icons-round">send</span>
 								</button>
 							</div>
 						</form>
 					{/if}
-				</div>
-
-				<!-- Seller Profile Card -->
-				<div class="seller-card">
-					<div class="seller-avatar">
-						<span
-							>{(selectedItem.seller_username ||
-								selectedItem.username ||
-								'?')[0].toUpperCase()}</span
-						>
-					</div>
-					<div>
-						<p class="seller-name-title">
-							Vendido por @{selectedItem.seller_username || selectedItem.username}
-						</p>
-						<p class="seller-status-text">Creador verificado</p>
-					</div>
 				</div>
 			</div>
 		</div>
@@ -735,24 +815,14 @@
 		position: relative;
 		overflow: hidden;
 		padding: 32px 24px;
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-lg);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 24px;
-	}
-
-	.bubble-decoration {
-		position: absolute;
-		top: -48px;
-		right: -48px;
-		width: 180px;
-		height: 180px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: rgba(0, 229, 255, 0.14);
-		filter: blur(50px);
-		pointer-events: none;
+		box-shadow:
+			var(--shadow-lg),
+			inset 0 1px 2px rgba(255, 255, 255, 0.2);
 	}
 
 	.header-content {
@@ -807,8 +877,8 @@
 	}
 
 	.chip {
-		padding: 8px 18px;
-		border-radius: var(--radius-md);
+		padding: 8px 20px;
+		border-radius: var(--radius-full);
 		font-size: 0.8rem;
 		font-weight: 600;
 		white-space: nowrap;
@@ -816,21 +886,28 @@
 		color: var(--text-secondary);
 		border: 1px solid var(--glass-border);
 		cursor: pointer;
-		transition: all var(--t-fast);
+		transition:
+			transform var(--t-spring),
+			background var(--t-fast),
+			box-shadow var(--t-fast);
+		backdrop-filter: var(--glass-blur);
 	}
 
 	.chip:hover {
-		background: var(--bg-overlay);
+		background: rgba(255, 255, 255, 0.1);
 		color: var(--text-primary);
-		transform: translateY(-1px);
+		transform: translateY(-2px);
 	}
 
 	.chip.active {
-		background: var(--grad-primary);
-		color: var(--text-on-accent);
+		background: var(--accent-blue-base);
+		color: #fff;
 		font-weight: 700;
-		border-color: transparent;
-		box-shadow: var(--shadow-sm);
+		border-color: rgba(255, 255, 255, 0.3);
+		box-shadow:
+			var(--shadow-glow),
+			0 4px 12px rgba(27, 133, 243, 0.4);
+		transform: translateY(-2px);
 	}
 
 	.market-layout {
@@ -1001,14 +1078,22 @@
 		flex-direction: column;
 		border-radius: var(--radius-md);
 		overflow: hidden;
-		transition: all 0.3s ease;
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-fast);
 		height: 100%;
+		background: var(--glass-bg);
+		border: 1px solid var(--glass-border);
+		backdrop-filter: var(--glass-blur);
+		will-change: transform;
 	}
 
 	.market-item-card:hover {
-		border-color: var(--aero-primary);
-		box-shadow: 0 0 20px var(--aero-primary-glow, rgba(46, 180, 255, 0.2));
-		transform: translateY(-3px);
+		border-color: var(--accent-blue-light);
+		box-shadow:
+			var(--shadow-glow),
+			0 8px 30px rgba(27, 133, 243, 0.25);
+		transform: translateY(-6px) scale(1.01);
 	}
 
 	.item-thumbnail {
@@ -1017,13 +1102,15 @@
 		background: rgba(0, 229, 255, 0.03);
 		position: relative;
 		overflow: hidden;
+		border-bottom: 1px solid var(--glass-border);
+		contain: strict;
 	}
 
 	.item-img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		transition: transform 0.5s;
+		transition: transform 0.6s var(--ease-spring);
 	}
 
 	.market-item-card:hover .item-img {
@@ -1046,13 +1133,19 @@
 		right: 12px;
 		padding: 6px 12px;
 		border-radius: var(--radius-sm);
-		background: rgba(0, 0, 0, 0.75);
-		font-weight: 700;
-		font-size: 0.8rem;
-		color: #7de3ff;
-		border: 1px solid rgba(46, 180, 255, 0.25);
-		backdrop-filter: blur(4px);
+		background: rgba(0, 0, 0, 0.6);
+		font-weight: 900;
+		font-size: 0.85rem;
+		color: var(--text-on-accent);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		backdrop-filter: blur(8px) saturate(1.2);
 		z-index: 10;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+	.price-tag .usd {
+		font-size: 0.65rem;
+		opacity: 0.8;
+		font-weight: 700;
 	}
 
 	.item-details {
@@ -1136,18 +1229,6 @@
 		box-shadow: 0 4px 20px rgba(46, 180, 255, 0.4);
 	}
 
-	.modal-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 50;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(5px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 16px;
-	}
-
 	.modal-header {
 		display: flex;
 		justify-content: space-between;
@@ -1162,17 +1243,21 @@
 	}
 
 	.close-btn {
-		background: none;
-		border: none;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-full);
 		color: var(--text-muted);
 		cursor: pointer;
-		padding: 4px;
+		padding: 6px;
 		display: flex;
 		align-items: center;
+		transition: all var(--t-fast);
 	}
 
 	.close-btn:hover {
+		background: rgba(255, 255, 255, 0.15);
 		color: var(--text-main);
+		transform: scale(1.1);
 	}
 
 	.alert-box {
@@ -1267,219 +1352,546 @@
 		padding: 10px;
 	}
 
-	/* Detail modal styling */
-	.detail-modal {
-		max-width: 760px;
-		width: 100%;
-		display: flex;
-		border-radius: var(--radius-lg);
-		border: 1px solid rgba(0, 119, 255, 0.12);
-		overflow: hidden;
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-		max-height: 90vh;
-	}
-
-	@media (max-width: 768px) {
-		.detail-modal {
-			flex-direction: column;
-			overflow-y: auto;
-		}
-		.detail-media-pane {
-			width: 100% !important;
-			aspect-ratio: 16/9;
-		}
-		.detail-info-pane {
-			width: 100% !important;
-			max-height: none !important;
-		}
-	}
-
-	.detail-media-pane {
-		width: 50%;
-		background: var(--bg-canvas);
+	/* ══════════════════════════════════════════════════════════════════════
+	   💎 DETAIL MODAL (Compact, Proportional & Centered across all screens)
+	   ══════════════════════════════════════════════════════════════════════ */
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: var(--z-modal-backdrop, 1000);
+		background: rgba(4, 12, 24, 0.82);
+		backdrop-filter: blur(16px) saturate(1.3);
+		-webkit-backdrop-filter: blur(16px) saturate(1.3);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		position: relative;
+		padding: 24px;
+		overflow-y: auto;
+		box-sizing: border-box;
 	}
 
-	.detail-media-pane img {
+	.detail-modal {
+		position: relative;
+		z-index: var(--z-modal-content, 1010);
+		max-width: 760px;
+		width: 100%;
+		max-height: min(520px, 86vh);
+		display: flex;
+		flex-direction: row;
+		align-items: stretch;
+		border-radius: var(--radius-xl, 24px);
+		background: var(--bg-surface, #0d1527);
+		border: 1px solid var(--glass-border-t, rgba(255, 255, 255, 0.22));
+		box-shadow:
+			0 24px 70px rgba(0, 0, 0, 0.65),
+			0 0 50px rgba(var(--accent-blue-rgb), 0.22),
+			inset 0 1px 2px rgba(255, 255, 255, 0.25);
+		overflow: hidden;
+		margin: auto;
+		flex-shrink: 0;
+	}
+
+	/* Ambient Background Glow */
+	.detail-modal::before {
+		content: '';
+		position: absolute;
+		top: -30%;
+		right: -20%;
+		width: 420px;
+		height: 420px;
+		border-radius: 50%;
+		background: radial-gradient(
+			circle,
+			rgba(var(--accent-blue-rgb), 0.2) 0%,
+			rgba(0, 212, 170, 0.05) 45%,
+			transparent 70%
+		);
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	/* ── Left Column: Media Showcase ──────────────── */
+	.detail-media-pane {
+		flex: 0 0 280px;
+		width: 280px;
+		min-width: 280px;
+		max-width: 280px;
+		background: linear-gradient(
+			180deg,
+			rgba(var(--accent-blue-rgb), 0.08) 0%,
+			rgba(0, 0, 0, 0.25) 100%
+		);
+		padding: 20px 18px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		border-right: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
+		position: relative;
+		z-index: 1;
+		box-sizing: border-box;
+	}
+
+	.detail-img-frame {
+		position: relative;
+		width: 100%;
+		aspect-ratio: 1 / 1;
+		border-radius: var(--radius-lg, 18px);
+		overflow: hidden;
+		background: rgba(0, 0, 0, 0.4);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		box-shadow:
+			0 12px 28px rgba(0, 0, 0, 0.45),
+			inset 0 1px 2px rgba(255, 255, 255, 0.18);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.showcase-img {
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		object-fit: contain;
+		transition: transform 0.4s var(--ease-spring);
+	}
+
+	.showcase-img:hover {
+		transform: scale(1.04);
 	}
 
 	.detail-media-placeholder {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: rgba(0, 119, 255, 0.18);
-		font-size: 3rem;
+		color: rgba(var(--accent-blue-rgb), 0.3);
+		font-size: 3.5rem;
 	}
 
-	.detail-info-pane {
-		width: 50%;
-		padding: 24px;
+	.media-footer-meta {
 		display: flex;
-		flex-direction: column;
-		gap: 20px;
-		background: rgba(11, 15, 25, 0.3);
-		overflow-y: auto;
-		max-height: 80vh;
-	}
-
-	.detail-header {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-
-	.detail-title-row {
-		display: flex;
-		justify-content: justify;
+		align-items: center;
 		justify-content: space-between;
-		align-items: flex-start;
-		gap: 8px;
+		width: 100%;
+		padding: 0 2px;
 	}
 
-	.detail-title {
-		font-size: 1.15rem;
-		font-weight: 800;
-		color: var(--text-main);
-		margin: 0;
-		line-height: 1.3;
-	}
-
-	.detail-price {
-		font-size: 1.1rem;
-		font-weight: 900;
-		color: var(--aero-rose);
-		margin: 0;
-	}
-
-	.detail-desc-text {
-		font-size: 0.8rem;
+	.asset-id-badge {
+		font-family: var(--font-mono, monospace);
+		font-size: 0.7rem;
+		font-weight: 700;
 		color: var(--text-muted);
-		line-height: 1.45;
-		margin: 6px 0 0 0;
+		background: rgba(255, 255, 255, 0.05);
+		padding: 2px 6px;
+		border-radius: var(--radius-xs);
+		border: 1px solid var(--glass-border);
 	}
 
-	.detail-section {
-		border-top: 1px solid rgba(0, 119, 255, 0.1);
-		padding-top: 16px;
+	/* ── Right Column: Details & Interactions ──────── */
+	.detail-info-pane {
+		flex: 1 1 auto;
+		min-width: 0;
+		padding: 20px 22px;
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-	}
-
-	.section-subtitle-mini {
-		font-size: 0.75rem;
-		font-weight: 700;
-		color: var(--text-main);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		margin: 0;
-	}
-
-	.reviews-list-container {
-		flex: 1;
+		background: transparent;
 		overflow-y: auto;
-		max-height: 150px;
+		max-height: min(520px, 86vh);
+		position: relative;
+		z-index: 1;
+		box-sizing: border-box;
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) transparent;
+	}
+
+	.detail-top-row {
 		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		padding-right: 4px;
-	}
-
-	.empty-reviews-text {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		margin: 0;
-	}
-
-	.review-item {
-		padding: 8px;
-		border-radius: var(--radius-sm);
-		background: rgba(0, 229, 255, 0.03);
-		border: 1px solid rgba(0, 119, 255, 0.06);
-	}
-
-	.review-meta {
-		display: flex;
-		justify-content: justify;
+		align-items: center;
 		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 4px;
+		width: 100%;
 	}
 
-	.review-author {
-		font-size: 0.7rem;
-		font-weight: 700;
-		color: rgba(0, 229, 255, 0.8);
+	.price-showcase {
+		display: flex;
+		align-items: baseline;
+		gap: 2px;
+		font-family: var(--font-display);
 	}
 
-	.review-rating {
+	.price-currency {
+		font-size: 1.1rem;
+		font-weight: 800;
+		color: var(--accent-blue-light);
+	}
+
+	.price-number {
+		font-size: 1.55rem;
+		font-weight: 900;
+		letter-spacing: -0.02em;
+		background: linear-gradient(135deg, #ffffff 0%, var(--accent-blue-light) 100%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		filter: drop-shadow(0 2px 8px rgba(var(--accent-blue-rgb), 0.4));
+	}
+
+	.price-unit {
+		font-size: 0.75rem;
+		font-weight: 800;
+		color: var(--text-muted);
+		margin-left: 3px;
+		letter-spacing: 0.05em;
+	}
+
+	.modal-close-btn {
+		width: 32px;
+		height: 32px;
+		border-radius: var(--radius-full);
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid var(--glass-border);
+		color: var(--text-muted);
+		cursor: pointer;
 		display: flex;
 		align-items: center;
-		gap: 1px;
-		font-size: 0.7rem;
-		color: #fbbf24;
-		font-weight: 700;
+		justify-content: center;
+		transition: all var(--t-fast);
+		backdrop-filter: blur(8px);
+		flex-shrink: 0;
 	}
 
-	.review-rating .material-icons-round {
-		font-size: 0.75rem;
+	.modal-close-btn:hover {
+		background: rgba(239, 68, 68, 0.18);
+		border-color: rgba(239, 68, 68, 0.4);
+		color: #ef4444;
+		transform: rotate(90deg) scale(1.08);
 	}
 
-	.review-comment {
-		font-size: 0.75rem;
+	.detail-title {
+		font-family: var(--font-display);
+		font-size: 1.35rem;
+		font-weight: 900;
 		color: var(--text-main);
 		margin: 0;
-		line-height: 1.35;
+		line-height: 1.2;
+		letter-spacing: -0.01em;
 	}
 
-	.review-form {
-		margin-top: 8px;
-	}
-
-	.review-input-row {
-		display: flex;
-		gap: 8px;
-		align-items: center;
-	}
-
-	.seller-card {
-		border-top: 1px solid rgba(0, 119, 255, 0.1);
-		padding-top: 16px;
+	/* ── Seller Card ──────────────────────────────── */
+	.seller-showcase-card {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		justify-content: space-between;
+		padding: 7px 12px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
+		box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
 	}
 
-	.seller-avatar {
+	.seller-left-meta {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.seller-avatar-shield {
 		width: 32px;
 		height: 32px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
-		background: linear-gradient(135deg, #f000ff 0%, #7000ff 100%);
+		background: linear-gradient(135deg, var(--accent-blue-base) 0%, var(--aero-mint) 100%);
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		font-weight: 800;
 		color: #ffffff;
-		font-weight: 700;
 		font-size: 0.85rem;
+		box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+		flex-shrink: 0;
 	}
 
-	.seller-name-title {
-		font-size: 0.75rem;
-		font-weight: 700;
+	.seller-text-info {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.seller-display-name {
+		font-size: 0.82rem;
+		font-weight: 800;
 		color: var(--text-main);
+		line-height: 1.2;
+	}
+
+	.seller-handle {
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--accent-blue-light);
+		line-height: 1.2;
+	}
+
+	.seller-verified-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		font-size: 0.68rem;
+		font-weight: 800;
+		color: var(--aero-mint);
+		background: rgba(0, 212, 170, 0.12);
+		border: 1px solid rgba(0, 212, 170, 0.25);
+		padding: 3px 8px;
+		border-radius: var(--radius-full);
+	}
+
+	.seller-verified-tag .material-icons-round {
+		font-size: 0.82rem;
+	}
+
+	/* ── Description Box ──────────────────────────── */
+	.detail-desc-box {
+		background: rgba(255, 255, 255, 0.025);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
+		padding: 10px 12px;
+		max-height: 65px;
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+
+	.detail-desc-text {
+		font-size: 0.82rem;
+		color: var(--text-secondary);
+		line-height: 1.45;
 		margin: 0;
 	}
 
-	.seller-status-text {
-		font-size: 0.65rem;
+	/* ── Actions Container ────────────────────────── */
+	.detail-action-container {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.p2p-trust-pill {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 0.7rem;
+		font-weight: 600;
 		color: var(--text-muted);
-		margin: 2px 0 0 0;
+		background: rgba(var(--accent-blue-rgb), 0.06);
+		padding: 6px 10px;
+		border-radius: var(--radius-sm);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.12);
+	}
+
+	.trust-icon {
+		font-size: 0.9rem;
+		color: var(--accent-blue-light);
+	}
+
+	.action-btn-wrapper {
+		display: flex;
+		width: 100%;
+		gap: 10px;
+	}
+
+	.action-btn-wrapper.has-two-buttons {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.action-btn-wrapper a {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		text-decoration: none;
+		padding: 10px 14px;
+		font-size: 0.85rem;
+		font-weight: 800;
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-sm);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-fast);
+	}
+
+	.action-btn-wrapper a.full-width {
+		width: 100%;
+	}
+
+	.action-btn-wrapper a:hover {
+		transform: translateY(-2px);
+	}
+
+	/* ── Reviews / Ratings ────────────────────────── */
+	.detail-reviews-wrapper {
+		border-top: 1px solid var(--glass-border);
+		padding-top: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.reviews-header-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.reviews-section-title {
+		font-size: 0.75rem;
+		font-weight: 800;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-main);
+		margin: 0;
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.reviews-count-badge {
+		font-size: 0.68rem;
+		font-weight: 700;
+		color: var(--accent-blue-light);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		padding: 2px 6px;
+		border-radius: var(--radius-full);
+	}
+
+	.reviews-scroll-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		max-height: 80px;
+		overflow-y: auto;
+		padding-right: 4px;
+		scrollbar-width: thin;
+	}
+
+	.empty-reviews-card {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 10px;
+		border-radius: var(--radius-sm);
+		background: rgba(255, 255, 255, 0.02);
+		border: 1px dashed var(--glass-border);
+		color: var(--text-muted);
+		font-size: 0.75rem;
+	}
+
+	.empty-reviews-card .material-icons-round {
+		font-size: 1.1rem;
+		opacity: 0.6;
+	}
+
+	.review-bubble {
+		padding: 8px 12px;
+		border-radius: var(--radius-md);
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid var(--glass-border);
+	}
+
+	.review-bubble-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 2px;
+	}
+
+	.review-author-name {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--accent-blue-light);
+	}
+
+	.review-stars-row {
+		display: flex;
+		align-items: center;
+		gap: 1px;
+	}
+
+	.star-filled {
+		font-size: 0.78rem;
+		color: #f59e0b;
+	}
+
+	.review-bubble-comment {
+		font-size: 0.75rem;
+		color: var(--text-main);
+		line-height: 1.35;
+		margin: 0;
+	}
+
+	/* Review Composer Form */
+	.review-composer-form {
+		margin-top: 2px;
+	}
+
+	.review-composer-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.review-rating-select {
+		width: 76px;
+		flex-shrink: 0;
+	}
+
+	.review-input-field {
+		flex: 1;
+		font-size: 0.75rem !important;
+		padding: 6px 10px !important;
+	}
+
+	.review-submit-btn {
+		width: 32px;
+		height: 32px;
+		padding: 0 !important;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-sm);
+		flex-shrink: 0;
+	}
+
+	.review-submit-btn .material-icons-round {
+		font-size: 0.95rem;
+	}
+
+	/* ── Responsive Adaptations ───────────────────── */
+	@media (max-width: 768px) {
+		.detail-modal {
+			flex-direction: column;
+			max-height: 90vh;
+			max-width: 440px;
+			overflow-y: auto;
+		}
+
+		.detail-media-pane {
+			flex: 0 0 auto;
+			width: 100%;
+			min-width: 100%;
+			max-width: 100%;
+			border-right: none;
+			border-bottom: 1px solid var(--glass-border);
+			padding: 16px;
+		}
+
+		.detail-img-frame {
+			max-width: 220px;
+			margin: 0 auto;
+		}
+
+		.detail-info-pane {
+			padding: 16px;
+			max-height: none;
+		}
 	}
 </style>

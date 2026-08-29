@@ -1,5 +1,5 @@
 /**
- * xp.js — Curva de nivel de V-SOCIAL en cliente.
+ * xp.js — Curva de nivel de Voom! en cliente.
  * Espejo exacto de `lib/server/gamification.js`:
  *   level = floor(sqrt(XP / 100)) + 1  (cap MAX_LEVEL = 20)
  *   XP acumulada para alcanzar el nivel n = (n - 1)^2 * 100

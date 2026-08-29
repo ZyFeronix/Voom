@@ -411,23 +411,20 @@
 		max-height: 260px;
 		overflow-y: auto;
 		overscroll-behavior: contain;
-		z-index: var(--z-dropdown, 100);
-		/* Fondo sólido: el glass translúcido (--bg-surface al 55%) dejaba ver el
-		   contenido de detrás (encabezados de tarjetas, texto…) mezclado con las
-		   opciones, rompiendo la legibilidad del menú. */
-		background: var(--bg-surface-solid, var(--bg-surface, #0f172a));
-		backdrop-filter: var(--glass-blur);
-		-webkit-backdrop-filter: var(--glass-blur);
-		border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+		z-index: var(--z-dropdown, 250);
+		background: var(--bg-surface-solid, #0d1f33) !important;
+		backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		-webkit-backdrop-filter: var(--glass-blur, blur(14px) saturate(1.2));
+		border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.16));
 		border-top: 1px solid var(--glass-border-t, rgba(255, 255, 255, 0.45));
 		border-radius: var(--radius-md, 14px);
 		box-shadow:
-			0 12px 36px rgba(0, 0, 0, 0.38),
-			0 2px 8px rgba(0, 0, 0, 0.15),
-			0 0 0 1px rgba(255, 255, 255, 0.05);
+			0 18px 48px rgba(0, 0, 0, 0.75),
+			0 4px 16px rgba(0, 0, 0, 0.35),
+			0 0 0 1px var(--border-subtle);
 		display: flex;
 		flex-direction: column;
-		padding: 4px;
+		padding: 6px;
 		gap: 6px;
 	}
 

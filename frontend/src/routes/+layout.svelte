@@ -24,6 +24,45 @@
 	import LevelUpModal from '$lib/components/gamification/LevelUpModal.svelte';
 	import { perfStore } from '$lib/stores/perf.svelte.js';
 
+	// Referencia a la View Transition en curso (ver onNavigate más abajo).
+	let activeVt = null;
+
+	// Rutas SIN shell (landing, login, admin): al cruzar hacia/desde ellas los
+	// grupos nombrados de la VT solo existen en un lado y las piezas del shell
+	// aparecen en momentos distintos (rail instantáneo, topbar 0.28s, canvas
+	// 0.32s) — se ve como un fallo de carga fragmentado. En esos cruces la VT
+	// se hace root-only: un único crossfade de toda la página.
+	const SHELLLESS_ROUTES = ['/', '/login', '/register', '/maintenance', '/reset-password'];
+	const isShellless = (pathname) =>
+		SHELLLESS_ROUTES.includes(pathname) || pathname.startsWith('/admin');
+
+	const SECTION_ORDER = [
+		'/feed',
+		'/explore',
+		'/posts/create',
+		'/stories/create',
+		'/reels/create',
+		'/reels',
+		'/messages',
+		'/notifications',
+		'/marketplace',
+		'/leaderboard',
+		'/settings'
+	];
+
+	function getSectionIndex(pathname) {
+		if (!pathname) return -1;
+		for (let i = 0; i < SECTION_ORDER.length; i++) {
+			const route = SECTION_ORDER[i];
+			if (pathname === route || pathname.startsWith(route + '/')) {
+				return i;
+			}
+		}
+		if (pathname.startsWith('/posts/')) return 0;
+		if (pathname.startsWith('/u/')) return SECTION_ORDER.length;
+		return -1;
+	}
+
 	onNavigate((navigation) => {
 		// La View Transitions API es el único requisito. Ningún perfil de
 		// rendimiento la bloquea: cada perfil tiene sus propias duraciones
@@ -39,10 +78,46 @@
 		)
 			return;
 
+		const rootOnly =
+			isShellless(navigation.from?.url.pathname ?? '/') !==
+			isShellless(navigation.to?.url.pathname ?? '/');
+		document.documentElement.classList.toggle('vt-root-only', rootOnly);
+
+		// Determina la dirección física de navegación (bajar o subir en secciones)
+		// para que la tarjeta se desplace hacia abajo al descender o hacia arriba al ascender,
+		// incluyendo el cambio entre /reels y /messages en cualquier dirección.
+		const fromPath = navigation.from?.url.pathname ?? '/';
+		const toPath = navigation.to?.url.pathname ?? '/';
+
+		let direction = null;
+		if (!rootOnly) {
+			const fromIdx = getSectionIndex(fromPath);
+			const toIdx = getSectionIndex(toPath);
+			if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+				direction = toIdx > fromIdx ? 'down' : 'up';
+			} else {
+				direction = 'down';
+			}
+		}
+
+		if (direction) {
+			document.documentElement.setAttribute('data-vt-direction', direction);
+		} else {
+			document.documentElement.removeAttribute('data-vt-direction');
+		}
+
 		// Congela transiciones CSS de entrada mientras dura el snapshot de la
 		// View Transition: evita que animaciones propias de cada página (stagger,
 		// fades) compitan con el crossfade y ensucien el fundido.
 		document.documentElement.classList.add('is-vt-active');
+
+		// Si una VT anterior sigue viva (navegaciones encadenadas rápidas, p. ej.
+		// feed → landing → feed), se salta: dos snapshots solapados se descartan
+		// con corte seco y rompen la animación visible.
+		if (activeVt) {
+			activeVt.skipTransition();
+			activeVt = null;
+		}
 
 		return new Promise((resolve) => {
 			let transition;
@@ -53,10 +128,18 @@
 				});
 			} catch (_e) {
 				// Sin transición no hay nada que congelar: restaurar y continuar.
+				document.documentElement.removeAttribute('data-vt-direction');
 				document.documentElement.classList.remove('is-vt-active');
+				document.documentElement.classList.remove('vt-root-only');
 				resolve();
 				return;
 			}
+
+			// Si llega otra navegación antes de que esta VT termine, se salta la
+			// actual: encadenar dos snapshots produce un corte seco (el overlay
+			// de la primera se descarta sin animación) justo en el tramo visible.
+			// `activeVt` se limpia cuando la transición termina por cualquier vía.
+			activeVt = transition;
 
 			// El crossfade no debe esperar al decodificado de imágenes de la
 			// página nueva: en cuanto el callback del DOM termina, arrancamos
@@ -64,6 +147,8 @@
 			// aparezcan dentro del canvas ya fundido. Evita frames vacíos.
 			transition.updateCallbackDone.finally(() => {
 				document.documentElement.classList.remove('is-vt-active');
+				document.documentElement.classList.remove('vt-root-only');
+				if (activeVt === transition) activeVt = null;
 			});
 			transition.updateCallbackDone.catch(() => {});
 
@@ -72,7 +157,12 @@
 			const timeout = setTimeout(() => {
 				transition.skipTransition();
 			}, 1000);
-			transition.finished.finally(() => clearTimeout(timeout)).catch(() => {});
+			transition.finished
+				.finally(() => {
+					clearTimeout(timeout);
+					document.documentElement.removeAttribute('data-vt-direction');
+				})
+				.catch(() => {});
 
 			// Evitar excepciones no capturadas si la transición se aborta
 			if (transition.ready) transition.ready.catch(() => {});
@@ -183,7 +273,16 @@
 		'/marketplace',
 		'/leaderboard'
 	];
-	const publicExact = ['/', '/login', '/register', '/privacy', '/terms', '/cookies'];
+	const publicExact = [
+		'/',
+		'/login',
+		'/register',
+		'/privacy',
+		'/terms',
+		'/cookies',
+		'/maintenance',
+		'/reset-password'
+	];
 	const isStrictlyPrivate = $derived(
 		page.url.pathname.startsWith('/feed') ||
 			page.url.pathname.startsWith('/messages') ||
@@ -200,8 +299,14 @@
 				publicPrefixes.some((prefix) => page.url.pathname.startsWith(prefix)))
 	);
 	const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
-	const isReelsRoute = $derived(
-		page.url.pathname.startsWith('/reels') && !page.url.pathname.startsWith('/reels/create')
+	const isReelsRoute = $derived(page.url.pathname.startsWith('/reels'));
+
+	// Rutas inmersivas / workspaces de pantalla completa donde la TopBar global
+	// (barra de búsqueda general) es redundante porque la vista tiene su propio header dedicado
+	// o es de pantalla completa (mensajes, estudio de diseño, reels y creación de historias).
+	const HIDE_TOPBAR_ROUTES = ['/messages', '/settings/design', '/reels', '/stories/create'];
+	const hideTopBar = $derived(
+		HIDE_TOPBAR_ROUTES.some((r) => page.url.pathname === r || page.url.pathname.startsWith(r + '/'))
 	);
 	const isInitializing = $derived(!installChecked || !authStore.initialized);
 
@@ -459,7 +564,7 @@
 </script>
 
 <svelte:head>
-	<title>VSocial &mdash; Red Social para Creadores Virtuales</title>
+	<title>Voom! &mdash; Red Social para Creadores Virtuales</title>
 </svelte:head>
 
 <svelte:body class:is-reels={isReelsRoute} />
@@ -517,6 +622,7 @@
 		class:vs-shell--collapsed={!uiStore.sidebarExpanded}
 		class:sidebar-expanded={uiStore.sidebarExpanded}
 		class:vs-shell--reels={isReelsRoute}
+		class:vs-shell--immersive={hideTopBar}
 		style="--sidebar-width: {uiStore.sidebarExpanded ? '250px' : '80px'};"
 	>
 		<aside class="vs-shell__rail">
@@ -524,9 +630,8 @@
 		</aside>
 
 		<div class="vs-shell__stage">
-			<!-- En /reels la página es inmersiva a pantalla completa: la TopBar global
-				   se oculta para que no se cruce con los controles propios del reproductor. -->
-			{#if !isReelsRoute}
+			<!-- Ocultar TopBar global con buscador en /messages, /settings/design, /reels y /stories/create -->
+			{#if !hideTopBar}
 				<TopBar />
 			{/if}
 			<main class="vs-shell__canvas">
@@ -565,17 +670,30 @@
 <style>
 	:global(body.is-reels),
 	:global(html.is-reels) {
-		background-color: #05131a !important;
+		background-color: var(--bg-canvas) !important;
 	}
 
 	:global(.vs-shell--reels .vs-shell__canvas) {
-		background-color: #05131a !important;
+		background-color: transparent !important;
 		padding: 0 !important;
 		position: relative !important;
 		height: 100% !important;
 		overflow: hidden !important;
 	}
-	:global(.vs-shell--reels .vs-shell__canvas::-webkit-scrollbar) {
+	:global(.vs-shell--immersive .vs-shell__stage) {
+		height: 100vh !important;
+		max-height: 100vh !important;
+		overflow: hidden !important;
+	}
+	:global(.vs-shell--immersive .vs-shell__canvas) {
+		padding: 0 !important;
+		position: relative !important;
+		height: 100% !important;
+		max-height: 100vh !important;
+		overflow: hidden !important;
+	}
+	:global(.vs-shell--reels .vs-shell__canvas::-webkit-scrollbar),
+	:global(.vs-shell--immersive .vs-shell__canvas::-webkit-scrollbar) {
 		display: none;
 	}
 
@@ -584,7 +702,22 @@
 		inset: 0;
 		display: grid;
 		place-items: center;
-		background: radial-gradient(circle at 50% 50%, #061e2d 0%, #030f17 60%, #02090e 100%);
+		/* El boot hereda el tema activo (light/dark/midnight) vía los tokens
+		   globales: mismo fondo que el canvas para que la salida del splash
+		   funda sin salto de color. */
+		background:
+			radial-gradient(
+				at 15% 20%,
+				rgba(var(--accent-sky-rgb, 46, 180, 255), 0.16) 0px,
+				transparent 45%
+			),
+			radial-gradient(
+				at 85% 80%,
+				rgba(var(--aero-mint-rgb, 0, 212, 170), 0.14) 0px,
+				transparent 48%
+			),
+			var(--bg-canvas);
+		color: var(--text-primary);
 		isolation: isolate;
 		z-index: 9999;
 		overflow: hidden;
@@ -605,7 +738,11 @@
 		height: 480px;
 		top: 15%;
 		left: 20%;
-		background: radial-gradient(circle, rgba(0, 229, 255, 0.45) 0%, transparent 70%);
+		background: radial-gradient(
+			circle,
+			rgba(var(--accent-sky-rgb, 46, 180, 255), 0.45) 0%,
+			transparent 70%
+		);
 		animation: bootFloatOrb1 12s ease-in-out infinite alternate;
 	}
 
@@ -614,7 +751,11 @@
 		height: 420px;
 		bottom: 15%;
 		right: 20%;
-		background: radial-gradient(circle, rgba(236, 72, 153, 0.35) 0%, transparent 70%);
+		background: radial-gradient(
+			circle,
+			rgba(var(--aero-rose-rgb, 236, 72, 153), 0.3) 0%,
+			transparent 70%
+		);
 		animation: bootFloatOrb2 14s ease-in-out infinite alternate;
 	}
 
@@ -623,7 +764,11 @@
 		height: 380px;
 		bottom: 25%;
 		left: 30%;
-		background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+		background: radial-gradient(
+			circle,
+			rgba(var(--aero-mint-rgb, 0, 212, 170), 0.3) 0%,
+			transparent 70%
+		);
 		animation: bootFloatOrb3 10s ease-in-out infinite alternate;
 	}
 
@@ -635,15 +780,14 @@
 		gap: 2.25rem;
 		padding: 3.25rem 4rem;
 		border-radius: 28px;
-		background: rgba(12, 35, 55, 0.65);
-		backdrop-filter: blur(24px) saturate(1.35);
-		-webkit-backdrop-filter: blur(24px) saturate(1.35);
-		border: 1px solid rgba(255, 255, 255, 0.16);
+		background: var(--bg-surface);
+		backdrop-filter: var(--glass-blur, blur(24px) saturate(1.35));
+		-webkit-backdrop-filter: var(--glass-blur, blur(24px) saturate(1.35));
+		border: 1px solid var(--border-glass);
 		box-shadow:
-			0 24px 64px -12px rgba(0, 0, 0, 0.65),
-			0 0 35px rgba(0, 229, 255, 0.15),
-			inset 0 1px 2px rgba(255, 255, 255, 0.4),
-			inset 0 -1px 2px rgba(0, 229, 255, 0.2);
+			var(--shadow-lg),
+			var(--shadow-btn-primary),
+			inset 0 1px 2px rgba(255, 255, 255, 0.4);
 		overflow: hidden;
 		animation: vsCoreFloat 0.75s var(--ease-spring) both;
 		z-index: 10;
@@ -668,9 +812,9 @@
 		transform: translateX(-50%);
 		background: radial-gradient(
 			ellipse at 50% 50%,
-			rgba(0, 229, 255, 0.16) 0%,
-			rgba(16, 185, 129, 0.08) 40%,
-			rgba(236, 72, 153, 0.04) 65%,
+			rgba(var(--accent-sky-rgb, 46, 180, 255), 0.16) 0%,
+			rgba(var(--aero-mint-rgb, 0, 212, 170), 0.08) 40%,
+			rgba(var(--aero-rose-rgb, 236, 72, 153), 0.04) 65%,
 			transparent 80%
 		);
 		pointer-events: none;
@@ -680,7 +824,7 @@
 		position: absolute;
 		inset: -40%;
 		border-radius: 48%;
-		border: 1px dashed rgba(0, 229, 255, 0.12);
+		border: 1px dashed rgba(var(--accent-sky-rgb, 46, 180, 255), 0.18);
 		animation: bootOrbit 20s linear infinite;
 		pointer-events: none;
 	}
@@ -688,7 +832,7 @@
 	.vs-boot__orbit-ring--reverse {
 		inset: -35%;
 		border-radius: 46%;
-		border: 1px dotted rgba(236, 72, 153, 0.1);
+		border: 1px dotted rgba(var(--aero-rose-rgb, 236, 72, 153), 0.14);
 		animation: bootOrbit 28s linear infinite reverse;
 	}
 
@@ -705,10 +849,14 @@
 		width: 64px;
 		height: 64px;
 		border-radius: 18px;
-		background: linear-gradient(135deg, rgba(0, 229, 255, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
-		border: 1px solid rgba(0, 229, 255, 0.4);
+		background: linear-gradient(
+			135deg,
+			rgba(var(--accent-sky-rgb, 46, 180, 255), 0.2) 0%,
+			rgba(var(--aero-mint-rgb, 0, 212, 170), 0.1) 100%
+		);
+		border: 1px solid rgba(var(--accent-sky-rgb, 46, 180, 255), 0.4);
 		box-shadow:
-			0 8px 24px rgba(0, 229, 255, 0.25),
+			var(--shadow-glow),
 			inset 0 1px 2px rgba(255, 255, 255, 0.6);
 		display: grid;
 		place-items: center;
@@ -727,10 +875,13 @@
 		font-weight: 900;
 		font-size: 1.75rem;
 		letter-spacing: -0.05em;
-		background: linear-gradient(135deg, #ffffff 0%, #00e5ff 100%);
+		background: var(--accent-gradient);
 		-webkit-background-clip: text;
 		background-clip: text;
+		/* El fill transparente del clip degradado desaparecería si el
+		   gradiente es claro sobre fondo claro; en light el texto usa tinta. */
 		-webkit-text-fill-color: transparent;
+		color: var(--text-primary);
 	}
 
 	.vs-boot__titles {
@@ -745,7 +896,7 @@
 		font-weight: 900;
 		font-size: clamp(2.5rem, 6vw, 3.5rem);
 		letter-spacing: -0.03em;
-		color: #ffffff;
+		color: var(--text-primary);
 		margin: 0;
 		line-height: 1;
 	}
@@ -755,12 +906,11 @@
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		text-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
 	}
 
 	.vs-boot__suffix {
-		color: #ffffff;
-		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+		color: var(--text-primary);
+		text-shadow: none;
 	}
 
 	.vs-boot__tagline {
@@ -769,7 +919,7 @@
 		font-weight: 700;
 		letter-spacing: 0.25em;
 		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.5);
+		color: var(--text-tertiary);
 	}
 
 	.vs-boot__meter {
@@ -788,20 +938,20 @@
 		width: 100%;
 		height: 5px;
 		border-radius: 9999px;
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: var(--bg-input);
+		border: 1px solid var(--border-subtle);
 		overflow: hidden;
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
 	}
 
 	.vs-boot__fill {
 		position: absolute;
 		inset: 0;
 		border-radius: inherit;
-		background: linear-gradient(90deg, #00e5ff 0%, #10b981 50%, #ec4899 100%);
+		background: var(--accent-gradient);
 		background-size: 200% 100%;
 		animation: vsPulseSweep 1.8s ease-in-out infinite;
-		box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+		box-shadow: var(--shadow-glow);
 	}
 
 	.vs-boot__scanner {
@@ -828,10 +978,10 @@
 		width: 7px;
 		height: 7px;
 		border-radius: 9999px;
-		background: #00e5ff;
+		background: var(--aero-sky);
 		box-shadow:
-			0 0 10px #00e5ff,
-			0 0 16px #00e5ff;
+			0 0 10px var(--aero-sky),
+			0 0 16px var(--aero-sky);
 		animation: vsDotPulse 1.2s ease-in-out infinite alternate;
 	}
 
@@ -842,7 +992,7 @@
 		font-weight: 600;
 		letter-spacing: 0.18em;
 		text-transform: uppercase;
-		color: rgba(255, 255, 255, 0.75);
+		color: var(--text-secondary);
 	}
 
 	.vs-shell {

@@ -35,7 +35,7 @@
 				icon: 'admin_panel_settings',
 				color: 'var(--badge-admin)',
 				title: 'Administrador del Sistema',
-				desc: 'Esta cuenta pertenece a la administración oficial de V-SOCIAL con privilegios plenos.',
+				desc: 'Esta cuenta pertenece a la administración oficial de Voom! con privilegios plenos.',
 				linkText: 'Conocer más'
 			};
 		}
@@ -52,7 +52,7 @@
 			return {
 				icon: 'support_agent',
 				color: 'var(--badge-support)',
-				title: 'Soporte V-SOCIAL',
+				title: 'Soporte Voom!',
 				desc: 'Esta cuenta pertenece al equipo oficial de soporte, encargados de verificaciones y asistencia humana.',
 				linkText: 'Contactar Soporte'
 			};
@@ -61,8 +61,8 @@
 			return {
 				icon: 'military_tech',
 				color: 'var(--badge-team)',
-				title: 'Equipo V-SOCIAL',
-				desc: 'Esta cuenta pertenece a un miembro central del equipo de desarrollo o staff de V-SOCIAL.',
+				title: 'Equipo Voom!',
+				desc: 'Esta cuenta pertenece a un miembro central del equipo de desarrollo o staff de Voom!.',
 				linkText: 'Conocer al equipo'
 			};
 		}

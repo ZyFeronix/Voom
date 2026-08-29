@@ -70,8 +70,8 @@
 			checklist: [
 				'Portafolio público y activo con al menos 6 piezas originales',
 				'Demostración de autoría humana y proceso creativo',
-				'Mención cruzada hacia V-SOCIAL en perfil o post principal',
-				'Perfil completo en V-SOCIAL con avatar, portada y biografía'
+				'Mención cruzada hacia Voom! en perfil o post principal',
+				'Perfil completo en Voom! con avatar, portada y biografía'
 			]
 		},
 		streamer: {
@@ -254,7 +254,7 @@
 
 		if (!authStore.isAuthenticated) {
 			submitError =
-				'Debes iniciar sesión con tu cuenta de V-SOCIAL para enviar la solicitud de verificación.';
+				'Debes iniciar sesión con tu cuenta de Voom! para enviar la solicitud de verificación.';
 			return;
 		}
 
@@ -331,7 +331,7 @@
 </script>
 
 <svelte:head>
-	<title>{cfg.title} - V-SOCIAL</title>
+	<title>{cfg.title} - Voom!</title>
 	<meta name="description" content={cfg.subtitle} />
 </svelte:head>
 
@@ -407,11 +407,11 @@
 					<form onsubmit={handleFormSubmit} class="audit-form">
 						<!-- Base Identity Section -->
 						<div class="form-fieldset">
-							<span class="fieldset-legend">1. Cuenta en V-SOCIAL & Contacto</span>
+							<span class="fieldset-legend">1. Cuenta en Voom! & Contacto</span>
 
 							<div class="form-row-2col">
 								<div class="form-group">
-									<label for="app-username">Nombre de Usuario en V-SOCIAL *</label>
+									<label for="app-username">Nombre de Usuario en Voom! *</label>
 									<div class="input-with-prefix">
 										<span class="input-prefix">@</span>
 										<input
@@ -486,7 +486,7 @@
 									<input
 										id="creator-proof"
 										type="url"
-										placeholder="URL a post en X/Bluesky/ArtStation mencionando @tu_usuario en V-SOCIAL"
+										placeholder="URL a post en X/Bluesky/ArtStation mencionando @tu_usuario en Voom!"
 										bind:value={creatorProofLink}
 										class="modal-input"
 									/>
@@ -792,7 +792,7 @@
 									<input type="checkbox" required bind:checked={orgAck} />
 									<span
 										>Certifico contar con la debida personería y autorización para gestionar la
-										presencia y representación oficial de esta organización en V-SOCIAL.</span
+										presencia y representación oficial de esta organización en Voom!.</span
 									>
 								</label>
 							{:else if currentCatKey === 'government'}

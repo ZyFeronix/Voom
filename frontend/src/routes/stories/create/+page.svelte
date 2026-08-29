@@ -172,11 +172,8 @@
 </script>
 
 <svelte:head>
-	<title>Nueva Historia — VSocial</title>
-	<meta
-		name="description"
-		content="Crea y comparte una historia en VSocial. Visible por 24 horas."
-	/>
+	<title>Nueva Historia — Voom!</title>
+	<meta name="description" content="Crea y comparte una historia en Voom!. Visible por 24 horas." />
 </svelte:head>
 
 <div class="sc-root">

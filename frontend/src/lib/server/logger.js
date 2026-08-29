@@ -1,5 +1,5 @@
 /**
- * VSocial Structured Logger
+ * Voom! Structured Logger
  * Uses Pino for production-grade logging
  */
 import pino from 'pino';

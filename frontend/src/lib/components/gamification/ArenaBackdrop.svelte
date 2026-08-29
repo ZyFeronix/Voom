@@ -1,6 +1,6 @@
 <script>
 	/**
-	 * ArenaBackdrop.svelte — Escenografía del /leaderboard (Arena V-SOCIAL).
+	 * ArenaBackdrop.svelte — Escenografía del /leaderboard (Arena Voom!).
 	 *
 	 * - Dos haces volumétricos cruzados (dorado para el campeón + haz reactivo al tipo de ranking)
 	 *   y reflejo de suelo bajo el podio.

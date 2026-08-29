@@ -1,6 +1,8 @@
 <script>
 	import { fly, scale, fade } from 'svelte/transition';
 	import { quintOut, backOut, cubicOut } from 'svelte/easing';
+	import { twemojiAction } from '$lib/actions/twemoji.js';
+	import { emoteFor } from '$lib/data/msnEmoticons.js';
 
 	let {
 		streak = 0,
@@ -372,11 +374,25 @@
 					<!-- Sub-píldora con desglose de bonus de racha -->
 					<div class="xp-streak-bonus-pill">
 						{#if calculatedBonus > 0}
-							<span class="bonus-fire-icon">🔥</span>
+							<img
+								class="msn-emoji-render"
+								src={emoteFor('🔥').url}
+								alt="🔥"
+								title="fire"
+								loading="lazy"
+								decoding="async"
+							/>
 							<span class="bonus-text">+{calculatedBonus} XP Bonus ({nextStreak}d)</span>
 						{:else}
-							<span class="bonus-fire-icon">✨</span>
-							<span class="bonus-text">{activeTierConfig.tagText}</span>
+							<img
+								class="msn-emoji-render"
+								src={emoteFor('✨').url}
+								alt="✨"
+								title="sparkles"
+								loading="lazy"
+								decoding="async"
+							/>
+							<span class="bonus-text" use:twemojiAction>{activeTierConfig.tagText}</span>
 						{/if}
 					</div>
 				</div>
@@ -384,8 +400,8 @@
 				<!-- Micro-puntos flotantes que se dispersan en arco hacia arriba -->
 				<div class="micro-xp-drift-container" aria-hidden="true">
 					<span class="micro-xp-spark micro-1">+{displayXp} XP</span>
-					<span class="micro-xp-spark micro-2">🔥 x{nextStreak}</span>
-					<span class="micro-xp-spark micro-3">✨ ¡Racha!</span>
+					<span class="micro-xp-spark micro-2" use:twemojiAction>🔥 x{nextStreak}</span>
+					<span class="micro-xp-spark micro-3" use:twemojiAction>✨ ¡Racha!</span>
 				</div>
 			</div>
 		{/if}

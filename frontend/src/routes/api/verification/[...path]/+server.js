@@ -1,5 +1,5 @@
 /**
- * VSocial — Creator & Identity Verification API
+ * Voom! — Creator & Identity Verification API
  *
  * GET  /api/verification/status?folio=XXX  — Check application status
  * GET  /api/verification/status            — Get authenticated user's active application
@@ -147,9 +147,11 @@ export async function POST({ request, params }) {
 			.run(userId, JSON.stringify({ folio, category, handle: applicantHandle }))
 			.catch(() => {});
 
-		// Notify admins via socket if active
+		// Notify staff via the staff room (no global: los folios son datos sensibles)
 		if (globalThis.io) {
-			globalThis.io.emit('new_admin_verification', { folio, category, handle: applicantHandle });
+			globalThis.io
+				.to('staff')
+				.emit('new_admin_verification', { folio, category, handle: applicantHandle });
 		}
 
 		return json({

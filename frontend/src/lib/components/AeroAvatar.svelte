@@ -1,6 +1,6 @@
 <script>
 	/**
-	 * AeroAvatar.svelte - V-SOCIAL Neo-Aero Avatar Component
+	 * AeroAvatar.svelte - Voom! Neo-Aero Avatar Component
 	 * Renderiza avatares con marcos de cristal Frutiger Aero y estelas de presencia en tiempo real.
 	 * La presencia se representa exclusivamente mediante la estela bioluminiscente alrededor del marco.
 	 */
@@ -18,6 +18,17 @@
 		className = '',
 		showPresence = true
 	} = $props();
+
+	let hasError = $state(false);
+
+	// Solo strings: un objeto en src se coercería a "[object Object]" y el
+	// navegador emitiría un GET inútil a /%5Bobject%20Object%5D (404).
+	let safeSrc = $derived(typeof src === 'string' && src.trim() !== '' ? src : null);
+
+	$effect(() => {
+		safeSrc;
+		hasError = false;
+	});
 
 	// Obtener la inicial para el avatar de fallback
 	let initial = $derived.by(() => {
@@ -47,8 +58,8 @@
 
 {#if href}
 	<a {href} class={frameClasses} title={alt}>
-		{#if src}
-			<img {src} {alt} loading="lazy" />
+		{#if safeSrc && !hasError}
+			<img src={safeSrc} {alt} loading="lazy" onerror={() => (hasError = true)} />
 		{:else}
 			<span class="avatar-ring-letter">
 				{initial}
@@ -57,8 +68,8 @@
 	</a>
 {:else}
 	<div class={frameClasses} title={alt}>
-		{#if src}
-			<img {src} {alt} loading="lazy" />
+		{#if safeSrc && !hasError}
+			<img src={safeSrc} {alt} loading="lazy" onerror={() => (hasError = true)} />
 		{:else}
 			<span class="avatar-ring-letter">
 				{initial}

@@ -1,5 +1,5 @@
 /**
- * VSocial — Posts API
+ * Voom! — Posts API
  * POST   /api/posts              — Create post
  * POST   /api/posts/media        — Upload media
  * GET    /api/posts/:id          — Get single post

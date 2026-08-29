@@ -1,5 +1,5 @@
 /**
- * VSocial — Messages API
+ * Voom! — Messages API
  *
  * Sub-rutas (dispatch interno por segmentos de params.path):
  *   GET    /unread-count
@@ -137,8 +137,8 @@ export async function GET({ request, url, params }) {
 			.all(userId, userId, userId);
 
 		for (const c of convs) {
-			if (c.type === 'dm') {
-				const peer = await db
+			if (c.type === 'dm' || c.type === 'direct') {
+				let peer = await db
 					.prepare(
 						`
 					SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_verified, u.last_seen_at,
@@ -150,22 +150,45 @@ export async function GET({ request, url, params }) {
 				`
 					)
 					.get(c.id, userId);
+
+				if (!peer) {
+					peer = await db
+						.prepare(
+							`
+						SELECT u.id, u.username, u.display_name, u.avatar_url, u.is_verified, u.last_seen_at,
+							COALESCE(s.show_online_status, 1) AS show_online_status
+						FROM conversation_participants cp
+						JOIN users u ON cp.user_id = u.id
+						LEFT JOIN user_settings s ON s.user_id = u.id
+						WHERE cp.conversation_id = ? LIMIT 1
+					`
+						)
+						.get(c.id);
+				}
+
 				if (peer) {
 					c.peer_id = peer.id;
-					c.name = peer.display_name;
+					const isSelf = Number(peer.id) === Number(userId);
+					c.name = isSelf
+						? `${peer.display_name || peer.username} (Notas personales)`
+						: peer.display_name || peer.username;
 					c.username = peer.username;
 					c.avatar = peer.avatar_url;
 					c.peer_avatar = peer.avatar_url;
-					c.peer_display_name = peer.display_name;
+					c.peer_display_name = c.name;
 					c.peer_username = peer.username;
 					c.is_verified = peer.is_verified;
 					// Presencia en vivo desde el registro en memoria de Socket.IO,
 					// respetando la privacidad show_online_status del peer.
 					c.peer_online = peer.show_online_status ? isUserOnline(peer.id) : false;
 					c.peer_last_seen = peer.show_online_status ? peer.last_seen_at : null;
+				} else {
+					c.name = 'Usuario de Voom';
+					c.peer_display_name = 'Usuario de Voom';
+					c.peer_username = 'usuario';
 				}
 			} else {
-				c.name = c.group_name;
+				c.name = c.group_name || 'Grupo';
 				c.avatar = c.group_avatar_url;
 			}
 		}
@@ -722,9 +745,11 @@ export async function DELETE({ request, params }) {
 		if (!msg) return json({ error: 'Message not found' }, { status: 404 });
 		if (msg.sender_id !== userId) return json({ error: 'Unauthorized' }, { status: 403 });
 
+		// Soft-delete: marcar como borrado, limpiar media y dejar body=NULL para que
+		// el frontend gestione la UI del mensaje eliminado con su propio token/i18n.
 		await db
 			.prepare(
-				"UPDATE messages_new SET is_deleted = 1, body = 'Este mensaje fue eliminado', voice_url = NULL, media_url = NULL, media_type = NULL WHERE id = ?"
+				'UPDATE messages_new SET is_deleted = 1, body = NULL, voice_url = NULL, media_url = NULL, media_type = NULL WHERE id = ?'
 			)
 			.run(msgId);
 

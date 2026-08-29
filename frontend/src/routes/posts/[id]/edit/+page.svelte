@@ -141,7 +141,7 @@
 	}
 </script>
 
-<svelte:head><title>Editar Publicación — VSocial</title></svelte:head>
+<svelte:head><title>Editar Publicación — Voom!</title></svelte:head>
 
 <div class="edit-wrapper">
 	<!-- Top Bar / Back Navigation -->

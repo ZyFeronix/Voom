@@ -40,7 +40,7 @@
 </script>
 
 <svelte:head>
-	<title>Privacidad — VSocial</title>
+	<title>Privacidad — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card" class:is-saving={saving}>

@@ -1,5 +1,5 @@
 /**
- * VSocial — Image Metadata & Dimension Extractor
+ * Voom! — Image Metadata & Dimension Extractor
  * Pure JS binary header parser for PNG, GIF, WebP, and JPEG.
  */
 

@@ -1,5 +1,5 @@
 /**
- * VSocial — Utilidades isomórficas de diseño (seguras en cliente Y servidor)
+ * Voom! — Utilidades isomórficas de diseño (seguras en cliente Y servidor)
  *
  * Sanitiza y valida la personalización de perfil antes de persistirla
  * (server) y al renderizarla (cliente). Módulo puro: sin imports de Node.

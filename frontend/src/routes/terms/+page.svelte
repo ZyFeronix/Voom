@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Términos de Servicio - V-SOCIAL</title>
+	<title>Términos de Servicio - Voom!</title>
 </svelte:head>
 
 <div class="legal-container" in:fade={{ duration: 500 }}>
@@ -14,7 +14,7 @@
 		<section>
 			<h2>1. Aceptación de los términos</h2>
 			<p>
-				Al registrarte y usar V-SOCIAL aceptas los presentes Términos de Servicio y la Política de
+				Al registrarte y usar Voom! aceptas los presentes Términos de Servicio y la Política de
 				Privacidad. Si no estás de acuerdo, no debes crear una cuenta ni utilizar la plataforma. El
 				consentimiento se recoge mediante la casilla de aceptación durante el registro y se registra
 				con fecha y hora.
@@ -44,9 +44,9 @@
 		<section>
 			<h2>4. Contenido y licencia</h2>
 			<p>
-				Mantienes la propiedad del contenido que publicas. Al subirlo, concedes a V-SOCIAL una
-				licencia no exclusiva para alojarlo, mostrarlo y distribuirlo dentro de la plataforma con la
-				finalidad de prestar el servicio. El código fuente de V-SOCIAL se distribuye bajo licencia
+				Mantienes la propiedad del contenido que publicas. Al subirlo, concedes a Voom! una licencia
+				no exclusiva para alojarlo, mostrarlo y distribuirlo dentro de la plataforma con la
+				finalidad de prestar el servicio. El código fuente de Voom! se distribuye bajo licencia
 				AGPLv3.
 			</p>
 		</section>
@@ -84,7 +84,7 @@
 		<section>
 			<h2>8. Limitación de responsabilidad</h2>
 			<p>
-				V-SOCIAL se ofrece «tal cual», sin garantías explícitas o implícitas. El operador de la
+				Voom! se ofrece «tal cual», sin garantías explícitas o implícitas. El operador de la
 				instancia no se hace responsable de pérdidas de datos, interrupciones del servicio o daños
 				derivados del uso de la plataforma, en la medida en que lo permita la legislación aplicable.
 			</p>
@@ -93,11 +93,11 @@
 		<section>
 			<h2>9. Transacciones y economía entre usuarios (P2P)</h2>
 			<p>
-				V-SOCIAL no actúa como pasarela de pago, procesador financiero, custodio ni intermediario
+				Voom! no actúa como pasarela de pago, procesador financiero, custodio ni intermediario
 				mercantil. Cualquier transacción comercial, compra de servicios digitales, encargos
 				artísticos o apoyos económicos se realiza de forma directa y entre pares (P2P) a través de
 				los enlaces externos configurados voluntariamente por los propios creadores (como PayPal,
-				Ko-fi o Patreon). V-SOCIAL <strong>no cobra comisiones</strong> por dichas transacciones,
+				Ko-fi o Patreon). Voom! <strong>no cobra comisiones</strong> por dichas transacciones,
 				<strong>no retiene fondos</strong> ni interviene en la custodia del dinero, y no asume responsabilidad
 				respecto al cumplimiento o disputas comerciales entre usuarios.
 			</p>

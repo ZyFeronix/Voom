@@ -52,7 +52,7 @@
 </script>
 
 <svelte:head>
-	<title>Mis Datos (RGPD) — VSocial</title>
+	<title>Mis Datos (RGPD) — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card">

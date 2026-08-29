@@ -1,5 +1,5 @@
 /**
- * VSocial — Marketplace API
+ * Voom! — Marketplace API
  */
 import { json } from '@sveltejs/kit';
 import { existsSync, unlinkSync } from 'fs';
@@ -147,7 +147,11 @@ export async function GET({ _request, url, params }) {
 		listings.map((l) => l.id)
 	);
 	listings.forEach((item) => {
-		item.media = mediaMap[item.id] || [];
+		const mediaList = mediaMap[item.id] || [];
+		item.media = mediaList.map((m) => m.url);
+		// Primer thumbnail disponible para el grid; fallback al original
+		const firstWithThumb = mediaList.find((m) => m.thumb);
+		item.thumbnail_url = firstWithThumb?.thumb || null;
 		item.image_url = item.media[0] || null;
 		item.ratings_avg = Number(ratingMap[item.id]?.avg || 0);
 		item.ratings_count = ratingMap[item.id]?.count || 0;

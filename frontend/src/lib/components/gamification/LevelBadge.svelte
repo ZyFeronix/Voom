@@ -18,7 +18,7 @@
 			minLevel: 1,
 			maxLevel: 4,
 			color: '#94a3b8',
-			desc: 'Rango inicial de membresía. Comienza tu viaje en V-SOCIAL interactuando, publicando y ganando tus primeros puntos de XP.'
+			desc: 'Rango inicial de membresía. Comienza tu viaje en Voom! interactuando, publicando y ganando tus primeros puntos de XP.'
 		},
 		2: {
 			tier: 2,
@@ -58,7 +58,7 @@
 			minLevel: 20,
 			maxLevel: 29,
 			color: '#f59e0b',
-			desc: 'Rango Oro Solar Élite. Uno de los mayores honores en V-SOCIAL para usuarios pilares con máxima reputación e influencia.'
+			desc: 'Rango Oro Solar Élite. Uno de los mayores honores en Voom! para usuarios pilares con máxima reputación e influencia.'
 		},
 		6: {
 			tier: 6,

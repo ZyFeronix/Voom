@@ -1,5 +1,5 @@
 /**
- * VSocial — Deterministic Spam & Bot Heuristics Engine
+ * Voom! — Deterministic Spam & Bot Heuristics Engine
  * Analyzes behavioral anomalies without AI:
  *  - Follower / Following imbalance (churn/follow-botting)
  *  - High-frequency posting bursts

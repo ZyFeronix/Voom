@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>Política de Privacidad - V-SOCIAL</title>
+	<title>Política de Privacidad - Voom!</title>
 </svelte:head>
 
 <div class="legal-container" in:fade={{ duration: 500 }}>
@@ -14,7 +14,7 @@
 		<section>
 			<h2>1. Responsable del tratamiento</h2>
 			<p>
-				El responsable del tratamiento de tus datos personales es V-SOCIAL, una plataforma de red
+				El responsable del tratamiento de tus datos personales es Voom!, una plataforma de red
 				social autoalojada (self-hosted). Los datos se almacenan en una base de datos SQLite en el
 				servidor donde se despliega la instancia. Para cualquier cuestión relacionada con la
 				protección de datos, puedes contactar a través de los canales habilitados por el operador de

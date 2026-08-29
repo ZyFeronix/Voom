@@ -1,6 +1,6 @@
 /**
  * Performance & Optimization Store (Svelte 5 Runes)
- * VSocial Engine - Gestor centralizado de rendimiento, aceleración de GPU,
+ * Voom! Engine - Gestor centralizado de rendimiento, aceleración de GPU,
  * perfiles de bajo consumo, optimización de DOM y diagnósticos en tiempo real.
  */
 
@@ -20,6 +20,13 @@ let _fpsHud = $state(false);
 let _gpuAcceleration = $state(true); // Aceleración GPU por capas (will-change / translateZ)
 let _routePreload = $state('hover'); // 'hover' | 'tap' | 'off'
 let _disableHoverGlow = $state(false); // Suprime cálculos de iluminación en hover
+let _videoAmbientLight = $state(true); // Luz ambiental reactiva del reproductor de vídeo
+let _batterySaverAuto = $state(false); // Activar Lite automáticamente con batería baja
+
+// Snapshot de los ajustes previos a la activación por batería baja: al volver a
+// cargar el equipo se restauran EXACTAMENTE los valores que tenía el usuario,
+// no un preset genérico. `null` = no hay activación automática en curso.
+let _batterySaverSnapshot = null;
 
 let _hardwareInfo = $state({
 	cores: 4,
@@ -78,6 +85,7 @@ function syncDomAttributes() {
 	root.setAttribute('data-fps-hud', _fpsHud ? 'true' : 'false');
 	root.setAttribute('data-gpu-acceleration', _gpuAcceleration && !isLite ? 'true' : 'false');
 	root.setAttribute('data-disable-hover-glow', _disableHoverGlow || isLite ? 'true' : 'false');
+	root.setAttribute('data-video-ambient-light', _videoAmbientLight && !isLite ? 'true' : 'false');
 
 	if (document.body) {
 		document.body.setAttribute('data-sveltekit-preload-data', _routePreload);
@@ -185,6 +193,12 @@ export const perfStore = {
 	get disableHoverGlow() {
 		return _disableHoverGlow;
 	},
+	get videoAmbientLight() {
+		return _videoAmbientLight && _perfProfile !== 'lite';
+	},
+	get batterySaverAuto() {
+		return _batterySaverAuto;
+	},
 	get hardwareInfo() {
 		return _hardwareInfo;
 	},
@@ -209,13 +223,34 @@ export const perfStore = {
 		}
 		this._initialized = true;
 
+		/**
+		 * Lista blanca de valores legítimos por clave. localStorage es manipulable
+		 * desde la consola y versiones anteriores escribían valores que ya no
+		 * existen (p. ej. view_transitions='lite'): sin saneamiento quedaban
+		 * controles segmentados sin opción activa y estados híbridos.
+		 */
+		const _allowedValues = {
+			vsocial_perf_profile: ['lite', 'balanced', 'high', 'custom'],
+			vsocial_glass_blur: ['none', 'subtle', 'full'],
+			vsocial_video_autoplay: ['always', 'wifi', 'never'],
+			vsocial_view_transitions: ['enabled', 'fast', 'disabled'],
+			vsocial_route_preload: ['hover', 'tap', 'off']
+		};
+
+		function _sanitize(key, value) {
+			const allowed = _allowedValues[key];
+			return allowed && !allowed.includes(value) ? null : value;
+		}
+
 		try {
 			// Migración legacy: si solo existe la bandera antigua perf_mode=true,
 			// se interpreta como perfil Lite canónico (y applyPreset persiste las
 			// claves nuevas). Antes quedaba un estado híbrido sin efecto real.
-			const savedProfile =
+			const savedProfile = _sanitize(
+				'vsocial_perf_profile',
 				localStorage.getItem('vsocial_perf_profile') ||
-				(localStorage.getItem('vsocial_perf_mode') === 'true' ? 'lite' : null);
+					(localStorage.getItem('vsocial_perf_mode') === 'true' ? 'lite' : null)
+			);
 			const savedBlur = localStorage.getItem('vsocial_glass_blur');
 			const savedMotion = localStorage.getItem('vsocial_reduce_motion');
 			const savedBg = localStorage.getItem('vsocial_disable_liquid_bg');
@@ -227,8 +262,13 @@ export const perfStore = {
 			const savedTransitions = localStorage.getItem('vsocial_view_transitions');
 			const savedFpsHud = localStorage.getItem('vsocial_fps_hud');
 			const savedGpu = localStorage.getItem('vsocial_gpu_acceleration');
-			const savedPreload = localStorage.getItem('vsocial_route_preload');
+			const savedPreload = _sanitize(
+				'vsocial_route_preload',
+				localStorage.getItem('vsocial_route_preload')
+			);
 			const savedHoverGlow = localStorage.getItem('vsocial_disable_hover_glow');
+			const savedAmbientLight = localStorage.getItem('vsocial_video_ambient_light');
+			const savedBatterySaver = localStorage.getItem('vsocial_battery_saver_auto');
 
 			if (savedProfile) _perfProfile = savedProfile;
 			_perfMode = _perfProfile === 'lite';
@@ -247,6 +287,8 @@ export const perfStore = {
 			if (savedGpu !== null) _gpuAcceleration = savedGpu === 'true';
 			if (savedPreload) _routePreload = savedPreload;
 			if (savedHoverGlow !== null) _disableHoverGlow = savedHoverGlow === 'true';
+			if (savedAmbientLight !== null) _videoAmbientLight = savedAmbientLight === 'true';
+			if (savedBatterySaver !== null) _batterySaverAuto = savedBatterySaver === 'true';
 
 			// Migración: un perfil guardado (lite/balanced/high) es la fuente canónica
 			// de TODOS sus valores. Re-aplicarlo repara combinaciones escritas por
@@ -255,6 +297,12 @@ export const perfStore = {
 			// del modo. Si el perfil es 'custom', se respetan los ajustes individuales.
 			if (savedProfile === 'lite' || savedProfile === 'balanced' || savedProfile === 'high') {
 				this.applyPreset(savedProfile);
+			} else {
+				// Sin perfil canónico aplicable, la bandera legacy debe reflejar igualmente
+				// el estado real: app.html la consulta en la primera pintura y un
+				// vsocial_perf_mode='true' huérfano forzaría Lite fantasma tras borrar
+				// vsocial_perf_profile.
+				this._persistKey('vsocial_perf_mode', _perfProfile === 'lite' ? 'true' : 'false');
 			}
 
 			// Diagnóstico de hardware + medición de Hz: crean un contexto WebGL y
@@ -268,6 +316,7 @@ export const perfStore = {
 			whenIdle(() => {
 				this.detectHardware();
 				this.measureScreenRefreshRate();
+				this.setupBatterySaver();
 			});
 			syncDomAttributes();
 		} catch (_e) {
@@ -360,6 +409,8 @@ export const perfStore = {
 						if (!battery.charging && battery.level <= 0.2) {
 							_hardwareInfo.isLowEnd = true;
 						}
+
+						if (_batterySaverAuto) this.evaluateBatterySaver();
 					};
 					updateBattery();
 					battery.addEventListener('levelchange', updateBattery);
@@ -432,6 +483,9 @@ export const perfStore = {
 
 	/**
 	 * Ejecuta un benchmark interactivo de 3 segundos midiendo estabilidad y FPS en vivo.
+	 * Genera carga gráfica real (canvas con gradientes radiales animados + blur CSS)
+	 * para que la medición refleje la GPU del equipo: un bucle rAF vacío puntúa alto
+	 * incluso en hardware modesto porque el navegador no tiene nada que rasterizar.
 	 */
 	async runBenchmark() {
 		if (typeof window === 'undefined' || _benchmarkState.isRunning) return null;
@@ -456,11 +510,60 @@ export const perfStore = {
 			const frameTimes = [];
 			let dropped = 0;
 
+			// Escenario de estrés: canvas a pantalla parcial con 3 gradientes radiales
+			// en movimiento + desenfoque, equivalencia aproximada de los blobs Aurora
+			// del fondo líquido en modo High.
+			const stressCanvas = document.createElement('canvas');
+			stressCanvas.width = Math.min(480, window.innerWidth || 480);
+			stressCanvas.height = Math.min(320, window.innerHeight || 320);
+			stressCanvas.setAttribute('aria-hidden', 'true');
+			stressCanvas.style.cssText =
+				'position:fixed;left:-9999px;top:0;width:480px;height:320px;filter:blur(6px);pointer-events:none;';
+			document.body.appendChild(stressCanvas);
+			const sctx = stressCanvas.getContext('2d');
+
+			const drawStressFrame = (t) => {
+				if (!sctx) return;
+				const w = stressCanvas.width;
+				const h = stressCanvas.height;
+				sctx.fillStyle = '#08101f';
+				sctx.fillRect(0, 0, w, h);
+				const blobs = [
+					{
+						x: w * (0.5 + 0.35 * Math.sin(t / 500)),
+						y: h * (0.5 + 0.3 * Math.cos(t / 700)),
+						c: 'rgba(0,242,254,0.7)'
+					},
+					{
+						x: w * (0.5 + 0.3 * Math.cos(t / 600)),
+						y: h * (0.5 + 0.32 * Math.sin(t / 450)),
+						c: 'rgba(0,212,170,0.65)'
+					},
+					{
+						x: w * (0.45 + 0.4 * Math.sin(t / 800)),
+						y: h * (0.55 + 0.28 * Math.sin(t / 650)),
+						c: 'rgba(14,165,233,0.6)'
+					}
+				];
+				for (const b of blobs) {
+					const grad = sctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, w * 0.45);
+					grad.addColorStop(0, b.c);
+					grad.addColorStop(1, 'transparent');
+					sctx.fillStyle = grad;
+					sctx.fillRect(0, 0, w, h);
+				}
+			};
+
+			const cleanupStress = () => {
+				stressCanvas.remove();
+			};
+
 			const step = (now) => {
 				if (!start) {
 					start = now;
 					lastFrame = now;
 				}
+				drawStressFrame(now);
 
 				const delta = now - lastFrame;
 				lastFrame = now;
@@ -477,6 +580,7 @@ export const perfStore = {
 				if (elapsed < durationMs) {
 					requestAnimationFrame(step);
 				} else {
+					cleanupStress();
 					const avgDelta = frameTimes.reduce((a, b) => a + b, 0) / (frameTimes.length || 1);
 					const calculatedFps = Math.round((frameCount * 1000) / elapsed);
 					const maxDelta = Math.max(...frameTimes, 16.6);
@@ -607,6 +711,82 @@ export const perfStore = {
 		this._updateProfileState();
 	},
 
+	setVideoAmbientLight(enabled) {
+		_videoAmbientLight = !!enabled;
+		this._persistKey('vsocial_video_ambient_light', _videoAmbientLight ? 'true' : 'false');
+		syncDomAttributes();
+	},
+
+	setBatterySaverAuto(enabled) {
+		_batterySaverAuto = !!enabled;
+		this._persistKey('vsocial_battery_saver_auto', _batterySaverAuto ? 'true' : 'false');
+		if (_batterySaverAuto) {
+			this.evaluateBatterySaver();
+		} else if (_batterySaverSnapshot) {
+			this.restoreBatterySaverSnapshot();
+		}
+	},
+
+	/**
+	 * Con el auto-ahorro activo: batería ≤20% sin cargador → Lite (guardando
+	 * snapshot). Al cargar corriente (o desactivar el ajuste) se restaura la
+	 * configuración exacta previa.
+	 */
+	evaluateBatterySaver() {
+		const { batteryLevel, batteryCharging } = _hardwareInfo;
+		if (batteryLevel === null) return;
+
+		if (!batteryCharging && batteryLevel <= 20 && !_batterySaverSnapshot) {
+			const rec = _hardwareInfo.recommendedProfile || 'balanced';
+			if (rec === 'lite') return; // Ya está en Lite: nada que ahorrar ni restaurar
+
+			_batterySaverSnapshot = {
+				glassBlur: _glassBlur,
+				reduceMotion: _reduceMotion,
+				disableLiquidBg: _disableLiquidBg,
+				disableNoise: _disableNoise,
+				simplifyShadows: _simplifyShadows,
+				contentVisibility: _contentVisibility,
+				videoAutoplay: _videoAutoplay,
+				dataSaver: _dataSaver,
+				viewTransitions: _viewTransitions,
+				gpuAcceleration: _gpuAcceleration,
+				routePreload: _routePreload,
+				disableHoverGlow: _disableHoverGlow,
+				videoAmbientLight: _videoAmbientLight
+			};
+			this.applyPreset('lite');
+		} else if ((batteryCharging || batteryLevel > 20) && _batterySaverSnapshot) {
+			this.restoreBatterySaverSnapshot();
+		}
+	},
+
+	restoreBatterySaverSnapshot() {
+		if (!_batterySaverSnapshot) return;
+		const s = _batterySaverSnapshot;
+		_batterySaverSnapshot = null;
+		_glassBlur = s.glassBlur;
+		_reduceMotion = s.reduceMotion;
+		_disableLiquidBg = s.disableLiquidBg;
+		_disableNoise = s.disableNoise;
+		_simplifyShadows = s.simplifyShadows;
+		_contentVisibility = s.contentVisibility;
+		_videoAutoplay = s.videoAutoplay;
+		_dataSaver = s.dataSaver;
+		_viewTransitions = s.viewTransitions;
+		_gpuAcceleration = s.gpuAcceleration;
+		_routePreload = s.routePreload;
+		_disableHoverGlow = s.disableHoverGlow;
+		_videoAmbientLight = s.videoAmbientLight;
+		this._persistAll();
+		this._persistKey('vsocial_video_ambient_light', _videoAmbientLight ? 'true' : 'false');
+		this._persistKey('vsocial_perf_mode', _perfProfile === 'lite' ? 'true' : 'false');
+		_perfProfile = calculateCurrentProfile();
+		_perfMode = _perfProfile === 'lite';
+		this._persistKey('vsocial_perf_profile', _perfProfile);
+		syncDomAttributes();
+	},
+
 	/**
 	 * Aplica un preset integral (Lite, Balanced, High).
 	 */
@@ -627,6 +807,7 @@ export const perfStore = {
 			_gpuAcceleration = false;
 			_routePreload = 'off';
 			_disableHoverGlow = true;
+			_videoAmbientLight = false;
 		} else if (presetId === 'balanced') {
 			_perfMode = false;
 			_glassBlur = 'subtle';
@@ -641,6 +822,7 @@ export const perfStore = {
 			_gpuAcceleration = true;
 			_routePreload = 'hover';
 			_disableHoverGlow = false;
+			_videoAmbientLight = true;
 		} else if (presetId === 'high') {
 			_perfMode = false;
 			_glassBlur = 'full';
@@ -655,6 +837,7 @@ export const perfStore = {
 			_gpuAcceleration = true;
 			_routePreload = 'hover';
 			_disableHoverGlow = false;
+			_videoAmbientLight = true;
 		}
 
 		this._persistAll();
@@ -666,6 +849,26 @@ export const perfStore = {
 	 */
 	resetDefaults() {
 		this.applyPreset('balanced');
+	},
+
+	setupBatterySaver() {
+		if (!_batterySaverAuto) return;
+		if (_hardwareInfo.batteryLevel !== null) {
+			this.evaluateBatterySaver();
+			return;
+		}
+		// La batería llega asíncrona vía detectHardware; si aún no está,
+		// reevaluar cuando llegue el primer dato.
+		if (typeof navigator.getBattery === 'function') {
+			navigator
+				.getBattery()
+				.then((battery) => {
+					_hardwareInfo.batteryLevel = Math.round(battery.level * 100);
+					_hardwareInfo.batteryCharging = battery.charging;
+					this.evaluateBatterySaver();
+				})
+				.catch(() => {});
+		}
 	},
 
 	/**
@@ -731,7 +934,9 @@ export const perfStore = {
 				'vsocial_fps_hud',
 				'vsocial_gpu_acceleration',
 				'vsocial_route_preload',
-				'vsocial_disable_hover_glow'
+				'vsocial_disable_hover_glow',
+				'vsocial_video_ambient_light',
+				'vsocial_battery_saver_auto'
 			]);
 
 			// Limpieza de claves de caché en localStorage
@@ -773,6 +978,7 @@ export const perfStore = {
 		_perfProfile = calculateCurrentProfile();
 		_perfMode = _perfProfile === 'lite';
 		this._persistKey('vsocial_perf_profile', _perfProfile);
+		this._persistKey('vsocial_perf_mode', _perfProfile === 'lite' ? 'true' : 'false');
 		syncDomAttributes();
 	},
 
@@ -798,5 +1004,7 @@ export const perfStore = {
 		localStorage.setItem('vsocial_gpu_acceleration', _gpuAcceleration ? 'true' : 'false');
 		localStorage.setItem('vsocial_route_preload', _routePreload);
 		localStorage.setItem('vsocial_disable_hover_glow', _disableHoverGlow ? 'true' : 'false');
+		localStorage.setItem('vsocial_video_ambient_light', _videoAmbientLight ? 'true' : 'false');
+		localStorage.setItem('vsocial_battery_saver_auto', _batterySaverAuto ? 'true' : 'false');
 	}
 };

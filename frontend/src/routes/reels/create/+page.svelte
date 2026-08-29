@@ -767,10 +767,10 @@
 </script>
 
 <svelte:head>
-	<title>Studio Reels | V-SOCIAL</title>
+	<title>Studio Reels | Voom!</title>
 	<meta
 		name="description"
-		content="Crea y comparte reels con herramientas profesionales en V-SOCIAL."
+		content="Crea y comparte reels con herramientas profesionales en Voom!."
 	/>
 </svelte:head>
 
@@ -892,7 +892,7 @@
 						<div class="dropzone-icon-halo">
 							<span class="material-icons-round">movie_creation</span>
 						</div>
-						<h1 class="dropzone-title">Sube tu próximo éxito a V-SOCIAL</h1>
+						<h1 class="dropzone-title">Sube tu próximo éxito a Voom!</h1>
 						<p class="dropzone-desc">
 							Arrastra tu video aquí o haz clic para explorar tus archivos.
 						</p>

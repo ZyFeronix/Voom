@@ -1,5 +1,5 @@
 /**
- * VSocial — Market API (catálogo + ofertas P2P)
+ * Voom! — Market API (catálogo + ofertas P2P)
  * Las ofertas ya NO mueven dinero de la plataforma: el pago se cierra
  * externamente con el enlace personal del vendedor (payment_link).
  */

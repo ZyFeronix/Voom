@@ -2,7 +2,7 @@
  * likeSparkles.js — Generador de destellos y partículas Neo-Aero para la animación de Like.
  *
  * Proporciona un estallido radial simétrico con variación orgánica en ángulos,
- * distancias, tamaños y la paleta de colores cromática de V-SOCIAL.
+ * distancias, tamaños y la paleta de colores cromática de Voom!.
  */
 
 export function generateLikeSparkles(count = 8, baseDist = 22) {

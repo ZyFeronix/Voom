@@ -1,5 +1,5 @@
 /**
- * VSocial — Gigs API
+ * Voom! — Gigs API
  */
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';

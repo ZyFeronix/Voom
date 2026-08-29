@@ -79,7 +79,7 @@
 </script>
 
 <svelte:head>
-	<title>Usuarios Bloqueados — VSocial</title>
+	<title>Usuarios Bloqueados — Voom!</title>
 </svelte:head>
 
 <div class="glass-card panel-card">
