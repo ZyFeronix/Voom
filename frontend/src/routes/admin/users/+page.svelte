@@ -1,552 +1,422 @@
 <script>
 	import { onMount } from 'svelte';
 	import { admin as adminApi } from '$lib/api.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
 	import CustomSelect from '$lib/components/CustomSelect.svelte';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
+	import VerifiedBadge from '$lib/components/VerifiedBadge.svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { backOut } from 'svelte/easing';
 
-	let activeMenuId = $state(null);
+	let { data } = $props();
+	const staff = $derived(data.staff);
+	// Solo admin (permiso users.manage) gestiona cuentas; soporte/moderador consultan.
+	const canManage = $derived(staff.permissions.includes('users.manage'));
+
+	// Jerarquía espejo de lib/server/roles.js para pintar solo opciones válidas.
+	const ROLE_LEVELS = {
+		user: 0,
+		team: 10,
+		staff: 10,
+		support: 20,
+		moderator: 30,
+		admin: 40,
+		super_admin: 50
+	};
+	const ROLE_LABELS = {
+		user: 'Usuario',
+		team: 'Equipo Voom!',
+		staff: 'Staff',
+		support: 'Soporte',
+		moderator: 'Moderador',
+		admin: 'Administrador',
+		super_admin: 'Super Admin'
+	};
+	function canGrant(to) {
+		const level = ROLE_LEVELS[staff.role] ?? 0;
+		if (level < 40) return false;
+		if (to === 'super_admin') return staff.role === 'super_admin';
+		if (to === 'admin') return staff.role === 'super_admin';
+		return (ROLE_LEVELS[to] ?? 0) < level;
+	}
+	const assignableRoles = ['user', 'team', 'support', 'moderator', 'admin', 'super_admin'];
+	const grantableRoleOptions = $derived(
+		assignableRoles.filter(canGrant).map((r) => ({ value: r, label: ROLE_LABELS[r] }))
+	);
+
+	// ── Listado ──
 	let loading = $state(true);
+	let listError = $state('');
 	let users = $state([]);
 	let searchQuery = $state('');
-	let actionError = $state('');
-
-	// Pagination & Filters
 	let page = $state(1);
 	let totalPages = $state(1);
 	let roleFilter = $state('');
 	let statusFilter = $state('');
 
-	// Creation Modal
-	let showCreateModal = $state(false);
-	let creatingUser = $state(false);
-	let newUser = $state({ username: '', email: '', password: '', role: 'user' });
-	// Delete Modal
-	let userToDelete = $state(null);
-	let deletingUser = $state(false);
-
-	// Strike / Discipline Modal
-	let userToStrike = $state(null);
-	let strikeLevel = $state(2);
-	let strikeReason = $state('');
-	let issuingStrike = $state(false);
-	let strikeSuccess = $state('');
-
-	onMount(async () => {
-		await loadUsers();
-	});
+	const roleFilterOptions = [
+		{ value: '', label: 'Todos los roles' },
+		{ value: 'user', label: 'Usuarios' },
+		{ value: 'team', label: 'Equipo Voom!' },
+		{ value: 'support', label: 'Soporte' },
+		{ value: 'moderator', label: 'Moderadores' },
+		{ value: 'admin', label: 'Administradores' },
+		{ value: 'super_admin', label: 'Super Admins' }
+	];
+	const statusFilterOptions = [
+		{ value: '', label: 'Todos los estados' },
+		{ value: 'active', label: 'Activos' },
+		{ value: 'inactive', label: 'Desactivados' },
+		{ value: 'banned', label: 'Baneados' }
+	];
 
 	async function loadUsers(p = page) {
 		loading = true;
+		listError = '';
 		try {
 			const params = { q: searchQuery, page: p, limit: 20 };
 			if (roleFilter) params.role = roleFilter;
 			if (statusFilter) params.status = statusFilter;
-
 			const res = await adminApi.users.list(params);
 			users = res.users || [];
 			page = res.page;
 			totalPages = Math.ceil(res.total / res.limit) || 1;
 		} catch (e) {
-			console.error(e);
-			actionError = 'Error cargando usuarios';
+			listError = e?.message || 'Error cargando usuarios.';
 		} finally {
 			loading = false;
 		}
 	}
 
-	function handleFilterChange() {
+	onMount(() => {
 		loadUsers(1);
-	}
+	});
 
 	let searchTimeout;
-	function handleSearchInput() {
+	function onSearchInput() {
 		clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(() => {
-			loadUsers(1);
-		}, 500);
+		searchTimeout = setTimeout(() => loadUsers(1), 400);
 	}
 
-	async function toggleBan(user) {
-		activeMenuId = null;
-		const isBanned = user.is_banned == 1;
-		// Optimistic Update
-		user.is_banned = isBanned ? 0 : 1;
-		user.is_active = isBanned ? 1 : 0;
-		users = [...users];
+	function actionError(msg) {
+		listError = msg;
+		setTimeout(() => (listError = ''), 4000);
+	}
 
-		try {
-			if (isBanned) {
-				await adminApi.users.unban(user.id);
-			} else {
-				await adminApi.users.ban(user.id);
-			}
-		} catch (e) {
-			console.error(e);
-			// Revert on failure
-			user.is_banned = isBanned ? 1 : 0;
-			user.is_active = isBanned ? 0 : 1;
-			users = [...users];
-			actionError = 'Error cambiando estado de usuario';
-			setTimeout(() => (actionError = ''), 4000);
+	// ── Acciones por fila ──
+	async function toggleBan(user) {
+		if (user.is_banned == 1) {
+			await runAction(
+				user,
+				(u) => adminApi.users.unban(u.id),
+				() => {
+					user.is_banned = 0;
+					user.is_active = 1;
+				}
+			);
+		} else {
+			const ok = await uiStore.requestConfirm({
+				title: 'Banear usuario',
+				message: `@${user.username} perderá el acceso a la plataforma de inmediato. ¿Confirmar?`,
+				danger: true,
+				confirmText: 'Banear'
+			});
+			if (!ok) return;
+			await runAction(
+				user,
+				(u) => adminApi.users.ban(u.id),
+				() => {
+					user.is_banned = 1;
+					user.is_active = 0;
+				}
+			);
 		}
 	}
 
-	async function changeUserRole(user, newVal) {
-		if (user.id === 1) return; // Proteger al admin principal
+	async function toggleDisable(user) {
+		const deactivating = user.is_active == 1;
+		if (deactivating) {
+			await runAction(
+				user,
+				(u) => adminApi.users.disable(u.id),
+				() => (user.is_active = 0)
+			);
+		} else {
+			await runAction(
+				user,
+				(u) => adminApi.users.enable(u.id),
+				() => (user.is_active = 1)
+			);
+		}
+	}
 
-		if (newVal === 'admin' && !confirm(`¿Hacer a @${user.username} administrador?`)) {
-			users = [...users]; // Trigger reactivity to reset select si es necesario
+	async function runAction(user, call, apply) {
+		const snapshot = { is_banned: user.is_banned, is_active: user.is_active };
+		apply(user);
+		users = [...users];
+		try {
+			await call(user);
+		} catch (e) {
+			user.is_banned = snapshot.is_banned;
+			user.is_active = snapshot.is_active;
+			users = [...users];
+			actionError(e?.message || 'No se pudo aplicar la acción.');
+		}
+	}
+
+	async function changeUserRole(user, newRole) {
+		if (user.id === 1 || user.id === staff.id) return;
+		// El select sigue mostrando el rol actual hasta confirmar; si se
+		// cancela, incrementamos _rv para re-montarlo con el valor real.
+		if (newRole === user.effective_role) {
+			user._rv = (user._rv ?? 0) + 1;
+			users = [...users];
 			return;
 		}
-
+		const ok = await uiStore.requestConfirm({
+			title: 'Cambiar rol',
+			message: `@${user.username} pasará de ${ROLE_LABELS[user.effective_role] || user.effective_role} a ${ROLE_LABELS[newRole] || newRole}.`,
+			confirmText: 'Cambiar'
+		});
+		if (!ok) {
+			user._rv = (user._rv ?? 0) + 1;
+			users = [...users];
+			return;
+		}
 		const oldRole = user.effective_role;
-		user.effective_role = newVal; // Optimistic update
-		user.role = newVal;
+		user.effective_role = newRole;
+		user.role = newRole;
 		users = [...users];
-
 		try {
-			await adminApi.users.update(user.id, { role: newVal });
+			await adminApi.users.update(user.id, { role: newRole });
 		} catch (e) {
-			console.error(e);
 			user.effective_role = oldRole;
 			user.role = oldRole;
+			user._rv = (user._rv ?? 0) + 1;
 			users = [...users];
-			actionError = 'Error al cambiar rol';
-			setTimeout(() => (actionError = ''), 4000);
+			actionError(e?.message || 'Error al cambiar rol.');
 		}
 	}
 
-	function toggleMenu(id) {
-		if (activeMenuId === id) activeMenuId = null;
-		else activeMenuId = id;
-	}
-
-	function handleWindowClick(e) {
-		if (!e.target.closest('.action-menu-container')) {
-			activeMenuId = null;
-		}
-	}
-
-	function smartPosition(node) {
-		requestAnimationFrame(() => {
-			const rect = node.getBoundingClientRect();
-			const parentRect = node.parentElement.getBoundingClientRect();
-			const spaceBelow = window.innerHeight - parentRect.bottom;
-			const spaceAbove = parentRect.top;
-
-			const requiredSpace = rect.height || 200;
-
-			if (spaceBelow < requiredSpace && spaceAbove > spaceBelow) {
-				node.style.top = 'auto';
-				node.style.bottom = 'calc(100% + 8px)';
-				node.style.transformOrigin = 'bottom right';
-			} else {
-				node.style.top = 'calc(100% + 8px)';
-				node.style.bottom = 'auto';
-				node.style.transformOrigin = 'top right';
-			}
-		});
-
-		return {
-			destroy() {}
-		};
-	}
-
-	async function verifyUser(user) {
-		activeMenuId = null;
-		const isVerified = user.is_verified == 1;
-		user.is_verified = isVerified ? 0 : 1;
+	async function toggleVerify(user) {
+		const snapshot = user.is_verified;
+		user.is_verified = snapshot == 1 ? 0 : 1;
 		users = [...users];
-
 		try {
 			await adminApi.users.update(user.id, { is_verified: user.is_verified });
 		} catch (e) {
-			console.error(e);
-			user.is_verified = isVerified ? 1 : 0;
+			user.is_verified = snapshot;
 			users = [...users];
-			actionError = 'Error verificando usuario';
-			setTimeout(() => (actionError = ''), 4000);
+			actionError(e?.message || 'Error al cambiar verificación.');
 		}
 	}
 
-	function confirmDelete(user) {
-		activeMenuId = null;
-		userToDelete = user;
-	}
-
-	async function executeDelete() {
-		if (!userToDelete) return;
-		deletingUser = true;
+	async function removeUser(user) {
+		const ok = await uiStore.requestConfirm({
+			title: 'Eliminar usuario',
+			message: `Se eliminará definitivamente a @${user.username} y todo su contenido. Esta acción no se puede deshacer.`,
+			danger: true,
+			confirmText: 'Eliminar'
+		});
+		if (!ok) return;
 		try {
-			await adminApi.users.delete(userToDelete.id);
-			users = users.filter((u) => u.id !== userToDelete.id);
-			if (users.length === 0 && page > 1) {
-				loadUsers(page - 1);
-			}
-			userToDelete = null;
+			await adminApi.users.delete(user.id);
+			users = users.filter((u) => u.id !== user.id);
+			if (users.length === 0 && page > 1) loadUsers(page - 1);
 		} catch (e) {
-			console.error(e);
-			actionError = e.message || 'Error al eliminar usuario';
-			setTimeout(() => (actionError = ''), 4000);
-			userToDelete = null;
-		} finally {
-			deletingUser = false;
+			actionError(e?.message || 'Error al eliminar usuario.');
 		}
 	}
+
+	// ── Sanciones ──
+	const STRIKE_LEVELS = [
+		{
+			level: 1,
+			icon: 'warning',
+			title: 'Advertencia',
+			desc: 'Aviso oficial registrado en su historial.'
+		},
+		{
+			level: 2,
+			icon: 'voice_over_off',
+			title: 'Silencio 24h',
+			desc: 'No podrá publicar ni comentar por 24 horas.'
+		},
+		{
+			level: 3,
+			icon: 'block',
+			title: 'Suspensión 7 días',
+			desc: 'Cuenta desactivada temporalmente.'
+		},
+		{ level: 4, icon: 'gavel', title: 'Ban permanente', desc: 'Pérdida definitiva del acceso.' }
+	];
+	let userToStrike = $state(null);
+	let strikeLevel = $state(2);
+	let strikeReason = $state('');
+	let issuingStrike = $state(false);
 
 	function openStrikeModal(user) {
-		activeMenuId = null;
 		userToStrike = user;
 		strikeLevel = 2;
 		strikeReason = '';
 	}
 
 	async function executeStrike() {
-		if (!userToStrike) return;
 		if (!strikeReason.trim()) {
-			actionError = 'Debe especificar un motivo para la sanción';
-			setTimeout(() => (actionError = ''), 4000);
+			actionError('Debe especificar un motivo para la sanción.');
 			return;
 		}
 		issuingStrike = true;
 		try {
-			const res = await adminApi.strikes.issue({
+			await adminApi.strikes.issue({
 				user_id: userToStrike.id,
 				strike_level: strikeLevel,
 				reason: strikeReason.trim()
 			});
-			strikeSuccess = res.message || 'Sanción disciplinaria aplicada';
-			setTimeout(() => (strikeSuccess = ''), 4000);
 			userToStrike = null;
-			await loadUsers();
+			loadUsers();
 		} catch (e) {
-			actionError = e.message || 'Error al aplicar sanción';
-			setTimeout(() => (actionError = ''), 4000);
+			actionError(e?.message || 'Error al aplicar sanción.');
 		} finally {
 			issuingStrike = false;
 		}
 	}
 
-	async function toggleDisable(user) {
-		activeMenuId = null;
-		const isActivating = user.is_active == 0;
+	// ── Ficha de usuario ──
+	let showDetail = $state(false);
+	let detailLoading = $state(false);
+	let detail = $state(null);
 
-		user.is_active = isActivating ? 1 : 0;
-		users = [...users];
-
+	async function openDetail(user) {
+		showDetail = true;
+		detailLoading = true;
+		detail = null;
 		try {
-			if (isActivating) {
-				await adminApi.users.enable(user.id);
-			} else {
-				await adminApi.users.disable(user.id);
-			}
+			detail = await adminApi.users.get(user.id);
 		} catch (e) {
-			console.error(e);
-			user.is_active = isActivating ? 0 : 1;
-			users = [...users];
-			actionError = `Error al ${isActivating ? 'habilitar' : 'deshabilitar'} usuario`;
-			setTimeout(() => (actionError = ''), 4000);
+			actionError(e?.message || 'No se pudo cargar la ficha.');
+			showDetail = false;
+		} finally {
+			detailLoading = false;
 		}
 	}
 
+	// ── Crear usuario ──
+	let showCreate = $state(false);
+	let creatingUser = $state(false);
+	let newUser = $state({ username: '', email: '', password: '', role: 'user' });
+
 	async function createUser() {
-		if (!newUser.username || !newUser.email || !newUser.password) {
-			actionError = 'Por favor, llena todos los campos obligatorios';
-			setTimeout(() => (actionError = ''), 4000);
-			return;
-		}
 		creatingUser = true;
 		try {
 			await adminApi.users.create(newUser);
-			showCreateModal = false;
+			showCreate = false;
 			newUser = { username: '', email: '', password: '', role: 'user' };
-			await loadUsers(1); // Recargar primera página
+			await loadUsers(1);
 		} catch (e) {
-			console.error(e);
-			actionError = e.message || 'Error al crear usuario';
-			setTimeout(() => (actionError = ''), 4000);
+			actionError(e?.message || 'Error al crear usuario.');
 		} finally {
 			creatingUser = false;
 		}
 	}
+
+	function fmtDate(raw) {
+		if (!raw) return '—';
+		const s = String(raw).trim();
+		const iso = (s.includes('T') ? s : s.replace(' ', 'T')).replace(/Z?$/, 'Z');
+		const d = new Date(iso);
+		return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('es-ES');
+	}
+
+	function statusOf(u) {
+		if (u.is_banned == 1) return { key: 'is-banned', label: 'Baneado' };
+		if (u.is_active == 0) return { key: 'is-inactive', label: 'Desactivado' };
+		return { key: 'is-active', label: 'Activo' };
+	}
+
+	function rowRoleOptions(user) {
+		// Opciones del selector inline: incluye el rol actual + los que puede otorgar.
+		const options = grantableRoleOptions.map((o) => o.value);
+		if (!options.includes(user.effective_role)) {
+			return [
+				{
+					value: user.effective_role,
+					label: ROLE_LABELS[user.effective_role] || user.effective_role
+				}
+			];
+		}
+		return grantableRoleOptions;
+	}
 </script>
 
 <svelte:head>
-	<title>Usuarios | VSocial Admin</title>
+	<title>Usuarios | Voom! Staff</title>
 </svelte:head>
 
-<svelte:window onclick={handleWindowClick} />
-
-<!-- Create User Modal -->
-{#if showCreateModal}
-	<div class="modal-backdrop">
-		<div class="modal-content glass-card neo-shadow">
-			<div class="modal-header">
-				<h2>Crear Nuevo Usuario</h2>
-				<button class="btn-icon shield-btn" onclick={() => (showCreateModal = false)}>
-					<span class="material-icons-round">close</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<div class="form-group">
-					<label for="c-username">Username <span class="text-error">*</span></label>
-					<input
-						id="c-username"
-						type="text"
-						class="aero-input w-full"
-						bind:value={newUser.username}
-						placeholder="ej. satoshi"
-					/>
-				</div>
-				<div class="form-group">
-					<label for="c-email">Correo Electrónico <span class="text-error">*</span></label>
-					<input
-						id="c-email"
-						type="email"
-						class="aero-input w-full"
-						bind:value={newUser.email}
-						placeholder="correo@ejemplo.com"
-					/>
-				</div>
-				<div class="form-group">
-					<label for="c-password">Contraseña <span class="text-error">*</span></label>
-					<input
-						id="c-password"
-						type="password"
-						class="aero-input w-full"
-						bind:value={newUser.password}
-						placeholder="Mínimo 8 caracteres"
-					/>
-				</div>
-				<div class="form-group">
-					<span class="form-label">Rol Inicial</span>
-					<div style="position: relative; z-index: 10;">
-						<CustomSelect
-							bind:value={newUser.role}
-							options={[
-								{ value: 'user', label: 'User' },
-								{ value: 'team', label: 'Team' },
-								{ value: 'moderator', label: 'Moderator' },
-								{ value: 'government', label: 'Government' },
-								{ value: 'admin', label: 'Admin' }
-							]}
-						/>
-					</div>
-				</div>
-			</div>
-			<div class="modal-footer">
-				<button
-					class="btn-aero-ghost"
-					onclick={() => (showCreateModal = false)}
-					disabled={creatingUser}>Cancelar</button
-				>
-				<button class="btn-aero-primary" onclick={createUser} disabled={creatingUser}>
-					{#if creatingUser}
-						<span class="loading loading-spinner loading-sm"></span>
-					{:else}
-						Crear Usuario
-					{/if}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Delete Confirmation Modal -->
-{#if userToDelete}
-	<div class="modal-backdrop">
-		<div class="modal-content glass-card neo-shadow">
-			<div class="modal-header">
-				<h2 class="text-error flex items-center gap-2">
-					<span class="material-icons-round">warning</span>
-					Confirmar Eliminación
-				</h2>
-				<button class="btn-icon shield-btn" onclick={() => (userToDelete = null)}>
-					<span class="material-icons-round">close</span>
-				</button>
-			</div>
-			<div class="modal-body">
-				<p class="text-primary font-medium">
-					¿Estás seguro de que deseas eliminar permanentemente a <strong class="text-error"
-						>@{userToDelete.username}</strong
-					>?
-				</p>
-				<p class="text-sm text-muted">
-					Esta acción es irreversible y purgará todos sus datos de la base de datos de V-SOCIAL.
-				</p>
-			</div>
-			<div class="modal-footer">
-				<button class="btn-aero-ghost" onclick={() => (userToDelete = null)} disabled={deletingUser}
-					>Cancelar</button
-				>
-				<button class="btn-aero-danger" onclick={executeDelete} disabled={deletingUser}>
-					{#if deletingUser}
-						<span class="loading loading-spinner loading-sm"></span>
-					{:else}
-						Eliminar
-					{/if}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
-<!-- Disciplinary Strike Modal -->
-{#if userToStrike}
-	<div class="modal-backdrop">
-		<div class="modal-content glass-card neo-shadow" style="max-width: 500px;">
-			<div class="modal-header">
-				<h2 class="text-warning flex items-center gap-2 font-bold">
-					<span class="material-icons-round text-amber-400">gavel</span>
-					Sanción Disciplinaria a @{userToStrike.username}
-				</h2>
-				<button class="btn-icon shield-btn" onclick={() => (userToStrike = null)}>
-					<span class="material-icons-round">close</span>
-				</button>
-			</div>
-			<div class="modal-body flex flex-col gap-4 text-xs">
-				<div class="form-control">
-					<label
-						for="strike-level-select"
-						class="font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block"
-					>
-						Grado de Sanción / Penalización:
-					</label>
-					<select
-						id="strike-level-select"
-						bind:value={strikeLevel}
-						class="modal-input text-xs w-full p-2.5 bg-black/40 rounded-xl border border-white/10 text-white"
-					>
-						<option value={1}>Nivel 1 — Advertencia Oficial (Notificación)</option>
-						<option value={2}>Nivel 2 — Silencio Temporal / Mute (24 Horas)</option>
-						<option value={3}>Nivel 3 — Suspensión Temporal de Cuenta (7 Días)</option>
-						<option value={4}>Nivel 4 — Baneo Permanente de la Plataforma</option>
-					</select>
-				</div>
-
-				<div class="form-control">
-					<label
-						for="strike-reason-textarea"
-						class="font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block"
-					>
-						Motivo y Justificación de la Sanción *:
-					</label>
-					<textarea
-						id="strike-reason-textarea"
-						rows="3"
-						bind:value={strikeReason}
-						placeholder="Especifica el motivo de la infracción comunitaria..."
-						class="modal-input text-xs w-full p-3 resize-none bg-black/30 rounded-xl border border-white/10"
-					></textarea>
-				</div>
-			</div>
-			<div class="modal-footer">
-				<button
-					class="btn-aero-ghost"
-					onclick={() => (userToStrike = null)}
-					disabled={issuingStrike}
-				>
-					Cancelar
-				</button>
-				<button class="btn-aero-primary font-bold" onclick={executeStrike} disabled={issuingStrike}>
-					{#if issuingStrike}
-						<span class="loading loading-spinner loading-sm"></span>
-					{:else}
-						Aplicar Sanción
-					{/if}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
 <div class="page-header">
-	<div class="header-left">
-		<h1 class="page-title">Usuarios</h1>
-		<p class="page-subtitle">Gestiona las cuentas y accesos de la plataforma</p>
-	</div>
-	<div class="header-right" style="display: flex; gap: 12px;">
-		<button
-			class="btn-aero-primary flex items-center gap-2"
-			onclick={() => (showCreateModal = true)}
-		>
-			<span class="material-icons-round text-[18px]">person_add</span>
-			Nuevo Usuario
-		</button>
-	</div>
+	<h1 class="page-title"><span class="material-icons-round">people</span> Usuarios</h1>
+	<p class="page-subtitle">
+		{canManage
+			? 'Gestiona cuentas, roles y estado de los miembros de la plataforma.'
+			: 'Consulta perfiles, historial de sanciones y reportes de cualquier cuenta.'}
+	</p>
 </div>
 
 <div class="page-content">
-	{#if actionError}
-		<div class="glass-panel p-4 mb-6 flex items-center gap-2 text-sm rounded-lg error-toast">
-			<span class="material-icons-round text-[18px]">error_outline</span>
-			{actionError}
+	{#if listError}
+		<div class="alert-box error" role="alert">
+			<span class="material-icons-round">error</span>
+			<span style="flex:1">{listError}</span>
+			<button class="btn-aero-secondary btn-sm" onclick={() => loadUsers(page)}>Reintentar</button>
 		</div>
 	{/if}
 
-	{#if strikeSuccess}
-		<div
-			class="glass-panel p-4 mb-6 flex items-center gap-2 text-sm rounded-lg"
-			style="background: rgba(0, 212, 170, 0.15); border: 1px solid rgba(0, 212, 170, 0.3); color: var(--aero-mint);"
-		>
-			<span class="material-icons-round text-[18px]">check_circle</span>
-			{strikeSuccess}
-		</div>
-	{/if}
-
-	<!-- Filters Row -->
-	<div class="filters-row glass-panel">
-		<div class="search-box flex-1 max-w-[300px]">
+	<div class="glass-panel admin-toolbar neo-shadow">
+		<label class="search-box">
 			<span class="material-icons-round">search</span>
 			<input
-				type="text"
-				placeholder="Buscar por usuario, email..."
+				type="search"
+				placeholder="Buscar por nombre, usuario o email…"
 				bind:value={searchQuery}
-				oninput={handleSearchInput}
-				class="aero-input w-full"
+				oninput={onSearchInput}
 			/>
-		</div>
-
-		<div class="filter-group">
-			<span class="text-xs text-muted font-bold uppercase tracking-wider mb-1 block"
-				>Filtrar por Rol</span
+		</label>
+		<CustomSelect
+			options={roleFilterOptions}
+			bind:value={roleFilter}
+			onchange={() => loadUsers(1)}
+			fullWidth={false}
+		/>
+		<CustomSelect
+			options={statusFilterOptions}
+			bind:value={statusFilter}
+			onchange={() => loadUsers(1)}
+			fullWidth={false}
+		/>
+		{#if canManage}
+			<button
+				class="btn-aero-primary btn-sm"
+				onclick={() => (showCreate = true)}
+				style="margin-left:auto"
 			>
-			<div style="width: 150px; z-index: 20;">
-				<CustomSelect
-					bind:value={roleFilter}
-					options={[
-						{ value: '', label: 'Todos los Roles' },
-						{ value: 'user', label: 'User' },
-						{ value: 'team', label: 'Team' },
-						{ value: 'moderator', label: 'Moderator' },
-						{ value: 'government', label: 'Government' },
-						{ value: 'admin', label: 'Admin' }
-					]}
-					onchange={handleFilterChange}
-				/>
-			</div>
-		</div>
-
-		<div class="filter-group">
-			<span class="text-xs text-muted font-bold uppercase tracking-wider mb-1 block">Estado</span>
-			<div style="width: 150px; z-index: 20;">
-				<CustomSelect
-					bind:value={statusFilter}
-					options={[
-						{ value: '', label: 'Todos' },
-						{ value: 'active', label: 'Activos' },
-						{ value: 'inactive', label: 'Inactivos' },
-						{ value: 'banned', label: 'Baneados' }
-					]}
-					onchange={handleFilterChange}
-				/>
-			</div>
-		</div>
+				<span class="material-icons-round" style="font-size:16px">person_add</span>
+				Crear cuenta
+			</button>
+		{/if}
 	</div>
 
 	<div class="glass-card table-card">
-		{#if loading && users.length === 0}
-			<div class="loader-container">
-				<span class="loading loading-spinner text-primary"></span>
+		{#if loading}
+			<div style="padding:20px">
+				{#each Array(6) as _, i (i)}
+					<div class="skeleton-shimmer skeleton-row"></div>
+				{/each}
+			</div>
+		{:else if users.length === 0}
+			<div class="empty-state">
+				<span class="material-icons-round">person_search</span>
+				<p>Sin resultados</p>
+				<p class="empty-hint">Prueba con otro término de búsqueda o cambia los filtros.</p>
 			</div>
 		{:else}
 			<div class="table-responsive">
@@ -556,537 +426,474 @@
 							<th>Usuario</th>
 							<th>Rol</th>
 							<th>Estado</th>
-							<th>Fecha de Ingreso</th>
-							<th class="text-right">Acciones</th>
+							<th>Sanciones</th>
+							<th>Registro</th>
+							<th style="text-align:right">Acciones</th>
 						</tr>
 					</thead>
 					<tbody>
-						{#each users as user}
+						{#each users as user (user.id)}
+							{@const isPrincipal = user.id === 1}
+							{@const isSelf = user.id === staff.id}
+							{@const st = statusOf(user)}
 							<tr>
 								<td>
-									<div class="user-cell">
-										<div class="user-avatar-mini shrink-0">
-											{#if user.avatar_url}
-												<img src={user.avatar_url} alt={user.username} />
-											{:else}
-												<span>{(user.display_name || user.username)[0].toUpperCase()}</span>
-											{/if}
+									<div class="cell-user">
+										<div style="flex: 0 0 44px; min-width: 44px; min-height: 44px">
+											<AeroAvatar
+												src={user.avatar_url}
+												alt={user.username}
+												size="sm"
+												showPresence={false}
+											/>
 										</div>
-										<div class="user-details min-w-0">
-											<p class="user-name truncate">
+										<div class="cell-user-main">
+											<div class="cell-user-name">
 												{user.display_name || user.username}
-												{#if user.is_verified == 1}<span class="material-icons-round verified-icon"
-														>verified</span
-													>{/if}
-											</p>
-											<p class="user-handle truncate">@{user.username}</p>
+												<VerifiedBadge
+													role={user.effective_role}
+													isVerified={user.is_verified == 1}
+													size="13px"
+												/>
+											</div>
+											<div class="cell-user-sub">
+												@{user.username}{isPrincipal
+													? ' · cuenta principal'
+													: isSelf
+														? ' · tú'
+														: ''}
+											</div>
 										</div>
 									</div>
 								</td>
 								<td>
-									{#if user.id === 1}
-										<span
-											class="badge badge-outline"
-											style="color: var(--aero-gold); border-color: rgba(255,191,0,0.3)"
-											>Super Admin</span
-										>
-									{:else}
-										<div style="width: 140px;">
+									{#if canManage && !isPrincipal && !isSelf && grantableRoleOptions.length}
+										{#key `${user.id}:${user.effective_role}:${user._rv ?? 0}`}
 											<CustomSelect
-												bind:value={user.effective_role}
-												options={[
-													{ value: 'user', label: 'User' },
-													{ value: 'team', label: 'Team' },
-													{ value: 'moderator', label: 'Moderator' },
-													{ value: 'government', label: 'Government' },
-													{ value: 'admin', label: 'Admin' }
-												]}
-												onchange={(val) => changeUserRole(user, val)}
+												options={rowRoleOptions(user)}
+												value={user.effective_role}
+												onchange={(v) => changeUserRole(user, v)}
+												size="sm"
+												fullWidth={false}
 											/>
-										</div>
+										{/key}
+									{:else}
+										<span class="role-chip" data-role={user.effective_role}
+											>{ROLE_LABELS[user.effective_role] || user.effective_role}</span
+										>
 									{/if}
-								</td>
-								<td>
-									<span
-										class="status-badge"
-										class:active={user.is_banned == 0 && user.is_active == 1}
-									>
-										{user.is_banned == 1 ? 'Baneado' : user.is_active == 1 ? 'Activo' : 'Inactivo'}
-									</span>
 								</td>
 								<td
-									><span class="text-sm">{new Date(user.created_at).toLocaleDateString()}</span></td
+									><span class="status-badge {st.key}"><span class="dot"></span>{st.label}</span
+									></td
 								>
-								<td class="text-right">
-									{#if user.id !== 1}
-										<div
-											class="action-menu-container"
-											style="position: relative; display: inline-block;"
+								<td>
+									{#if user.strike_count > 0}
+										<span class="status-badge is-banned"
+											><span class="dot"></span>{user.strike_count}</span
 										>
-											<button class="btn-icon shield-btn" onclick={() => toggleMenu(user.id)}>
-												<span class="material-icons-round">more_vert</span>
-											</button>
-
-											{#if activeMenuId === user.id}
-												<div class="glass-menu action-dropdown" use:smartPosition>
-													<button class="menu-item" onclick={() => toggleBan(user)}>
-														<span class="material-icons-round text-[18px]"
-															>{user.is_banned == 1 ? 'how_to_reg' : 'block'}</span
-														>
-														{user.is_banned == 1 ? 'Desbanear' : 'Banear'}
-													</button>
-													{#if user.is_banned == 0}
-														<button class="menu-item" onclick={() => toggleDisable(user)}>
-															<span class="material-icons-round text-[18px]"
-																>{user.is_active == 0 ? 'visibility' : 'visibility_off'}</span
-															>
-															{user.is_active == 0 ? 'Habilitar Perfil' : 'Deshabilitar Perfil'}
-														</button>
-													{/if}
-													<button class="menu-item text-blue-400" onclick={() => verifyUser(user)}>
-														<span class="material-icons-round text-[18px]"
-															>{user.is_verified == 1 ? 'remove_circle_outline' : 'verified'}</span
-														>
-														{user.is_verified == 1 ? 'Quitar Verificación' : 'Verificar'}
-													</button>
-													<button
-														class="menu-item text-amber-400"
-														onclick={() => openStrikeModal(user)}
-													>
-														<span class="material-icons-round text-[18px]">gavel</span>
-														Sancionar / Strike
-													</button>
-													<div class="menu-divider"></div>
-													<button
-														class="menu-item text-error hover-danger"
-														onclick={() => confirmDelete(user)}
-													>
-														<span class="material-icons-round text-[18px]">delete_forever</span>
-														Eliminar Cuenta
-													</button>
-												</div>
-											{/if}
-										</div>
 									{:else}
-										<span class="badge badge-outline" style="opacity: 0.5">Protegido</span>
+										<span class="muted-note">—</span>
 									{/if}
+								</td>
+								<td>{fmtDate(user.created_at)}</td>
+								<td>
+									<div class="row-actions">
+										<button class="icon-btn" title="Ver ficha" onclick={() => openDetail(user)}>
+											<span class="material-icons-round">plagiarism</span>
+										</button>
+										{#if canManage && !isPrincipal && !isSelf}
+											<button
+												class="icon-btn"
+												title={user.is_verified == 1 ? 'Quitar insignia' : 'Otorgar insignia'}
+												onclick={() => toggleVerify(user)}
+											>
+												<span class="material-icons-round"
+													>{user.is_verified == 1 ? 'verified_off' : 'verified'}</span
+												>
+											</button>
+											<button
+												class="icon-btn"
+												title="Sancionar"
+												onclick={() => openStrikeModal(user)}
+											>
+												<span class="material-icons-round">gavel</span>
+											</button>
+											<button
+												class="icon-btn"
+												title={user.is_active == 1 ? 'Desactivar' : 'Reactivar'}
+												onclick={() => toggleDisable(user)}
+											>
+												<span class="material-icons-round"
+													>{user.is_active == 1 ? 'person_off' : 'person_check'}</span
+												>
+											</button>
+											<button
+												class="icon-btn"
+												title={user.is_banned == 1 ? 'Levantar ban' : 'Banear'}
+												onclick={() => toggleBan(user)}
+											>
+												<span class="material-icons-round"
+													>{user.is_banned == 1 ? 'lock_open' : 'block'}</span
+												>
+											</button>
+											<button
+												class="icon-btn danger"
+												title="Eliminar cuenta"
+												onclick={() => removeUser(user)}
+											>
+												<span class="material-icons-round">delete</span>
+											</button>
+										{/if}
+									</div>
 								</td>
 							</tr>
 						{/each}
-						{#if users.length === 0}
-							<tr>
-								<td colspan="5" class="empty-row"
-									>No se encontraron usuarios para los filtros seleccionados</td
-								>
-							</tr>
-						{/if}
 					</tbody>
 				</table>
 			</div>
 
-			<!-- Pagination Controls -->
-			{#if totalPages > 1}
-				<div class="pagination-bar">
-					<button
-						class="aero-btn ghost icon-only shield-btn"
-						disabled={page === 1}
-						onclick={() => loadUsers(page - 1)}
-					>
-						<span class="material-icons-round">chevron_left</span>
-					</button>
-					<span class="page-info">Página {page} de {totalPages}</span>
-					<button
-						class="aero-btn ghost icon-only shield-btn"
-						disabled={page === totalPages}
-						onclick={() => loadUsers(page + 1)}
-					>
-						<span class="material-icons-round">chevron_right</span>
-					</button>
-				</div>
-			{/if}
+			<div class="pagination-bar">
+				<button
+					class="page-btn"
+					disabled={page <= 1}
+					onclick={() => loadUsers(page - 1)}
+					aria-label="Página anterior"
+				>
+					<span class="material-icons-round">chevron_left</span>
+				</button>
+				<span class="pagination-info">Página {page} de {totalPages}</span>
+				<button
+					class="page-btn"
+					disabled={page >= totalPages}
+					onclick={() => loadUsers(page + 1)}
+					aria-label="Página siguiente"
+				>
+					<span class="material-icons-round">chevron_right</span>
+				</button>
+			</div>
 		{/if}
 	</div>
 </div>
 
+<!-- ══ Modal: crear cuenta ══ -->
+{#if showCreate}
+	<div
+		class="modal-backdrop"
+		transition:fade={{ duration: 150 }}
+		onclick={(e) => e.target === e.currentTarget && (showCreate = false)}
+		role="presentation"
+		aria-label="Crear cuenta"
+	>
+		<div class="modal-panel" in:scale={{ duration: 200, start: 0.94, easing: backOut }}>
+			<div class="modal-header">
+				<h3><span class="material-icons-round">person_add</span> Crear cuenta</h3>
+				<button class="modal-close" onclick={() => (showCreate = false)} aria-label="Cerrar">
+					<span class="material-icons-round">close</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div class="form-group">
+					<label class="form-label" for="nu-username">Usuario</label>
+					<input
+						id="nu-username"
+						class="aero-input"
+						bind:value={newUser.username}
+						placeholder="nombre_usuario"
+					/>
+				</div>
+				<div class="form-group">
+					<label class="form-label" for="nu-email">Email</label>
+					<input
+						id="nu-email"
+						class="aero-input"
+						type="email"
+						bind:value={newUser.email}
+						placeholder="correo@ejemplo.com"
+					/>
+				</div>
+				<div class="form-group">
+					<label class="form-label" for="nu-pass">Contraseña</label>
+					<input
+						id="nu-pass"
+						class="aero-input"
+						type="password"
+						bind:value={newUser.password}
+						placeholder="Mínimo 8 caracteres"
+					/>
+				</div>
+				{#if grantableRoleOptions.length > 1}
+					<div class="form-group">
+						<span class="form-label">Rol inicial</span>
+						<CustomSelect options={grantableRoleOptions} bind:value={newUser.role} />
+					</div>
+				{/if}
+			</div>
+			<div class="modal-footer">
+				<button class="btn-aero-ghost" onclick={() => (showCreate = false)}>Cancelar</button>
+				<button class="btn-aero-primary" onclick={createUser} disabled={creatingUser}>
+					{#if creatingUser}<span class="material-icons-round spin" style="font-size:16px"
+							>sync</span
+						>{/if}
+					Crear
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ══ Modal: sanción disciplinaria ══ -->
+{#if userToStrike}
+	<div
+		class="modal-backdrop"
+		transition:fade={{ duration: 150 }}
+		onclick={(e) => e.target === e.currentTarget && (userToStrike = null)}
+		role="presentation"
+		aria-label="Aplicar sanción"
+	>
+		<div class="modal-panel" in:scale={{ duration: 200, start: 0.94, easing: backOut }}>
+			<div class="modal-header">
+				<h3>
+					<span class="material-icons-round">gavel</span> Sancionar a @{userToStrike.username}
+				</h3>
+				<button class="modal-close" onclick={() => (userToStrike = null)} aria-label="Cerrar">
+					<span class="material-icons-round">close</span>
+				</button>
+			</div>
+			<div class="modal-body">
+				<div class="strike-grid">
+					{#each STRIKE_LEVELS as sl (sl.level)}
+						<button
+							class="strike-card"
+							class:selected={strikeLevel === sl.level}
+							onclick={() => (strikeLevel = sl.level)}
+							type="button"
+						>
+							<span class="material-icons-round">{sl.icon}</span>
+							<strong>{sl.title}</strong>
+							<small>{sl.desc}</small>
+						</button>
+					{/each}
+				</div>
+				<div class="form-group">
+					<label class="form-label" for="strike-reason">Motivo (obligatorio)</label>
+					<textarea
+						id="strike-reason"
+						class="aero-input strike-reason-input"
+						rows="3"
+						bind:value={strikeReason}
+						placeholder="Describe la infracción…"
+					></textarea>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button class="btn-aero-ghost" onclick={() => (userToStrike = null)}>Cancelar</button>
+				<button
+					class="btn-aero-danger"
+					onclick={executeStrike}
+					disabled={issuingStrike || !strikeReason.trim()}
+				>
+					{#if issuingStrike}<span class="material-icons-round spin" style="font-size:16px"
+							>sync</span
+						>{/if}
+					Aplicar sanción
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- ══ Modal: ficha de usuario ══ -->
+{#if showDetail}
+	<div
+		class="modal-backdrop"
+		transition:fade={{ duration: 150 }}
+		onclick={(e) => e.target === e.currentTarget && (showDetail = false)}
+		role="presentation"
+		aria-label="Ficha de usuario"
+	>
+		<div class="modal-panel wide" in:scale={{ duration: 200, start: 0.94, easing: backOut }}>
+			<div class="modal-header">
+				<h3><span class="material-icons-round">plagiarism</span> Ficha de usuario</h3>
+				<button class="modal-close" onclick={() => (showDetail = false)} aria-label="Cerrar">
+					<span class="material-icons-round">close</span>
+				</button>
+			</div>
+			<div class="modal-body" style="overflow-y: auto; max-height: 65vh;">
+				{#if detailLoading}
+					<div class="skeleton-shimmer" style="height:220px"></div>
+				{:else if detail?.user}
+					{@const u = detail.user}
+					<div class="detail-head">
+						<div style="flex: 0 0 48px; min-width: 48px; min-height: 48px">
+							<AeroAvatar src={u.avatar_url} alt={u.username} size="lg" showPresence={false} />
+						</div>
+						<div>
+							<div class="cell-user-name" style="font-size:1.05rem">
+								{u.display_name || u.username}
+								<VerifiedBadge
+									role={u.effective_role}
+									isVerified={u.is_verified == 1}
+									size="15px"
+								/>
+							</div>
+							<div class="cell-user-sub">@{u.username} · id {u.id}</div>
+							<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap">
+								<span class="role-chip" data-role={u.effective_role}
+									>{ROLE_LABELS[u.effective_role] || u.effective_role}</span
+								>
+								<span class="status-badge {statusOf(u).key}"
+									><span class="dot"></span>{statusOf(u).label}</span
+								>
+								<span class="status-badge is-inactive">{u.follower_count ?? 0} seguidores</span>
+								<span class="status-badge is-inactive">{u.post_count ?? 0} posts</span>
+								<span class="status-badge is-inactive">{u.active_sessions ?? 0} sesiones</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="detail-meta">
+						<span><strong>Email:</strong> {u.email || '—'}</span>
+						<span><strong>Registro:</strong> {fmtDate(u.created_at)}</span>
+						<span><strong>Sanciones acumuladas:</strong> {u.strike_count ?? 0}</span>
+						{#if u.muted_until}
+							<span><strong>Silenciado hasta:</strong> {fmtDate(u.muted_until)}</span>
+						{/if}
+					</div>
+
+					<h4 class="detail-section-title">Historial de sanciones</h4>
+					{#if detail.strikes?.length}
+						{#each detail.strikes as s (s.id)}
+							<div class="detail-row">
+								<span class="status-badge is-banned"
+									><span class="dot"></span>Nv.{s.strike_level}</span
+								>
+								<span class="detail-row-main">{s.reason}</span>
+								<span class="muted-note">{s.issuer_name || 'Staff'} · {fmtDate(s.created_at)}</span>
+							</div>
+						{/each}
+					{:else}
+						<p class="muted-note">Sin sanciones registradas.</p>
+					{/if}
+
+					<h4 class="detail-section-title">Reportes recibidos (perfil)</h4>
+					{#if detail.reports_against?.length}
+						{#each detail.reports_against as r (r.id)}
+							<div class="detail-row">
+								<span class="status-badge is-pending"><span class="dot"></span>{r.status}</span>
+								<span class="detail-row-main">{r.reason}</span>
+								<span class="muted-note"
+									>por {r.reporter_name || 'anónimo'} · {fmtDate(r.created_at)}</span
+								>
+							</div>
+						{/each}
+					{:else}
+						<p class="muted-note">Sin reportes contra este perfil.</p>
+					{/if}
+				{/if}
+			</div>
+			<div class="modal-footer">
+				<button class="btn-aero-secondary" onclick={() => (showDetail = false)}>Cerrar</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style>
-	.page-header {
-		padding: 32px;
-		background: linear-gradient(180deg, rgba(46, 134, 232, 0.03) 0%, transparent 100%);
-		border-bottom: 1px solid var(--border-subtle);
+	.neo-shadow {
+		box-shadow: var(--shadow-md);
+	}
+	.row-actions {
 		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
-	}
-	.page-title {
-		font-size: 1.8rem;
-		font-family: var(--font-display);
-		font-weight: 800;
-		color: var(--text-primary);
-		margin: 0;
-	}
-	.page-subtitle {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-		margin: 4px 0 0;
+		gap: 6px;
+		justify-content: flex-end;
 	}
 
-	.filters-row {
-		padding: 16px;
-		margin-bottom: 24px;
-		border-radius: var(--radius-lg);
-		display: flex;
-		gap: 24px;
-		align-items: flex-end;
-		background: var(--glass-surface);
-		border: 1px solid var(--glass-border);
-		overflow: visible !important;
-		position: relative;
-		z-index: 50;
+	/* Tarjetas de nivel de sanción */
+	.strike-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		gap: 10px;
 	}
-
-	.search-box {
-		position: relative;
-	}
-	.search-box .material-icons-round {
-		position: absolute;
-		left: 12px;
-		top: 50%;
-		transform: translateY(-50%);
-		color: var(--text-muted);
-		font-size: 20px;
-	}
-	.search-box input {
-		width: 100%;
-		padding-left: 40px;
-	}
-	.text-muted {
-		color: var(--text-muted);
-	}
-	.text-error {
-		color: var(--aero-rose);
-	}
-
-	.page-content {
-		padding: 32px;
-	}
-
-	.table-card {
-		border-radius: var(--radius-lg);
-		overflow: visible; /* To allow dropdowns to overflow */
-		box-shadow: var(--depth-2);
-	}
-	.table-responsive {
-		overflow-x: auto;
-		overflow-y: visible;
-	}
-
-	.aero-table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-	.aero-table th {
-		text-align: left;
-		padding: 16px 24px;
-		font-size: 0.75rem;
-		font-weight: 700;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.aero-table td {
-		padding: 16px 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: middle;
-	}
-	.aero-table tr:last-child td {
-		border-bottom: none;
-	}
-	.aero-table tr:hover td {
-		background: rgba(255, 255, 255, 0.02);
-	}
-
-	.text-right {
-		text-align: right !important;
-	}
-
-	.user-cell {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-
-	/* Escudo Volumétrico de Avatares */
-	.user-avatar-mini {
-		flex: 0 0 44px;
-		min-width: 44px;
-		min-height: 44px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--grad-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #fff;
-		font-weight: 700;
-		overflow: hidden;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-	}
-	.user-avatar-mini img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.user-name {
-		font-weight: 600;
-		color: var(--text-primary);
-		margin: 0;
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
-	.verified-icon {
-		font-size: 14px;
-		color: var(--aero-sky);
-	}
-	.user-handle {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		margin: 0;
-	}
-
-	.badge-outline {
-		border: 1px solid var(--border-glass);
-		padding: 4px 8px;
-		border-radius: var(--radius-xs);
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		font-weight: 700;
-	}
-
-	.status-badge {
-		padding: 4px 10px;
-		border-radius: var(--radius-sm);
-		font-size: 0.75rem;
-		font-weight: 600;
-		background: rgba(232, 74, 114, 0.1);
-		color: var(--aero-rose);
-		border: 1px solid rgba(232, 74, 114, 0.2);
-	}
-	.status-badge.active {
-		background: rgba(46, 204, 113, 0.15);
-		color: #2ecc71;
-		border-color: rgba(46, 204, 113, 0.3);
-	}
-
-	/* Escudo Volumétrico Botones de Acción */
-	.shield-btn {
-		flex: 0 0 44px;
-		min-width: 44px;
-		min-height: 44px;
-	}
-
-	.btn-icon {
-		background: transparent;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.2s var(--ease-spring);
-	}
-	.btn-icon:hover {
-		background: rgba(255, 255, 255, 0.1);
-		color: var(--text-primary);
-		box-shadow: var(--neon-primary);
-	}
-
-	.action-dropdown {
-		position: absolute;
-		right: 0;
-		width: 220px;
-		z-index: 100;
-		border-radius: var(--radius-lg);
-		background: rgba(255, 255, 255, 0.03);
-		backdrop-filter: blur(32px) saturate(150%);
-		-webkit-backdrop-filter: blur(32px) saturate(150%);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		box-shadow:
-			0 16px 40px rgba(0, 0, 0, 0.4),
-			inset 0 1px 0 rgba(255, 255, 255, 0.15);
-		padding: 8px;
-		text-align: left;
-		animation: fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-	}
-
-	@keyframes fadeInScale {
-		0% {
-			opacity: 0;
-			transform: scale(0.92);
-		}
-		100% {
-			opacity: 1;
-			transform: scale(1);
-		}
-	}
-
-	.menu-item {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		width: 100%;
-		padding: 10px 14px;
-		border: none;
-		background: transparent;
-		color: var(--text-primary);
-		font-size: 0.9rem;
-		font-weight: 500;
-		border-radius: var(--radius-sm);
-		cursor: pointer;
-		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-		text-align: left;
-	}
-	.menu-item:hover {
-		background: rgba(255, 255, 255, 0.08);
-		transform: translateX(4px);
-	}
-	.menu-item.text-error {
-		color: var(--aero-rose);
-	}
-	.menu-item.hover-danger:hover {
-		background: rgba(232, 74, 114, 0.15);
-		box-shadow: inset 0 0 0 1px rgba(232, 74, 114, 0.25);
-		color: #ff4d6d;
-		transform: translateX(4px);
-	}
-
-	.menu-divider {
-		height: 1px;
-		background: rgba(255, 255, 255, 0.1);
-		margin: 4px 0;
-	}
-
-	/* Pagination Bar */
-	.pagination-bar {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		padding: 16px;
-		gap: 16px;
-		border-top: 1px solid var(--border-subtle);
-		background: rgba(0, 0, 0, 0.2);
-	}
-	.page-info {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text-primary);
-	}
-
-	.empty-row {
-		text-align: center;
-		color: var(--text-muted);
-		padding: 64px !important;
-	}
-	.loader-container {
-		padding: 64px;
-		text-align: center;
-	}
-
-	.error-toast {
-		background: rgba(232, 74, 114, 0.1);
-		border: 1px solid rgba(232, 74, 114, 0.3);
-		color: var(--aero-rose);
-		box-shadow: 0 4px 20px rgba(232, 74, 114, 0.15);
-	}
-
-	/* Modal */
-	.modal-backdrop {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(8px);
-		z-index: 1000;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		animation: fadeIn 0.2s ease;
-	}
-	.modal-content {
-		width: 100%;
-		max-width: 450px;
-		background: var(--bg-surface);
-		border-radius: var(--radius-lg);
-		box-shadow: var(--depth-elevated);
-		border: 1px solid var(--glass-border);
-		animation: slideUp 0.3s var(--ease-spring);
-	}
-	@keyframes slideUp {
-		0% {
-			opacity: 0;
-			transform: translateY(20px) scale(0.95);
-		}
-		100% {
-			opacity: 1;
-			transform: translateY(0) scale(1);
-		}
-	}
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 24px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.modal-header h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: var(--text-primary);
-	}
-
-	.modal-body {
-		padding: 24px;
+	.strike-card {
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		align-items: flex-start;
+		gap: 4px;
+		padding: 12px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--glass-border);
+		background: var(--bg-overlay);
+		color: var(--text-secondary);
+		cursor: pointer;
+		text-align: left;
+		transition: all var(--t-base);
 	}
-
-	.form-group label {
-		display: block;
-		font-size: 0.85rem;
-		font-weight: 600;
+	.strike-card:hover {
+		border-color: var(--aero-sky);
+	}
+	.strike-card.selected {
+		border-color: var(--aero-rose);
+		background: rgba(236, 72, 153, 0.08);
+		box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+	}
+	.strike-card .material-icons-round {
+		font-size: 20px;
+		color: var(--aero-rose);
+	}
+	.strike-card strong {
+		font-size: 0.8rem;
+		color: var(--text-primary);
+	}
+	.strike-card small {
+		font-size: 0.7rem;
 		color: var(--text-muted);
-		margin-bottom: 6px;
+		line-height: 1.35;
+	}
+	.strike-reason-input {
+		resize: vertical;
+		min-height: 70px;
 	}
 
-	.modal-footer {
-		padding: 16px 24px;
+	/* Ficha de usuario */
+	.detail-head {
 		display: flex;
-		justify-content: flex-end;
-		gap: 12px;
-		border-top: 1px solid var(--border-subtle);
-		background: rgba(0, 0, 0, 0.1);
+		gap: 14px;
+		align-items: flex-start;
 	}
-
-	.neo-shadow {
-		box-shadow:
-			var(--depth-3),
-			inset 0 1px 0 rgba(255, 255, 255, 0.1);
+	.detail-meta {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 6px 16px;
+		font-size: 0.8rem;
+		color: var(--text-secondary);
+		padding: 10px 12px;
+		background: var(--bg-overlay);
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border-subtle);
+	}
+	.detail-section-title {
+		margin: 6px 0 0;
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: var(--text-muted);
+	}
+	.detail-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 8px 0;
+		border-bottom: 1px solid var(--border-subtle);
+		font-size: 0.82rem;
+	}
+	.detail-row:last-child {
+		border-bottom: none;
+	}
+	.detail-row-main {
+		flex: 1;
+		min-width: 0;
+		color: var(--text-secondary);
 	}
 </style>

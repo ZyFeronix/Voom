@@ -1,393 +1,550 @@
 <script>
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { authStore } from '$lib/stores/auth.svelte.js';
-	import { admin as adminApi } from '$lib/api.js';
+	import { admin } from '$lib/api.js';
+
+	let { data } = $props();
+	const staff = $derived(data.staff);
+	const isAdminLevel = $derived(staff.role === 'admin' || staff.role === 'super_admin');
 
 	let loading = $state(true);
+	let loadError = $state('');
 	let stats = $state(null);
-	let activity = $state([]);
-	let reports = $state([]);
+	let recentReports = $state([]);
+	let weeklySignups = $state([]);
+	let announcements = $state([]);
 
-	onMount(async () => {
+	async function loadDashboard() {
+		loading = true;
+		loadError = '';
 		try {
-			await authStore.initialize();
-			if (!authStore.isAuthenticated || !authStore.isAdmin) {
-				goto('/feed');
-				return;
-			}
-			const res = await adminApi.dashboard();
+			const res = await admin.dashboard();
 			stats = res.stats;
-			activity = res.recent_activity || [];
-			reports = res.recent_reports || [];
+			recentReports = res.recent_reports || [];
+			weeklySignups = res.weekly_signups || [];
+			announcements = res.announcements || [];
 		} catch (e) {
-			console.error(e);
-			// Fallback
-			stats = { total_users: 0, total_posts: 0, total_reels: 0, pending_reports: 0 };
+			loadError = e?.message || 'No se pudo cargar el resumen del panel.';
 		} finally {
 			loading = false;
 		}
+	}
+
+	onMount(() => {
+		loadDashboard();
 	});
 
-	// Helper for dates
-	function timeAgo(dateString) {
-		if (!dateString) return '';
-		const date = new Date(dateString);
-		const seconds = Math.floor((new Date() - date) / 1000);
-		let interval = seconds / 31536000;
-		if (interval > 1) return Math.floor(interval) + ' años';
-		interval = seconds / 2592000;
-		if (interval > 1) return Math.floor(interval) + ' meses';
-		interval = seconds / 86400;
-		if (interval > 1) return Math.floor(interval) + ' d';
-		interval = seconds / 3600;
-		if (interval > 1) return Math.floor(interval) + ' h';
-		interval = seconds / 60;
-		if (interval > 1) return Math.floor(interval) + ' min';
-		return Math.floor(seconds) + ' s';
+	function timeAgo(dateStr) {
+		if (!dateStr) return '';
+		const raw = String(dateStr).trim();
+		const iso = (raw.includes('T') ? raw : raw.replace(' ', 'T')).replace(/Z?$/, 'Z');
+		const diff = Date.now() - new Date(iso).getTime();
+		if (Number.isNaN(diff)) return '';
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'ahora mismo';
+		if (mins < 60) return `hace ${mins} min`;
+		const hours = Math.floor(mins / 60);
+		if (hours < 24) return `hace ${hours} h`;
+		const days = Math.floor(hours / 24);
+		if (days < 30) return `hace ${days} d`;
+		return new Date(iso).toLocaleDateString('es-ES');
 	}
+
+	const ENTITY_LABELS = { post: 'Post', comment: 'Comentario', reel: 'Reel', user: 'Usuario' };
+
+	// Accesos rápidos según los permisos reales del rol ('*' = solo admin).
+	const QUICK_LINKS = [
+		{
+			href: '/admin/reports',
+			icon: 'flag',
+			label: 'Reportes',
+			desc: 'Centro de confianza',
+			perm: 'reports.view'
+		},
+		{
+			href: '/admin/verifications',
+			icon: 'verified',
+			label: 'Verificaciones',
+			desc: 'Solicitudes de insignia',
+			perm: 'verifications.view'
+		},
+		{
+			href: '/admin/users',
+			icon: 'people',
+			label: 'Usuarios',
+			desc: 'Buscar y consultar fichas',
+			perm: 'users.view'
+		},
+		{
+			href: '/admin/content',
+			icon: 'grid_view',
+			label: 'Contenido',
+			desc: 'Posts, reels y papelera',
+			perm: 'content.view'
+		},
+		{
+			href: '/admin/strikes',
+			icon: 'gavel',
+			label: 'Sanciones',
+			desc: 'Historial disciplinario',
+			perm: 'strikes.view'
+		},
+		{
+			href: '/admin/team',
+			icon: 'diversity_3',
+			label: 'Equipo',
+			desc: 'Anuncios internos',
+			perm: 'announcements.view'
+		},
+		{
+			href: '/admin/audit',
+			icon: 'history',
+			label: 'Auditoría',
+			desc: 'Trazabilidad de acciones',
+			perm: '*'
+		},
+		{
+			href: '/admin/tags',
+			icon: 'sell',
+			label: 'Tags',
+			desc: 'Etiquetas y temas',
+			perm: '*'
+		},
+		{
+			href: '/admin/settings',
+			icon: 'tune',
+			label: 'Sistema',
+			desc: 'Configuración global',
+			perm: 'settings.manage'
+		},
+		{
+			href: '/admin/apis',
+			icon: 'api',
+			label: 'APIs',
+			desc: 'Integraciones externas',
+			perm: 'settings.manage'
+		},
+		{
+			href: '/studio/emotes',
+			icon: 'mood',
+			label: 'Estudio Emotes',
+			desc: 'Emotes y stickers',
+			perm: 'announcements.view'
+		}
+	];
+	const quickLinks = $derived(
+		QUICK_LINKS.filter((l) => (l.perm === '*' ? isAdminLevel : staff.permissions.includes(l.perm)))
+	);
+
+	const maxWeekly = $derived(Math.max(1, ...weeklySignups.map((d) => d.count)));
+	const WEEK_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 </script>
 
 <svelte:head>
-	<title>Dashboard | VSocial Admin</title>
+	<title>{staff.title} | Voom!</title>
 </svelte:head>
 
 <div class="page-header">
-	<h1 class="page-title">Dashboard</h1>
-	<p class="page-subtitle">Visión general del estado de VSocial</p>
+	<h1 class="page-title">
+		<span class="material-icons-round"
+			>{isAdminLevel ? 'admin_panel_settings' : 'shield_person'}</span
+		>
+		{staff.title}
+	</h1>
+	<p class="page-subtitle">
+		Hola, {staff.display_name} · sesión con rango {staff.label.toLowerCase()}
+	</p>
 </div>
 
-{#if loading}
-	<div class="loader-container">
-		<span class="loading loading-spinner text-primary"></span>
-	</div>
-{:else}
-	<!-- ── Metrics ──────────────────────────────────────────────────────── -->
-	<div class="metrics-grid">
-		<div class="metric-card glass-card">
-			<div class="metric-icon" style="color: var(--aero-sky);">
-				<span class="material-icons-round">people</span>
-			</div>
-			<div class="metric-data">
-				<p class="metric-value">{stats?.total_users || 0}</p>
-				<p class="metric-label">Usuarios Registrados</p>
-			</div>
+<div class="page-content">
+	{#if loadError}
+		<div class="alert-box error" role="alert">
+			<span class="material-icons-round">error</span>
+			<span style="flex:1">{loadError}</span>
+			<button class="btn-aero-secondary btn-sm" onclick={loadDashboard}>Reintentar</button>
+		</div>
+	{/if}
+
+	{#if loading}
+		<div class="metric-grid">
+			{#each Array(4) as _, i (i)}
+				<div class="glass-card metric-card">
+					<div class="skeleton-shimmer" style="width:100%;height:44px;"></div>
+				</div>
+			{/each}
+		</div>
+		<div class="skeleton-shimmer skeleton-card"></div>
+	{:else if stats}
+		<!-- ══ KPIs por rol ══ -->
+		<div class="metric-grid">
+			{#if isAdminLevel}
+				<a class="glass-card metric-card" href="/admin/users">
+					<div class="metric-icon"><span class="material-icons-round">people</span></div>
+					<div>
+						<div class="metric-value">{stats.total_users ?? 0}</div>
+						<div class="metric-label">Usuarios</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/content">
+					<div class="metric-icon is-mint"><span class="material-icons-round">grid_view</span></div>
+					<div>
+						<div class="metric-value">{stats.total_posts ?? 0}</div>
+						<div class="metric-label">Posts</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/content">
+					<div class="metric-icon is-mint"><span class="material-icons-round">movie</span></div>
+					<div>
+						<div class="metric-value">{stats.total_reels ?? 0}</div>
+						<div class="metric-label">Reels</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/reports">
+					<div class="metric-icon is-rose"><span class="material-icons-round">flag</span></div>
+					<div>
+						<div class="metric-value">{stats.pending_reports ?? 0}</div>
+						<div class="metric-label">Reportes pendientes</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/verifications">
+					<div class="metric-icon is-amber"><span class="material-icons-round">verified</span></div>
+					<div>
+						<div class="metric-value">{stats.pending_verifications ?? 0}</div>
+						<div class="metric-label">Verificaciones</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/strikes">
+					<div class="metric-icon is-rose"><span class="material-icons-round">gavel</span></div>
+					<div>
+						<div class="metric-value">{stats.active_strikes ?? 0}</div>
+						<div class="metric-label">Sanciones activas</div>
+					</div>
+				</a>
+				<div class="glass-card metric-card">
+					<div class="metric-icon"><span class="material-icons-round">diversity_3</span></div>
+					<div>
+						<div class="metric-value">{stats.staff_count ?? 0}</div>
+						<div class="metric-label">Staff</div>
+					</div>
+				</div>
+				<div class="glass-card metric-card">
+					<div class="metric-icon is-amber">
+						<span class="material-icons-round">storefront</span>
+					</div>
+					<div>
+						<div class="metric-value">{stats.total_listings ?? 0}</div>
+						<div class="metric-label">Anuncios publicados</div>
+					</div>
+				</div>
+				<div class="glass-card metric-card">
+					<div class="metric-icon is-mint">
+						<span class="material-icons-round">auto_stories</span>
+					</div>
+					<div>
+						<div class="metric-value">{stats.total_stories ?? 0}</div>
+						<div class="metric-label">Historias activas</div>
+					</div>
+				</div>
+				<div class="glass-card metric-card">
+					<div class="metric-icon"><span class="material-icons-round">today</span></div>
+					<div>
+						<div class="metric-value">{stats.new_users_today ?? 0}</div>
+						<div class="metric-label">Nuevos hoy</div>
+					</div>
+				</div>
+			{:else if staff.role === 'moderator'}
+				<a class="glass-card metric-card" href="/admin/reports">
+					<div class="metric-icon is-rose"><span class="material-icons-round">flag</span></div>
+					<div>
+						<div class="metric-value">{stats.pending_reports ?? 0}</div>
+						<div class="metric-label">Reportes pendientes</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/strikes">
+					<div class="metric-icon is-rose"><span class="material-icons-round">gavel</span></div>
+					<div>
+						<div class="metric-value">{stats.active_strikes ?? 0}</div>
+						<div class="metric-label">Sanciones activas</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/content">
+					<div class="metric-icon is-mint"><span class="material-icons-round">grid_view</span></div>
+					<div>
+						<div class="metric-value">{stats.total_posts ?? 0}</div>
+						<div class="metric-label">Posts en plataforma</div>
+					</div>
+				</a>
+				<a class="glass-card metric-card" href="/admin/users">
+					<div class="metric-icon"><span class="material-icons-round">people</span></div>
+					<div>
+						<div class="metric-value">{stats.total_users ?? 0}</div>
+						<div class="metric-label">Usuarios</div>
+					</div>
+				</a>
+			{:else}
+				<!-- Soporte / Equipo: vista ligera de solo lectura -->
+				<div class="glass-card metric-card">
+					<div class="metric-icon"><span class="material-icons-round">people</span></div>
+					<div>
+						<div class="metric-value">{stats.total_users ?? 0}</div>
+						<div class="metric-label">Usuarios</div>
+					</div>
+				</div>
+				<div class="glass-card metric-card">
+					<div class="metric-icon is-mint"><span class="material-icons-round">grid_view</span></div>
+					<div>
+						<div class="metric-value">{stats.total_posts ?? 0}</div>
+						<div class="metric-label">Posts</div>
+					</div>
+				</div>
+				{#if staff.permissions.includes('verifications.view')}
+					<a class="glass-card metric-card" href="/admin/verifications">
+						<div class="metric-icon is-amber">
+							<span class="material-icons-round">verified</span>
+						</div>
+						<div>
+							<div class="metric-value">{stats.pending_verifications ?? 0}</div>
+							<div class="metric-label">Verificaciones pendientes</div>
+						</div>
+					</a>
+				{/if}
+				{#if staff.permissions.includes('reports.view')}
+					<a class="glass-card metric-card" href="/admin/reports">
+						<div class="metric-icon is-rose"><span class="material-icons-round">flag</span></div>
+						<div>
+							<div class="metric-value">{stats.pending_reports ?? 0}</div>
+							<div class="metric-label">Reportes pendientes</div>
+						</div>
+					</a>
+				{/if}
+			{/if}
 		</div>
 
-		<div class="metric-card glass-card">
-			<div class="metric-icon" style="color: var(--aero-rose);">
-				<span class="material-icons-round">movie</span>
-			</div>
-			<div class="metric-data">
-				<p class="metric-value">{stats?.total_reels || 0}</p>
-				<p class="metric-label">Reels Publicados</p>
-			</div>
-		</div>
-
-		<div class="metric-card glass-card">
-			<div
-				class="metric-icon"
-				style="background: var(--grad-primary); color: #fff; box-shadow: 0 4px 15px rgba(46,134,232,0.4), inset 0 2px 4px rgba(255,255,255,0.4);"
-			>
-				<span class="material-icons-round text-white">dynamic_feed</span>
-			</div>
-			<div class="metric-data">
-				<p class="metric-value">{stats?.total_posts || 0}</p>
-				<p class="metric-label">Posts Totales</p>
-			</div>
-		</div>
-
-		<div class="metric-card glass-card">
-			<div class="metric-icon" style="color: var(--aero-amber);">
-				<span class="material-icons-round">flag</span>
-			</div>
-			<div class="metric-data">
-				<p class="metric-value">{stats?.pending_reports || 0}</p>
-				<p class="metric-label">Reportes Pendientes</p>
-			</div>
-		</div>
-	</div>
-
-	<div class="dashboard-columns">
-		<!-- ── Activity Feed ────────────────────────────────────────────────── -->
-		<div class="dashboard-col glass-card">
-			<div class="col-header">
-				<h2 class="col-title">Actividad Reciente</h2>
-			</div>
-			<div class="activity-list">
-				{#if activity.length === 0}
-					<div class="empty-state">No hay actividad reciente.</div>
-				{:else}
-					{#each activity as act}
-						<div class="activity-item">
-							<div class="act-avatar">
-								{#if act.actor_avatar}
-									<img src={act.actor_avatar} alt="Avatar" />
-								{:else}
-									<span class="material-icons-round">notifications</span>
-								{/if}
-							</div>
-							<div class="act-content">
-								<p class="act-text">
-									<span class="act-user">@{act.actor_username || 'Sistema'}</span>
-									{act.body || act.message}
-								</p>
-								<span class="act-time">{timeAgo(act.created_at)}</span>
-							</div>
+		<div class="section-grid">
+			<!-- ══ Reportes recientes (quien ve reportes) ══ -->
+			{#if recentReports.length && staff.permissions.includes('reports.view')}
+				<div class="glass-card panel-card">
+					<div class="toolbar-row">
+						<h2 class="panel-title">
+							<span class="material-icons-round">flag</span> Reportes recientes
+						</h2>
+						<a class="btn-aero-ghost btn-sm" href="/admin/reports">Ver todos</a>
+					</div>
+					{#each recentReports.slice(0, 4) as report (report.id)}
+						<div class="mini-report">
+							<span class="status-badge is-pending"
+								><span class="dot"></span>{ENTITY_LABELS[report.entity_type] ||
+									report.entity_type}</span
+							>
+							<p class="mini-report-reason">{report.reason}</p>
+							<span class="muted-note">{timeAgo(report.created_at)}</span>
 						</div>
 					{/each}
+				</div>
+			{/if}
+
+			<!-- ══ Actividad semanal (solo admin) ══ -->
+			{#if isAdminLevel}
+				<div class="glass-card panel-card">
+					<h2 class="panel-title">
+						<span class="material-icons-round">bar_chart</span> Registros de la semana
+					</h2>
+					{#if weeklySignups.length}
+						<div class="weekly-chart" role="img" aria-label="Registros por día de la semana">
+							{#each weeklySignups as day (`${day.day}-${day.count}`)}
+								<div class="weekly-bar-group">
+									<div
+										class="weekly-bar"
+										style="height:{Math.max(8, Math.round((day.count / maxWeekly) * 100))}%"
+									>
+										<span class="weekly-bar-count">{day.count}</span>
+									</div>
+									<span class="weekly-bar-day">{WEEK_DAYS[parseInt(day.day)] ?? ''}</span>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<p class="muted-note">Sin registros esta semana.</p>
+					{/if}
+				</div>
+			{/if}
+
+			<!-- ══ Anuncios internos ══ -->
+			<div class="glass-card panel-card">
+				<div class="toolbar-row">
+					<h2 class="panel-title">
+						<span class="material-icons-round">campaign</span> Anuncios del staff
+					</h2>
+					<a class="btn-aero-ghost btn-sm" href="/admin/team">Ver tablón</a>
+				</div>
+				{#if announcements.length}
+					{#each announcements as ann (ann.id)}
+						<div class="mini-announcement">
+							<div class="mini-ann-head">
+								{#if ann.pinned}<span class="material-icons-round pinned-icon">push_pin</span>{/if}
+								<strong>{ann.title}</strong>
+							</div>
+							<p class="mini-ann-body">{ann.body}</p>
+							<span class="muted-note"
+								>{ann.author_name || 'Staff'} · {timeAgo(ann.created_at)}</span
+							>
+						</div>
+					{/each}
+				{:else}
+					<p class="muted-note">Todavía no hay anuncios internos.</p>
 				{/if}
 			</div>
 		</div>
 
-		<!-- ── Recent Reports ───────────────────────────────────────────────── -->
-		<div class="dashboard-col glass-card">
-			<div class="col-header">
-				<h2 class="col-title">Reportes Pendientes</h2>
-				<a href="/admin/reports" class="col-link">Ver todos</a>
-			</div>
-			<div class="reports-list">
-				{#if reports.length === 0}
-					<div class="empty-state">No hay reportes pendientes.</div>
-				{:else}
-					{#each reports as r}
-						<div class="report-item">
-							<div class="rep-icon">
-								<span class="material-icons-round">report_problem</span>
-							</div>
-							<div class="rep-content">
-								<p class="rep-title">Reporte #{r.id} • {r.entity_type}</p>
-								<p class="rep-reason">{r.reason}</p>
-							</div>
-							<span class="rep-time">{timeAgo(r.created_at)}</span>
-						</div>
-					{/each}
-				{/if}
+		<!-- ══ Accesos rápidos ══ -->
+		<div class="glass-card panel-card">
+			<h2 class="panel-title"><span class="material-icons-round">bolt</span> Accesos rápidos</h2>
+			<div class="quick-grid">
+				{#each quickLinks as link (link.href)}
+					<a href={link.href} class="quick-link">
+						<span class="material-icons-round">{link.icon}</span>
+						<span class="quick-label">{link.label}</span>
+						<span class="quick-desc">{link.desc}</span>
+					</a>
+				{/each}
 			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</div>
 
 <style>
-	.page-header {
-		padding: 32px;
-		background: linear-gradient(180deg, rgba(46, 134, 232, 0.03) 0%, transparent 100%);
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.page-title {
-		font-size: 1.8rem;
-		font-family: var(--font-display);
-		font-weight: 800;
-		color: var(--text-primary);
-		margin: 0;
-	}
-	.page-subtitle {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-		margin: 4px 0 0;
-	}
-
-	.loader-container {
-		display: flex;
-		justify-content: center;
-		padding: 64px;
-	}
-
-	/* Metrics Grid */
-	.metrics-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-		gap: 20px;
-		padding: 32px;
-	}
 	.metric-card {
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		padding: 24px;
-		border-radius: var(--radius-lg);
-	}
-	.metric-icon {
-		width: 56px;
-		height: 56px;
-		border-radius: var(--radius-md);
-		background: var(--bg-surface);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-	}
-	.metric-icon .material-icons-round {
-		font-size: 28px;
-	}
-	.metric-data {
-		display: flex;
-		flex-direction: column;
-	}
-	.metric-value {
-		font-size: 1.8rem;
-		font-weight: 800;
-		font-family: var(--font-display);
-		color: var(--text-primary);
-		margin: 0;
-		line-height: 1.2;
-	}
-	.metric-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin: 0;
-	}
-
-	/* Columns */
-	.dashboard-columns {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 20px;
-		padding: 0 32px 32px;
-	}
-	@media (max-width: 1024px) {
-		.dashboard-columns {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	.dashboard-col {
-		border-radius: var(--radius-lg);
-		display: flex;
-		flex-direction: column;
-	}
-	.col-header {
-		padding: 20px 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-	.col-title {
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin: 0;
-	}
-	.col-link {
-		font-size: 0.85rem;
-		color: var(--aero-sky);
 		text-decoration: none;
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-base);
+	}
+	a.metric-card:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md), var(--shadow-glow);
+	}
+
+	.mini-report {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 9px 0;
+		border-bottom: 1px solid var(--border-subtle);
+	}
+	.mini-report:last-child {
+		border-bottom: none;
+	}
+	.mini-report-reason {
+		flex: 1;
+		min-width: 0;
+		margin: 0;
+		font-size: 0.83rem;
+		color: var(--text-secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.weekly-chart {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 8px;
+		height: 140px;
+		padding: 24px 4px 0;
+	}
+	.weekly-bar-group {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		height: 100%;
+		justify-content: flex-end;
+	}
+	.weekly-bar {
+		width: 100%;
+		max-width: 42px;
+		min-height: 8px;
+		border-radius: var(--radius-sm) var(--radius-sm) 4px 4px;
+		background: var(--grad-primary);
+		position: relative;
+		box-shadow: 0 3px 10px rgba(46, 134, 232, 0.2);
+	}
+	.weekly-bar-count {
+		position: absolute;
+		top: -18px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.66rem;
+		font-weight: 700;
+		color: var(--text-secondary);
+	}
+	.weekly-bar-day {
+		font-size: 0.68rem;
+		color: var(--text-muted);
 		font-weight: 600;
 	}
-	.col-link:hover {
-		text-decoration: underline;
-	}
 
-	.empty-state {
-		padding: 32px;
-		text-align: center;
-		color: var(--text-muted);
-		font-size: 0.9rem;
-	}
-
-	/* Activity List */
-	.activity-list {
-		display: flex;
-		flex-direction: column;
-	}
-	.activity-item {
-		display: flex;
-		align-items: flex-start;
-		gap: 16px;
-		padding: 16px 24px;
+	.mini-announcement {
+		padding: 10px 0;
 		border-bottom: 1px solid var(--border-subtle);
 	}
-	.activity-item:last-child {
+	.mini-announcement:last-child {
 		border-bottom: none;
 	}
-	.act-avatar {
-		width: 36px;
-		height: 36px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--bg-surface);
-		overflow: hidden;
+	.mini-ann-head {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.act-avatar img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.act-avatar .material-icons-round {
-		font-size: 18px;
-		color: var(--text-muted);
-	}
-	.act-content {
-		flex: 1;
-		min-width: 0;
-	}
-	.act-text {
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-		margin: 0 0 4px 0;
-		line-height: 1.4;
-	}
-	.act-user {
-		font-weight: 700;
+		gap: 6px;
+		font-size: 0.87rem;
 		color: var(--text-primary);
 	}
-	.act-time {
-		font-size: 0.7rem;
-		color: var(--text-muted);
+	.pinned-icon {
+		font-size: 14px;
+		color: var(--aero-amber);
 	}
-
-	/* Reports List */
-	.reports-list {
-		display: flex;
-		flex-direction: column;
-	}
-	.report-item {
-		display: flex;
-		align-items: flex-start;
-		gap: 16px;
-		padding: 16px 24px;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.report-item:last-child {
-		border-bottom: none;
-	}
-	.rep-icon {
-		width: 36px;
-		height: 36px;
-		border-radius: var(--radius-sm);
-		background: rgba(232, 74, 114, 0.1);
-		color: var(--aero-rose);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-	}
-	.rep-content {
-		flex: 1;
-		min-width: 0;
-	}
-	.rep-title {
-		font-size: 0.85rem;
-		font-weight: 700;
-		color: var(--text-primary);
-		margin: 0 0 4px 0;
-	}
-	.rep-reason {
+	.mini-ann-body {
+		margin: 4px 0;
 		font-size: 0.8rem;
 		color: var(--text-secondary);
-		margin: 0;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 	}
-	.rep-time {
-		font-size: 0.7rem;
+
+	.quick-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 10px;
+	}
+	.quick-link {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 14px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--glass-border);
+		background: var(--bg-overlay);
+		text-decoration: none;
+		transition: all var(--t-base);
+	}
+	.quick-link:hover {
+		border-color: var(--aero-sky);
+		box-shadow: var(--shadow-sm), var(--glass-inset);
+		transform: translateY(-2px);
+	}
+	.quick-link .material-icons-round {
+		font-size: 20px;
+		color: var(--aero-sky);
+	}
+	.quick-label {
+		font-weight: 700;
+		font-size: 0.85rem;
+		color: var(--text-primary);
+	}
+	.quick-desc {
+		font-size: 0.72rem;
 		color: var(--text-muted);
-		flex-shrink: 0;
 	}
 </style>

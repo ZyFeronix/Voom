@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
 	import { tags as tagsApi } from '$lib/api.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
+	import CustomSelect from '$lib/components/CustomSelect.svelte';
 
 	const ICON_OPTIONS = [
 		{ value: 'sell', label: 'Etiqueta' },
@@ -109,13 +111,13 @@
 	}
 
 	async function removeTag(tag) {
-		if (
-			!confirm(
-				`¿Eliminar el tag "${tag.name}"? Los hashtags #${tag.slug} en los posts no se tocan.`
-			)
-		) {
-			return;
-		}
+		const ok = await uiStore.requestConfirm({
+			title: 'Eliminar tag',
+			message: `¿Eliminar el tag "${tag.name}"? Los hashtags #${tag.slug} en los posts no se tocan.`,
+			danger: true,
+			confirmText: 'Eliminar'
+		});
+		if (!ok) return;
 		saving = true;
 		errorMsg = '';
 		okMsg = '';
@@ -132,28 +134,26 @@
 </script>
 
 <svelte:head>
-	<title>Tags | VSocial Admin</title>
+	<title>Tags | Voom! Admin</title>
 </svelte:head>
 
 <div class="page-header">
-	<div class="header-left">
-		<h1 class="page-title">Tags</h1>
-		<p class="page-subtitle">
-			Crea los tags que aparecen en /explore. Cada tag filtra los posts que usan el hashtag #slug
-			(ej. #gaming).
-		</p>
-	</div>
+	<h1 class="page-title"><span class="material-icons-round">sell</span> Tags</h1>
+	<p class="page-subtitle">
+		Crea los tags que aparecen en /explore. Cada tag filtra los posts que usan el hashtag #slug (ej.
+		#gaming).
+	</p>
 </div>
 
 <div class="page-content">
 	{#if errorMsg}
-		<div class="alert alert-error">
-			<span class="material-icons-round">error_outline</span>
-			{errorMsg}
+		<div class="alert-box error" role="alert">
+			<span class="material-icons-round">error</span>
+			<span style="flex:1">{errorMsg}</span>
 		</div>
 	{/if}
 	{#if okMsg}
-		<div class="alert alert-ok">
+		<div class="alert-box success" role="status">
 			<span class="material-icons-round">check_circle</span>
 			{okMsg}
 		</div>
@@ -175,16 +175,12 @@
 				/>
 			</div>
 			<div class="field">
-				<label class="field-label" for="tag-icon">Icono</label>
-				<select id="tag-icon" bind:value={newIcon} class="aero-select">
-					{#each ICON_OPTIONS as opt}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
-				</select>
+				<span class="field-label">Icono</span>
+				<CustomSelect options={ICON_OPTIONS} bind:value={newIcon} />
 			</div>
 			<button class="btn-aero-primary create-btn" onclick={createTag} disabled={saving}>
 				{#if saving}
-					<span class="loading loading-spinner loading-xs"></span>
+					<span class="material-icons-round spin">sync</span>
 				{:else}
 					<span class="material-icons-round">add</span>
 				{/if}
@@ -196,12 +192,14 @@
 	<!-- Listado -->
 	<div class="glass-card table-card">
 		{#if loading && tags.length === 0}
-			<div class="loader-container">
-				<span class="loading loading-spinner text-primary"></span>
+			<div style="padding:20px">
+				{#each Array(4) as _, i (i)}
+					<div class="skeleton-shimmer skeleton-row"></div>
+				{/each}
 			</div>
 		{:else if tags.length === 0}
 			<div class="empty-state">
-				<span class="material-icons-round empty-icon">sell</span>
+				<span class="material-icons-round">sell</span>
 				<p>Todavía no hay tags. Crea el primero con el formulario de arriba.</p>
 			</div>
 		{:else}
@@ -212,8 +210,8 @@
 							<th>Icono</th>
 							<th>Nombre</th>
 							<th>Slug / Hashtag</th>
-							<th class="text-center">Posts</th>
-							<th class="text-right">Acciones</th>
+							<th style="text-align:center">Posts</th>
+							<th style="text-align:right">Acciones</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -230,11 +228,11 @@
 												placeholder="Nombre del tag"
 												onkeydown={(e) => e.key === 'Enter' && saveEdit(tag)}
 											/>
-											<select bind:value={editIcon} class="aero-select edit-icon-select">
-												{#each ICON_OPTIONS as opt}
-													<option value={opt.value}>{opt.label}</option>
-												{/each}
-											</select>
+											<CustomSelect
+												options={ICON_OPTIONS}
+												bind:value={editIcon}
+												fullWidth={false}
+											/>
 											<button
 												class="btn-aero-primary btn-sm"
 												onclick={() => saveEdit(tag)}
@@ -257,20 +255,22 @@
 									<td>
 										<code class="tag-slug">#{tag.slug}</code>
 									</td>
-									<td class="text-center">
+									<td style="text-align:center">
 										<span class="post-count">{tag.post_count ?? 0}</span>
 									</td>
-									<td class="text-right">
-										<button class="icon-btn" title="Editar tag" onclick={() => startEdit(tag)}>
-											<span class="material-icons-round">edit</span>
-										</button>
-										<button
-											class="icon-btn danger"
-											title="Eliminar tag"
-											onclick={() => removeTag(tag)}
-										>
-											<span class="material-icons-round">delete</span>
-										</button>
+									<td>
+										<div style="display:flex; gap:6px; justify-content:flex-end">
+											<button class="icon-btn" title="Editar tag" onclick={() => startEdit(tag)}>
+												<span class="material-icons-round">edit</span>
+											</button>
+											<button
+												class="icon-btn danger"
+												title="Eliminar tag"
+												onclick={() => removeTag(tag)}
+											>
+												<span class="material-icons-round">delete</span>
+											</button>
+										</div>
 									</td>
 								{/if}
 							</tr>
@@ -283,58 +283,13 @@
 </div>
 
 <style>
-	.page-header {
-		padding: 32px;
-		background: linear-gradient(180deg, rgba(46, 134, 232, 0.03) 0%, transparent 100%);
-		border-bottom: 1px solid var(--border-subtle);
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
-	}
-	.page-title {
-		font-size: 1.8rem;
-		font-family: var(--font-display);
-		font-weight: 800;
-		margin: 0;
-	}
-	.page-subtitle {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-		margin: 4px 0 0;
-		max-width: 640px;
-		line-height: 1.5;
-	}
-
-	.page-content {
-		padding: 32px;
-		display: flex;
-		flex-direction: column;
-		gap: 20px;
-	}
-
-	.alert {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px 16px;
-		border-radius: var(--radius-md);
-		font-size: 0.88rem;
-		font-weight: 500;
-	}
-	.alert-error {
-		background: rgba(239, 68, 68, 0.1);
-		border: 1px solid rgba(239, 68, 68, 0.3);
-		color: #f87171;
-	}
-	.alert-ok {
-		background: rgba(16, 185, 129, 0.1);
-		border: 1px solid rgba(16, 185, 129, 0.3);
-		color: #34d399;
-	}
-
 	.create-card {
 		border-radius: var(--radius-lg);
 		padding: 20px 24px;
+		z-index: 50;
+		position: relative;
+		overflow: visible !important;
+		contain: none !important;
 	}
 	.card-title {
 		font-size: 0.95rem;
@@ -370,43 +325,6 @@
 		flex-shrink: 0;
 	}
 
-	.table-card {
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-	}
-	.table-responsive {
-		overflow-x: auto;
-	}
-	.aero-table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: 0.88rem;
-	}
-	.aero-table th {
-		text-align: left;
-		padding: 14px 18px;
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--text-muted);
-		border-bottom: 1px solid var(--border-subtle);
-		background: var(--bg-overlay);
-	}
-	.aero-table td {
-		padding: 12px 18px;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: middle;
-	}
-	.aero-table tbody tr:last-child td {
-		border-bottom: none;
-	}
-	.text-center {
-		text-align: center;
-	}
-	.text-right {
-		text-align: right;
-	}
-
 	.tag-icon {
 		display: inline-flex;
 		align-items: center;
@@ -414,7 +332,7 @@
 		width: 34px;
 		height: 34px;
 		border-radius: var(--radius-sm);
-		background: var(--bg-input-tint);
+		background: var(--bg-input-tint, var(--bg-overlay));
 		color: var(--aero-sky);
 		font-size: 18px;
 		border: 1px solid var(--glass-border);
@@ -443,29 +361,6 @@
 		font-weight: 600;
 	}
 
-	.icon-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		border-radius: var(--radius-sm);
-		border: 1px solid transparent;
-		background: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all var(--t-fast);
-	}
-	.icon-btn:hover {
-		background: var(--bg-overlay);
-		color: var(--aero-sky);
-		border-color: var(--glass-border);
-	}
-	.icon-btn.danger:hover {
-		color: #f87171;
-		border-color: rgba(239, 68, 68, 0.3);
-	}
-
 	.edit-row {
 		display: flex;
 		align-items: center;
@@ -481,37 +376,5 @@
 		min-width: 160px;
 		max-width: 260px;
 		padding: 8px 12px;
-	}
-	.edit-icon-select {
-		width: auto;
-		min-width: 140px;
-		padding: 8px 12px;
-	}
-	.btn-sm {
-		padding: 8px 14px;
-		font-size: 0.8rem;
-	}
-
-	.loader-container {
-		display: flex;
-		justify-content: center;
-		padding: 48px;
-	}
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 10px;
-		padding: 48px 24px;
-		color: var(--text-muted);
-		text-align: center;
-	}
-	.empty-icon {
-		font-size: 40px;
-		opacity: 0.5;
-	}
-	.empty-state p {
-		margin: 0;
-		font-size: 0.9rem;
 	}
 </style>

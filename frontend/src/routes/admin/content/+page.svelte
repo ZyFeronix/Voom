@@ -1,119 +1,148 @@
 <script>
-	import { fade, scale } from 'svelte/transition';
-	import { backOut } from 'svelte/easing';
 	import { onMount } from 'svelte';
 	import { admin as adminApi } from '$lib/api.js';
+	import { uiStore } from '$lib/stores/ui.svelte.js';
+	import AeroAvatar from '$lib/components/AeroAvatar.svelte';
+
+	let { data } = $props();
+	const staff = $derived(data.staff);
+	const canModerate = $derived(staff.permissions.includes('content.moderate'));
+	const isAdminLevel = $derived(staff.role === 'admin' || staff.role === 'super_admin');
 
 	let loading = $state(true);
+	let loadError = $state('');
 	let contentList = $state([]);
-	let currentType = $state('posts'); // 'posts' or 'reels'
+	let currentType = $state('posts'); // posts | reels | trash
+	let page = $state(1);
+	let totalPages = $state(1);
+	const LIMIT = 20;
 
-	onMount(async () => {
-		await loadContent();
-	});
+	const TYPE_TABS = [
+		{ key: 'posts', label: 'Posts', icon: 'article' },
+		{ key: 'reels', label: 'Reels', icon: 'movie' },
+		{ key: 'trash', label: 'Papelera', icon: 'delete_outline' }
+	];
 
-	async function loadContent() {
+	async function loadContent(p = 1) {
 		loading = true;
+		loadError = '';
 		try {
-			const res = await adminApi.content.list({ type: currentType });
+			const res = await adminApi.content.list({ type: currentType, page: p, limit: LIMIT });
 			contentList = res.content || [];
+			page = res.page || p;
+			totalPages = Math.ceil(res.total / (res.limit || LIMIT)) || 1;
 		} catch (e) {
-			console.error(e);
+			loadError = e?.message || 'No se pudo cargar el contenido.';
 		} finally {
 			loading = false;
 		}
 	}
 
+	onMount(() => {
+		loadContent(1);
+	});
+
 	function switchType(type) {
 		currentType = type;
-		loadContent();
+		loadContent(1);
 	}
 
-	let showConfirmModal = $state(false);
-	let confirmTitle = $state('');
-	let confirmMessage = $state('');
-	let isDanger = $state(true);
-	let confirmAction = $state(null);
-	let actionError = $state('');
-
-	function promptDeleteContent(item) {
-		confirmTitle = `¿Eliminar ${currentType}?`;
-		confirmMessage =
-			currentType === 'trash'
-				? 'Este contenido se borrará definitivamente de la base de datos.'
-				: 'El contenido se moverá a la papelera por 30 días.';
-		isDanger = true;
-		actionError = '';
-		confirmAction = async () => {
-			try {
-				await adminApi.content.delete(
-					currentType === 'posts' ? 'post' : currentType === 'reels' ? 'reel' : 'trash',
-					item.id
-				);
-				contentList = contentList.filter((c) => c.id !== item.id);
-				showConfirmModal = false;
-			} catch (e) {
-				console.error(e);
-				actionError = 'Error al eliminar el contenido.';
-			}
-		};
-		showConfirmModal = true;
+	async function deleteContent(item) {
+		const isPurge = currentType === 'trash';
+		const ok = await uiStore.requestConfirm({
+			title: isPurge
+				? 'Purgar definitivamente'
+				: `Eliminar ${currentType === 'reels' ? 'reel' : 'post'}`,
+			message: isPurge
+				? `El post #${item.id} se borrará DEFINITIVAMENTE de la base de datos. Esta acción no se puede deshacer.`
+				: `El contenido pasará a la papelera y quedará fuera de la plataforma.`,
+			danger: true,
+			confirmText: isPurge ? 'Purgar' : 'Eliminar'
+		});
+		if (!ok) return;
+		try {
+			const apiType = currentType === 'posts' ? 'post' : currentType === 'reels' ? 'reel' : 'trash';
+			await adminApi.content.delete(apiType, item.id);
+			contentList = contentList.filter((c) => c.id !== item.id);
+		} catch (e) {
+			loadError = e?.message || 'Error al eliminar el contenido.';
+			setTimeout(() => (loadError = ''), 4500);
+		}
 	}
 
-	function promptRestoreContent(item) {
-		confirmTitle = `¿Restaurar post #${item.id}?`;
-		confirmMessage = 'El post volverá a estar visible públicamente.';
-		isDanger = false;
-		actionError = '';
-		confirmAction = async () => {
-			try {
-				await adminApi.content.restore(item.id);
-				contentList = contentList.filter((c) => c.id !== item.id);
-				showConfirmModal = false;
-			} catch (e) {
-				console.error(e);
-				actionError = 'Error al restaurar el contenido.';
-			}
-		};
-		showConfirmModal = true;
+	async function restoreContent(item) {
+		try {
+			await adminApi.content.restore(item.id);
+			contentList = contentList.filter((c) => c.id !== item.id);
+		} catch (e) {
+			loadError = e?.message || 'Error al restaurar el contenido.';
+			setTimeout(() => (loadError = ''), 4500);
+		}
+	}
+
+	function fmtDate(raw) {
+		if (!raw) return '—';
+		const s = String(raw).trim();
+		const iso = (s.includes('T') ? s : s.replace(' ', 'T')).replace(/Z?$/, 'Z');
+		const d = new Date(iso);
+		return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('es-ES');
 	}
 </script>
 
 <svelte:head>
-	<title>Contenido | VSocial Admin</title>
+	<title>Contenido | Voom! Staff</title>
 </svelte:head>
 
 <div class="page-header">
-	<div class="header-left">
-		<h1 class="page-title">Contenido</h1>
-		<p class="page-subtitle">Modera y gestiona posts y reels</p>
-	</div>
-	<div class="header-right">
-		<div class="type-toggles">
-			<button
-				class="toggle-btn"
-				class:active={currentType === 'posts'}
-				onclick={() => switchType('posts')}>Posts</button
-			>
-			<button
-				class="toggle-btn"
-				class:active={currentType === 'reels'}
-				onclick={() => switchType('reels')}>Reels</button
-			>
-			<button
-				class="toggle-btn"
-				class:active={currentType === 'trash'}
-				onclick={() => switchType('trash')}>Papelera</button
-			>
-		</div>
-	</div>
+	<h1 class="page-title"><span class="material-icons-round">grid_view</span> Contenido</h1>
+	<p class="page-subtitle">Modera publicaciones, reels y gestiona la papelera.</p>
 </div>
 
 <div class="page-content">
+	{#if loadError}
+		<div class="alert-box error" role="alert">
+			<span class="material-icons-round">error</span>
+			<span style="flex:1">{loadError}</span>
+			<button class="btn-aero-secondary btn-sm" onclick={() => loadContent(page)}>Reintentar</button
+			>
+		</div>
+	{/if}
+
+	<div class="glass-panel admin-toolbar neo-shadow">
+		<div class="filter-chips">
+			{#each TYPE_TABS as tab (tab.key)}
+				<button
+					class="filter-chip"
+					class:active={currentType === tab.key}
+					onclick={() => switchType(tab.key)}
+				>
+					<span class="material-icons-round" style="font-size:15px">{tab.icon}</span>
+					{tab.label}
+				</button>
+			{/each}
+		</div>
+		{#if currentType === 'trash'}
+			<span class="muted-note" style="margin-left:auto">
+				{isAdminLevel
+					? 'Puedes purgar definitivamente o restaurar posts.'
+					: 'Puedes restaurar posts eliminados.'}
+			</span>
+		{/if}
+	</div>
+
 	<div class="glass-card table-card">
-		{#if loading && contentList.length === 0}
-			<div class="loader-container">
-				<span class="loading loading-spinner text-primary"></span>
+		{#if loading}
+			<div style="padding:20px">
+				{#each Array(6) as _, i (i)}
+					<div class="skeleton-shimmer skeleton-row"></div>
+				{/each}
+			</div>
+		{:else if contentList.length === 0}
+			<div class="empty-state">
+				<span class="material-icons-round"
+					>{currentType === 'trash' ? 'delete_outline' : 'post_add'}</span
+				>
+				<p>{currentType === 'trash' ? 'La papelera está vacía' : 'Sin contenido publicado aún'}</p>
 			</div>
 		{:else}
 			<div class="table-responsive">
@@ -122,297 +151,121 @@
 						<tr>
 							<th>Autor</th>
 							<th>Contenido</th>
-							<th>Fecha</th>
-							<th>Interacciones</th>
-							<th class="text-right">Acciones</th>
+							<th>Me gusta</th>
+							<th>{currentType === 'trash' ? 'Eliminado' : 'Publicado'}</th>
+							{#if canModerate}<th style="text-align:right">Acciones</th>{/if}
 						</tr>
 					</thead>
 					<tbody>
-						{#each contentList as item}
+						{#each contentList as item (item.id)}
 							<tr>
 								<td>
-									<div class="user-cell">
-										<div class="user-avatar-mini">
-											{#if item.avatar_url}
-												<img src={item.avatar_url} alt={item.username} />
-											{:else}
-												<span>{item.username[0].toUpperCase()}</span>
-											{/if}
+									<div class="cell-user">
+										<div style="flex: 0 0 44px; min-width: 44px; min-height: 44px">
+											<AeroAvatar
+												src={item.avatar_url}
+												alt={item.username}
+												size="sm"
+												showPresence={false}
+											/>
 										</div>
-										<span class="user-handle">@{item.username}</span>
+										<div class="cell-user-main">
+											<div class="cell-user-name">@{item.username}</div>
+										</div>
 									</div>
 								</td>
 								<td>
 									<div class="content-cell">
-										{#if item.media}
-											<div class="media-thumb">
-												{#if currentType === 'reels' || item.media.includes('video')}
-													<span class="material-icons-round play-icon">play_circle</span>
-													{#if item.thumbnail_url}
-														<img src={item.thumbnail_url} alt="Media" />
-													{:else}
-														<video src={item.media} muted playsinline preload="metadata"></video>
-													{/if}
-												{:else}
-													<img src={item.media} alt="Media" />
-												{/if}
+										{#if item.media_type === 'video'}
+											<div class="content-thumb video-thumb">
+												<span class="material-icons-round">play_circle</span>
+											</div>
+										{:else if item.media}
+											<img src={item.media} alt="" class="content-thumb" loading="lazy" />
+										{:else}
+											<div class="content-thumb">
+												<span class="material-icons-round">notes</span>
 											</div>
 										{/if}
-										<p class="content-text">{item.body || '(Sin texto)'}</p>
+										<span class="cell-body">{item.body || item.caption || '(sin texto)'}</span>
 									</div>
 								</td>
-								<td>{new Date(item.created_at).toLocaleDateString()}</td>
-								<td>
-									<span class="stat-badge"
-										><span class="material-icons-round">favorite</span> {item.like_count || 0}</span
-									>
-								</td>
-								<td class="text-right">
-									{#if currentType === 'trash'}
-										<button
-											class="btn-aero-primary btn-sm"
-											style="margin-right: 4px;"
-											onclick={() => promptRestoreContent(item)}>Restaurar</button
-										>
-									{/if}
-									<button class="btn-aero-danger btn-sm" onclick={() => promptDeleteContent(item)}
-										>Eliminar</button
-									>
-								</td>
+								<td>{item.like_count ?? 0}</td>
+								<td>{fmtDate(currentType === 'trash' ? item.deleted_at : item.created_at)}</td>
+								{#if canModerate}
+									<td>
+										<div class="row-actions">
+											{#if currentType === 'trash'}
+												<button
+													class="icon-btn"
+													title="Restaurar post"
+													onclick={() => restoreContent(item)}
+												>
+													<span class="material-icons-round">restore_from_trash</span>
+												</button>
+												{#if isAdminLevel}
+													<button
+														class="icon-btn danger"
+														title="Purgar definitivamente"
+														onclick={() => deleteContent(item)}
+													>
+														<span class="material-icons-round">delete_forever</span>
+													</button>
+												{/if}
+											{:else}
+												<button
+													class="icon-btn danger"
+													title="Eliminar"
+													onclick={() => deleteContent(item)}
+												>
+													<span class="material-icons-round">delete</span>
+												</button>
+											{/if}
+										</div>
+									</td>
+								{/if}
 							</tr>
 						{/each}
-						{#if contentList.length === 0}
-							<tr>
-								<td colspan="5" class="empty-row">No hay {currentType} disponibles.</td>
-							</tr>
-						{/if}
 					</tbody>
 				</table>
+			</div>
+
+			<div class="pagination-bar">
+				<button
+					class="page-btn"
+					disabled={page <= 1}
+					onclick={() => loadContent(page - 1)}
+					aria-label="Página anterior"
+				>
+					<span class="material-icons-round">chevron_left</span>
+				</button>
+				<span class="pagination-info">Página {page} de {totalPages}</span>
+				<button
+					class="page-btn"
+					disabled={page >= totalPages}
+					onclick={() => loadContent(page + 1)}
+					aria-label="Página siguiente"
+				>
+					<span class="material-icons-round">chevron_right</span>
+				</button>
 			</div>
 		{/if}
 	</div>
 </div>
 
-{#if showConfirmModal}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-		onclick={(e) => {
-			if (e.target === e.currentTarget) showConfirmModal = false;
-		}}
-		transition:fade={{ duration: 150 }}
-	>
-		<div
-			class="glass-panel p-6 max-w-sm w-full"
-			style="border-radius: var(--radius-lg); background: var(--glass-bg);"
-			transition:scale={{ duration: 250, start: 0.95, easing: backOut }}
-		>
-			<div class="flex items-center gap-3 mb-3">
-				<div
-					class="w-10 h-10 squircle flex items-center justify-center flex-shrink-0 {isDanger
-						? 'bg-red-500/20 text-red-500'
-						: 'bg-blue-500/20 text-blue-500'}"
-				>
-					<span class="material-icons-round">{isDanger ? 'warning' : 'restore'}</span>
-				</div>
-				<h3 class="font-bold text-lg text-main m-0">{confirmTitle}</h3>
-			</div>
-			<p class="text-sm text-muted mb-6 leading-relaxed">{confirmMessage}</p>
-			{#if actionError}
-				<p class="text-xs text-red-400 mb-4 bg-red-500/10 p-2 rounded-md">{actionError}</p>
-			{/if}
-			<div class="flex gap-3 justify-end">
-				<button
-					onclick={() => (showConfirmModal = false)}
-					class="btn-aero-secondary"
-					style="padding: 8px 16px; font-size: 0.85rem;">Cancelar</button
-				>
-				<button
-					onclick={confirmAction}
-					class={isDanger ? 'btn-aero-danger' : 'btn-aero-primary'}
-					style="padding: 8px 16px; font-size: 0.85rem;"
-				>
-					{isDanger ? 'Eliminar' : 'Restaurar'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
-
 <style>
-	.page-header {
-		padding: 32px;
-		background: linear-gradient(180deg, rgba(46, 134, 232, 0.03) 0%, transparent 100%);
-		border-bottom: 1px solid var(--border-subtle);
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-end;
+	.neo-shadow {
+		box-shadow: var(--shadow-md);
 	}
-	.page-title {
-		font-size: 1.8rem;
-		font-family: var(--font-display);
-		font-weight: 800;
-		margin: 0;
-	}
-	.page-subtitle {
-		font-size: 0.9rem;
-		color: var(--text-muted);
-		margin: 4px 0 0;
-	}
-
-	.type-toggles {
-		display: flex;
-		background: var(--bg-surface);
-		border-radius: var(--radius-md);
-		padding: 4px;
-		border: 1px solid var(--glass-border);
-	}
-	.toggle-btn {
-		background: none;
-		border: none;
-		padding: 6px 16px;
-		border-radius: var(--radius-sm);
-		font-weight: 600;
-		color: var(--text-muted);
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-	.toggle-btn.active {
-		background: var(--bg-canvas);
-		color: var(--text-primary);
-		box-shadow: var(--shadow-sm);
-	}
-
-	.page-content {
-		padding: 32px;
-	}
-	.table-card {
-		border-radius: var(--radius-lg);
-		overflow: hidden;
-	}
-	.table-responsive {
-		overflow-x: auto;
-	}
-
-	.aero-table {
-		width: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
-	}
-	.aero-table th {
-		text-align: left;
-		padding: 16px 24px;
-		font-size: 0.75rem;
-		font-weight: 700;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	.aero-table td {
-		padding: 16px 24px;
-		border-bottom: 1px solid var(--border-subtle);
-		vertical-align: middle;
-	}
-	.aero-table tr:hover td {
-		background: rgba(255, 255, 255, 0.02);
-	}
-
-	.user-cell {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-	.user-avatar-mini {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
-		background: var(--grad-primary);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #fff;
-		font-weight: 700;
-		overflow: hidden;
-	}
-	.user-avatar-mini img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.user-handle {
-		font-size: 0.85rem;
-		font-weight: 600;
-	}
-
 	.content-cell {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		max-width: 300px;
+		gap: 10px;
+		min-width: 0;
 	}
-	.media-thumb {
-		width: 48px;
-		height: 48px;
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		position: relative;
-		background: #000;
-		flex-shrink: 0;
-	}
-	.media-thumb img,
-	.media-thumb video {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.play-icon {
-		position: absolute;
-		inset: 0;
-		margin: auto;
-		color: #fff;
-		font-size: 24px;
-		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-		width: 24px;
-		height: 24px;
-	}
-	.content-text {
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-		margin: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.stat-badge {
+	.row-actions {
 		display: flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--text-muted);
-	}
-	.stat-badge .material-icons-round {
-		font-size: 14px;
-		color: var(--aero-rose);
-	}
-
-	.text-right {
-		text-align: right !important;
-	}
-	.btn-sm {
-		padding: 6px 12px;
-		font-size: 0.8rem;
-	}
-	.empty-row {
-		text-align: center;
-		color: var(--text-muted);
-		padding: 32px !important;
-	}
-	.loader-container {
-		padding: 64px;
-		text-align: center;
+		gap: 6px;
+		justify-content: flex-end;
 	}
 </style>
