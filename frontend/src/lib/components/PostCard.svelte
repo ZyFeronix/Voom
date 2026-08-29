@@ -1432,13 +1432,19 @@
 		position: absolute;
 		right: 0;
 		top: 100%;
-		margin-top: 4px;
+		margin-top: 6px;
 		background: var(--bg-surface-solid, var(--bg-surface));
-		border: 1px solid var(--glass-border);
+		border: 1px solid rgba(var(--accent-blue-rgb, 46, 134, 232), 0.3);
 		border-radius: var(--radius-sm);
-		padding: 4px;
-		box-shadow: var(--shadow-md), var(--glass-inset);
-		min-width: 140px;
+		padding: 5px;
+		/* Elevación clara + halo de acento para separarse del contenido de la tarjeta */
+		box-shadow:
+			var(--shadow-lg),
+			0 10px 28px rgba(0, 0, 0, 0.2),
+			0 0 0 1px rgba(255, 255, 255, 0.03),
+			0 0 18px rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12),
+			var(--glass-inset);
+		min-width: 156px;
 		z-index: 100;
 	}
 
@@ -1466,23 +1472,34 @@
 	.aero-dropdown-item {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 10px;
 		width: 100%;
-		padding: 8px 12px;
+		padding: 9px 12px;
 		border: none;
 		background: transparent;
 		text-align: left;
 		font-size: 0.9rem;
-		color: var(--text-secondary);
+		font-weight: 600;
+		color: var(--text-primary);
 		border-radius: var(--radius-xs);
 		cursor: pointer;
 		transition:
 			background var(--t-fast),
-			color var(--t-fast);
+			color var(--t-fast),
+			transform var(--t-fast);
+	}
+
+	.aero-dropdown-item .material-icons-round {
+		color: var(--accent-blue-base, #1b85f3);
+		transition: color var(--t-fast);
 	}
 
 	.aero-dropdown-item:hover {
-		background: var(--bg-overlay);
+		background: rgba(var(--accent-blue-rgb, 46, 134, 232), 0.12);
+		color: var(--aero-blue);
+	}
+
+	.aero-dropdown-item:hover .material-icons-round {
 		color: var(--aero-blue);
 	}
 
