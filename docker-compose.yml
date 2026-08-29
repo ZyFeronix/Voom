@@ -1,26 +1,91 @@
-version: '3.8'
+# =============================================================================
+# Voom! — Stack de producción (Docker / Portainer)
+#
+# Instrucciones completas para NO avanzados: DEPLOY.md
+#
+# Resumen:
+#   1. Apunta el DNS (A record) de tu dominio a la IP del servidor.
+#   2. Levanta el stack y define la variable DOMAIN (ej. voom.social).
+#      - JWT_SECRET es opcional: si no lo pones, se genera y guarda solo.
+#   3. Abre https://tu-dominio → el asistente de instalación crea la BD y el
+#      admin. En /admin/settings activa «Registro Solo con Invitación».
+#
+# El servicio caddy obtiene el certificado TLS automáticamente (Let's Encrypt)
+# y mantiene los websockets de Socket.IO sin configuración extra.
+# =============================================================================
 
 services:
-  vsocial:
-    build: .
-    container_name: vsocial_app
-    ports:
-      - "3000:3000"
+  # ── Aplicación Voom! (SvelteKit + Socket.IO) ─────────────────────────────
+  voom:
+    image: ghcr.io/dannydevsys/voom:latest # o build: . si compilas localmente
+    container_name: voom_app
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # URL pública ABSOLUTA (cookies Secure, CSRF, links de email):
+      - ORIGIN=https://${DOMAIN}
+      # Confía en las cabeceras X-Forwarded-* de Caddy:
+      - TRUST_PROXY=1
+      # Límite de cuerpo = máx. subida (50 MB por archivo):
+      - BODY_SIZE_LIMIT=52428800
+      # Persistencia (todo dentro del volumen /data):
       - DB_PATH=/data/database.sqlite
-      - JWT_SECRET=${JWT_SECRET}
       - UPLOAD_DIR=/data/uploads
+      - DATA_DIR=/data
+      - MIGRATIONS_DIR=/app/migrations
+      # Opcional: pégalo en la UI del stack o se genera y persiste solo.
+      - JWT_SECRET=${JWT_SECRET:-}
+      # Opcional (Turso remoto en vez de SQLite local):
+      # - DATABASE_URL=libsql://tu-db.turso.io
+      # - DATABASE_AUTH_TOKEN=tu-token
     volumes:
-      - vsocial_data:/data
+      - voom_data:/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+
+  # ── Proxy inverso con HTTPS automático (Let's Encrypt) ───────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: voom_caddy
+    depends_on:
+      - voom
+    ports:
+      - '80:80' # necesario para la validación del certificado
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+  # ── Backups diarios (opcional): activa el perfil "backup" ────────────────
+  # Copia la BD (snapshot consistente) y los uploads a /data/backups;
+  # conserva los últimos 7. Corre a diario a las 03:30.
+  backup:
+    image: alpine:3.20
+    container_name: voom_backup
+    profiles: ['backup']
+    depends_on:
+      - voom
+    volumes:
+      - voom_data:/data
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        apk add --no-cache sqlite >/dev/null 2>&1
+        while true; do
+          if [ "$$(date +%H:%M)" = "03:30" ]; then
+            sh /backup.sh /data || true
+            sleep 60
+          fi
+          sleep 30
+        done
+    restart: unless-stopped
 
 volumes:
-  vsocial_data:
+  voom_data:
+  caddy_data:
+  caddy_config:

@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TARGET_REPO_URL: "git.alexdevuwu.com/organizations/zyferonix/vsocial.git"
+      TARGET_REPO_URL: "git.alexdevuwu.com/organizations/zyferonix/voom.git"
       GITLAB_USER: "oauth2"
 
     steps:

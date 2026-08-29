@@ -1,0 +1,14 @@
+# Voom! — Caddyfile
+# HTTPS automático (Let's Encrypt) + proxy al contenedor Voom!.
+# Los websockets de Socket.IO funcionan sin configuración extra: Caddy
+# reenvía Upgrade/Connection y las cabeceras X-Forwarded-* por defecto.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Archivos subidos y assets con caché larga
+	@static path /uploads/*
+	header @static Cache-Control "public, max-age=86400"
+
+	reverse_proxy voom:3000
+}

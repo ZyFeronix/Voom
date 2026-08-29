@@ -26,6 +26,7 @@ node_modules/
 # Build outputs
 frontend/build/
 frontend/.svelte-kit/
+.svelte-kit/
 
 # Local environment files
 .env
@@ -54,6 +55,7 @@ tmp_*.sqlite-shm
 tmp_*.sqlite-wal
 
 # ─── Releases (el .zip va a GitHub Releases, no al repo) ───
+voom-*.zip
 vsocial-*.zip
 
 # ─── Docs y notas internas de agentes (no van al repo oficial) ───
@@ -94,6 +96,7 @@ Zyferonyx_full.png
 _auth_migration_backup/
 /media/
 ClassicMojis/
+VoomMojis/
 apply_prismatic.py
 build_emoticons.py
 clone_exact.mjs
@@ -124,3 +127,9 @@ frontend/src/routes/fix_radii.py
 /.perch/
 /SOUL.md
 /tools/
+
+# Residuos locales one-off (no forman parte del repo)
+qa_token.tmp
+VoomMojis.zip
+skype-emoticons/
+download_emoticons.mjs
