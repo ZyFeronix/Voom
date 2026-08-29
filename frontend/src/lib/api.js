@@ -83,6 +83,12 @@ export const auth = {
 	logout: () => post('/auth/logout', {}),
 	me: () => get('/auth/me'),
 	config: () => get('/auth/config'),
+	check: (params = {}) => {
+		const qs = new URLSearchParams(
+			Object.fromEntries(Object.entries(params).filter(([, v]) => v))
+		).toString();
+		return get(`/auth/check${qs ? '?' + qs : ''}`);
+	},
 	forgotPassword: (email) => post('/auth/forgot-password', { email }),
 	resetPassword: (token, password) => post('/auth/reset-password', { token, password }),
 	resendVerification: (email) => post('/auth/resend-verification', { email }),

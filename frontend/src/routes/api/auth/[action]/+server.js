@@ -396,6 +396,32 @@ export async function GET({ request, url, params }) {
 		return new Response('', { status: 302, headers: { Location: '/login?verified=1' } });
 	}
 
+	// ── GET /api/auth/check?username=&email= — disponibilidad de nombre/email ──
+	// Para el registro: comprueba en vivo si un usuario/correo ya está registrado.
+	// Comparación case-insensitive para no dejar colar variantes en mayúsculas.
+	if (action === 'check') {
+		const db = getDb();
+		const rawUsername = (url.searchParams.get('username') || '').trim();
+		const rawEmail = (url.searchParams.get('email') || '').trim();
+
+		let username_available = true;
+		let email_available = true;
+
+		if (rawUsername) {
+			const row = await db
+				.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)')
+				.get(rawUsername);
+			username_available = !row;
+		}
+
+		if (rawEmail) {
+			const row = await db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(rawEmail);
+			email_available = !row;
+		}
+
+		return json({ username_available, email_available });
+	}
+
 	// ── GET /api/auth/config — flags públicos de registro (sin auth) ──
 	if (action === 'config') {
 		const db = getDb();

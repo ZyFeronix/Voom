@@ -48,6 +48,14 @@
 	let shakeError = $state(false);
 	let mounted = $state(false);
 
+	// ── Disponibilidad username/email (debounced vs /api/auth/check) ───────
+	// Sentinela null = sin confirmar aún; true = libre; false = ya registrado.
+	let usernameAvailable = $state(null);
+	let emailAvailable = $state(null);
+	let usernameChecking = $state(false);
+	let emailChecking = $state(false);
+	let availabilityDebounce;
+
 	// ── Derived Validations ──────────────────────────────────────────────────
 	let usernameValid = $derived(/^[a-zA-Z0-9_]{3,32}$/.test(username.trim()));
 	let emailValid = $derived(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()));
@@ -65,10 +73,65 @@
 			!!birthDate &&
 			ageValid &&
 			acceptedTerms &&
+			usernameAvailable === true &&
+			emailAvailable === true &&
 			(!requireInviteCode || inviteCode.trim().length >= 6)
 	);
 
 	let step2Valid = $derived(selectedInterests.length === 3);
+
+	// ── Disponibilidad en vivo (debounced) ───────────────────────────────────
+	// Al escribir username/email, espera 500ms y consulta /auth/check. Mientras
+	// la respuesta está en vuelo los campos quedan "sin confirmar" (null), lo que
+	// bloquea el avance hasta validar que son libres.
+	$effect(() => {
+		const uname = username.trim();
+		const mail = email.trim();
+		const checkUsername = usernameValid && !!uname;
+		const checkEmail = emailValid && !!mail;
+
+		if (checkUsername) {
+			usernameAvailable = null;
+			usernameChecking = true;
+		}
+		if (checkEmail) {
+			emailAvailable = null;
+			emailChecking = true;
+		}
+
+		clearTimeout(availabilityDebounce);
+		availabilityDebounce = setTimeout(async () => {
+			try {
+				const res = await authApi.check({
+					username: checkUsername ? uname : '',
+					email: checkEmail ? mail : ''
+				});
+				// Solo aplica el resultado si el valor sigue sin cambiar (evita que
+				// una respuesta desordenada pise una validación más reciente).
+				if (checkUsername && username.trim() === uname) {
+					usernameAvailable = !!res?.username_available;
+					usernameChecking = false;
+				}
+				if (checkEmail && email.trim() === mail) {
+					emailAvailable = !!res?.email_available;
+					emailChecking = false;
+				}
+			} catch (_e) {
+				// Fail-safe: ante error dejamos el campo sin confirmar (bloqueado) y
+				// el servidor vuelve a validar con su 409 en el registro final.
+				if (username.trim() === uname) {
+					usernameAvailable = null;
+					usernameChecking = false;
+				}
+				if (email.trim() === mail) {
+					emailAvailable = null;
+					emailChecking = false;
+				}
+			}
+		}, 500);
+
+		return () => clearTimeout(availabilityDebounce);
+	});
 
 	// ── Lifecycle ────────────────────────────────────────────────────────────
 	$effect(() => {
@@ -405,6 +468,10 @@
 										<p class="vs-field-error">
 											Entre 3 y 32 caracteres (solo letras, números y _).
 										</p>
+									{:else if usernameChecking}
+										<p class="vs-field-hint">Comprobando disponibilidad…</p>
+									{:else if usernameAvailable === false}
+										<p class="vs-field-error">Este usuario ya está registrado.</p>
 									{/if}
 								</div>
 
@@ -434,6 +501,10 @@
 									</div>
 									{#if email && !emailValid}
 										<p class="vs-field-error">Introduce un correo electrónico válido.</p>
+									{:else if emailChecking}
+										<p class="vs-field-hint">Comprobando disponibilidad…</p>
+									{:else if emailAvailable === false}
+										<p class="vs-field-error">Este correo electrónico ya está registrado.</p>
 									{/if}
 								</div>
 
