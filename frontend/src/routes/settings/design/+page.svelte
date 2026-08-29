@@ -23,6 +23,10 @@
 	import AppPreviewStage from '$lib/components/settings/design/AppPreviewStage.svelte';
 	import ThemeSelector from '$lib/components/ThemeSelector.svelte';
 
+	/* Dominio reactivo del mockup de navegador: refleja el host real en el que
+	 * corre la app (p. ej. el túnel actual o voom.social) en lugar de un valor fijo. */
+	let siteHost = $derived(typeof window !== 'undefined' ? window.location.host : '');
+
 	/* ══════════════════════════ Constantes ══════════════════════════ */
 
 	const PRESETS = [
@@ -956,7 +960,7 @@
 								</div>
 								<div class="mockup-address">
 									<span class="material-icons-round lock-ico">lock</span>
-									<span>voom.social/u/{me?.username || 'perfil'}</span>
+									<span>{siteHost}/u/{me?.username || 'perfil'}</span>
 								</div>
 								<span class="mockup-badge">Lienzo en vivo</span>
 							</div>

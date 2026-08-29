@@ -18,6 +18,10 @@
 	let shared = $state(false);
 	let activeSampleNav = $state('feed');
 
+	// Dominio reactivo de la barra de URL del mockup: refleja el host real en el
+	// que corre la app (p. ej. el túnel actual o voom.social).
+	let siteHost = $derived(typeof window !== 'undefined' ? window.location.host : '');
+
 	const activePresetObj = $derived(APP_PRESETS.find((p) => p.id === appearanceStore.activePreset));
 
 	function toggleLike() {
@@ -66,7 +70,7 @@
 			</div>
 			<div class="stage-url-bar">
 				<span class="material-icons-round lock-icon" aria-hidden="true">lock</span>
-				<span class="url-text">voom.social/{activeSampleNav}</span>
+				<span class="url-text">{siteHost}/{activeSampleNav}</span>
 			</div>
 			<div class="stage-topbar-right">
 				{#if activePresetObj}
