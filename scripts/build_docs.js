@@ -5,6 +5,7 @@ const readmePath = path.join(__dirname, '../README.md');
 const docsPath = path.join(__dirname, '../DOCS.md');
 const architecturePath = path.join(__dirname, '../ARCHITECTURE.md');
 const contributingPath = path.join(__dirname, '../CONTRIBUTING.md');
+const changelogPath = path.join(__dirname, '../CHANGELOG.md');
 const licensePath = path.join(__dirname, '../LICENSE');
 
 const outDir = path.join(__dirname, '../frontend/static/docs');
@@ -18,27 +19,45 @@ const readme = fs.readFileSync(readmePath, 'utf-8');
 const docs = fs.readFileSync(docsPath, 'utf-8');
 const architecture = fs.readFileSync(architecturePath, 'utf-8');
 const contributing = fs.readFileSync(contributingPath, 'utf-8');
+const changelog = fs.readFileSync(changelogPath, 'utf-8');
 const licenseText = fs.readFileSync(licensePath, 'utf-8');
 
-// "Personality & SOUL.md" has spaces + an ampersand that break static serving.
-// It is served under a URL-safe name (Personality-and-SOUL.md).
-const SOUL_SAFE_NAME = 'Personality-and-SOUL.md';
+const readmeClean = readme;
+const docsClean = docs;
+const architectureClean = architecture;
+const contributingClean = contributing;
+const changelogClean = changelog;
 
-const fixSoulLinks = (str) =>
-    str.replace(/Personality\s*&\s*SOUL\.md/g, SOUL_SAFE_NAME)
-       .replace(/Personality%20&%20SOUL\.md/g, SOUL_SAFE_NAME);
+// Rebranding note: explain the VSocial → Voom! transition
+const rebrandingNote = `# Rebranding: VSocial → Voom!
 
-const readmeClean = fixSoulLinks(readme);
-const docsClean = fixSoulLinks(docs);
-const architectureClean = fixSoulLinks(architecture);
-const contributingClean = fixSoulLinks(contributing);
+**Voom!** es el nuevo nombre de la plataforma anteriormente conocida como **VSocial** (o **V-SOCIAL**). El rebranding se completó en agosto de 2026.
+
+## Qué cambió
+
+- **Nombre de marca**: "VSocial" / "V-SOCIAL" → **"Voom!"** en toda la interfaz de usuario, documentación, emails y metadatos.
+- **Dominio**: \`vsocial.app\` → \`voom.social\` (emails: \`noreply@voom.social\`).
+- **Assets**: Nuevo logo.svg con tipografía Outfit y efecto glassmorphism Neo-Aero; favicon actualizado.
+- **Configuración**: \`package.json\` nombra ahora \`voom\`; contenedores y volúmenes Docker pasan a llamarse \`voom_app\` / \`voom_data\`.
+- **Docs**: Todos los archivos .md, el manual de marca (DOCS_BRAND_ZYFERONYX.md) y el portal de documentación reflejan el nuevo nombre.
+
+## Qué se preservó (para compatibilidad)
+
+- **Claves de localStorage**: Las ~50 claves con prefijo \`vsocial_*\` (incluyendo \`vsocial_token\` para auth) **no se migraron**. Se conservaron para mantener la compatibilidad con usuarios existentes — renombrarlas requeriría una migración en el cliente que rompería sesiones activas.
+- **Clases CSS**: Los selectores \`.vsocial\`, \`.vs-brand__logo\`, \`.vsocial-col\` etc. permanecen sin cambios para no romper el sistema de estilos existente.
+- **Migraciones históricas**: Los archivos en \`migrations/*.sql\` conservan las menciones originales a VSocial como registro histórico.
+- **Cache del service worker**: El nombre de caché \`vsocial-cache-{version}\` se preserva para evitar crear caches obsoletas en navegadores de usuarios existentes.
+- **Cookie de consentimiento**: \`vsocial_cookie_consent\` mantiene su nombre técnico por cumplimiento RGPD.
+
+> **ZyFeronyx DevStudio** sigue siendo el estudio creador. La identidad visual pasa de verde cian eléctrico a un esquema de neón azul-eléctrico con acentos de menta, manteniendo la estética **Glassmorphism 2.0 + Neo-Aero**.
+`;
 
 const html = `<!DOCTYPE html>
 <html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VSocial - Documentación Oficial</title>
+    <title>Voom! - Documentación Oficial</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -51,16 +70,16 @@ const html = `<!DOCTYPE html>
     
     <style>
         :root {
-            --bg-base: #0f172a;
-            --primary: #00f2fe; /* Celeste aero */
-            --primary-glow: #1b85f3;
+            --bg-base: #040d17; /* Voom! Midnight Cyberspace */
+            --primary: #00d4aa; /* Voom! Aero Teal */
+            --primary-glow: #1b85f3; /* Voom! Electric Azure */
             --success: #10b981; /* Green esmeralda */
             
             /* Glassmorphism 2.0 Tokens */
-            --glass-surface: rgba(255, 255, 255, 0.08);
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --glass-highlight: rgba(255, 255, 255, 0.25);
-            --neon-primary: 0 0 15px rgba(27, 133, 243, 0.25);
+            --glass-surface: rgba(8, 27, 46, 0.65);
+            --glass-border: rgba(0, 212, 170, 0.3);
+            --glass-highlight: rgba(255, 255, 255, 0.45);
+            --neon-primary: 0 0 20px rgba(0, 212, 170, 0.4), 0 0 40px rgba(27, 133, 243, 0.2);
             --neon-success: 0 0 15px rgba(16, 185, 129, 0.25);
             
             --text-main: #f8fafc;
@@ -94,8 +113,8 @@ const html = `<!DOCTYPE html>
             width: 200%;
             height: 200%;
             background: 
-                radial-gradient(circle at 50% 50%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 30%);
+                radial-gradient(circle at 50% 50%, rgba(0, 212, 170, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 30%);
             z-index: -1;
             animation: liquid-rotate 30s linear infinite;
             pointer-events: none;
@@ -114,60 +133,111 @@ const html = `<!DOCTYPE html>
             z-index: 1;
         }
 
-        header {
+        .docs-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 3rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--glass-border);
+            justify-content: space-between;
+            gap: 20px;
+            padding: 12px 24px;
+            width: 100%;
+            box-sizing: border-box;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 2rem;
         }
 
-        .logo {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--text-main), var(--primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: var(--neon-primary);
-            letter-spacing: -0.05em;
-        }
-
-        .tabs {
+        /* 1. MARCA */
+        .docs-brand {
             display: flex;
-            gap: 1rem;
-            background: var(--glass-surface);
-            padding: 0.5rem;
-            border-radius: 100px;
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            flex-direction: column;
+            gap: 2px;
+            flex-shrink: 0; /* 👈 Impide que se comprima */
         }
 
-        .tab-btn {
+        .docs-brand-row {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .docs-brand .logo {
+            font-size: 1.35rem;
+            font-weight: 900;
+            color: #00d2ff;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        }
+
+        .docs-brand .version-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 7px;
+            background: rgba(0, 210, 255, 0.08);
+            border: 1px solid rgba(0, 210, 255, 0.25);
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-family: var(--font-mono, monospace);
+            color: #7dd3fc;
+            white-space: nowrap;
+        }
+
+        .docs-brand .version-badge .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 5px #10b981;
+            flex-shrink: 0;
+        }
+
+        .docs-brand .docs-subtitle {
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        /* 2. CÁPSULA UNIFICADA DE PESTAÑAS */
+        .docs-nav-bar {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 5px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 999px; /* Cápsula contenedora */
+            backdrop-filter: blur(8px);
+            flex-shrink: 0; /* 👈 CRUCIAL: impide que caiga a segunda fila */
+            white-space: nowrap;
+        }
+
+        /* Pestaña individual */
+        .nav-tab {
             background: transparent;
             border: none;
-            color: var(--text-muted);
-            padding: 0.75rem 1.5rem;
-            border-radius: 100px;
-            font-family: inherit;
-            font-weight: 600;
-            font-size: 0.95rem;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.6);
             cursor: pointer;
-            transition: all 0.3s var(--ease-spring);
-            position: relative;
-            overflow: hidden;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
         }
 
-        .tab-btn:hover {
-            color: var(--text-main);
+        .nav-tab:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.06);
         }
 
-        .tab-btn.active {
-            color: var(--text-main);
+        /* Pestaña activa con Aqua Glow */
+        .nav-tab.active {
             background: rgba(255, 255, 255, 0.12);
-            box-shadow: var(--neon-primary), inset 0 1px 0 var(--glass-highlight);
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            color: #ffffff !important;
+            font-weight: 600;
+            border: 1px solid rgba(0, 210, 255, 0.4);
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
         }
 
         .content-panel {
@@ -346,29 +416,6 @@ const html = `<!DOCTYPE html>
             display: block;
         }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success);
-            padding: 0.5rem 1rem;
-            border-radius: 100px;
-            font-weight: 500;
-            font-size: 0.85rem;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            box-shadow: var(--neon-success);
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--success);
-            animation: pulse-dot 2s infinite;
-        }
-
         @keyframes pulse-dot {
             0% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.2); }
@@ -376,9 +423,9 @@ const html = `<!DOCTYPE html>
         }
 
         @media (max-width: 768px) {
-            header { flex-direction: column; gap: 1.5rem; align-items: flex-start; }
-            .tabs { flex-wrap: wrap; width: 100%; justify-content: center; }
-            .tab-btn { flex: 1; text-align: center; }
+            .docs-header { flex-direction: column; gap: 1rem; align-items: flex-start; }
+            .docs-nav-bar { flex-wrap: wrap; gap: 4px; }
+            .nav-tab { flex: 1; text-align: center; font-size: 0.72rem; padding: 4px 8px; }
             .content-panel { padding: 1.5rem; }
             .license-pre { padding: 1.5rem; width: 100%; }
         }
@@ -386,40 +433,47 @@ const html = `<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <header>
-            <div>
-                <div class="logo">VSocial Docs</div>
-                <div style="margin-top: 0.5rem;">
-                    <div class="status-badge">
-                        <div class="status-dot"></div>
-                        Beta v0.6.0-beta.1 - Glassmorphism 2.0
-                    </div>
+        <header class="docs-header">
+            <!-- MARCA IZQUIERDA -->
+            <div class="docs-brand">
+                <div class="docs-brand-row">
+                    <span class="logo">Voom!</span>
+                    <span class="version-badge">
+                        <span class="dot"></span>
+                        <span>v0.6.0-beta.2</span>
+                    </span>
                 </div>
+                <span class="docs-subtitle">Documentación Oficial &amp; Guías</span>
             </div>
-            
-            <div class="tabs">
-                <button class="tab-btn active" data-target="readme">README</button>
-                <button class="tab-btn" data-target="docs">DOCS (Maestro)</button>
-                <button class="tab-btn" data-target="architecture">Arquitectura</button>
-                <button class="tab-btn" data-target="contributing">Contributing</button>
-                <button class="tab-btn" data-target="license">Licencia</button>
-            </div>
+
+            <!-- BARRA DE PESTAÑAS EN CÁPSULA (Derecha) -->
+            <nav class="docs-nav-bar">
+                <a href="#readme" class="nav-tab active">README</a>
+                <a href="#doc" class="nav-tab">Documentación</a>
+                <a href="#arch" class="nav-tab">Arquitectura</a>
+                <a href="#contrib" class="nav-tab">Contributing</a>
+                <a href="#changelog" class="nav-tab">Changelog</a>
+                <a href="#rebrand" class="nav-tab">Rebranding</a>
+                <a href="#licencia" class="nav-tab">Licencia</a>
+            </nav>
         </header>
 
-        <main>
+            <main>
             <div id="readme" class="content-panel active markdown-body"></div>
             <div id="docs" class="content-panel markdown-body"></div>
             <div id="architecture" class="content-panel markdown-body"></div>
             <div id="contributing" class="content-panel markdown-body"></div>
+            <div id="changelog" class="content-panel markdown-body"></div>
+            <div id="rebranding" class="content-panel markdown-body"></div>
             <div id="license" class="content-panel markdown-body">
                 <h1>Licencia y Protección Legal</h1>
-                <p>Acuerdo de usuario, términos de uso de V-SOCIAL y protecciones de propiedad intelectual.</p>
+                <p>Acuerdo de usuario, términos de uso de Voom! y protecciones de propiedad intelectual.</p>
 
                 <h2>Licencia AGPLv3</h2>
-                <p>V-SOCIAL es software libre bajo la Licencia Pública General Affero de GNU (AGPLv3). Esto garantiza libertades esenciales, pero impone obligaciones estrictamente respetadas:</p>
+                <p>Voom! es software libre bajo la Licencia Pública General Affero de GNU (AGPLv3). Esto garantiza libertades esenciales, pero impone obligaciones estrictamente respetadas:</p>
                 <ul>
                     <li><strong>Código Abierto:</strong> Si distribuyes o modificas esta plataforma, debes compartir el código fuente resultante bajo la misma licencia.</li>
-                    <li><strong>Uso en Red (cláusula §13):</strong> A diferencia de la GPLv3, la AGPLv3 exige que quien ponga una versión modificada de V-SOCIAL a disposición de usuarios a través de una red ofrezca también el código fuente a esos usuarios.</li>
+                    <li><strong>Uso en Red (cláusula §13):</strong> A diferencia de la GPLv3, la AGPLv3 exige que quien ponga una versión modificada de Voom! a disposición de usuarios a través de una red ofrezca también el código fuente a esos usuarios.</li>
                     <li><strong>Sin Garantía:</strong> El software se proporciona "tal cual", sin ninguna garantía implícita o explícita.</li>
                     <li><strong>Reconocimiento:</strong> Se debe mantener la atribución a los autores originales en todas las copias y derivados.</li>
                 </ul>
@@ -430,15 +484,15 @@ const html = `<!DOCTYPE html>
                 </div>
 
                 <h2>Protección Anti-Clonación (IP)</h2>
-                <p>Más allá de la lógica de negocio cubierta por AGPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de V-SOCIAL.</p>
+                <p>Más allá de la lógica de negocio cubierta por AGPLv3, la <strong>identidad visual, la marca y el sistema de diseño (Glassmorphism 2.0 / Neo-Aero)</strong> son propiedad intelectual exclusiva de Voom!.</p>
                 <ul>
-                    <li><strong>Identidad de Marca:</strong> No se permite el uso del nombre "V-SOCIAL", los logotipos, la tipografía distintiva ni el esquema de colores para engañar a usuarios o hacerse pasar por la plataforma oficial.</li>
+                    <li><strong>Identidad de Marca:</strong> No se permite el uso del nombre "Voom!", los logotipos, la tipografía distintiva ni el esquema de colores para engañar a usuarios o hacerse pasar por la plataforma oficial.</li>
                     <li><strong>Protección de Interfaz (Look & Feel):</strong> El clonado exacto de la interfaz de usuario con fines comerciales competidores está estrictamente prohibido sin autorización.</li>
                     <li><strong>Rate Limiting & Anti-Scraping:</strong> La infraestructura incluye protecciones activas. El scraping automatizado o la ingeniería inversa de los algoritmos de feeds privados se considerará un abuso de los términos de servicio.</li>
                 </ul>
 
                 <h2>Términos de Servicio (SLA)</h2>
-                <p>Al utilizar o alojar una instancia de V-SOCIAL, te comprometes a seguir los estándares de ingeniería y respeto al usuario (<em>Anti-Caja Negra</em>).</p>
+                <p>Al utilizar o alojar una instancia de Voom!, te comprometes a seguir los estándares de ingeniería y respeto al usuario (<em>Anti-Caja Negra</em>).</p>
                 <ul>
                     <li><strong>Privacidad del Usuario:</strong> Los feeds de Radar y Descubrimiento no deben ser manipulados con algoritmos ocultos.</li>
                     <li><strong>Uso Responsable:</strong> Queda prohibido el uso de la plataforma para distribuir malware, contenido ilícito o esquemas de fraude.</li>
@@ -458,6 +512,8 @@ const html = `<!DOCTYPE html>
     <script type="text/markdown" id="md-docs">\n${docsClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/markdown" id="md-architecture">\n${architectureClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/markdown" id="md-contributing">\n${contributingClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-changelog">\n${changelogClean.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
+    <script type="text/markdown" id="md-rebranding">\n${rebrandingNote.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
     <script type="text/plain" id="raw-license-content">\n${licenseText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n</script>
 
     <script>
@@ -524,6 +580,8 @@ const html = `<!DOCTYPE html>
                 renderMd('docs');
                 renderMd('architecture');
                 renderMd('contributing');
+                renderMd('changelog');
+                renderMd('rebranding');
 
                 // Populate raw license code block
                 const rawLic = document.getElementById('raw-license-content');
@@ -532,16 +590,28 @@ const html = `<!DOCTYPE html>
                     if (codeEl) codeEl.textContent = decodeHtml(rawLic.innerHTML).trim();
                 }
 
-                const switchTab = (tabId, anchorId = '') => {
-                    const tabBtn = document.querySelector(\`.tab-btn[data-target="\${tabId}"]\`);
-                    if (!tabBtn) return;
+                // Map hrefs abreviados → IDs de content-panel
+                const tabMap = {
+                    'readme': 'readme',
+                    'doc': 'docs',
+                    'arch': 'architecture',
+                    'contrib': 'contributing',
+                    'changelog': 'changelog',
+                    'rebrand': 'rebranding',
+                    'licencia': 'license'
+                };
 
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    tabBtn.classList.add('active');
+                const switchTab = (tabId, anchorId = '') => {
+                    const panelId = tabMap[tabId] || tabId;
+                    const navTab = document.querySelector(\`.nav-tab[href="#\${tabId}"]\`);
+                    if (!navTab) return;
+
+                    document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+                    navTab.classList.add('active');
 
                     document.querySelectorAll('.content-panel').forEach(p => {
                         p.classList.remove('active');
-                        if (p.id === tabId) {
+                        if (p.id === panelId) {
                             p.style.animation = 'none';
                             p.offsetHeight;
                             p.style.animation = null;
@@ -584,7 +654,7 @@ const html = `<!DOCTYPE html>
                                 let anchorId = '';
 
                                 if (isLicenseLink) {
-                                    targetTab = 'license';
+                                    targetTab = 'licencia';
                                 } else if (isHashLink) {
                                     anchorId = href.substring(1);
                                     const targetElem = document.getElementById(anchorId);
@@ -595,10 +665,18 @@ const html = `<!DOCTYPE html>
                                         targetTab = document.querySelector('.content-panel.active')?.id || 'readme';
                                     }
                                 } else {
-                                    const match = href.match(/^\\.?\\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING)\\.md(#.*)?$/i);
+                                    const match = href.match(/^\\.?\\/?(README|DOCS|ARCHITECTURE|CONTRIBUTING|CHANGELOG)\\.md(#.*)?$/i);
                                     if (match) {
                                         const name = match[1].toLowerCase();
-                                        targetTab = name === 'readme' ? 'readme' : name === 'docs' ? 'docs' : name === 'architecture' ? 'architecture' : 'contributing';
+                                        // Map panel IDs to nav-tab hrefs
+                                        const panelToHref = {
+                                            'readme': 'readme',
+                                            'docs': 'doc',
+                                            'architecture': 'arch',
+                                            'contributing': 'contrib',
+                                            'changelog': 'changelog'
+                                        };
+                                        targetTab = panelToHref[name] || name;
                                         if (match[2]) anchorId = match[2].substring(1);
                                     }
                                 }
@@ -614,10 +692,11 @@ const html = `<!DOCTYPE html>
 
                 setupLinks();
 
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const target = btn.getAttribute('data-target');
-                        switchTab(target);
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const href = tab.getAttribute('href').substring(1);
+                        switchTab(href);
                     });
                 });
 
@@ -625,8 +704,20 @@ const html = `<!DOCTYPE html>
                     const hash = window.location.hash.substring(1);
                     if (!hash) return;
 
-                    if (['readme', 'docs', 'architecture', 'contributing', 'license'].includes(hash)) {
-                        switchTab(hash);
+                    // Check if hash matches a nav-tab href (abreviado) or panel ID
+                    const validTabs = ['readme', 'doc', 'docs', 'arch', 'architecture', 'contrib', 'contributing', 'changelog', 'rebrand', 'rebranding', 'licencia', 'license'];
+                    if (validTabs.includes(hash)) {
+                        // Convert panel ID to nav-tab href
+                        const panelToHref = {
+                            'readme': 'readme',
+                            'docs': 'doc',
+                            'architecture': 'arch',
+                            'contributing': 'contrib',
+                            'changelog': 'changelog',
+                            'rebranding': 'rebrand',
+                            'license': 'licencia'
+                        };
+                        switchTab(panelToHref[hash] || hash);
                         return;
                     }
 
@@ -660,6 +751,8 @@ const linkedFiles = [
     'ARCHITECTURE.md',
     'CHANGELOG.md',
     'CONTRIBUTING.md',
+    'PACKAGING.md',
+    'DOCS_BRAND_ZYFERONYX.md',
     'schema_sqlite.sql',
     '.env.example',
     'LICENSE'
@@ -674,14 +767,6 @@ for (const file of linkedFiles) {
     } else {
         console.warn(`[build_docs] referenced file not found, skipped: ${file}`);
     }
-}
-
-const soulSrc = path.join(repoRoot, 'Personality & SOUL.md');
-if (fs.existsSync(soulSrc)) {
-    fs.copyFileSync(soulSrc, path.join(outDir, SOUL_SAFE_NAME));
-    copied++;
-} else {
-    console.warn('[build_docs] referenced file not found, skipped: Personality & SOUL.md');
 }
 
 console.log(`[build_docs] copied ${copied} linked source file(s) into static/docs/`);

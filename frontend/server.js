@@ -24,5 +24,5 @@ const server = createServer((req, res) => {
 initSocketIO(server);
 
 server.listen(port, host, () => {
-	console.log(`[V-SOCIAL] Production server running on http://${host}:${port}`);
+	console.log(`[VOOM] Production server running on http://${host}:${port}`);
 });

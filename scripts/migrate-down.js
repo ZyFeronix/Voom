@@ -1,5 +1,5 @@
 /**
- * VSocial Migration Downgrade Runner
+ * Voom! Migration Downgrade Runner
  * Usage: node scripts/migrate-down.js [number_of_migrations]
  */
 import { resolve } from 'path';

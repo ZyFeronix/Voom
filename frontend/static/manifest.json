@@ -1,11 +1,11 @@
 {
-  "name": "V-SOCIAL",
-  "short_name": "V-SOCIAL",
+  "name": "Voom!",
+  "short_name": "Voom!",
   "description": "La red social de próxima generación.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#1b85f3",
+  "background_color": "#040D17",
+  "theme_color": "#1B85F3",
   "icons": [
     {
       "src": "/logo.svg",

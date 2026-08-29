@@ -1,5 +1,5 @@
 /**
- * VSocial Database Seeder
+ * Voom! Database Seeder
  * Usage: node scripts/seed.js
  */
 import { initDb, getDb } from '../frontend/src/lib/server/db.js';
@@ -12,7 +12,7 @@ async function run() {
 
     // Seed system settings
     const settings = [
-        ['site_name', 'VSocial'],
+        ['site_name', 'Voom!'],
         ['allow_registration', '1'],
         ['max_upload_size_mb', '50'],
         ['reels_enabled', '1'],

@@ -3,7 +3,7 @@ import svelte from 'eslint-plugin-svelte';
 import globals from 'globals';
 
 /**
- * ESLint flat config for VSocial (SvelteKit 5, runes mode).
+ * ESLint flat config for Voom! (SvelteKit 5, runes mode).
  *
  * Notas:
  * - El parser de Svelte (svelte-eslint-parser) se aplica a `*.svelte`.
