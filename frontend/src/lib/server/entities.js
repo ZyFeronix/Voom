@@ -61,3 +61,49 @@ export function sanitizeHtml(html) {
 		.replace(/<embed\b[^>]*>/gi, '')
 		.replace(/<object\b[^>]*>.*?<\/object>/gi, '');
 }
+
+/**
+ * Limpia el cuerpo de una publicación removiendo cualquier bloque [METADATA] incrustado.
+ * @param {string} rawBody
+ * @returns {string}
+ */
+export function cleanPostBody(rawBody) {
+	if (!rawBody) return '';
+	const idx = rawBody.indexOf('[METADATA]');
+	return idx !== -1 ? rawBody.slice(0, idx).trim() : rawBody;
+}
+
+/**
+ * Extrae metadatos estructurados (encuestas, citas, ubicación, audio) incrustados
+ * en post.body y limpia post.body y post.content.
+ * @param {object} post - Objeto post con propiedad body
+ * @returns {object} el mismo post modificado
+ */
+export function parsePostMetadata(post) {
+	if (!post) return post;
+	const body = post.body || '';
+	const idx = body.indexOf('[METADATA]');
+	if (idx !== -1) {
+		post.body = body.slice(0, idx).trim();
+		post.content = post.body;
+		try {
+			const metaStr = body.slice(idx + 10).trim();
+			const meta = JSON.parse(metaStr);
+			if (meta.poll) {
+				post.poll = meta.poll;
+			}
+			if (meta.location) {
+				post.location = meta.location;
+			}
+			if (meta.quote) {
+				post.quoted_post = meta.quote;
+			}
+			if (meta.audio) {
+				post.audio = meta.audio;
+			}
+		} catch (e) {
+			console.error('Failed to parse post metadata:', e);
+		}
+	}
+	return post;
+}

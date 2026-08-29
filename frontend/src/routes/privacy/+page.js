@@ -1,3 +1,3 @@
-// Página legal estática (sin datos dinámicos): prerender para primer pintado instantáneo + SEO.
-export const prerender = true;
+// Página legal servida vía SSR unificado con el layout raíz
+export const prerender = false;
 export const ssr = true;

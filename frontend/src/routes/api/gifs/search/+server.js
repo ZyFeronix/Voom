@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
 
-// Usaremos fetch dinámico ya que klipy-js podría necesitar configuración específica.
-// O si klipy-js falló, fallback a Giphy/Tenor compatible.
-// La documentación de Klipy (klipy.co) usa endpoints REST.
+// Klipy REST API v1: la clave viaja en el path, no en cabeceras.
+// Se usa el fetch del evento (no el global) para no disparar el aviso de
+// SvelteKit sobre fetch durante SSR ni reintentos anidados del SDK klipy-js.
+const KLIPY_BASE = 'https://api.klipy.com/api/v1';
 
-export async function GET({ url }) {
+export async function GET({ url, fetch }) {
 	const query = url.searchParams.get('q') || '';
 	const limit = parseInt(url.searchParams.get('limit')) || 20;
 
@@ -26,41 +27,24 @@ export async function GET({ url }) {
 			});
 		}
 
-		// Klipy REST API
-		// Si 'klipy-js' fue instalado, lo importamos dinámicamente para no crashear si falla.
-		let klipyData = [];
-		try {
-			const { KlipyClient } = await import('klipy-js');
-			const klipy = new KlipyClient({ apiKey });
+		const endpoint = query
+			? `${KLIPY_BASE}/${apiKey}/gifs/search?q=${encodeURIComponent(query)}&per_page=${limit}`
+			: `${KLIPY_BASE}/${apiKey}/gifs/trending?per_page=${limit}`;
 
-			let results;
-			if (query) {
-				results = await klipy.gifs.search({ q: query, limit });
-			} else {
-				results = await klipy.gifs.trending({ limit });
-			}
-			klipyData = results.data || [];
-		} catch (sdkError) {
-			// Fallback si klipy-js no resuelve, usar HTTP Fetch
-			console.log('Klipy SDK Error, usando HTTP Fetch', sdkError.message);
-			const endpoint = query
-				? `https://api.klipy.co/v2/gifs/search?q=${encodeURIComponent(query)}&limit=${limit}`
-				: `https://api.klipy.co/v2/gifs/trending?limit=${limit}`;
-
-			const response = await fetch(endpoint, {
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					'Content-Type': 'application/json'
-				}
-			});
-			if (!response.ok) throw new Error('Klipy HTTP request failed: ' + response.statusText);
-			const data = await response.json();
-			klipyData = data.data || [];
+		const response = await fetch(endpoint, {
+			headers: { 'Content-Type': 'application/json' }
+		});
+		if (!response.ok) {
+			throw new Error('Klipy HTTP request failed: ' + response.statusText);
 		}
+
+		const payload = await response.json();
+		// Klipy envuelve los resultados: { data: { data: [...gifs], pagination } }
+		const gifs = payload?.data?.data ?? payload?.data ?? [];
 
 		return json({
 			success: true,
-			gifs: klipyData
+			gifs
 		});
 	} catch (err) {
 		console.error('Klipy API Error:', err);

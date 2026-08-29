@@ -106,6 +106,76 @@
 		}
 	];
 
+	// Navigation sections config
+	const navSections = [
+		{ id: 'mision', label: 'Misión', icon: 'auto_awesome' },
+		{ id: 'ecosistema', label: 'Ecosistema', icon: 'hub' },
+		{ id: 'arquitectura', label: 'Arquitectura', icon: 'memory' },
+		{ id: 'creadores', label: 'Creadores', icon: 'groups' },
+		{ id: 'seguridad', label: 'Seguridad', icon: 'verified_user' },
+		{ id: 'faq', label: 'FAQ', icon: 'help_outline' },
+		{ id: 'unirse', label: 'Unirse', icon: 'rocket_launch', isCta: true }
+	];
+
+	let navPillEl = $state(null);
+	let linkRefs = $state({});
+	let indicatorStyle = $state('opacity: 0;');
+	let isClickScrolling = false;
+	let clickScrollTimer = null;
+
+	function updateIndicator() {
+		if (!navPillEl || !activeSection) {
+			indicatorStyle = 'opacity: 0;';
+			return;
+		}
+		const activeEl = linkRefs[activeSection];
+		if (activeEl) {
+			const left = activeEl.offsetLeft;
+			const top = activeEl.offsetTop;
+			const width = activeEl.offsetWidth;
+			const height = activeEl.offsetHeight;
+			indicatorStyle = `transform: translate3d(${left}px, ${top}px, 0); width: ${width}px; height: ${height}px; opacity: 1;`;
+
+			// Auto-scroll horizontal suave dentro del pill si el elemento activo desborda
+			const scrollLeft = navPillEl.scrollLeft;
+			const pillWidth = navPillEl.clientWidth;
+			if (left < scrollLeft + 8) {
+				navPillEl.scrollTo({ left: Math.max(0, left - 16), behavior: 'smooth' });
+			} else if (left + width > scrollLeft + pillWidth - 8) {
+				navPillEl.scrollTo({ left: left + width - pillWidth + 16, behavior: 'smooth' });
+			}
+		} else {
+			indicatorStyle = 'opacity: 0;';
+		}
+	}
+
+	$effect(() => {
+		void activeSection;
+		updateIndicator();
+	});
+
+	function handleNavClick(e, sectionId) {
+		e.preventDefault();
+		activeSection = sectionId;
+		isClickScrolling = true;
+		clearTimeout(clickScrollTimer);
+		clickScrollTimer = setTimeout(() => {
+			isClickScrolling = false;
+		}, 850);
+
+		const target = document.getElementById(sectionId);
+		if (target) {
+			const topOffset = 80;
+			const elementPosition = target.getBoundingClientRect().top;
+			const offsetPosition = elementPosition + window.pageYOffset - topOffset;
+			window.scrollTo({
+				top: offsetPosition,
+				behavior: 'smooth'
+			});
+			history.replaceState(null, '', `#${sectionId}`);
+		}
+	}
+
 	// Specular lighting handler for interactive cards
 	function handleCardMouseMove(e) {
 		const card = e.currentTarget;
@@ -118,6 +188,58 @@
 
 	onMount(() => {
 		_isMounted = true;
+
+		const allTrackedSections = [
+			'hero',
+			'mision',
+			'ecosistema',
+			'arquitectura',
+			'creadores',
+			'seguridad',
+			'faq',
+			'unirse'
+		];
+		let scrollRaf = null;
+
+		function handleScroll() {
+			if (isClickScrolling) return;
+			if (scrollRaf) return;
+			scrollRaf = requestAnimationFrame(() => {
+				scrollRaf = null;
+				const scrollPosition = window.scrollY + 160;
+
+				for (let i = allTrackedSections.length - 1; i >= 0; i--) {
+					const id = allTrackedSections[i];
+					const el = document.getElementById(id);
+					if (el && el.offsetTop <= scrollPosition) {
+						if (activeSection !== id) {
+							activeSection = id;
+						}
+						break;
+					}
+				}
+			});
+		}
+
+		function handleResize() {
+			updateIndicator();
+		}
+
+		window.addEventListener('scroll', handleScroll, { passive: true });
+		window.addEventListener('resize', handleResize, { passive: true });
+
+		// Ajustar tras render inicial
+		setTimeout(() => {
+			handleScroll();
+			updateIndicator();
+		}, 100);
+
+		return () => {
+			window.removeEventListener('scroll', handleScroll);
+			window.removeEventListener('resize', handleResize);
+			clearTimeout(clickScrollTimer);
+			if (scrollRaf) cancelAnimationFrame(scrollRaf);
+		};
 	});
 </script>
 
@@ -130,60 +252,27 @@
 </svelte:head>
 
 <div class="about-page-wrapper">
-	<!-- Quick Floating Anchor Navigation -->
-	<nav class="quick-nav-pill glass-card" aria-label="Navegación de secciones">
-		<a
-			href="#mision"
-			class="nav-link {activeSection === 'mision' ? 'active' : ''}"
-			onclick={() => (activeSection = 'mision')}
-		>
-			<span class="material-icons-round">auto_awesome</span>
-			<span>Misión</span>
-		</a>
-		<a
-			href="#ecosistema"
-			class="nav-link {activeSection === 'ecosistema' ? 'active' : ''}"
-			onclick={() => (activeSection = 'ecosistema')}
-		>
-			<span class="material-icons-round">hub</span>
-			<span>Ecosistema</span>
-		</a>
-		<a
-			href="#arquitectura"
-			class="nav-link {activeSection === 'arquitectura' ? 'active' : ''}"
-			onclick={() => (activeSection = 'arquitectura')}
-		>
-			<span class="material-icons-round">memory</span>
-			<span>Arquitectura</span>
-		</a>
-		<a
-			href="#creadores"
-			class="nav-link {activeSection === 'creadores' ? 'active' : ''}"
-			onclick={() => (activeSection = 'creadores')}
-		>
-			<span class="material-icons-round">groups</span>
-			<span>Creadores</span>
-		</a>
-		<a
-			href="#seguridad"
-			class="nav-link {activeSection === 'seguridad' ? 'active' : ''}"
-			onclick={() => (activeSection = 'seguridad')}
-		>
-			<span class="material-icons-round">verified_user</span>
-			<span>Seguridad</span>
-		</a>
-		<a
-			href="#faq"
-			class="nav-link {activeSection === 'faq' ? 'active' : ''}"
-			onclick={() => (activeSection = 'faq')}
-		>
-			<span class="material-icons-round">help_outline</span>
-			<span>FAQ</span>
-		</a>
-		<a href="#unirse" class="nav-link cta-pill" onclick={() => (activeSection = 'unirse')}>
-			<span class="material-icons-round">rocket_launch</span>
-			<span>Unirse</span>
-		</a>
+	<!-- Quick Floating Anchor Navigation con slider dinámico -->
+	<nav class="quick-nav-pill glass-card" aria-label="Navegación de secciones" bind:this={navPillEl}>
+		<div
+			class="nav-slider-indicator"
+			class:is-cta={activeSection === 'unirse'}
+			style={indicatorStyle}
+			aria-hidden="true"
+		></div>
+		{#each navSections as section (section.id)}
+			<a
+				href="#{section.id}"
+				class="nav-link"
+				class:active={activeSection === section.id}
+				class:cta-pill={section.isCta}
+				bind:this={linkRefs[section.id]}
+				onclick={(e) => handleNavClick(e, section.id)}
+			>
+				<span class="material-icons-round">{section.icon}</span>
+				<span>{section.label}</span>
+			</a>
+		{/each}
 	</nav>
 
 	<main class="about-main-content" in:fade={{ duration: 500 }}>
@@ -278,7 +367,7 @@
 					<span class="material-icons-round">flag</span>
 					<span>Nuestra Filosofía</span>
 				</div>
-				<h2 class="section-title">El Manifiesto V-Social</h2>
+				<h2 class="section-title">El Manifiesto Voom!</h2>
 				<p class="section-subtitle">
 					Rechazamos el minimalismo estéril y los algoritmos diseñados para la retención tóxica.
 					Construimos software con alma, rendimiento y respeto.
@@ -286,18 +375,16 @@
 			</div>
 
 			<div class="manifesto-grid">
-				<!-- Pillar 1 -->
+				<!-- Pillar 1: Estética Glassmorphism 2.0 -->
 				<div
 					class="glass-card pillar-card"
+					style="--pillar-color: var(--aero-sky); --pillar-rgb: 46, 180, 255;"
 					role="presentation"
 					onmousemove={handleCardMouseMove}
 					in:fade={{ duration: 400, delay: 100 }}
 				>
-					<div
-						class="pillar-icon-box bg-cyan-glass"
-						style="flex: 0 0 54px; min-width: 54px; min-height: 54px;"
-					>
-						<span class="material-icons-round text-cyan">blur_on</span>
+					<div class="pillar-icon-box" style="flex: 0 0 56px; min-width: 56px; min-height: 56px;">
+						<span class="material-icons-round">blur_on</span>
 					</div>
 					<h3 class="pillar-heading">Estética Glassmorphism 2.0</h3>
 					<p class="pillar-body">
@@ -306,21 +393,22 @@
 						>), saturación dinámica, sombras de neón del color primario y micro-física de resorte
 						con <code class="code-tag">--ease-spring</code>.
 					</p>
-					<div class="pillar-tag text-cyan">Experiencia Visceral</div>
+					<div class="pillar-tag">
+						<span class="material-icons-round">auto_awesome</span>
+						<span>Experiencia Visceral</span>
+					</div>
 				</div>
 
-				<!-- Pillar 2 -->
+				<!-- Pillar 2: Rendimiento Extremo -->
 				<div
 					class="glass-card pillar-card"
+					style="--pillar-color: var(--aero-mint); --pillar-rgb: 0, 212, 170;"
 					role="presentation"
 					onmousemove={handleCardMouseMove}
 					in:fade={{ duration: 400, delay: 200 }}
 				>
-					<div
-						class="pillar-icon-box bg-emerald-glass"
-						style="flex: 0 0 54px; min-width: 54px; min-height: 54px;"
-					>
-						<span class="material-icons-round text-emerald">bolt</span>
+					<div class="pillar-icon-box" style="flex: 0 0 56px; min-width: 56px; min-height: 56px;">
+						<span class="material-icons-round">bolt</span>
 					</div>
 					<h3 class="pillar-heading">Rendimiento Extremo</h3>
 					<p class="pillar-body">
@@ -328,21 +416,22 @@
 						<strong>Write-Ahead Logging (WAL)</strong>. Cada consulta preparada se ejecuta en
 						sub-milisegundos, sin frameworks pesados ni latencia oculta.
 					</p>
-					<div class="pillar-tag text-emerald">Reactividad Quirúrgica</div>
+					<div class="pillar-tag">
+						<span class="material-icons-round">speed</span>
+						<span>Reactividad Quirúrgica</span>
+					</div>
 				</div>
 
-				<!-- Pillar 3 -->
+				<!-- Pillar 3: Soberanía Creativa -->
 				<div
 					class="glass-card pillar-card"
+					style="--pillar-color: var(--aero-amber); --pillar-rgb: 245, 166, 35;"
 					role="presentation"
 					onmousemove={handleCardMouseMove}
 					in:fade={{ duration: 400, delay: 300 }}
 				>
-					<div
-						class="pillar-icon-box bg-amber-glass"
-						style="flex: 0 0 54px; min-width: 54px; min-height: 54px;"
-					>
-						<span class="material-icons-round text-amber">monetization_on</span>
+					<div class="pillar-icon-box" style="flex: 0 0 56px; min-width: 56px; min-height: 56px;">
+						<span class="material-icons-round">monetization_on</span>
 					</div>
 					<h3 class="pillar-heading">Soberanía Creativa</h3>
 					<p class="pillar-body">
@@ -350,21 +439,22 @@
 						freelance sin intermediarios financieros. Tú decides el valor de tu arte y recibes el
 						100% de tus ingresos vía pagos directos P2P (PayPal, Ko-fi, Patreon).
 					</p>
-					<div class="pillar-tag text-amber">Economía 100% P2P</div>
+					<div class="pillar-tag">
+						<span class="material-icons-round">savings</span>
+						<span>Economía 100% P2P</span>
+					</div>
 				</div>
 
-				<!-- Pillar 4 -->
+				<!-- Pillar 4: Privacidad & RGPD Nativo -->
 				<div
 					class="glass-card pillar-card"
+					style="--pillar-color: var(--aero-rose); --pillar-rgb: 236, 72, 153;"
 					role="presentation"
 					onmousemove={handleCardMouseMove}
 					in:fade={{ duration: 400, delay: 400 }}
 				>
-					<div
-						class="pillar-icon-box bg-rose-glass"
-						style="flex: 0 0 54px; min-width: 54px; min-height: 54px;"
-					>
-						<span class="material-icons-round text-rose">privacy_tip</span>
+					<div class="pillar-icon-box" style="flex: 0 0 56px; min-width: 56px; min-height: 56px;">
+						<span class="material-icons-round">privacy_tip</span>
 					</div>
 					<h3 class="pillar-heading">Privacidad & RGPD Nativo</h3>
 					<p class="pillar-body">
@@ -372,7 +462,10 @@
 							class="code-tag">/api/users/export</code
 						>), cero píxeles de rastreo publicitario de terceros y derecho al olvido automatizado.
 					</p>
-					<div class="pillar-tag text-rose">Zero-Trust Real</div>
+					<div class="pillar-tag">
+						<span class="material-icons-round">lock</span>
+						<span>Zero-Trust Real</span>
+					</div>
 				</div>
 			</div>
 		</section>
@@ -386,7 +479,7 @@
 					<span class="material-icons-round">widgets</span>
 					<span>Funcionalidades Vivas</span>
 				</div>
-				<h2 class="section-title">Explora el Ecosistema V-Social</h2>
+				<h2 class="section-title">Explora el Ecosistema Voom!</h2>
 				<p class="section-subtitle">
 					Interactúa con los componentes reales de la plataforma. Diseñados para potenciar la
 					expresión, la comunidad y el crecimiento de creadores.
@@ -433,7 +526,7 @@
 			</div>
 
 			<!-- Dynamic Tab Content -->
-			<div class="ecosystem-tab-viewport glass-panel aero-card">
+			<div class="ecosystem-tab-viewport glass-panel">
 				<!-- TAB 1: FEED & CREATION -->
 				{#if activeEcosystemTab === 'feed'}
 					<div class="tab-pane" in:fade={{ duration: 300 }}>
@@ -719,7 +812,7 @@
 
 							<!-- Interactive Gamification Card -->
 							<div class="tab-demo-col">
-								<div class="gamification-preview-card glass-card aero-card">
+								<div class="gamification-preview-card glass-card">
 									<div class="level-badge-circle">
 										<span class="level-num">{calculatedLevel}</span>
 										<span class="level-lbl">NIVEL</span>
@@ -1022,7 +1115,7 @@
 		<!-- 6. SEGURIDAD Y PRIVACIDAD RGPD                                  -->
 		<!-- ══════════════════════════════════════════════════════════════════ -->
 		<section id="seguridad" class="privacy-section">
-			<div class="privacy-box glass-panel aero-card">
+			<div class="privacy-box glass-panel">
 				<div class="privacy-header-content">
 					<div
 						class="privacy-shield-icon"
@@ -1144,11 +1237,7 @@
 		<!-- 8. HUB DE LLAMADA A LA ACCIÓN (CTA FINAL)                         -->
 		<!-- ══════════════════════════════════════════════════════════════════ -->
 		<section id="unirse" class="cta-hub-section">
-			<div
-				class="cta-hub-card glass-panel aero-card"
-				role="presentation"
-				onmousemove={handleCardMouseMove}
-			>
+			<div class="cta-hub-card glass-panel" role="presentation" onmousemove={handleCardMouseMove}>
 				<div class="cta-glow-bg"></div>
 
 				<div class="cta-content-wrap">
@@ -1200,8 +1289,52 @@
 		position: relative;
 	}
 
+	/* Encabezados de sección compartidos (canon: landing + /about/verified) */
+	.section-header {
+		text-align: center;
+		margin-bottom: 3rem;
+	}
+
+	.section-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--accent-blue-light);
+		background: rgba(var(--accent-blue-rgb), 0.1);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.25);
+		padding: 0.35rem 0.9rem;
+		border-radius: var(--radius-full);
+		margin-bottom: 0.9rem;
+	}
+
+	.section-eyebrow .material-icons-round {
+		font-size: 1rem;
+	}
+
+	.section-title {
+		font-family: var(--font-display);
+		font-size: clamp(1.9rem, 3.5vw, 2.9rem);
+		font-weight: 900;
+		letter-spacing: -0.03em;
+		color: var(--text-primary);
+		margin: 0 0 0.75rem;
+		line-height: 1.15;
+	}
+
+	.section-subtitle {
+		font-size: 1.02rem;
+		color: var(--text-secondary);
+		max-width: 640px;
+		margin: 0 auto;
+		line-height: 1.6;
+	}
+
 	/* ══════════════════════════════════════════════════════════════════════
-	   FLOATING QUICK NAVIGATION BAR
+	   FLOATING QUICK NAVIGATION BAR WITH DYNAMIC SLIDER
 	   ══════════════════════════════════════════════════════════════════════ */
 	.quick-nav-pill {
 		position: sticky;
@@ -1216,13 +1349,44 @@
 		align-items: center;
 		gap: 0.35rem;
 		overflow-x: auto;
+		scrollbar-width: none;
 		background: var(--bg-surface);
 		backdrop-filter: var(--glass-blur);
 		border: 1px solid var(--border-subtle);
 		box-shadow: var(--shadow-sm), var(--shadow-glow);
 	}
 
+	.quick-nav-pill::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* Slider deslizante de fondo */
+	.nav-slider-indicator {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border-radius: var(--radius-full);
+		background: var(--accent-blue-base);
+		box-shadow: 0 4px 14px rgba(var(--accent-blue-rgb, 27, 133, 243), 0.4);
+		transition:
+			transform 0.38s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+			width 0.38s var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)),
+			height 0.2s ease,
+			opacity 0.25s ease,
+			background 0.3s ease,
+			box-shadow 0.3s ease;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	.nav-slider-indicator.is-cta {
+		background: linear-gradient(90deg, var(--aero-blue), var(--aero-mint));
+		box-shadow: 0 4px 16px rgba(0, 212, 170, 0.45);
+	}
+
 	.nav-link {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		align-items: center;
 		gap: 0.4rem;
@@ -1233,7 +1397,9 @@
 		color: var(--text-secondary);
 		text-decoration: none;
 		white-space: nowrap;
-		transition: all var(--t-fast);
+		transition:
+			color var(--t-fast),
+			background var(--t-fast);
 	}
 
 	.nav-link span.material-icons-round {
@@ -1242,19 +1408,16 @@
 
 	.nav-link:hover {
 		color: var(--text-primary);
-		background: rgba(var(--accent-blue-rgb), 0.12);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 	}
 
 	.nav-link.active {
 		color: #ffffff;
-		background: var(--accent-blue-base);
-		box-shadow: 0 4px 14px rgba(var(--accent-blue-rgb), 0.4);
+		background: transparent;
 	}
 
-	.nav-link.cta-pill {
-		background: linear-gradient(90deg, var(--aero-blue), var(--aero-mint));
-		color: #ffffff;
-		font-weight: 700;
+	.nav-link.cta-pill:not(.active) {
+		color: var(--accent-blue-light);
 	}
 
 	/* ══════════════════════════════════════════════════════════════════
@@ -1272,7 +1435,7 @@
 		overflow: hidden;
 		border: 1px solid var(--border-subtle);
 		background: var(--bg-surface);
-		backdrop-filter: blur(24px) saturate(1.2);
+		backdrop-filter: var(--glass-blur);
 		box-shadow:
 			var(--shadow-lg),
 			var(--shadow-glow),
@@ -1302,22 +1465,6 @@
 		100% {
 			transform: scale(1.05) rotate(5deg);
 		}
-	}
-
-	.hero-badge-pill {
-		position: relative;
-		z-index: 1;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.4rem 1rem;
-		border-radius: var(--radius-full);
-		background: rgba(var(--accent-blue-rgb), 0.12);
-		border: 1px solid rgba(var(--accent-blue-rgb), 0.3);
-		color: var(--accent-blue-light);
-		font-size: 0.85rem;
-		margin-bottom: 1.8rem;
-		box-shadow: 0 4px 15px rgba(var(--accent-blue-rgb), 0.15);
 	}
 
 	.badge-dot {
@@ -1351,11 +1498,11 @@
 		border-radius: var(--radius-full);
 		background: rgba(var(--accent-blue-rgb), 0.1);
 		border: 1px solid rgba(var(--accent-blue-rgb), 0.3);
-		color: var(--accent-blue-base);
+		color: var(--accent-blue-light);
 		font-size: 0.88rem;
 		font-weight: 700;
 		margin-bottom: 1.8rem;
-		backdrop-filter: blur(8px);
+		backdrop-filter: var(--glass-blur);
 	}
 
 	.hero-headline {
@@ -1405,7 +1552,7 @@
 		border-radius: var(--radius-lg);
 		background: rgba(var(--accent-blue-rgb), 0.05);
 		border: 1px solid var(--border-subtle);
-		backdrop-filter: blur(12px);
+		backdrop-filter: var(--glass-blur);
 		margin-bottom: 2.8rem;
 		box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.15);
 	}
@@ -1461,7 +1608,6 @@
 	.btn-hero-sub,
 	.btn-hero-demo {
 		padding: 0.85rem 1.6rem;
-		border-radius: var(--radius-md);
 		font-size: 1rem;
 		font-weight: 700;
 		display: flex;
@@ -1498,61 +1644,139 @@
 
 	.pillar-card {
 		padding: 2.2rem 1.8rem;
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-xl);
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
 		position: relative;
 		overflow: hidden;
-		transition: all var(--t-spring);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-spring),
+			border-color var(--t-base);
 		border: 1px solid var(--border-subtle);
 		background: var(--bg-surface);
+		backdrop-filter: var(--glass-blur);
+		box-shadow: var(--shadow-sm), var(--shadow-glow);
+		isolation: isolate;
+	}
+
+	/* Reflejo especular que sigue el cursor */
+	.pillar-card::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity 0.4s ease;
+		background: radial-gradient(
+			340px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+			rgba(var(--pillar-rgb, 27, 133, 243), 0.16),
+			transparent 65%
+		);
+		z-index: 1;
+	}
+
+	.pillar-card:hover::after {
+		opacity: 1;
 	}
 
 	.pillar-card:hover {
-		transform: translateY(-8px);
-		box-shadow: var(--shadow-lg), var(--shadow-glow);
-		border-color: rgba(var(--accent-blue-rgb), 0.4);
+		transform: translateY(-6px) scale(1.015);
+		border-color: rgba(var(--pillar-rgb, 27, 133, 243), 0.5);
+		box-shadow:
+			0 18px 40px rgba(0, 0, 0, 0.22),
+			0 0 24px rgba(var(--pillar-rgb, 27, 133, 243), 0.25),
+			inset 0 1px 2px rgba(255, 255, 255, 0.25);
+	}
+
+	.pillar-card > * {
+		position: relative;
+		z-index: 2;
 	}
 
 	.pillar-icon-box {
-		width: 54px;
-		height: 54px;
-		border-radius: var(--radius-md);
+		width: 56px;
+		height: 56px;
+		border-radius: var(--radius-lg);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		margin-bottom: 1.4rem;
-		border: 1px solid var(--border-subtle);
+		background: rgba(var(--pillar-rgb, 27, 133, 243), 0.12);
+		border: 1px solid rgba(var(--pillar-rgb, 27, 133, 243), 0.3);
+		box-shadow:
+			0 4px 14px rgba(var(--pillar-rgb, 27, 133, 243), 0.2),
+			inset 0 1px 2px rgba(255, 255, 255, 0.4);
+		transition:
+			transform var(--t-spring),
+			box-shadow var(--t-spring);
+	}
+
+	.pillar-card:hover .pillar-icon-box {
+		transform: scale(1.08) rotate(3deg);
+		box-shadow:
+			0 6px 20px rgba(var(--pillar-rgb, 27, 133, 243), 0.35),
+			inset 0 1px 2px rgba(255, 255, 255, 0.6);
 	}
 
 	.pillar-icon-box span {
-		font-size: 1.9rem;
+		font-size: 2rem;
+		color: var(--pillar-color, var(--accent-blue-light));
 	}
 
 	.pillar-heading {
 		font-family: var(--font-display);
 		font-size: 1.35rem;
 		font-weight: 800;
+		letter-spacing: -0.02em;
 		color: var(--text-primary);
 		margin-bottom: 0.8rem;
+		line-height: 1.25;
 	}
 
 	.pillar-body {
 		font-size: 0.95rem;
 		color: var(--text-secondary);
 		line-height: 1.65;
-		margin-bottom: 1.5rem;
+		margin-bottom: 1.6rem;
 		flex-grow: 1;
 	}
 
-	.pillar-tag {
-		font-size: 0.8rem;
+	.pillar-body strong {
+		color: var(--text-primary);
 		font-weight: 700;
-		padding: 0.3rem 0.75rem;
-		border-radius: var(--radius-sm);
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid var(--border-subtle);
+	}
+
+	.pillar-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		padding: 0.35rem 0.85rem;
+		border-radius: var(--radius-full);
+		background: rgba(var(--pillar-rgb, 27, 133, 243), 0.1);
+		border: 1px solid rgba(var(--pillar-rgb, 27, 133, 243), 0.28);
+		color: var(--pillar-color, var(--accent-blue-light));
+		box-shadow: 0 2px 8px rgba(var(--pillar-rgb, 27, 133, 243), 0.1);
+		transition:
+			transform var(--t-fast),
+			background var(--t-fast),
+			border-color var(--t-fast);
+	}
+
+	.pillar-tag span.material-icons-round {
+		font-size: 0.95rem;
+	}
+
+	.pillar-card:hover .pillar-tag {
+		transform: translateY(-1px);
+		background: rgba(var(--pillar-rgb, 27, 133, 243), 0.16);
+		border-color: rgba(var(--pillar-rgb, 27, 133, 243), 0.45);
 	}
 
 	/* ══════════════════════════════════════════════════════════════════
@@ -1592,7 +1816,7 @@
 	}
 
 	.eco-tab-btn.active {
-		color: #ffffff;
+		color: var(--text-on-accent);
 		background: var(--accent-blue-base);
 		box-shadow: 0 6px 18px rgba(var(--accent-blue-rgb), 0.4);
 	}
@@ -1772,7 +1996,7 @@
 
 	.mood-chip.selected {
 		background: var(--accent-blue-base);
-		color: #ffffff;
+		color: var(--text-on-accent);
 		border-color: transparent;
 	}
 
@@ -1844,9 +2068,9 @@
 		font-weight: 700;
 		padding: 0.25rem 0.6rem;
 		border-radius: var(--radius-full);
-		background: rgba(0, 212, 170, 0.12);
+		background: rgba(var(--aero-mint-rgb), 0.12);
 		color: var(--aero-mint);
-		border: 1px solid rgba(0, 212, 170, 0.3);
+		border: 1px solid rgba(var(--aero-mint-rgb), 0.3);
 	}
 
 	.mock-chat-feed {
@@ -1875,7 +2099,7 @@
 	.mock-bubble.outgoing {
 		align-self: flex-end;
 		background: var(--accent-blue-base);
-		color: #ffffff;
+		color: var(--text-on-accent);
 		border: 1px solid rgba(255, 255, 255, 0.2);
 	}
 
@@ -1962,13 +2186,13 @@
 	}
 
 	.calc-side.vsocial {
-		background: rgba(0, 212, 170, 0.1);
-		border: 1px solid rgba(0, 212, 170, 0.3);
+		background: rgba(var(--aero-mint-rgb), 0.1);
+		border: 1px solid rgba(var(--aero-mint-rgb), 0.3);
 	}
 
 	.calc-side.legacy {
-		background: rgba(244, 63, 94, 0.1);
-		border: 1px solid rgba(244, 63, 94, 0.25);
+		background: rgba(var(--aero-rose-rgb), 0.1);
+		border: 1px solid rgba(var(--aero-rose-rgb), 0.25);
 	}
 
 	.calc-platform-name {
@@ -2101,7 +2325,7 @@
 		height: 72px;
 		border-radius: 50%;
 		background: linear-gradient(135deg, var(--aero-blue), var(--aero-mint));
-		color: #ffffff;
+		color: var(--text-on-accent);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -2184,7 +2408,7 @@
 	}
 
 	.perk-pill.active {
-		border-color: rgba(0, 212, 170, 0.4);
+		border-color: rgba(var(--aero-mint-rgb), 0.4);
 		color: var(--text-primary);
 	}
 
@@ -2374,10 +2598,10 @@
 		padding: 3.5rem 2.5rem;
 		border-radius: var(--radius-xl);
 		background: var(--bg-surface);
-		border: 1px solid rgba(0, 212, 170, 0.3);
+		border: 1px solid rgba(var(--aero-mint-rgb), 0.3);
 		box-shadow:
 			var(--shadow-lg),
-			0 0 24px rgba(0, 212, 170, 0.18);
+			0 0 24px rgba(var(--aero-mint-rgb), 0.18);
 	}
 
 	.privacy-header-content {
@@ -2391,8 +2615,8 @@
 		width: 64px;
 		height: 64px;
 		border-radius: var(--radius-lg);
-		background: rgba(0, 212, 170, 0.12);
-		border: 1px solid rgba(0, 212, 170, 0.4);
+		background: rgba(var(--aero-mint-rgb), 0.12);
+		border: 1px solid rgba(var(--aero-mint-rgb), 0.4);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -2621,7 +2845,6 @@
 
 	.btn-cta-large {
 		padding: 0.95rem 1.8rem;
-		border-radius: var(--radius-md);
 		font-size: 1rem;
 		font-weight: 700;
 		display: flex;
@@ -2669,13 +2892,19 @@
 	}
 
 	.code-tag {
-		font-family: monospace;
-		font-size: 0.85em;
-		padding: 0.15rem 0.45rem;
+		display: inline-block;
+		white-space: nowrap;
+		word-break: keep-all;
+		font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+		font-size: 0.82em;
+		font-weight: 600;
+		padding: 0.15rem 0.5rem;
 		border-radius: var(--radius-xs);
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid var(--border-subtle);
+		background: rgba(var(--accent-blue-rgb, 27, 133, 243), 0.1);
+		border: 1px solid rgba(var(--accent-blue-rgb, 27, 133, 243), 0.25);
 		color: var(--aero-sky);
+		vertical-align: baseline;
+		line-height: 1.3;
 	}
 
 	/* Responsive tweaks */

@@ -5,31 +5,7 @@ import { json } from '@sveltejs/kit';
 import { getDb } from '$lib/server/db.js';
 import { optionalAuth } from '$lib/server/auth.js';
 import { anonymizePost } from '$lib/server/security.js';
-
-function parsePostMetadata(post) {
-	if (!post) return;
-	const body = post.body || '';
-	const idx = body.indexOf('\n[METADATA]');
-	if (idx !== -1) {
-		post.body = body.slice(0, idx).trim();
-		post.content = post.body;
-		try {
-			const metaStr = body.slice(idx + 11).trim();
-			const meta = JSON.parse(metaStr);
-			if (meta.poll) {
-				post.poll = meta.poll;
-			}
-			if (meta.location) {
-				post.location = meta.location;
-			}
-			if (meta.quote) {
-				post.quoted_post = meta.quote;
-			}
-		} catch (e) {
-			console.error('Failed to parse post metadata:', e);
-		}
-	}
-}
+import { parsePostMetadata } from '$lib/server/entities.js';
 
 export async function GET({ request, url }) {
 	const q = (url.searchParams.get('q') || '').trim();

@@ -2114,8 +2114,11 @@
 
 						{#if showMediaModal}
 							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
-								<div class="glass-panel p-4" style="min-height: max-content;">
-									<div class="flex justify-between items-center mb-3">
+								<div
+									class="glass-panel p-4 w-full"
+									style="min-height: max-content; box-sizing: border-box;"
+								>
+									<div class="w-full flex justify-between items-center mb-3">
 										<span
 											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
 										>
@@ -2127,6 +2130,7 @@
 											class="aqua-close-btn"
 											onclick={() => (showMediaModal = false)}
 											aria-label="Cerrar panel de multimedia"
+											title="Cerrar"
 										>
 											<span class="material-icons-round text-sm">close</span>
 										</button>
@@ -2163,10 +2167,10 @@
 						{#if showEmojis}
 							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div
-									class="glass-panel p-4"
-									style="position: relative; display: flex; flex-direction: column; align-items: center; min-height: max-content;"
+									class="glass-panel p-4 w-full"
+									style="position: relative; display: flex; flex-direction: column; min-height: max-content; box-sizing: border-box;"
 								>
-									<div class="w-full flex justify-between items-center mb-2">
+									<div class="w-full flex justify-between items-center mb-3">
 										<span
 											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
 										>
@@ -2178,6 +2182,7 @@
 											class="aqua-close-btn"
 											onclick={() => (showEmojis = false)}
 											aria-label="Cerrar emojis"
+											title="Cerrar"
 										>
 											<span class="material-icons-round text-sm">close</span>
 										</button>
@@ -2194,10 +2199,10 @@
 						{#if showGifModal}
 							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
 								<div
-									class="glass-panel p-4"
-									style="position: relative; display: flex; flex-direction: column; align-items: center; min-height: max-content;"
+									class="glass-panel p-4 w-full"
+									style="position: relative; display: flex; flex-direction: column; min-height: max-content; box-sizing: border-box;"
 								>
-									<div class="w-full flex justify-between items-center mb-2">
+									<div class="w-full flex justify-between items-center mb-3">
 										<span
 											class="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
 										>
@@ -2209,6 +2214,7 @@
 											class="aqua-close-btn"
 											onclick={() => (showGifModal = false)}
 											aria-label="Cerrar GIFs"
+											title="Cerrar"
 										>
 											<span class="material-icons-round text-sm">close</span>
 										</button>
@@ -2226,8 +2232,11 @@
 
 						{#if showPollModal}
 							<div transition:slide={{ duration: 350, easing: expoOut }} class="mt-3">
-								<div class="glass-panel p-4 w-full" style="min-height: max-content;">
-									<div class="panel-header flex justify-between items-center mb-3">
+								<div
+									class="glass-panel p-4 w-full"
+									style="min-height: max-content; box-sizing: border-box;"
+								>
+									<div class="panel-header w-full flex justify-between items-center mb-3">
 										<span
 											class="panel-title text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5"
 										>
@@ -2239,6 +2248,7 @@
 											class="aqua-close-btn"
 											onclick={() => (showPollModal = false)}
 											aria-label="Cerrar encuesta"
+											title="Cerrar"
 										>
 											<span class="material-icons-round text-sm">close</span>
 										</button>
@@ -2283,10 +2293,11 @@
 												<button
 													type="button"
 													class="aqua-close-btn shrink-0"
-													style="width: 28px; height: 28px;"
+													style="width: 28px; height: 28px; flex: 0 0 28px; min-width: 28px; min-height: 28px; border-radius: var(--radius-sm, 8px);"
 													onclick={() =>
 														(pollOptions = pollOptions.filter((_, i) => i !== idx + 2))}
 													aria-label="Eliminar opción"
+													title="Eliminar opción"
 												>
 													<span class="material-icons-round text-xs">close</span>
 												</button>
@@ -4343,8 +4354,10 @@
 	.aqua-close-btn {
 		width: 32px;
 		height: 32px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		flex: 0 0 32px;
+		min-width: 32px;
+		min-height: 32px;
+		border-radius: var(--radius-md, 10px);
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid var(--border-subtle);
 		color: var(--text-muted);
@@ -4352,12 +4365,21 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: all 0.2s;
+		padding: 0;
+		transition:
+			background var(--t-fast),
+			color var(--t-fast),
+			border-color var(--t-fast),
+			transform 0.18s var(--ease-spring);
 	}
 	.aqua-close-btn:hover {
 		background: rgba(239, 68, 68, 0.15);
 		color: #ef4444;
-		border-color: rgba(239, 68, 68, 0.3);
+		border-color: rgba(239, 68, 68, 0.35);
+		transform: scale(1.06);
+	}
+	.aqua-close-btn:active {
+		transform: scale(0.94);
 	}
 
 	.aqua-preset-card {

@@ -413,10 +413,10 @@
 
 <article
 	bind:this={cardRef}
-	class="aero-post-card animate-slide-in-up"
+	class="aero-post-card animate-slide-in-up {showMenu || shareMenuOpen ? 'has-open-dropdown' : ''}"
 	style="position: relative; z-index: {showDeleteModal
 		? 50
-		: showCommentEmojis || showCommentGifs || showMenu
+		: showCommentEmojis || showCommentGifs || showMenu || shareMenuOpen
 			? 40
 			: 2}; min-height: {showDeleteModal ? '240px' : 'auto'};"
 >

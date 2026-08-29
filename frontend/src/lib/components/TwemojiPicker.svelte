@@ -409,7 +409,7 @@
 			</button>
 		{/each}
 		<div style="flex: 1;"></div>
-		{#if onClose}
+		{#if onClose && variant !== 'inline'}
 			<button type="button" class="close-btn" onclick={onClose} title="Cerrar">
 				<span class="material-icons-round" style="font-size:16px">close</span>
 			</button>
@@ -507,6 +507,15 @@
 		background: transparent !important;
 		box-shadow: none;
 	}
+	.emoji-picker.variant-inline .tabs-container {
+		padding: 0 0 10px 0;
+	}
+	.emoji-picker.variant-inline .search-box {
+		padding: 0;
+	}
+	.emoji-picker.variant-inline .load-more {
+		margin: 0;
+	}
 	.tabs-container {
 		display: flex;
 		gap: 6px;
@@ -520,19 +529,22 @@
 		display: flex;
 		align-items: center;
 		flex-shrink: 0;
+		width: 100%;
 	}
 	.search-icon {
 		position: absolute;
 		left: 10px;
-		font-size: 15px;
+		font-size: 16px;
 		color: var(--text-tertiary);
 		pointer-events: none;
 	}
 	.search-input {
 		width: 100%;
-		padding: 7px 10px 7px 32px;
-		font-size: 0.8rem;
-		border-radius: var(--radius-squircle);
+		height: 36px;
+		padding: 0 12px 0 34px;
+		font-size: 0.82rem;
+		border-radius: var(--radius-md, 12px);
+		box-sizing: border-box;
 	}
 	.no-results {
 		grid-column: 1 / -1;
@@ -544,27 +556,37 @@
 	.load-more {
 		flex-shrink: 0;
 		border: 1px solid var(--border-subtle);
-		background: var(--bg-overlay);
+		background: var(--bg-surface-elevated, var(--bg-overlay));
 		color: var(--text-secondary);
-		font-size: 0.72rem;
+		font-size: 0.75rem;
 		font-weight: 600;
-		padding: 6px 10px;
-		border-radius: var(--radius-squircle);
+		padding: 8px 14px;
+		border-radius: var(--radius-md, 12px);
 		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		box-sizing: border-box;
 		transition:
 			background var(--t-fast),
-			color var(--t-fast);
+			border-color var(--t-fast),
+			color var(--t-fast),
+			transform var(--t-fast);
 	}
 	.load-more:hover {
 		background: var(--bg-surface-hover);
+		border-color: rgba(var(--accent-blue-rgb), 0.35);
 		color: var(--text-primary);
+	}
+	.load-more:active {
+		transform: scale(0.99);
 	}
 	.tab-btn {
 		background: transparent;
 		border: 1px solid transparent;
 		padding: 5px 10px;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		border-radius: var(--radius-sm, 8px);
 		cursor: pointer;
 		transition:
 			background var(--t-fast),
@@ -611,7 +633,7 @@
 		background: rgba(255, 0, 0, 0.1);
 		color: var(--rose-500, #f43f5e);
 	}
-	/* ── Grid Neo-Aero: tiles squircle con halo de acento al hover ── */
+	/* ── Grid Neo-Aero: tiles con halo de acento al hover ── */
 	.emoji-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
@@ -653,8 +675,7 @@
 		border: 1px solid transparent;
 		cursor: pointer;
 		padding: 0;
-		border-radius: var(--radius-squircle);
-		corner-shape: squircle;
+		border-radius: var(--radius-sm, 8px);
 		transition:
 			transform 0.18s var(--ease-spring),
 			background var(--t-fast),

@@ -1,9 +1,9 @@
 <script>
 	/**
-	 * MediaLightbox.svelte - Visor de Medios Universal Glassmorphism 2.0 / Neo-Aero para V-Social
+	 * MediaLightbox.svelte - Visor de Medios Universal Glassmorphism 2.0 / Neo-Aero para Voom!
 	 *
 	 * Características:
-	 * - Diseño Split-View 100% integrado al sistema de diseño V-Social y respetuoso con los temas (Light, Dark, Midnight).
+	 * - Diseño Split-View 100% integrado al sistema de diseño Voom! y respetuoso con los temas (Light, Dark, Midnight).
 	 * - Motor de Zoom fluido y continuo (1x a 4x) con interpolación suave en rueda y doble click.
 	 * - Paneo libre con física de inercia, fricción y contención estricta de límites (la imagen nunca se pierde).
 	 * - Doble click para zoom suave (1x <-> 2.2x).

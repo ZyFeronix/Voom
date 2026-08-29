@@ -10,7 +10,7 @@ const ALLOWED_HOSTS = [
 	'media.tenor.com'
 ];
 
-export async function GET({ url }) {
+export async function GET({ url, fetch }) {
 	const targetUrl = url.searchParams.get('url');
 	if (!targetUrl) {
 		throw error(400, 'Missing url parameter');
@@ -28,7 +28,7 @@ export async function GET({ url }) {
 
 		const res = await fetch(targetUrl, {
 			headers: {
-				'User-Agent': 'V-Social/2.0'
+				'User-Agent': 'Voom/2.0'
 			}
 		});
 

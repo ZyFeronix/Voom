@@ -1142,7 +1142,7 @@
 		</div>
 	</section>
 
-	<!-- Comparison Section: V-Social vs Traditional Social Networks -->
+	<!-- Comparison Section: Voom! vs Traditional Social Networks -->
 	<section class="comparison-section glass-panel">
 		<div class="section-badge">
 			<span class="material-icons-round text-sm">compare_arrows</span>

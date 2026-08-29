@@ -156,7 +156,7 @@
 					</div>
 
 					<p class="sample-post-text">
-						¡Explorando la nueva estética <strong>Neo-Aero</strong> en V-Social! Los reflejos de
+						¡Explorando la nueva estética <strong>Neo-Aero</strong> en Voom!! Los reflejos de
 						cristal líquido y la fluidez del diseño se sienten impecables. ✨
 						<span class="tag">#Voom!</span>
 						<span class="tag">#Glassmorphism</span>

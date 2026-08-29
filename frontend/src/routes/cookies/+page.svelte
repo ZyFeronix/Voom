@@ -1,22 +1,49 @@
 <script>
 	import { fade } from 'svelte/transition';
+	import { page } from '$app/state';
 </script>
 
 <svelte:head>
 	<title>Política de Cookies - Voom!</title>
 </svelte:head>
 
-<div class="legal-container" in:fade={{ duration: 500 }}>
+<div class="legal-container" in:fade={{ duration: 300 }}>
+	<header class="legal-header glass-panel">
+		<a href="/" class="legal-brand-link">
+			<span class="legal-brand-badge">VS</span>
+			<span class="legal-brand-text font-display">Voom!</span>
+		</a>
+		<nav class="legal-nav-tabs">
+			<a href="/terms" class="legal-tab-btn" class:active={page.url.pathname === '/terms'}>
+				<span class="material-icons-round text-sm">gavel</span>
+				<span>Términos</span>
+			</a>
+			<a href="/privacy" class="legal-tab-btn" class:active={page.url.pathname === '/privacy'}>
+				<span class="material-icons-round text-sm">security</span>
+				<span>Privacidad</span>
+			</a>
+			<a href="/cookies" class="legal-tab-btn" class:active={page.url.pathname === '/cookies'}>
+				<span class="material-icons-round text-sm">cookie</span>
+				<span>Cookies</span>
+			</a>
+		</nav>
+	</header>
+
 	<div class="glass-card aero-card legal-card">
 		<h1 class="legal-title">Política de Cookies</h1>
-		<p class="legal-updated">Última actualización: 22 de julio de 2026</p>
+		<p class="legal-updated">Última actualización: 29 de agosto de 2026</p>
 
 		<section>
 			<h2>1. Qué son las cookies</h2>
 			<p>
 				Las cookies y los mecanismos de almacenamiento del navegador (como localStorage) son
 				pequeños ficheros o datos que el sitio guarda en tu dispositivo para mantener tu sesión,
-				recordar preferencias o mejorar tu experiencia. Esta política explica cuáles utiliza Voom!.
+				recordar preferencias, asegurar las conexiones en tiempo real o mejorar tu experiencia. Esta
+				política explica cuáles utiliza Voom! <em
+					>(Nota: dado que el proyecto se llamó originalmente V-SOCIAL, los nombres técnicos de las
+					cookies y claves de almacenamiento conservan el prefijo <code>vsocial_</code> por motivos de
+					retrocompatibilidad y estabilidad de la plataforma)</em
+				>.
 			</p>
 		</section>
 
@@ -35,68 +62,87 @@
 					<tr>
 						<td><code>vsocial_token</code></td>
 						<td>Técnica / esencial</td>
-						<td>Mantiene tu sesión de autenticación. Se usa junto con el almacenamiento local.</td>
+						<td
+							>Mantiene tu sesión de autenticación. Es necesaria para el funcionamiento seguro de la
+							plataforma y llamadas API.</td
+						>
 						<td>365 días · SameSite=Strict · Secure</td>
 					</tr>
 					<tr>
 						<td><code>vsocial_cookie_consent</code></td>
 						<td>Consentimiento</td>
-						<td>Recuerda tu elección respecto a esta política de cookies.</td>
+						<td
+							>Recuerda tu elección respecto al aviso de cookies para no mostrar el banner
+							repetidamente.</td
+						>
 						<td>365 días · SameSite=Strict · Secure</td>
 					</tr>
 				</tbody>
 			</table>
 			<p>
 				No utilizamos cookies de analítica, publicidad ni seguimiento de terceros. Las cookies
-				presentes son estrictamente necesarias para el funcionamiento de la autenticación.
+				presentes son estrictamente necesarias (técnicas) para el funcionamiento de la plataforma.
 			</p>
 		</section>
 
 		<section>
 			<h2>3. Almacenamiento local (localStorage)</h2>
 			<p>
-				El sitio también guarda las siguientes preferencias en el almacenamiento local del
-				navegador:
+				El sitio también guarda preferencias funcionales y de estado en el almacenamiento local de
+				tu navegador. Estos datos no se envían al servidor de forma automática con cada petición
+				web, sino que se utilizan para el funcionamiento del cliente (Svelte):
 			</p>
 			<ul>
-				<li><code>vsocial_token</code> — token de autenticación.</li>
-				<li><code>vsocial_theme</code> — tema visual (claro/oscuro/auto).</li>
-				<li><code>vsocial_mic_id</code> — micrófono preferido para grabaciones.</li>
-				<li><code>vsocial_pwa_dismissed</code> — recordatorio de instalación de la app.</li>
-				<li><code>vs_recent_searches</code> — búsquedas recientes.</li>
-				<li><code>vs_sidebar_expanded</code> — estado del menú lateral.</li>
-				<li><code>vsocial_cookie_consent</code> — tu elección de consentimiento de cookies.</li>
+				<li><code>vsocial_token</code> — token JWT de autenticación primario.</li>
+				<li><code>vsocial_theme</code> — preferencia de tema visual (light/dark/midnight).</li>
+				<li>
+					<code>vsocial_mic_id</code> / <code>vsocial_cam_id</code> — hardware preferido para grabaciones
+					y llamadas WebRTC.
+				</li>
+				<li>
+					<code>vsocial_pwa_dismissed</code> — registro para no mostrar el recordatorio de instalación
+					PWA.
+				</li>
+				<li><code>vs_recent_searches</code> — historial local de búsquedas recientes.</li>
+				<li><code>vs_sidebar_expanded</code> — estado visual del menú lateral.</li>
+				<li>
+					<code>vsocial_cookie_consent</code> — réplica local de tu elección de consentimiento de cookies.
+				</li>
 			</ul>
-			<p>Puedes vaciar estos datos en cualquier momento desde las preferencias de tu navegador.</p>
+			<p>
+				Puedes vaciar estos datos en cualquier momento desde las herramientas de desarrollador o
+				preferencias de tu navegador.
+			</p>
 		</section>
 
 		<section>
 			<h2>4. Gestión y revocación del consentimiento</h2>
 			<p>
-				Puedes aceptar o rechazar las cookies no esenciales desde el banner que se muestra en tu
-				primera visita. Como Voom! solo emplea cookies esenciales para la autenticación, la
-				plataforma sigue funcionando incluso si rechazas el consentimiento, aunque no se guardará tu
-				preferencia. Para revocar o modificar tu elección puedes borrar la cookie <code
+				Puedes aceptar o configurar tus preferencias desde el banner de cookies que se muestra en tu
+				primera visita. Como Voom! solo emplea cookies técnicas esenciales para la autenticación y
+				seguridad, la plataforma requiere ciertas cookies para operar si inicias sesión. Para
+				revocar tu elección y volver a ver el banner, puedes borrar la cookie <code
 					>vsocial_cookie_consent</code
-				> y la entrada correspondiente en el almacenamiento local; el banner volverá a mostrarse.
+				> y su equivalente en el almacenamiento local.
 			</p>
 		</section>
 
 		<section>
 			<h2>5. Cómo eliminar las cookies</h2>
 			<p>
-				Los navegadores ofrecen opciones para bloquear o eliminar cookies y datos de sitios.
-				Consulta la ayuda de tu navegador para gestionar las preferencias de privacidad. Ten en
-				cuenta que eliminar la cookie de sesión (<code>vsocial_token</code>) cerrará tu sesión y
-				tendrás que volver a autenticarte.
+				Los navegadores ofrecen opciones nativas para bloquear, limpiar o eliminar cookies y datos
+				de sitios web. Consulta la ayuda de tu navegador para gestionar estas preferencias de
+				privacidad de manera global. Ten en cuenta que eliminar la cookie y el valor local de sesión
+				(<code>vsocial_token</code>) cerrará inmediatamente tu sesión activa en Voom!.
 			</p>
 		</section>
 
 		<section>
 			<h2>6. Cambios en esta política</h2>
 			<p>
-				Si la plataforma incorpora nuevas cookies o mecanismos de almacenamiento, esta política se
-				actualizará y la fecha de revisión se indicará en la parte superior.
+				Si la plataforma incorpora nuevas funciones que requieran almacenamiento en el cliente (ej.
+				nuevas preferencias de usuario), esta política se actualizará y la fecha de revisión se
+				reflejará en la parte superior.
 			</p>
 		</section>
 	</div>
@@ -110,6 +156,71 @@
 		position: relative;
 		z-index: 1;
 		min-height: 100vh;
+	}
+	.legal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem 1.25rem;
+		margin-bottom: 1.5rem;
+		border-radius: var(--radius-lg);
+		background: var(--bg-surface);
+		border: 1px solid var(--border-glass, var(--border-subtle));
+		box-shadow: var(--shadow-sm);
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+	.legal-brand-link {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		text-decoration: none;
+		color: var(--text-primary);
+		transition: transform var(--t-fast);
+	}
+	.legal-brand-link:hover {
+		transform: scale(1.03);
+	}
+	.legal-brand-badge {
+		background: var(--accent-gradient, linear-gradient(90deg, #0ea5e9 0%, #10b981 100%));
+		color: #fff;
+		font-weight: 900;
+		font-size: 0.8rem;
+		padding: 0.25rem 0.5rem;
+		border-radius: var(--radius-xs);
+		letter-spacing: 0.05em;
+	}
+	.legal-brand-text {
+		font-weight: 800;
+		font-size: 1.15rem;
+		letter-spacing: -0.02em;
+	}
+	.legal-nav-tabs {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.legal-tab-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.45rem 0.85rem;
+		border-radius: var(--radius-full);
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-decoration: none;
+		color: var(--text-secondary);
+		transition: all var(--t-fast);
+		border: 1px solid transparent;
+	}
+	.legal-tab-btn:hover {
+		color: var(--text-primary);
+		background: rgba(255, 255, 255, 0.06);
+	}
+	.legal-tab-btn.active {
+		color: #fff;
+		background: var(--accent-blue-base, #1b85f3);
+		box-shadow: 0 4px 12px rgba(27, 133, 243, 0.35);
 	}
 	.legal-card {
 		padding: 3rem;

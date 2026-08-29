@@ -32,9 +32,20 @@
 	// aparecen en momentos distintos (rail instantáneo, topbar 0.28s, canvas
 	// 0.32s) — se ve como un fallo de carga fragmentado. En esos cruces la VT
 	// se hace root-only: un único crossfade de toda la página.
-	const SHELLLESS_ROUTES = ['/', '/login', '/register', '/maintenance', '/reset-password'];
+	const SHELLLESS_ROUTES = [
+		'/',
+		'/login',
+		'/register',
+		'/maintenance',
+		'/reset-password',
+		'/terms',
+		'/privacy',
+		'/cookies',
+		'/about'
+	];
 	const isShellless = (pathname) =>
-		SHELLLESS_ROUTES.includes(pathname) || pathname.startsWith('/admin');
+		pathname.startsWith('/admin') ||
+		(!authStore.isAuthenticated && SHELLLESS_ROUTES.includes(pathname));
 
 	const SECTION_ORDER = [
 		'/feed',
@@ -222,11 +233,8 @@
 		return () => window.removeEventListener('global_settings_update', handleSettingsUpdate);
 	});
 
-	let hasBootedInSession = $state(
-		typeof window !== 'undefined' && typeof sessionStorage !== 'undefined'
-			? sessionStorage.getItem('vsocial_booted') === '1'
-			: false
-	);
+	let hasBootedInSession = $state(false);
+
 	let installChecked = $state(false);
 	let isInstalled = $state(false);
 	let bootGraceElapsed = $state(false);
@@ -239,6 +247,9 @@
 	});
 
 	onMount(() => {
+		if (typeof sessionStorage !== 'undefined') {
+			hasBootedInSession = sessionStorage.getItem('vsocial_booted') === '1';
+		}
 		if (!hasBootedInSession) {
 			// Gracia visual mínima para que el arranque inicial de la sesión sea suave y cinematográfico
 			const timer = setTimeout(() => {
@@ -301,20 +312,39 @@
 	const isAdminRoute = $derived(page.url.pathname.startsWith('/admin'));
 	const isReelsRoute = $derived(page.url.pathname.startsWith('/reels'));
 
-	// Rutas inmersivas / workspaces de pantalla completa donde la TopBar global
-	// (barra de búsqueda general) es redundante porque la vista tiene su propio header dedicado
-	// o es de pantalla completa (mensajes, estudio de diseño, reels y creación de historias).
-	const HIDE_TOPBAR_ROUTES = ['/messages', '/settings/design', '/reels', '/stories/create'];
+	// Rutas inmersivas / workspaces de pantalla completa donde el canvas se fija a 100vh
+	const IMMERSIVE_ROUTES = ['/messages', '/settings/design', '/reels', '/stories/create'];
+	const isImmersiveRoute = $derived(
+		IMMERSIVE_ROUTES.some((r) => page.url.pathname === r || page.url.pathname.startsWith(r + '/'))
+	);
+
+	// Rutas donde la TopBar global (barra de búsqueda y acciones) no se debe mostrar
+	const HIDE_TOPBAR_ROUTES = [
+		'/messages',
+		'/settings/design',
+		'/reels',
+		'/stories/create',
+		'/about'
+	];
 	const hideTopBar = $derived(
 		HIDE_TOPBAR_ROUTES.some((r) => page.url.pathname === r || page.url.pathname.startsWith(r + '/'))
 	);
+	let isHydrated = $state(false);
+	onMount(() => {
+		isHydrated = true;
+	});
+
+	// Use data.isAuthenticated during SSR and hydration to prevent mismatches.
+	// After mount, switch to authStore.isAuthenticated for reactivity (e.g. login/logout).
+	const isAuth = $derived(!isHydrated ? !!data?.isAuthenticated : authStore.isAuthenticated);
+
 	const isInitializing = $derived(!installChecked || !authStore.initialized);
 
 	// El Boot Screen solo se activa en el primer arranque frío de zonas clave (/) o (/feed)
 	const showBootScreen = $derived(
 		isBootKeyRoute &&
 			!isAdminRoute &&
-			!(isPublicRoute && !authStore.token) &&
+			!(isPublicRoute && !isAuth) &&
 			((!hasBootedInSession && (isInitializing || !bootGraceElapsed)) ||
 				(hasBootedInSession && isInitializing && isHeavyLoading))
 	);
@@ -616,13 +646,13 @@
 	</div>
 {:else if isAdminRoute}
 	{@render children()}
-{:else if authStore.isAuthenticated}
+{:else if isAuth}
 	<div
 		class="vs-shell app-layout-container"
 		class:vs-shell--collapsed={!uiStore.sidebarExpanded}
 		class:sidebar-expanded={uiStore.sidebarExpanded}
 		class:vs-shell--reels={isReelsRoute}
-		class:vs-shell--immersive={hideTopBar}
+		class:vs-shell--immersive={isImmersiveRoute}
 		style="--sidebar-width: {uiStore.sidebarExpanded ? '250px' : '80px'};"
 	>
 		<aside class="vs-shell__rail">
@@ -630,7 +660,7 @@
 		</aside>
 
 		<div class="vs-shell__stage">
-			<!-- Ocultar TopBar global con buscador en /messages, /settings/design, /reels y /stories/create -->
+			<!-- Ocultar TopBar global con buscador en /messages, /settings/design, /reels, /stories/create y /about -->
 			{#if !hideTopBar}
 				<TopBar />
 			{/if}

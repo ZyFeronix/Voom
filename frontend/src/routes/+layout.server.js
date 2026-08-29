@@ -11,7 +11,7 @@ function getIsInstalled() {
 	);
 }
 
-export async function load({ _locals }) {
+export async function load({ _locals, cookies }) {
 	let settings = {};
 
 	try {
@@ -39,9 +39,20 @@ export async function load({ _locals }) {
 		needsSetup = count?.cnt === 0;
 	} catch {}
 
+	let isAuthenticated = false;
+	const token = cookies.get('vsocial_token');
+	if (token) {
+		try {
+			const { getUserIdFromCookies } = await import('$lib/server/auth.js');
+			const userId = await getUserIdFromCookies(cookies);
+			if (userId) isAuthenticated = true;
+		} catch {}
+	}
+
 	return {
 		isInstalled: getIsInstalled(),
 		needsSetup,
-		globalSettings: settings
+		globalSettings: settings,
+		isAuthenticated
 	};
 }

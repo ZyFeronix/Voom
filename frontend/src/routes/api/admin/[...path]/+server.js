@@ -49,6 +49,7 @@ import {
 	validatePassword,
 	sanitizeInput
 } from '$lib/server/security.js';
+import { parsePostMetadata, cleanPostBody } from '$lib/server/entities.js';
 import bcrypt from 'bcryptjs';
 
 /** Claves modificables de system_settings (whitelist anti-inyección de claves). */
@@ -177,6 +178,9 @@ export async function GET({ request, url, params }) {
 		`
 			)
 			.all();
+		for (const r of recentReports) {
+			if (r.content_preview) r.content_preview = cleanPostBody(r.content_preview);
+		}
 
 		const weeklySignups = await db
 			.prepare(
@@ -252,6 +256,9 @@ export async function GET({ request, url, params }) {
 				 ORDER BY p.like_count DESC LIMIT 5`
 			)
 			.all();
+		for (const p of topPosts) {
+			parsePostMetadata(p);
+		}
 
 		const reportsTrend = await db
 			.prepare(
@@ -456,6 +463,9 @@ export async function GET({ request, url, params }) {
 				)
 				.get(...vals)
 		).c;
+		for (const r of reports) {
+			if (r.content_preview) r.content_preview = cleanPostBody(r.content_preview);
+		}
 		const pendingCount = (
 			await db.prepare("SELECT COUNT(*) as c FROM reports WHERE status = 'pending'").get()
 		).c;
@@ -535,6 +545,13 @@ export async function GET({ request, url, params }) {
 		} else {
 			return json({ error: 'Tipo de contenido no válido' }, { status: 400 });
 		}
+
+		for (const item of content) {
+			if (type === 'posts' || type === 'trash') {
+				parsePostMetadata(item);
+			}
+		}
+
 		return json({ success: true, content, total, page, limit });
 	}
 

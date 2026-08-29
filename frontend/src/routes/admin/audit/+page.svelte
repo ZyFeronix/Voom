@@ -73,15 +73,70 @@
 		if (action.startsWith('verification.')) return 'verified';
 		if (action.startsWith('settings.')) return 'tune';
 		if (action.startsWith('announcement.')) return 'campaign';
+		if (action.startsWith('invite.')) return 'mail';
 		return 'bolt';
 	}
 
-	function detailsSummary(raw) {
-		if (!raw) return '';
+	const FIELD_LABELS = {
+		keys: 'Claves',
+		reason: 'Motivo',
+		resolution: 'Resolución',
+		delete_content: 'Borrar contenido',
+		strike_level: 'Nivel sanción',
+		level: 'Nivel',
+		changes: 'Cambios',
+		role: 'Rol',
+		is_verified: 'Verificado',
+		pinned: 'Fijado',
+		title: 'Título',
+		code: 'Código',
+		max_uses: 'Usos máx.',
+		email: 'Email',
+		username: 'Usuario',
+		duration_hours: 'Duración (h)',
+		action: 'Acción'
+	};
+
+	const VALUE_MAP = {
+		resolved: 'Resuelto',
+		dismissed: 'Descartado',
+		approved: 'Aprobado',
+		rejected: 'Rechazado',
+		true: 'Sí',
+		false: 'No'
+	};
+
+	function formatValue(v, isFull = false) {
+		if (v === null || v === undefined) return '—';
+		if (typeof v === 'boolean') return v ? 'Sí' : 'No';
+		if (Array.isArray(v)) {
+			if (!isFull && v.length > 3) {
+				return `${v.slice(0, 3).join(', ')} (+${v.length - 3} más)`;
+			}
+			return v.join(', ');
+		}
+		if (typeof v === 'object') {
+			return Object.entries(v)
+				.map(([k, subV]) => `${FIELD_LABELS[k] || k}: ${formatValue(subV, isFull)}`)
+				.join(', ');
+		}
+		return VALUE_MAP[String(v)] || String(v);
+	}
+
+	function detailsSummary(raw, isFull = false) {
+		if (!raw) return '—';
 		try {
 			const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-			return Object.entries(parsed)
-				.map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+			if (typeof parsed !== 'object' || parsed === null) return String(parsed);
+
+			const entries = Object.entries(parsed);
+			if (entries.length === 0) return '—';
+
+			return entries
+				.map(([k, v]) => {
+					const label = FIELD_LABELS[k] || k;
+					return `${label}: ${formatValue(v, isFull)}`;
+				})
 				.join(' · ');
 		} catch {
 			return String(raw);
@@ -183,12 +238,22 @@
 								</td>
 								<td>
 									{#if log.entity_type}
-										<span class="muted-note">{log.entity_type} #{log.entity_id}</span>
+										<span class="muted-note">
+											{log.entity_type}{log.entity_id != null &&
+											String(log.entity_id).trim() !== '' &&
+											String(log.entity_id) !== 'null'
+												? ` #${log.entity_id}`
+												: ''}
+										</span>
 									{:else}
 										<span class="muted-note">—</span>
 									{/if}
 								</td>
-								<td><span class="cell-body">{detailsSummary(log.details)}</span></td>
+								<td>
+									<span class="cell-body" title={detailsSummary(log.details, true)}>
+										{detailsSummary(log.details, false)}
+									</span>
+								</td>
 								<td><span class="muted-note">{log.ip || '—'}</span></td>
 								<td>{fmtDate(log.created_at)}</td>
 							</tr>

@@ -22,7 +22,7 @@
 	const RADIUS_HINTS = {
 		sharp: 'Bordes rectos y modernos estilo Metro / Win11 nítido.',
 		modern: 'Curvatura sutil y técnica para alta densidad (10px).',
-		rounded: 'Curvatura equilibrada predeterminada de V-Social (20px).',
+		rounded: 'Curvatura equilibrada predeterminada de Voom! (20px).',
 		bubble: 'Curvatura orgánica pronunciada estilo Frutiger Aero (28px).'
 	};
 

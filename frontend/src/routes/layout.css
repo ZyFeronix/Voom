@@ -663,8 +663,7 @@ html {
    Solo su ajuste dedicado (activo por defecto en TODOS los perfiles, incluido
    Lite vía syncDomAttributes). La lista paralela de data-perf-mode era un
    duplicado que forzaba CV incluso con el ajuste apagado manualmente. */
-:root[data-content-visibility='true'] .feed-post-wrap,
-:root[data-content-visibility='true'] .aero-post-card,
+:root[data-content-visibility='true'] .aero-post-card:not(.has-open-dropdown),
 :root[data-content-visibility='true'] .comment-item,
 :root[data-content-visibility='true'] .notif-item,
 :root[data-content-visibility='true'] .listing-card {
@@ -1509,6 +1508,11 @@ a {
 	transform: translateZ(0);
 	contain: layout style;
 	will-change: auto;
+}
+
+/* Allow overflow only when dropdown is open to prevent visual clipping */
+.aero-post-card.has-open-dropdown {
+	overflow: visible;
 }
 
 /* Micro-texture noise overlay (eliminates gradient banding) */

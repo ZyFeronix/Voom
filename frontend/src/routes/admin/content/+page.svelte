@@ -87,6 +87,43 @@
 		const d = new Date(iso);
 		return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString('es-ES');
 	}
+
+	function formatContentBody(item) {
+		if (!item) return '(sin texto)';
+		let text = item.body || item.caption || '';
+		const idx = text.indexOf('[METADATA]');
+		if (idx !== -1) {
+			text = text.slice(0, idx).trim();
+		}
+		if (text) return text;
+		if (item.quoted_post) {
+			return `[Cita a @${item.quoted_post.username || 'usuario'}]`;
+		}
+		if (item.poll) {
+			return `[Encuesta: ${item.poll.question || 'Sin título'}]`;
+		}
+		if (item.media || item.media_type === 'video') {
+			return `[${item.media_type === 'video' ? 'Vídeo' : 'Multimedia'}]`;
+		}
+		return '(sin texto)';
+	}
+
+	function getContentTooltip(item) {
+		if (!item) return '';
+		let text = item.body || item.caption || '';
+		const idx = text.indexOf('[METADATA]');
+		if (idx !== -1) {
+			text = text.slice(0, idx).trim();
+		}
+		const extras = [];
+		if (item.quoted_post) extras.push(`Cita: @${item.quoted_post.username || 'usuario'}`);
+		if (item.poll) extras.push(`Encuesta: ${item.poll.question || ''}`);
+		if (item.location) extras.push(`Ubicación: ${item.location}`);
+		if (extras.length > 0) {
+			return text ? `${text} (${extras.join(' · ')})` : extras.join(' · ');
+		}
+		return text || '(sin texto)';
+	}
 </script>
 
 <svelte:head>
@@ -177,17 +214,27 @@
 								<td>
 									<div class="content-cell">
 										{#if item.media_type === 'video'}
-											<div class="content-thumb video-thumb">
+											<div class="content-thumb video-thumb" title="Vídeo">
 												<span class="material-icons-round">play_circle</span>
 											</div>
 										{:else if item.media}
 											<img src={item.media} alt="" class="content-thumb" loading="lazy" />
+										{:else if item.quoted_post}
+											<div class="content-thumb" title="Cita a publicación">
+												<span class="material-icons-round">format_quote</span>
+											</div>
+										{:else if item.poll}
+											<div class="content-thumb" title="Encuesta">
+												<span class="material-icons-round">poll</span>
+											</div>
 										{:else}
 											<div class="content-thumb">
 												<span class="material-icons-round">notes</span>
 											</div>
 										{/if}
-										<span class="cell-body">{item.body || item.caption || '(sin texto)'}</span>
+										<span class="cell-body" title={getContentTooltip(item)}
+											>{formatContentBody(item)}</span
+										>
 									</div>
 								</td>
 								<td>{item.like_count ?? 0}</td>

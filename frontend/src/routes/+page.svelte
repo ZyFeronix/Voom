@@ -65,7 +65,7 @@
 	let sandboxPosts = $state([
 		{
 			author: '@Aria_Hologram',
-			text: 'El sistema de gamificación de V-Social es el mejor que he visto. Los badges y el leaderboard hacen que crear contenido sea emocionante y transparente. 🏆✨',
+			text: 'El sistema de gamificación de Voom! es el mejor que he visto. Los badges y el leaderboard hacen que crear contenido sea emocionante y transparente. 🏆✨',
 			likes: 24,
 			time: 'Hace 3 min'
 		},
@@ -294,10 +294,10 @@
 </script>
 
 <svelte:head>
-	<title>V-Social — Red Social Libre para Creadores & Artistas Virtuales</title>
+	<title>Voom! — Red Social Premium para Creadores & Artistas Virtuales</title>
 	<meta
 		name="description"
-		content="Plataforma social open-source (AGPLv3) construida con SvelteKit 5 Runes, SQLite WAL y LiquidglassUI. 0% comisiones, feed cronológico puro, gamificación real y auto-hospedaje desde $4/mes."
+		content="Voom! — Plataforma social open-source (AGPLv3) para creadores virtuales, VTubers y artistas con SvelteKit 5 Runes, SQLite WAL y LiquidglassUI. 0% comisiones, feed cronológico puro y gamificación real."
 	/>
 </svelte:head>
 
@@ -306,7 +306,7 @@
 	<header class="aero-header">
 		<div class="nav-container">
 			<a href="/" class="nav-logo" aria-label="Voom! Inicio">
-				<span class="logo-prism">VS</span>ocial
+				<span class="logo-prism">V</span>oom!
 				<span class="nav-live-badge">
 					<span class="live-dot"></span>LIVE
 				</span>
@@ -532,7 +532,7 @@
 											<span class="status-live-badge">LIVE</span>
 										</div>
 										<p class="post-content">
-											V-Social nos devuelve la soberanía sobre nuestro contenido. Sin algoritmos
+											Voom! nos devuelve la soberanía sobre nuestro contenido. Sin algoritmos
 											secretos, con el 100% de ingresos directo a nuestra cuenta. 🎨💎🌊
 										</p>
 										<div class="post-visual-chart glass-card">
@@ -540,7 +540,7 @@
 												<span>Overhead por query (ms) — menor es mejor</span>
 											</div>
 											<div class="chart-row">
-												<span class="label">V-Social · SQLite WAL</span>
+												<span class="label">Voom! · SQLite WAL</span>
 												<div class="bar-container">
 													<div class="bar bar-fast" style="width: 5%"></div>
 												</div>
@@ -1531,14 +1531,14 @@ export const getFeed = async (limit = 20, offset = 0) =>
 					aria-expanded={faqOpenStates[0]}
 					aria-controls="faq-ans-0"
 				>
-					<span>¿V-Social es realmente 100% gratuito y de código abierto?</span>
+					<span>¿Voom! es realmente 100% gratuito y de código abierto?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[0]}
 					<div id="faq-ans-0" class="faq-answer-container" transition:slide>
 						<div class="faq-answer">
 							<p>
-								Sí, absolutamente. V-Social se publica bajo la <strong>Licencia AGPLv3</strong>,
+								Sí, absolutamente. Voom! se publica bajo la <strong>Licencia AGPLv3</strong>,
 								garantizando que el código sea libre y permanezca libre para siempre. No existen
 								suscripciones forzadas, muros de pago ocultos, publicidad invasiva ni
 								comercialización de datos privados.
@@ -1565,7 +1565,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 							<p>
 								A diferencia de las plataformas tradicionales que retienen entre 10% y 30% por
 								venta,
-								<strong>V-Social cobra el 0%</strong>. Las publicaciones en el Marketplace vinculan
+								<strong>Voom! cobra el 0%</strong>. Las publicaciones en el Marketplace vinculan
 								directamente a tu enlace de pago personal (PayPal, Ko-fi o Patreon). El 100% del
 								ingreso llega a tus manos sin intermediarios financieros.
 							</p>
@@ -1582,7 +1582,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 					aria-expanded={faqOpenStates[2]}
 					aria-controls="faq-ans-2"
 				>
-					<span>¿Qué requisitos tiene montar mi propio nodo de V-Social?</span>
+					<span>¿Qué requisitos tiene montar mi propio nodo de Voom!?</span>
 					<span class="material-icons-round chevron">expand_more</span>
 				</button>
 				{#if faqOpenStates[2]}
@@ -1705,7 +1705,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		<div class="footer-container">
 			<div class="footer-brand">
 				<a href="/" class="nav-logo footer-logo" aria-label="Voom! Inicio">
-					<span class="logo-prism">VS</span>ocial
+					<span class="logo-prism">V</span>oom!
 				</a>
 				<p>
 					Plataforma social libre para creadores y comunidades. Sin algoritmos opacos, sin
@@ -1804,7 +1804,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 
 		<div class="footer-bottom">
 			<p>
-				© 2026 V-Social · Open Source bajo Licencia AGPLv3 · LiquidglassUI 2.0 · Hecho con ❤️ por la
+				© 2026 Voom! · Open Source bajo Licencia AGPLv3 · LiquidglassUI 2.0 · Hecho con ❤️ por la
 				comunidad
 			</p>
 		</div>

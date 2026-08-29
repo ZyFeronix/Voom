@@ -103,7 +103,10 @@
 }
 
 /* ══ Tarjetas de sección ═══════════════════════════════════════════════ */
-.panel-card {
+/* Scope con :where (especificidad intacta): settings.css también define
+   .panel-card/.alert-box/.form-* y ambas hojas son globales que persisten
+   tras navegar por SPA — sin el scope, admin.css desfigura a /settings. */
+:where(.admin-main) .panel-card {
 	padding: 24px;
 	display: flex;
 	flex-direction: column;
@@ -409,7 +412,7 @@ table.aero-table {
 }
 
 /* ══ Alertas ═══════════════════════════════════════════════════════════ */
-.alert-box {
+:where(.admin-main) .alert-box {
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -423,12 +426,12 @@ table.aero-table {
 	font-size: 18px;
 	flex-shrink: 0;
 }
-.alert-box.error {
+:where(.admin-main) .alert-box.error {
 	color: var(--aero-rose);
 	border-color: rgba(236, 72, 153, 0.35);
 	background: rgba(236, 72, 153, 0.08);
 }
-.alert-box.success {
+:where(.admin-main) .alert-box.success {
 	color: var(--aero-mint);
 	border-color: rgba(0, 212, 170, 0.35);
 	background: rgba(0, 212, 170, 0.08);
@@ -566,12 +569,12 @@ table.aero-table {
 }
 
 /* Formularios dentro de paneles/modales */
-.form-group {
+:where(.admin-main) .form-group {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
 }
-.form-label {
+:where(.admin-main) .form-label {
 	font-size: 0.76rem;
 	font-weight: 700;
 	color: var(--text-secondary);

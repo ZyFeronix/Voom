@@ -1,5 +1,5 @@
 /**
- * mediaViewer.svelte.js - Store de estado reactivo para el Media Lightbox Universal de V-Social
+ * mediaViewer.svelte.js - Store de estado reactivo para el Media Lightbox Universal de Voom!
  * Utiliza Svelte 5 Runes para coordinar la apertura de galerías, posts, avatares y fotos de portada.
  */
 

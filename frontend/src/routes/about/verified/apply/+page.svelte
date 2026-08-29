@@ -186,7 +186,7 @@
 		<div class="portals-grid">
 			{#each portals as portal}
 				<div
-					class="portal-card glass-card aero-card {portal.isGov ? 'is-gov-portal' : ''}"
+					class="portal-card glass-card {portal.isGov ? 'is-gov-portal' : ''}"
 					style="--portal-accent: {portal.color};"
 				>
 					<div class="portal-card-top">

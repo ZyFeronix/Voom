@@ -24,7 +24,7 @@
 </script>
 
 <svelte:head>
-	<title>Reel de {data.reel.username} | V-Social</title>
+	<title>Reel de {data.reel.username} | Voom!</title>
 </svelte:head>
 
 <div class="fixed inset-0 bg-black z-50 flex items-center justify-center">

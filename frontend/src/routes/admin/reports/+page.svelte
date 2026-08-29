@@ -87,6 +87,12 @@
 		setTimeout(() => (actionSuccess = ''), 4500);
 	}
 
+	function cleanPreview(raw) {
+		if (!raw) return '';
+		const idx = raw.indexOf('[METADATA]');
+		return idx !== -1 ? raw.slice(0, idx).trim() : raw;
+	}
+
 	async function quickResolve(report, resolution) {
 		const idx = reports.findIndex((r) => r.id === report.id);
 		const prevReport = idx !== -1 ? { ...reports[idx] } : null;
@@ -376,7 +382,9 @@
 						{/if}
 
 						{#if report.content_preview}
-							<blockquote class="content-preview">“{report.content_preview}”</blockquote>
+							<blockquote class="content-preview">
+								“{cleanPreview(report.content_preview)}”
+							</blockquote>
 						{/if}
 					</div>
 

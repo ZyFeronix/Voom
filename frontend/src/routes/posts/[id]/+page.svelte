@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-	<title>Publicación | V-Social</title>
+	<title>Publicación | Voom!</title>
 </svelte:head>
 
 <!-- Barra de retroceso sticky (bajo el TopBar global) -->

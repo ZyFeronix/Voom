@@ -99,7 +99,10 @@
 	min-width: 0;
 }
 
-.panel-card {
+/* Scope con :where (especificidad intacta): .panel-card/.alert-box también
+   existen en admin.css y ambas hojas son globales que persisten tras navegar
+   por SPA — sin el scope, min-height:750px rompe las tarjetas de /admin. */
+:where(.settings-container) .panel-card {
 	padding: 32px;
 	border-radius: var(--radius-lg);
 	min-height: 750px;
@@ -135,17 +138,17 @@
 	opacity: 1;
 	margin-right: 6px;
 }
-form .btn-aero-primary {
+:where(.settings-container) form .btn-aero-primary {
 	gap: 0; /* Remove parent flex gap so we can control spacing perfectly with margin */
 }
 
 @media (max-width: 768px) {
-	.panel-card {
+	:where(.settings-container) .panel-card {
 		padding: 20px;
 	}
 }
 
-.alert-box {
+:where(.settings-container) .alert-box {
 	padding: 12px 16px;
 	border-radius: var(--radius-sm);
 	font-size: 0.8rem;
@@ -155,25 +158,25 @@ form .btn-aero-primary {
 	margin-bottom: 24px;
 }
 
-.alert-box.success {
+:where(.settings-container) .alert-box.success {
 	background: color-mix(in srgb, var(--aero-mint) 8%, transparent);
 	border: 1px solid color-mix(in srgb, var(--aero-mint) 25%, transparent);
 	color: var(--aero-mint);
 }
 
-.alert-box.error {
+:where(.settings-container) .alert-box.error {
 	background: color-mix(in srgb, var(--aero-rose) 8%, transparent);
 	border: 1px solid color-mix(in srgb, var(--aero-rose) 25%, transparent);
 	color: var(--aero-rose);
 }
 
 /* Saving state: dim entire panel card while async request is in flight */
-.panel-card.is-saving {
+:where(.settings-container) .panel-card.is-saving {
 	pointer-events: none;
 	opacity: 0.7;
 	transition: opacity 0.25s ease;
 }
-.panel-card {
+:where(.settings-container) .panel-card {
 	transition: opacity 0.25s ease;
 }
 

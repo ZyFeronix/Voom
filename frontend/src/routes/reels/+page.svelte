@@ -1665,7 +1665,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'In
 		if (!reel?.video_url) return;
 		const a = document.createElement('a');
 		a.href = reel.video_url;
-		a.download = `v-social-reel-${reel.username || 'video'}-${reel.id}.mp4`;
+		a.download = `voom-reel-${reel.username || 'video'}-${reel.id}.mp4`;
 		a.target = '_blank';
 		document.body.appendChild(a);
 		a.click();

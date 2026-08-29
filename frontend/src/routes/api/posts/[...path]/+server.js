@@ -25,31 +25,7 @@ import { awardXP } from '$lib/server/gamification.js';
 import { logActivity } from '$lib/server/activity.js';
 import { anonymizePost, anonymizeComment, getAnonIdentity } from '$lib/server/security.js';
 import { validateMediaUpload } from '$lib/server/media.js';
-
-function parsePostMetadata(post) {
-	if (!post) return;
-	const body = post.body || '';
-	const idx = body.indexOf('\n[METADATA]');
-	if (idx !== -1) {
-		post.body = body.slice(0, idx).trim();
-		post.content = post.body;
-		try {
-			const metaStr = body.slice(idx + 11).trim();
-			const meta = JSON.parse(metaStr);
-			if (meta.poll) {
-				post.poll = meta.poll;
-			}
-			if (meta.location) {
-				post.location = meta.location;
-			}
-			if (meta.quote) {
-				post.quoted_post = meta.quote;
-			}
-		} catch (e) {
-			console.error('Failed to parse post metadata:', e);
-		}
-	}
-}
+import { parsePostMetadata, cleanPostBody } from '$lib/server/entities.js';
 
 export async function GET({ request, _url, params }) {
 	const parts = params.path ? params.path.split('/') : [];
@@ -276,9 +252,7 @@ export async function POST({ request, _url, params }) {
 					)
 					.get(quoteId);
 				if (quoted) {
-					let quotedBody = quoted.body || '';
-					const metaIdx = quotedBody.indexOf('\n[METADATA]');
-					if (metaIdx !== -1) quotedBody = quotedBody.slice(0, metaIdx).trim();
+					const quotedBody = cleanPostBody(quoted.body || '');
 					quoteSnapshot = {
 						id: quoted.id,
 						body: quotedBody,
@@ -445,11 +419,11 @@ export async function POST({ request, _url, params }) {
 		const post = await db.prepare('SELECT body FROM posts WHERE id = ?').get(postId);
 		if (!post) return json({ error: 'Post not found' }, { status: 404 });
 
-		const idx = post.body.indexOf('\n[METADATA]');
+		const idx = post.body.indexOf('[METADATA]');
 		if (idx === -1) return json({ error: 'Post has no poll' }, { status: 400 });
 
-		const textPart = post.body.slice(0, idx);
-		const metaStr = post.body.slice(idx + 11);
+		const textPart = post.body.slice(0, idx).trim();
+		const metaStr = post.body.slice(idx + 10).trim();
 		let meta;
 		try {
 			meta = JSON.parse(metaStr);
@@ -804,9 +778,9 @@ export async function PUT({ request, _url, params }) {
 		// y el post se guardaba como texto plano.
 		let finalBody = bodyText;
 		if (oldPost?.body) {
-			const metaIdx = oldPost.body.indexOf('\n[METADATA]');
+			const metaIdx = oldPost.body.indexOf('[METADATA]');
 			if (metaIdx !== -1) {
-				finalBody = bodyText + oldPost.body.slice(metaIdx);
+				finalBody = bodyText + '\n' + oldPost.body.slice(metaIdx);
 			}
 		}
 

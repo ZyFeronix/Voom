@@ -13,7 +13,7 @@ const config = {
 			envPrefix: ''
 		}),
 		prerender: {
-			entries: ['/', '/privacy', '/terms', '/cookies', '/about'],
+			entries: [],
 			handleUnseenRoutes: 'ignore',
 			handleHttpError: ({ path, message }) => {
 				if (
