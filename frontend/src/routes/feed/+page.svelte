@@ -1362,7 +1362,7 @@
 						</p>
 
 						{#if showCustomSliders}
-							<div class="pt-2 px-1 space-y-2.5" transition:slide={{ duration: 250 }}>
+							<div class="pt-2 px-1 space-y-4" transition:slide={{ duration: 250 }}>
 								{#each WEIGHT_STATS as stat}
 									<div class="flex flex-col gap-1 group">
 										<div
