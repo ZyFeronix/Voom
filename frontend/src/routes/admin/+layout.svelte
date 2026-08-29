@@ -432,7 +432,7 @@
 			bottom: 0;
 			z-index: calc(var(--z-modal-backdrop, 500) + 10);
 			transform: translateX(-105%);
-			transition: transform var(--t-base) var(--ease-smooth);
+			transition: transform 0.3s var(--ease-smooth);
 			box-shadow: var(--shadow-lg);
 		}
 		.admin-aside.drawer-open {

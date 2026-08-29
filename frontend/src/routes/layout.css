@@ -1783,6 +1783,7 @@ a {
 	padding: 0.65rem 1.75rem;
 	cursor: pointer;
 	transition:
+		transform var(--t-spring),
 		box-shadow var(--t-base),
 		background var(--t-base),
 		border-color var(--t-base);

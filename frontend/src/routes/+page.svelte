@@ -3443,7 +3443,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		background: var(--glass-card-bg);
 		border: 1px solid var(--glass-card-border);
 		color: var(--badge-glow, var(--text-muted));
-		transition: all var(--t-fast) var(--ease-spring);
+		transition: all var(--t-spring);
 		cursor: default;
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 	}
@@ -3723,6 +3723,10 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		max-height: 280px;
 		overflow-y: auto;
 		padding-right: 4px;
+		scrollbar-width: none;
+	}
+	.sandbox-feed-display::-webkit-scrollbar {
+		display: none;
 	}
 	.sandbox-post-item {
 		padding: 1.15rem;
@@ -3940,7 +3944,7 @@ export const getFeed = async (limit = 20, offset = 0) =>
 		color: var(--accent-primary);
 	}
 	.chevron {
-		transition: transform var(--t-base) var(--ease-spring);
+		transition: transform var(--t-spring);
 		flex-shrink: 0;
 	}
 	.faq-item.open .chevron {

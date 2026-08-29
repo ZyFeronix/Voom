@@ -2745,7 +2745,7 @@
 	}
 
 	.chevron {
-		transition: transform var(--t-base) var(--ease-spring);
+		transition: transform var(--t-spring);
 		flex-shrink: 0;
 		color: var(--accent-blue-light);
 	}

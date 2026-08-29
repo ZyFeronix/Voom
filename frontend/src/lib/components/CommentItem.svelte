@@ -1407,7 +1407,7 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: all var(--t-fast) var(--ease-spring);
+		transition: all var(--t-spring);
 	}
 	.reply-composer-card.is-anon .reply-send-btn {
 		background: var(--anon-gradient, linear-gradient(135deg, #6366f1, #a855f7));
