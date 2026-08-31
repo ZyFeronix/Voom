@@ -1,4 +1,4 @@
-# Voom! — Red Social Full-Stack
+# Voom! — La primera Red Social de Código Abierto con Alma.
 
 [![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
@@ -47,7 +47,8 @@ Para quienes buscan el futuro, no el pasado.
 | **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting (1000 req/min por IP / 2000 por usuario), CSRF, headers HSTS, bloqueos, snooze, anti-bots (reputación + heurísticas) |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
 | **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado, **apariencia global por usuario** + **Frutiger Aero Engine** (presets, cristal, radios, gloss, wallpaper) y perfiles de rendimiento lite/balanced/high |
-
+| **Feed Inteligente (Anti-Ragebait)** | Algoritmo 100% transparente y controlable por el usuario.	
+Algoritmo 100% transparente y controlable por el usuario. Ajuste de pesos visual (recencia, interacciones, viralidad) y detección automática de toxicidad. Adiós a la caja negra.
 ---
 
 ## Tech Stack
