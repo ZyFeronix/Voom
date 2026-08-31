@@ -4,13 +4,15 @@
 [![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
 [![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
 
-Durante años, creadores y comunidades fueron estafados por scripts cerrados, vulnerables y costosos como WoWonder.
-Cansado de esa basura, decidí construir Voom!: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial.
+Durante años, creadores y comunidades fueron estafados por scripts cerrados, vulnerables y costosos como WoWonder. 
 
-Curiosamente, semanas después de hacer público mi código, los desarrolladores de WoWonder tumbaron su propio script de CodeCanyon.
-El código cerrado de baja calidad está muriendo.
+Cansado de esa basura, decidí construir **Voom!**: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial. 
 
-Bienvenidos a la era del Neo-Aero y el Open Source.
+Curiosamente, semanas después de hacer público mi código, los desarrolladores de WoWonder tumbaron su propio script de CodeCanyon. 
+
+El código cerrado de baja calidad está muriendo. 
+
+Bienvenidos a la era del Neo-Aero y el Open Source. 
 
 Para quienes buscan el futuro, no el pasado.
 
