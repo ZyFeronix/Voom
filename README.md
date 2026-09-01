@@ -6,7 +6,7 @@
 
 Durante años, creadores y comunidades fueron estafados por scripts cerrados, vulnerables y costosos como WoWonder. 
 
-Cansado de esa basura, decidí construir **Voom!**: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial. 
+Cansado de esa basura, decidímos construir **Voom!**: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial. 
 
 Curiosamente, semanas después de hacer público mi código, los desarrolladores de WoWonder tumbaron su propio script de CodeCanyon. 
 
