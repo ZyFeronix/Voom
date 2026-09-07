@@ -21,14 +21,15 @@ Para quienes buscan el futuro, no el pasado.
 > componentes, API, configuración, operaciones y roadmap.
 
 > [!WARNING]
-> ### Declaración de uso ético y repudio público
-> **Voom!** se construyó para devolverle la libertad a las comunidades, no para alimentar modelos depredadores.
+> ### Declaración de uso ético y desautorización pública
+> **Voom!** se construyó para devolverle la soberanía a las comunidades bajo software libre (AGPLv3), no para servir de base a corporaciones que instrumentalizan la nostalgia con fines extractivos.
 > 
-> Queda **terminantemente desautorizado** el uso de este proyecto como base para iniciativas que exploten la falsa nostalgia para lucrar, monetizar engaños o comercializar datos de usuarios.
+> Queda **terminantemente desautorizado** el uso de esta arquitectura como base por parte de **Operation Bluebird Inc.** y su producto **Tweet.app** (Project Bluebird).
 > 
-> Startups como **Project Bluebird** y **Tweet.app** no cuentan con autorización moral ni técnica para usar esta arquitectura como base.
+> No avalamos proyectos que explotan la nostalgia de la antigua red del pájaro azul para cobrar membresías tempranas ($20 a $40+ USD) bajo promesas de confianza, mientras en su letra chica imponen licencias perpetuas sobre el contenido del usuario para alimentar modelos de IA y explotación comercial sin posibilidad de borrado efectivo.
 > 
 > — *Hard, Desarrollador Principal de Voom!*
+
 ---
 
 ## Módulos
