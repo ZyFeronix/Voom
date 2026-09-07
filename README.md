@@ -20,6 +20,14 @@ Para quienes buscan el futuro, no el pasado.
 > 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
 > componentes, API, configuración, operaciones y roadmap.
 
+> [!WARNING]
+> ### Declaración de uso ético y repudio público
+> **Voom!** se construyó para devolverle la libertad a las comunidades, no para alimentar modelos depredadores. 
+Queda **terminantemente desautorizado** el uso de este proyecto como base para iniciativas que exploten la falsa nostalgia para lucrar, monetizar engaños o comercializar datos de usuarios.
+> 
+> Startups como **Project Bluebird** y **Tweet.app** no cuentan con autorización moral ni técnica para usar esta arquitectura como base.
+> 
+> — *Hard, Desarrollador Principal de Voom!*
 ---
 
 ## Módulos
