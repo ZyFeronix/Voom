@@ -158,6 +158,27 @@
 		transparent 100%
 	);
 
+	/* Reflejo gel curvo (Aqua 2004 "jelly button"): highlight elíptico superior
+	   usado por .gel-highlight::after en botones/pills con aeroGloss activo. */
+	--gel-highlight: radial-gradient(
+		120% 100% at 50% -25%,
+		rgba(255, 255, 255, 0.9) 0%,
+		rgba(255, 255, 255, 0.35) 38%,
+		rgba(255, 255, 255, 0) 70%
+	);
+	--gel-highlight-opacity: 0.9;
+
+	/* Textura orgánica sutil (ondas/burbujas) que acompaña al --noise-texture
+	   en superficies de cristal grandes; se desactiva junto al resto del glass
+	   en perfiles de rendimiento bajo. */
+	--organic-texture: radial-gradient(
+			circle at 18% 24%,
+			rgba(255, 255, 255, 0.25) 0%,
+			rgba(255, 255, 255, 0) 3.5%
+		),
+		radial-gradient(circle at 74% 68%, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 4.5%),
+		radial-gradient(circle at 60% 20%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 3%);
+
 	--text-muted: var(--icon-muted);
 	--text-inverse: #ffffff;
 	--text-on-accent: #042c33; /* WCAG AA: texto oscuro sobre gradiente cian/teal */
@@ -274,6 +295,23 @@
 		rgba(255, 255, 255, 0.15) 85%,
 		transparent 100%
 	);
+
+	/* Reflejo gel curvo (versión bioluminiscente): highlight más tenue, tinte frío */
+	--gel-highlight: radial-gradient(
+		120% 100% at 50% -25%,
+		rgba(180, 235, 255, 0.35) 0%,
+		rgba(180, 235, 255, 0.14) 38%,
+		rgba(180, 235, 255, 0) 70%
+	);
+	--gel-highlight-opacity: 0.55;
+
+	--organic-texture: radial-gradient(
+			circle at 18% 24%,
+			rgba(56, 189, 248, 0.12) 0%,
+			rgba(56, 189, 248, 0) 3.5%
+		),
+		radial-gradient(circle at 74% 68%, rgba(45, 212, 191, 0.1) 0%, rgba(45, 212, 191, 0) 4.5%),
+		radial-gradient(circle at 60% 20%, rgba(56, 189, 248, 0.08) 0%, rgba(56, 189, 248, 0) 3%);
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0f2136;
@@ -397,6 +435,23 @@
 		rgba(160, 210, 255, 0.12) 85%,
 		transparent 100%
 	);
+
+	/* Reflejo gel curvo (versión abisal): highlight mínimo, casi un susurro de cristal */
+	--gel-highlight: radial-gradient(
+		120% 100% at 50% -25%,
+		rgba(160, 210, 255, 0.28) 0%,
+		rgba(160, 210, 255, 0.1) 38%,
+		rgba(160, 210, 255, 0) 70%
+	);
+	--gel-highlight-opacity: 0.4;
+
+	--organic-texture: radial-gradient(
+			circle at 18% 24%,
+			rgba(77, 200, 255, 0.1) 0%,
+			rgba(77, 200, 255, 0) 3.5%
+		),
+		radial-gradient(circle at 74% 68%, rgba(62, 230, 195, 0.08) 0%, rgba(62, 230, 195, 0) 4.5%),
+		radial-gradient(circle at 60% 20%, rgba(77, 200, 255, 0.06) 0%, rgba(77, 200, 255, 0) 3%);
 
 	--text-muted: var(--icon-muted);
 	--text-inverse: #0d131c;
@@ -1530,6 +1585,15 @@ a {
 	z-index: 1;
 }
 
+/* Burbujas/ondas orgánicas (Frutiger Eco): capa sobre el grano existente en
+   las tarjetas de post, con opacidad propia para que se lean sin diluirse
+   junto al SVG de ruido. Se apaga con el resto del glass en perf bajo. */
+:root:not([data-perf-mode='true']):not([data-glass-blur='none']) .aero-post-card::before {
+	background: var(--noise-texture), var(--organic-texture);
+	background-blend-mode: normal, screen;
+	opacity: 0.06;
+}
+
 /* Top specular highlight (glass thickness refraction — crisp 1px bevel) */
 .aero-glass::after,
 .glass-panel::after,
@@ -1899,6 +1963,48 @@ a {
 }
 .btn-aero-success:hover {
 	box-shadow: 0 0 18px rgba(0, 212, 170, 0.4);
+}
+
+/* ── Reflejo gel curvo (Aqua 2004 "jelly button") ──────────────
+   ::after elíptico superior compartido por botones gel/glossy. Se apoya en
+   --gel-highlight (definido por tema) y respeta el apagado de perf/blur. */
+.aero-icon-btn,
+.aero-pill-btn,
+.btn-aero-primary,
+.vs-theme-trigger-btn {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+}
+.aero-icon-btn::after,
+.aero-pill-btn::after,
+.btn-aero-primary::after,
+.vs-theme-trigger-btn::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: var(--gel-highlight);
+	opacity: var(--gel-highlight-opacity, 0.7);
+	pointer-events: none;
+	z-index: 1;
+	transition: opacity var(--t-base);
+}
+.aero-icon-btn:active::after,
+.aero-pill-btn:active::after,
+.btn-aero-primary:active::after,
+.vs-theme-trigger-btn:active::after {
+	opacity: calc(var(--gel-highlight-opacity, 0.7) * 0.5);
+}
+:root[data-glass-blur='none'] .aero-icon-btn::after,
+:root[data-glass-blur='none'] .aero-pill-btn::after,
+:root[data-glass-blur='none'] .btn-aero-primary::after,
+:root[data-glass-blur='none'] .vs-theme-trigger-btn::after,
+:root[data-perf-mode='true'] .aero-icon-btn::after,
+:root[data-perf-mode='true'] .aero-pill-btn::after,
+:root[data-perf-mode='true'] .btn-aero-primary::after,
+:root[data-perf-mode='true'] .vs-theme-trigger-btn::after {
+	display: none;
 }
 
 /* ── Icon Buttons ───────────────────────────────────────────── */

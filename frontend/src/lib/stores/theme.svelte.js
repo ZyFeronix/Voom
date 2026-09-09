@@ -2,9 +2,9 @@
  * Theme Store — manages light / dark / midnight modes with localStorage persistence
  *
  * Ciclo: light → dark → midnight → light
- * - light:    Aurora clara (menta/teal/skyblue)
- * - dark:     Oceánico profundo (teal/azul)
- * - midnight: Azulado casi negro, apto OLED y uso nocturno
+ * - light:    Aurora Aqua (menta/teal/skyblue, gel diurno)
+ * - dark:     Abismo Oceánico (teal/azul bioluminiscente)
+ * - midnight: Obsidiana Nocturna, apto OLED y uso nocturno
  */
 
 import { tick } from 'svelte';
@@ -15,9 +15,9 @@ const STORAGE_KEY = 'vsocial_theme';
 // del `name` para no repetir datos. El icono es REPRESENTATIVO de cada tema
 // (distinto por tema, para reconocer de un vistazo en qué tema estás).
 export const THEME_OPTIONS = [
-	{ id: 'light', name: 'Claro', icon: 'light_mode', desc: 'Aurora clara' },
-	{ id: 'dark', name: 'Oscuro', icon: 'dark_mode', desc: 'Océano profundo' },
-	{ id: 'midnight', name: 'Noche', icon: 'bedtime', desc: 'Azul OLED' }
+	{ id: 'light', name: 'Aurora Aqua', icon: 'light_mode', desc: 'Gel diurno, cielo y menta' },
+	{ id: 'dark', name: 'Abismo Oceánico', icon: 'dark_mode', desc: 'Teal profundo bioluminiscente' },
+	{ id: 'midnight', name: 'Obsidiana Nocturna', icon: 'bedtime', desc: 'Azul casi-AMOLED' }
 ];
 
 const THEME_META = Object.fromEntries(
@@ -178,6 +178,6 @@ export const themeStore = {
 		return THEME_META[_theme]?.name ?? 'Oscuro';
 	},
 	get desc() {
-		return THEME_META[_theme]?.desc ?? 'Océano profundo';
+		return THEME_META[_theme]?.desc ?? 'Teal profundo bioluminiscente';
 	}
 };
