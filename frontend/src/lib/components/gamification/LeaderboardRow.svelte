@@ -343,7 +343,7 @@
 		height: 100%;
 		border-radius: inherit;
 		background: linear-gradient(90deg, var(--aero-sky, #2eb4ff), var(--aero-mint, #00d4aa));
-		box-shadow: 0 0 6px rgba(46, 180, 255, 0.5);
+		box-shadow: 0 0 6px rgba(var(--accent-blue-rgb), 0.5);
 		transition: width 0.6s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 	}
 

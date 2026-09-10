@@ -836,7 +836,7 @@
 		font-size: 0.85rem;
 		color: #fff;
 		background: linear-gradient(120deg, var(--aero-sky), var(--aero-mint));
-		box-shadow: 0 4px 16px rgba(46, 180, 255, 0.4);
+		box-shadow: 0 4px 16px rgba(var(--accent-blue-rgb), 0.4);
 		cursor: pointer;
 		text-decoration: none;
 		transition: transform 0.2s var(--ease-spring);

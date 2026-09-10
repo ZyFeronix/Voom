@@ -124,7 +124,7 @@
 	}
 	.lb-tabs__slider--level {
 		background: linear-gradient(120deg, var(--aero-sky, #2eb4ff), var(--aero-mint, #00d4aa));
-		box-shadow: 0 4px 16px rgba(46, 180, 255, 0.4);
+		box-shadow: 0 4px 16px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.lb-tabs__slider--streak {
 		background: linear-gradient(
