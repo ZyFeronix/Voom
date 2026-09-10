@@ -2253,7 +2253,7 @@
 	}
 
 	.comment-submit-btn:not(:disabled):hover {
-		box-shadow: 0 0 16px rgba(27, 133, 243, 0.5);
+		box-shadow: 0 0 16px rgba(var(--accent-blue-rgb), 0.5);
 	}
 
 	.comment-submit-btn:disabled {
