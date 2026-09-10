@@ -638,7 +638,7 @@
 		justify-content: center;
 		color: #fff;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.25);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.panel-icon-badge.is-amber {
 		background: linear-gradient(135deg, var(--aero-amber), var(--aero-coral));
@@ -767,7 +767,7 @@
 	}
 	.toggle-card-desc code {
 		font-size: 0.72rem;
-		background: rgba(0, 0, 0, 0.2);
+		background: var(--bg-overlay);
 		padding: 1px 4px;
 		border-radius: 4px;
 		color: var(--aero-sky);
@@ -810,7 +810,7 @@
 	.aero-switch input:checked + .slider {
 		background: var(--grad-primary);
 		border-color: transparent;
-		box-shadow: 0 2px 10px rgba(46, 134, 232, 0.4);
+		box-shadow: 0 2px 10px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.aero-switch input:checked + .slider::before {
 		transform: translateX(20px);

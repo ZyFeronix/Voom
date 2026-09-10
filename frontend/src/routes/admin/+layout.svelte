@@ -185,7 +185,7 @@
 		backdrop-filter: blur(28px) saturate(1.6);
 		-webkit-backdrop-filter: blur(28px) saturate(1.6);
 		border-right: 1px solid var(--glass-border);
-		box-shadow: 2px 0 24px rgba(46, 134, 232, 0.07);
+		box-shadow: 2px 0 24px rgba(var(--accent-blue-rgb), 0.07);
 		position: sticky;
 		top: 0;
 		height: 100vh;
@@ -249,7 +249,7 @@
 		color: #fff;
 		flex-shrink: 0;
 		box-shadow:
-			0 4px 12px rgba(46, 134, 232, 0.3),
+			0 4px 12px rgba(var(--accent-blue-rgb), 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.35);
 	}
 	.aside-logo-icon .material-icons-round {
@@ -335,7 +335,7 @@
 		color: #fff;
 		border-color: rgba(255, 255, 255, 0.22);
 		box-shadow:
-			0 4px 14px rgba(46, 134, 232, 0.28),
+			0 4px 14px rgba(var(--accent-blue-rgb), 0.28),
 			var(--glass-inset);
 		font-weight: 600;
 	}

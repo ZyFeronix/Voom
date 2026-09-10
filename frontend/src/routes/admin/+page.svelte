@@ -468,7 +468,7 @@
 		border-radius: var(--radius-sm) var(--radius-sm) 4px 4px;
 		background: var(--grad-primary);
 		position: relative;
-		box-shadow: 0 3px 10px rgba(46, 134, 232, 0.2);
+		box-shadow: 0 3px 10px rgba(var(--accent-blue-rgb), 0.2);
 	}
 	.weekly-bar-count {
 		position: absolute;

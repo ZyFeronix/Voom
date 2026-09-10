@@ -677,7 +677,7 @@
 		justify-content: center;
 		color: #fff;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.25);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.panel-icon-badge.is-amber {
 		background: linear-gradient(135deg, var(--aero-amber), var(--aero-coral));
@@ -806,7 +806,7 @@
 	.aero-switch input:checked + .slider {
 		background: var(--grad-primary);
 		border-color: transparent;
-		box-shadow: 0 2px 10px rgba(46, 134, 232, 0.4);
+		box-shadow: 0 2px 10px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.aero-switch input:checked + .slider::before {
 		transform: translateX(20px);
@@ -845,9 +845,9 @@
 	}
 	.preset-card.active {
 		border-color: var(--aero-sky);
-		background: rgba(46, 180, 255, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		box-shadow:
-			0 4px 16px rgba(46, 134, 232, 0.15),
+			0 4px 16px rgba(var(--accent-blue-rgb), 0.15),
 			inset 0 0 0 1px var(--aero-sky);
 	}
 	.preset-icon {
@@ -919,7 +919,7 @@
 		box-shadow: var(--shadow-sm);
 	}
 	.module-item-card.enabled {
-		background: rgba(46, 134, 232, 0.03);
+		background: rgba(var(--accent-blue-rgb), 0.03);
 	}
 	.module-icon {
 		width: 42px;
@@ -931,7 +931,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.25);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.module-icon.is-rose {
 		background: linear-gradient(135deg, var(--aero-rose), var(--aero-amber));
@@ -943,7 +943,7 @@
 	}
 	.module-icon.is-sky {
 		background: linear-gradient(135deg, var(--aero-sky), var(--aero-indigo));
-		box-shadow: 0 4px 12px rgba(46, 180, 255, 0.25);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.25);
 	}
 	.module-icon.is-mint {
 		background: linear-gradient(135deg, var(--aero-mint), var(--aero-sky));
