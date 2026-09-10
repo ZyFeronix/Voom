@@ -1226,7 +1226,7 @@
 		align-items: center;
 		justify-content: center;
 		z-index: 40;
-		box-shadow: 0 4px 20px rgba(46, 180, 255, 0.4);
+		box-shadow: 0 4px 20px rgba(var(--accent-sky-rgb), 0.4);
 	}
 
 	.modal-header {

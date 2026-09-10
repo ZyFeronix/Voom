@@ -388,7 +388,7 @@
 		background: var(--grad-primary);
 		color: #fff;
 		border-color: transparent;
-		box-shadow: 0 4px 14px rgba(46, 134, 232, 0.3);
+		box-shadow: 0 4px 14px rgba(var(--accent-blue-rgb), 0.3);
 	}
 
 	.progress-segment.done {
@@ -462,8 +462,8 @@
 		align-items: flex-start;
 		gap: 10px;
 		padding: 12px 16px;
-		background: rgba(46, 134, 232, 0.06);
-		border: 1px solid rgba(46, 134, 232, 0.15);
+		background: rgba(var(--accent-blue-rgb), 0.06);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.15);
 		border-radius: var(--radius-md);
 		font-size: 0.8rem;
 		color: var(--text-secondary);
@@ -540,8 +540,8 @@
 	.theme-opt.selected {
 		border-color: var(--aero-blue);
 		color: var(--aero-blue);
-		background: rgba(46, 134, 232, 0.08);
-		box-shadow: 0 2px 8px rgba(46, 134, 232, 0.15);
+		background: rgba(var(--accent-blue-rgb), 0.08);
+		box-shadow: 0 2px 8px rgba(var(--accent-blue-rgb), 0.15);
 	}
 
 	.field-error {

@@ -508,7 +508,7 @@
 	}
 
 	.profile-avatar.is-expandable:hover {
-		box-shadow: 0 0 16px rgba(27, 133, 243, 0.35);
+		box-shadow: 0 0 16px rgba(var(--accent-blue-rgb), 0.35);
 	}
 
 	.profile-avatar-camera-btn {
@@ -862,7 +862,7 @@
 		color: var(--aero-blue);
 		font-weight: 700;
 		border-bottom-color: var(--aero-blue);
-		text-shadow: 0 0 8px rgba(46, 134, 232, 0.3);
+		text-shadow: 0 0 8px rgba(var(--accent-blue-rgb), 0.3);
 	}
 
 	.tabs-container span.tab-button {

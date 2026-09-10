@@ -911,7 +911,7 @@
 		transition: all 0.15s ease;
 	}
 	.reply-btn:hover {
-		background: rgba(74, 171, 223, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		color: var(--aero-blue);
 	}
 	.reply-btn:active {
@@ -959,7 +959,7 @@
 		font-weight: 500;
 	}
 	.dropdown-item:hover {
-		background: rgba(74, 171, 223, 0.1);
+		background: rgba(var(--accent-blue-rgb), 0.1);
 		color: var(--aero-blue);
 	}
 	.dropdown-item.danger {
@@ -1023,8 +1023,8 @@
 
 	/* ── Edit Mode ── */
 	.edit-mode {
-		background: rgba(74, 171, 223, 0.06);
-		border: 1px solid rgba(74, 171, 223, 0.2);
+		background: rgba(var(--accent-blue-rgb), 0.06);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
 		border-radius: var(--radius-sm);
 		padding: 10px 12px;
 		animation: slideDown 0.25s ease;
@@ -1061,7 +1061,7 @@
 	}
 	.edit-textarea:focus {
 		border-color: var(--aero-sky);
-		box-shadow: 0 0 0 2px rgba(74, 171, 223, 0.15);
+		box-shadow: 0 0 0 2px rgba(var(--accent-blue-rgb), 0.15);
 	}
 	.edit-actions {
 		display: flex;
@@ -1097,11 +1097,11 @@
 		align-items: center;
 		gap: 4px;
 		transition: all 0.2s;
-		box-shadow: 0 2px 8px rgba(46, 134, 232, 0.3);
+		box-shadow: 0 2px 8px rgba(var(--accent-blue-rgb), 0.3);
 	}
 	.edit-save-btn:hover:not(:disabled) {
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.4);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.edit-save-btn:disabled {
 		opacity: 0.5;
@@ -1167,7 +1167,7 @@
 
 	.comment-gif-wrapper.is-clickable:hover {
 		filter: brightness(1.05);
-		border-color: rgba(27, 133, 243, 0.4);
+		border-color: rgba(var(--accent-blue-rgb), 0.4);
 	}
 
 	.comment-gif {
@@ -1356,7 +1356,7 @@
 	.reply-field-wrapper:focus-within {
 		border-color: var(--aero-sky);
 		box-shadow:
-			0 0 0 3px rgba(46, 134, 232, 0.12),
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.12),
 			var(--shadow-xs);
 	}
 	.reply-composer-card.is-anon .reply-field-wrapper:focus-within {

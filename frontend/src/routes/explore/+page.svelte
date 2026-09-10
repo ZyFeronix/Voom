@@ -665,7 +665,7 @@
 		border-color: transparent;
 		box-shadow:
 			inset 0 1px 0 rgba(255, 255, 255, 0.35),
-			0 4px 12px rgba(46, 134, 232, 0.25);
+			0 4px 12px rgba(var(--accent-blue-rgb), 0.25);
 	}
 
 	.chip.active .material-icons-round {

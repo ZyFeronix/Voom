@@ -1387,9 +1387,9 @@
 	}
 
 	.aero-post-card:hover {
-		border-color: rgba(27, 133, 243, 0.35);
+		border-color: rgba(var(--accent-blue-rgb), 0.35);
 		box-shadow:
-			0 0 20px rgba(27, 133, 243, 0.15),
+			0 0 20px rgba(var(--accent-blue-rgb), 0.15),
 			var(--glass-inset);
 	}
 
@@ -1654,20 +1654,20 @@
 	.action-btn:hover {
 		background: var(--bg-overlay);
 		color: var(--aero-blue);
-		box-shadow: 0 0 12px rgba(27, 133, 243, 0.15);
+		box-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.15);
 	}
 
 	.action-btn.liked {
 		color: var(--aero-rose, #ec4899);
-		background: rgba(236, 72, 153, 0.08);
+		background: rgba(var(--aero-rose-rgb), 0.08);
 	}
 	.action-btn.liked:hover {
-		background: rgba(236, 72, 153, 0.15);
+		background: rgba(var(--aero-rose-rgb), 0.15);
 		color: var(--aero-rose, #ec4899);
-		box-shadow: 0 0 14px rgba(236, 72, 153, 0.25);
+		box-shadow: 0 0 14px rgba(var(--aero-rose-rgb), 0.25);
 	}
 	.action-btn.liked .icon {
-		filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.5));
+		filter: drop-shadow(0 0 6px rgba(var(--aero-rose-rgb), 0.5));
 	}
 
 	.action-btn-save {
@@ -1687,7 +1687,7 @@
 
 	.action-btn-save.saved {
 		color: var(--aero-blue);
-		background: rgba(46, 134, 232, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 	}
 
 	.repost-indicator-banner {
@@ -1721,11 +1721,11 @@
 
 	.action-btn.shared {
 		color: var(--aero-mint, #00d4aa);
-		background: rgba(0, 212, 170, 0.08);
+		background: rgba(var(--aero-mint-rgb), 0.08);
 	}
 
 	.action-btn.shared .icon {
-		filter: drop-shadow(0 0 6px rgba(0, 212, 170, 0.5));
+		filter: drop-shadow(0 0 6px rgba(var(--aero-mint-rgb), 0.5));
 	}
 
 	.action-btn.shared:hover {
@@ -1882,7 +1882,7 @@
 	.comment-input-wrapper:focus-within {
 		border-color: var(--aero-sky);
 		box-shadow:
-			0 0 0 3px rgba(46, 134, 232, 0.1),
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.1),
 			var(--shadow-xs);
 	}
 
@@ -2118,7 +2118,7 @@
 		border: 1px solid var(--border-subtle);
 	}
 	.poll-option-btn:hover {
-		background: rgba(46, 134, 232, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		border-color: var(--aero-blue);
 		transform: translateY(-1px);
 	}

@@ -547,7 +547,7 @@
 
 	.custom-select-item:hover:not(.disabled),
 	.custom-select-item.highlighted:not(.disabled) {
-		background: rgba(27, 133, 243, 0.12);
+		background: rgba(var(--accent-blue-rgb), 0.12);
 		color: var(--text-primary, #ffffff);
 	}
 
@@ -557,7 +557,7 @@
 	}
 
 	.custom-select-item.selected {
-		background: rgba(27, 133, 243, 0.18);
+		background: rgba(var(--accent-blue-rgb), 0.18);
 		color: var(--aero-blue, #1b85f3);
 		font-weight: 600;
 	}

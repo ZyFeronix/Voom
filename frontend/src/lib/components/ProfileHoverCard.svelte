@@ -431,9 +431,9 @@
 		box-shadow: none;
 	}
 	.hc-follow-btn.following:hover {
-		background: rgba(236, 72, 153, 0.1);
+		background: rgba(var(--aero-rose-rgb), 0.1);
 		color: var(--aero-rose);
-		border-color: rgba(236, 72, 153, 0.3);
+		border-color: rgba(var(--aero-rose-rgb), 0.3);
 	}
 
 	.hc-user-info {
@@ -556,8 +556,8 @@
 	}
 
 	:global([data-theme='light']) .hc-follow-btn.following:hover {
-		background: rgba(236, 72, 153, 0.1);
+		background: rgba(var(--aero-rose-rgb), 0.1);
 		color: var(--aero-rose);
-		border-color: rgba(236, 72, 153, 0.3);
+		border-color: rgba(var(--aero-rose-rgb), 0.3);
 	}
 </style>

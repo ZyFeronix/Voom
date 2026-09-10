@@ -183,7 +183,7 @@
 		height: 260px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
-		border: 1px dashed rgba(46, 180, 255, 0.25);
+		border: 1px dashed rgba(var(--accent-blue-rgb), 0.25);
 		animation: vsSpinRing 20s linear infinite;
 		pointer-events: none;
 		z-index: 0;
@@ -212,7 +212,7 @@
 		font-size: 1.85rem;
 		font-weight: 900;
 		letter-spacing: -0.02em;
-		background: linear-gradient(135deg, #ffffff 0%, #2eb4ff 100%);
+		background: linear-gradient(135deg, #ffffff 0%, var(--accent-blue-light, #2eb4ff) 100%);
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
@@ -234,7 +234,7 @@
 		font-weight: 800;
 		letter-spacing: 0.12em;
 		color: var(--accent-blue-light, #2eb4ff);
-		text-shadow: 0 0 12px rgba(46, 180, 255, 0.6);
+		text-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.6);
 	}
 
 	.levelup-message {
