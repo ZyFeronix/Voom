@@ -183,6 +183,7 @@ function applyDom() {
 	if (_accent && HEX_RE.test(_accent)) {
 		const pal = deriveAccentPalette(_accent);
 		const rgb = hexToRgb(_accent);
+		const rgbLight = hexToRgb(pal.light);
 		s.setProperty('--accent-blue-base', pal.base);
 		s.setProperty('--accent-blue-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
 		s.setProperty('--accent-blue-light', pal.light);
@@ -196,6 +197,12 @@ function applyDom() {
 		// cada tema redefine hover con literales: lo cubrimos explícitamente.
 		s.setProperty('--grad-primary', pal.gradient);
 		s.setProperty('--grad-primary-hover', pal.gradientHover);
+		// --aero-blue/--aero-sky son literales fijos por tema en layout.css y
+		// los usan decenas de componentes directamente (no solo --accent-blue-*):
+		// sin esto el preset "cambiaba" variables que casi nadie consume.
+		s.setProperty('--aero-blue', pal.bright);
+		s.setProperty('--aero-sky', pal.light);
+		s.setProperty('--accent-sky-rgb', `${rgbLight.r}, ${rgbLight.g}, ${rgbLight.b}`);
 	} else {
 		for (const p of [
 			'--accent-blue-base',
@@ -208,7 +215,10 @@ function applyDom() {
 			'--accent-cyan',
 			'--accent-gradient',
 			'--grad-primary',
-			'--grad-primary-hover'
+			'--grad-primary-hover',
+			'--aero-blue',
+			'--aero-sky',
+			'--accent-sky-rgb'
 		]) {
 			s.removeProperty(p);
 		}
