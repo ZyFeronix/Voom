@@ -164,7 +164,7 @@
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
 		background: var(--aero-blue);
-		box-shadow: 0 0 6px rgba(46, 134, 232, 0.5);
+		box-shadow: 0 0 6px rgba(var(--accent-blue-rgb), 0.5);
 	}
 
 	.vs-mob-label {
@@ -214,7 +214,7 @@
 		margin-top: -24px;
 		border: none;
 		box-shadow:
-			0 4px 16px rgba(46, 134, 232, 0.4),
+			0 4px 16px rgba(var(--accent-blue-rgb), 0.4),
 			inset 0 1px 2px rgba(255, 255, 255, 0.4);
 		transition:
 			transform var(--t-spring),
@@ -237,7 +237,7 @@
 	.accent-item:hover .vs-accent-pill {
 		transform: translateY(-5px) scale(1.06);
 		box-shadow:
-			0 12px 28px rgba(46, 134, 232, 0.46),
+			0 12px 28px rgba(var(--accent-blue-rgb), 0.46),
 			inset 0 1px 0 rgba(255, 255, 255, 0.4);
 	}
 
