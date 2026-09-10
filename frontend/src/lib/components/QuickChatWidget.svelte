@@ -485,7 +485,7 @@
 			{#if !minimized}
 				<div
 					class="qc-conv-list"
-					style="overflow-y: scroll; scrollbar-width: thin; scrollbar-color: rgba(46,134,232,0.7) rgba(0,0,0,0.2);"
+					style="overflow-y: scroll; scrollbar-width: thin; scrollbar-color: rgba(var(--accent-blue-rgb),0.7) rgba(0,0,0,0.2);"
 				>
 					{#if loadingConvs}
 						<!-- Shimmer skeleton for conversations -->
@@ -1290,7 +1290,7 @@
 		height: 26px;
 		border-radius: var(--radius-squircle);
 		corner-shape: squircle;
-		background: rgba(46, 134, 232, 0.2);
+		background: rgba(var(--accent-blue-rgb), 0.2);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1478,7 +1478,7 @@
 		background: var(--grad-primary);
 		color: #fff;
 		border-bottom-right-radius: 4px;
-		box-shadow: 0 3px 10px rgba(46, 134, 232, 0.2);
+		box-shadow: 0 3px 10px rgba(var(--accent-blue-rgb), 0.2);
 	}
 
 	.qc-bubble-row.peer .qc-bubble {
@@ -1681,7 +1681,7 @@
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		box-shadow: 0 4px 12px rgba(46, 134, 232, 0.3);
+		box-shadow: 0 4px 12px rgba(var(--accent-blue-rgb), 0.3);
 		transition:
 			transform 150ms,
 			box-shadow 150ms,
@@ -1689,7 +1689,7 @@
 	}
 	.qc-send-btn:hover:not(:disabled) {
 		transform: scale(1.08);
-		box-shadow: 0 6px 16px rgba(46, 134, 232, 0.4);
+		box-shadow: 0 6px 16px rgba(var(--accent-blue-rgb), 0.4);
 	}
 	.qc-send-btn:disabled {
 		opacity: 0.4;
@@ -1709,12 +1709,12 @@
 	}
 	:global(.qc-messages::-webkit-scrollbar-thumb),
 	:global(.qc-conv-list::-webkit-scrollbar-thumb) {
-		background: rgba(46, 134, 232, 0.8) !important;
+		background: rgba(var(--accent-blue-rgb), 0.8) !important;
 		border-radius: var(--radius-xs) !important;
 		border: none !important;
 	}
 	:global(.qc-messages::-webkit-scrollbar-thumb:hover),
 	:global(.qc-conv-list::-webkit-scrollbar-thumb:hover) {
-		background: rgba(46, 134, 232, 1) !important;
+		background: rgba(var(--accent-blue-rgb), 1) !important;
 	}
 </style>

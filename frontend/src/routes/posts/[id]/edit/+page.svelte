@@ -652,7 +652,7 @@
 	}
 	.edit-textarea:focus {
 		border-color: var(--aero-sky);
-		box-shadow: 0 0 0 3px rgba(74, 171, 223, 0.12);
+		box-shadow: 0 0 0 3px rgba(var(--accent-sky-rgb), 0.12);
 	}
 	.char-counter {
 		display: flex;

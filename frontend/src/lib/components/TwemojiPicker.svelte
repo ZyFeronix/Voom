@@ -472,7 +472,7 @@
 		-webkit-backdrop-filter: var(--glass-blur) !important;
 		border: 1px solid var(--glass-border-t, rgba(255, 255, 255, 0.1));
 		border-radius: var(--radius-lg, 16px);
-		box-shadow: 0 4px 16px rgba(46, 134, 232, 0.06);
+		box-shadow: 0 4px 16px rgba(var(--accent-blue-rgb), 0.06);
 		display: flex;
 		flex-direction: column;
 		gap: 12px;

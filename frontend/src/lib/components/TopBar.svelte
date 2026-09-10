@@ -526,7 +526,7 @@
 	}
 	.vs-search-item-remove:hover {
 		color: var(--aero-rose);
-		background: rgba(236, 72, 153, 0.15);
+		background: rgba(var(--aero-rose-rgb), 0.15);
 	}
 
 	.vs-search-footer {

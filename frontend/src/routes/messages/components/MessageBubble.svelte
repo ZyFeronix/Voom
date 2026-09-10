@@ -1420,21 +1420,21 @@
 
 	/* ── Variación para "Peer" (Contacto) — Tema LIGHT ──────── */
 	.message-group.peer .marketplace-card-link {
-		background: rgba(27, 133, 243, 0.04);
-		border: 1px solid rgba(27, 133, 243, 0.2);
+		background: rgba(var(--accent-blue-rgb), 0.04);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.2);
 		box-shadow:
-			0 2px 8px rgba(27, 133, 243, 0.06),
+			0 2px 8px rgba(var(--accent-blue-rgb), 0.06),
 			inset 0 1px 0 rgba(255, 255, 255, 0.8);
 		color: #0f172a;
 	}
 
 	.message-group.peer .marketplace-card-link:hover {
-		background: rgba(27, 133, 243, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		border-color: var(--accent-blue-base, #1b85f3);
 		transform: translateY(-2px) scale(1.01);
 		box-shadow:
-			0 6px 18px rgba(27, 133, 243, 0.15),
-			0 0 10px rgba(27, 133, 243, 0.1);
+			0 6px 18px rgba(var(--accent-blue-rgb), 0.15),
+			0 0 10px rgba(var(--accent-blue-rgb), 0.1);
 	}
 
 	.message-group.peer .marketplace-media-box {
@@ -1444,7 +1444,7 @@
 	}
 
 	.message-group.peer .marketplace-placeholder {
-		background: rgba(27, 133, 243, 0.08);
+		background: rgba(var(--accent-blue-rgb), 0.08);
 		color: var(--accent-blue-base, #1b85f3);
 	}
 
@@ -1461,9 +1461,9 @@
 	}
 
 	.message-group.peer .marketplace-card-price {
-		background: rgba(27, 133, 243, 0.12);
+		background: rgba(var(--accent-blue-rgb), 0.12);
 		color: #0369a1;
-		border: 1px solid rgba(27, 133, 243, 0.28);
+		border: 1px solid rgba(var(--accent-blue-rgb), 0.28);
 	}
 
 	.message-group.peer .marketplace-card-category {

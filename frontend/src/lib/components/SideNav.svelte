@@ -485,7 +485,7 @@
 		justify-content: center;
 		/* Volumen Neo-Aero */
 		box-shadow:
-			0 4px 14px rgba(27, 133, 243, 0.38),
+			0 4px 14px rgba(var(--accent-blue-rgb), 0.38),
 			inset 0 1px 0 rgba(255, 255, 255, 0.55),
 			inset 0 -1px 0 rgba(0, 0, 0, 0.12);
 		position: relative;
@@ -515,7 +515,7 @@
 	.vs-brand__logo:hover .vs-brand__icon {
 		transform: scale(1.07) rotate(3deg);
 		box-shadow:
-			0 6px 18px rgba(27, 133, 243, 0.48),
+			0 6px 18px rgba(var(--accent-blue-rgb), 0.48),
 			inset 0 1px 0 rgba(255, 255, 255, 0.65);
 	}
 
@@ -691,9 +691,9 @@
 		font-weight: 700;
 		padding: 1px 6px;
 		border-radius: var(--radius-full);
-		background: rgba(236, 72, 153, 0.12);
+		background: rgba(var(--aero-rose-rgb), 0.12);
 		color: var(--aero-rose);
-		border: 1px solid rgba(236, 72, 153, 0.25);
+		border: 1px solid rgba(var(--aero-rose-rgb), 0.25);
 		line-height: 1.5;
 		letter-spacing: 0;
 		transition:
@@ -741,7 +741,7 @@
 		background: var(--grad-primary);
 		border-color: rgba(255, 255, 255, 0.25);
 		box-shadow:
-			0 4px 16px rgba(27, 133, 243, 0.3),
+			0 4px 16px rgba(var(--accent-blue-rgb), 0.3),
 			inset 0 1px 0 rgba(255, 255, 255, 0.35);
 	}
 	.vs-nav-item--active::before {
@@ -760,7 +760,7 @@
 	.vs-nav-item--active:hover {
 		transform: none;
 		box-shadow:
-			0 6px 20px rgba(27, 133, 243, 0.38),
+			0 6px 20px rgba(var(--accent-blue-rgb), 0.38),
 			inset 0 1px 0 rgba(255, 255, 255, 0.4);
 	}
 

@@ -973,7 +973,7 @@
 		border-radius: 50%;
 		background: var(--aero-blue);
 		box-shadow:
-			0 0 10px rgba(27, 133, 243, 0.6),
+			0 0 10px rgba(var(--accent-blue-rgb), 0.6),
 			0 2px 6px rgba(0, 0, 0, 0.4);
 		border: 2px solid #ffffff;
 		cursor: pointer;
@@ -1003,7 +1003,7 @@
 		border-radius: 50%;
 		background: var(--aero-blue);
 		box-shadow:
-			0 0 10px rgba(27, 133, 243, 0.6),
+			0 0 10px rgba(var(--accent-blue-rgb), 0.6),
 			0 2px 6px rgba(0, 0, 0, 0.4);
 		border: 2px solid #ffffff;
 		cursor: pointer;
