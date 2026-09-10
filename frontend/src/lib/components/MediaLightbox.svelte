@@ -1874,19 +1874,19 @@
 	}
 
 	:global([data-theme='light']) .vs-sidebar-panel {
-		background: #f8fafc;
-		border-left: 1px solid rgba(14, 165, 233, 0.25);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border-left: 1px solid var(--border-subtle);
 		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 
 	:global([data-theme='dark']) .vs-sidebar-panel {
-		background: rgba(12, 35, 55, 0.88);
-		border-left: 1px solid rgba(255, 255, 255, 0.12);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border-left: 1px solid var(--border-subtle);
 	}
 
 	:global([data-theme='midnight']) .vs-sidebar-panel {
-		background: rgba(6, 12, 24, 0.92);
-		border-left: 1px solid rgba(160, 210, 255, 0.1);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border-left: 1px solid var(--border-subtle);
 	}
 
 	.vs-author-card {
@@ -2000,7 +2000,7 @@
 	.action-btn:hover {
 		background: var(--bg-overlay, rgba(255, 255, 255, 0.06));
 		color: var(--aero-blue, #1b85f3);
-		box-shadow: 0 0 12px rgba(27, 133, 243, 0.15);
+		box-shadow: 0 0 12px rgba(var(--accent-blue-rgb), 0.15);
 	}
 
 	.action-btn:active {
@@ -2067,8 +2067,8 @@
 	}
 
 	:global([data-theme='light']) .vs-desktop-share-menu {
-		background: #ffffff;
-		border: 1px solid rgba(14, 165, 233, 0.2);
+		background: var(--bg-surface-solid, var(--bg-surface));
+		border: 1px solid var(--border-subtle);
 		box-shadow: var(--shadow-lg), var(--shadow-glow);
 	}
 
@@ -2140,7 +2140,7 @@
 	.comment-input-wrapper:focus-within {
 		border-color: var(--aero-sky, var(--accent-blue-base, #1b85f3));
 		box-shadow:
-			0 0 0 3px rgba(46, 134, 232, 0.1),
+			0 0 0 3px rgba(var(--accent-blue-rgb), 0.1),
 			var(--shadow-xs);
 	}
 
@@ -2242,7 +2242,7 @@
 		background: linear-gradient(135deg, var(--aero-sky, #38bdf8), var(--aero-blue, #1b85f3));
 		color: white;
 		border: none;
-		box-shadow: 0 3px 10px rgba(27, 133, 243, 0.3);
+		box-shadow: 0 3px 10px rgba(var(--accent-blue-rgb), 0.3);
 		display: flex;
 		align-items: center;
 		justify-content: center;

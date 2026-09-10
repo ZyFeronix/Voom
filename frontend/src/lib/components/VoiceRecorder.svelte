@@ -523,11 +523,11 @@
 
 	.start-btn {
 		background: var(--aero-amber, #f5a623);
-		box-shadow: 0 4px 12px rgba(245, 166, 35, 0.3);
+		box-shadow: 0 4px 12px rgba(var(--aero-amber-rgb), 0.3);
 	}
 
 	.start-btn:hover {
 		transform: scale(1.05);
-		box-shadow: 0 6px 16px rgba(245, 166, 35, 0.5);
+		box-shadow: 0 6px 16px rgba(var(--aero-amber-rgb), 0.5);
 	}
 </style>
