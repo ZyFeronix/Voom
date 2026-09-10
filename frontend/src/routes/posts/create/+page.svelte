@@ -3937,9 +3937,10 @@
 	.grid-media-cell {
 		position: relative;
 		aspect-ratio: 16 / 9;
-		background: #000000;
+		background: var(--bg-surface2, #000000);
 		overflow: hidden;
 		border-radius: var(--radius-xs);
+		border: 1px solid var(--border-glass, var(--border-subtle));
 	}
 	.mock-media-grid.grid-count-2 .grid-media-cell,
 	.mock-media-grid.grid-count-4 .grid-media-cell {
