@@ -883,7 +883,7 @@
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	border-top: 1px solid rgba(0, 119, 255, 0.1);
+	border-top: 1px solid rgba(var(--accent-blue-rgb), 0.1);
 	padding-top: 16px;
 	margin-top: 12px;
 	gap: 16px;
@@ -1070,7 +1070,7 @@
 	font-size: 1.5rem;
 	box-shadow:
 		inset 0 2px 4px rgba(255, 255, 255, 0.4),
-		0 4px 12px rgba(14, 165, 233, 0.3);
+		0 4px 12px rgba(var(--accent-sky-rgb), 0.3);
 }
 .payment-glow {
 	position: absolute;
@@ -1145,7 +1145,7 @@
 .payment-input-wrap:focus-within {
 	border-color: var(--accent-blue-light);
 	box-shadow:
-		0 0 0 3px rgba(46, 180, 255, 0.2),
+		0 0 0 3px rgba(var(--accent-sky-rgb), 0.2),
 		var(--input-shadow-inner);
 	background: var(--bg-input-tint);
 }
@@ -1306,8 +1306,12 @@
 	padding: 20px;
 	margin-top: 16px;
 	margin-bottom: 24px;
-	background: linear-gradient(135deg, rgba(27, 133, 243, 0.08) 0%, rgba(0, 212, 170, 0.05) 100%);
-	border: 1px solid rgba(27, 133, 243, 0.22);
+	background: linear-gradient(
+		135deg,
+		rgba(var(--accent-blue-rgb), 0.08) 0%,
+		rgba(0, 212, 170, 0.05) 100%
+	);
+	border: 1px solid rgba(var(--accent-blue-rgb), 0.22);
 	border-radius: var(--radius-lg);
 }
 
@@ -1329,7 +1333,7 @@
 .perf-diag-icon {
 	font-size: 28px;
 	color: var(--aero-sky);
-	background: rgba(46, 180, 255, 0.12);
+	background: rgba(var(--accent-sky-rgb), 0.12);
 	padding: 8px;
 	border-radius: var(--radius-md);
 }
@@ -1438,7 +1442,7 @@
 	font-size: 0.85rem;
 	font-weight: 700;
 	border-radius: var(--radius-md);
-	box-shadow: 0 4px 14px rgba(27, 133, 243, 0.25);
+	box-shadow: 0 4px 14px rgba(var(--accent-blue-rgb), 0.25);
 }
 
 .perf-section-block {
@@ -1492,16 +1496,16 @@
 
 .perf-preset-card:hover {
 	transform: translateY(-2px);
-	border-color: rgba(46, 180, 255, 0.4);
+	border-color: rgba(var(--accent-sky-rgb), 0.4);
 	box-shadow: var(--shadow-sm), var(--shadow-glow);
 }
 
 .perf-preset-card.active {
 	border-color: var(--aero-sky);
-	background: rgba(46, 180, 255, 0.08);
+	background: rgba(var(--accent-sky-rgb), 0.08);
 	box-shadow:
 		0 0 0 1px var(--aero-sky),
-		0 4px 16px rgba(46, 180, 255, 0.15);
+		0 4px 16px rgba(var(--accent-sky-rgb), 0.15);
 }
 
 .preset-badge-row {
@@ -1689,8 +1693,8 @@
 .perf-benchmark-box {
 	margin-top: 16px;
 	padding: 14px;
-	background: rgba(14, 165, 233, 0.06);
-	border: 1px dashed rgba(14, 165, 233, 0.35);
+	background: rgba(var(--accent-sky-rgb), 0.06);
+	border: 1px dashed rgba(var(--accent-sky-rgb), 0.35);
 	border-radius: var(--radius-md);
 }
 
@@ -1735,7 +1739,7 @@
 	height: 100%;
 	background: var(--accent-gradient);
 	transition: width 0.1s linear;
-	box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+	box-shadow: 0 0 10px rgba(var(--accent-sky-rgb), 0.5);
 }
 
 .perf-benchmark-results {
