@@ -328,7 +328,7 @@
 	}
 	.msn-status-dot.status-away,
 	.msn-status-dot.status-idle {
-		background: #f5a623;
+		background: var(--aero-amber, #f5a623);
 	}
 	.msn-status-dot.status-dnd {
 		background: #e5484d;
