@@ -615,8 +615,8 @@
 	}
 	.strike-card.selected {
 		border-color: var(--aero-rose);
-		background: rgba(236, 72, 153, 0.08);
-		box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+		background: rgba(var(--aero-rose-rgb), 0.08);
+		box-shadow: 0 0 0 3px rgba(var(--aero-rose-rgb), 0.12);
 	}
 	.strike-card .material-icons-round {
 		font-size: 20px;
