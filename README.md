@@ -12,7 +12,7 @@ Curiosamente, semanas después de hacer público mi código, los desarrolladores
 
 El código cerrado de baja calidad está muriendo. 
 
-Bienvenidos a la era del Neo-Aero y el Open Source. 
+Bienvenidos a la era del Aero Engine y el Open Source. 
 
 Para quienes buscan el futuro, no el pasado.
 
