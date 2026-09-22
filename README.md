@@ -8,8 +8,6 @@ Durante años, creadores y comunidades fueron estafados por scripts cerrados, vu
 
 Cansado de esa basura, decidímos construir **Voom!**: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial. 
 
-Curiosamente, semanas después de hacer público mi código, los desarrolladores de WoWonder tumbaron su propio script de CodeCanyon. 
-
 El código cerrado de baja calidad está muriendo. 
 
 Bienvenidos a la era del Aero Engine y el Open Source. 
