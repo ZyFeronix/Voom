@@ -28,6 +28,7 @@ Para quienes buscan el futuro, no el pasado.
 > 
 > — *Hard, Desarrollador Principal de Voom!*
 
+> —*Dalas, Ni pienses usar mis proyectos como base para tus estafas*
 ---
 
 ## Módulos
