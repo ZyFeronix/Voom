@@ -18,18 +18,20 @@ Para quienes buscan el futuro, no el pasado.
 > 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
 > componentes, API, configuración, operaciones y roadmap.
 
-> [!WARNING]
-> ### Declaración de uso ético y desautorización pública
-> **Voom!** se construyó para devolverle la soberanía a las comunidades bajo software libre (AGPLv3), no para servir de base a corporaciones que instrumentalizan la nostalgia con fines extractivos.
-> 
-> Queda **terminantemente desautorizado** el uso de esta arquitectura como base por parte de **Operation Bluebird Inc.** y su producto **Tweet.app** (Project Bluebird).
-> 
-> No avalamos proyectos que explotan la nostalgia de la antigua red del pájaro azul para cobrar membresías tempranas ($20 a $40+ USD) bajo promesas de confianza, mientras en su letra chica imponen licencias perpetuas sobre el contenido del usuario para alimentar modelos de IA y explotación comercial sin posibilidad de borrado efectivo.
-> 
-> — *Hard, Desarrollador Principal de Voom!*
-
-> —*Dalas, Ni pienses usar mis proyectos como base para tus estafas*
----
+> [!NOTE]
+> ### Principios del proyecto y uso de la marca
+>
+> **Voom!** es un proyecto de software libre bajo la licencia **GNU AGPLv3**, creado con el objetivo de ofrecer a comunidades y desarrolladores una plataforma social abierta, auditable y autohospedable.
+>
+> El proyecto promueve principios de **transparencia, privacidad, control del usuario, interoperabilidad y respeto por la propiedad del contenido**.
+>
+> El uso, modificación y distribución del código fuente se rigen exclusivamente por los términos de la licencia AGPLv3.
+>
+> El nombre **Voom!**, su identidad visual y sus elementos de marca no pueden utilizarse para insinuar patrocinio, aprobación, asociación oficial o afiliación con este proyecto sin autorización expresa.
+>
+> Los forks y proyectos derivados son bienvenidos siempre que respeten las obligaciones de la licencia aplicable y presenten de forma clara su independencia respecto al proyecto original.
+>
+> — *Hard, Lead Developer of Voom!*
 
 ## Módulos
 
