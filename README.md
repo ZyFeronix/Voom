@@ -1,22 +1,24 @@
-# Voom! — La primera Red Social de Código Abierto con Alma.
+# Voom! — Una Red Social de Código Abierto con Alma
 
-[![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
-[![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Glassmorphism%202.0-orange)](#tech-stack)
+[Version](https://github.com/ZyFeronix/Voom/blob/main/CHANGELOG.md) · [License: AGPLv3](https://www.gnu.org/licenses/agpl-3.0) · [Tech Stack](https://github.com/ZyFeronix/Voom/blob/main/README.md#tech-stack)
 
-Durante años, creadores y comunidades fueron estafados por scripts cerrados, vulnerables y costosos como WoWonder. 
+Durante años, muchas comunidades han dependido de plataformas y scripts sociales cerrados, difíciles de auditar, modificar y mantener de forma independiente.
 
-Cansado de esa basura, decidímos construir **Voom!**: una alternativa 100% libre (AGPLv3), con seguridad nivel OWASP 3, sin algoritmos tóxicos, y optimizada para costar $0 dólares de mantenimiento inicial. 
+Decidimos construir **Voom!** como una alternativa diferente: una plataforma social de **software libre y autohospedable**, desarrollada bajo AGPLv3, con una arquitectura moderna, controles transparentes y una experiencia diseñada alrededor de las comunidades.
 
-El código cerrado de baja calidad está muriendo. 
+Voom busca demostrar que una plataforma social moderna no necesita sacrificar **privacidad, control del usuario, transparencia ni libertad de modificación**.
 
-Bienvenidos a la era del Aero Engine y el Open Source. 
+Sin feeds diseñados alrededor de engagement artificial.  
+Sin dependencia obligatoria de una plataforma propietaria.  
+Sin convertir el código fuente en una caja negra.
 
-Para quienes buscan el futuro, no el pasado.
+Bienvenidos a **Voom!** y al **Aero Engine**.
 
-**Estado:** Beta v0.6.0-beta.2 — 19 módulos, 70 tablas, 27 grupos de API. En desarrollo activo.
-> 📖 **Documentación completa:** [`DOCS.md`](./DOCS.md) — arquitectura, schema, rutas,
-> componentes, API, configuración, operaciones y roadmap.
+Construido para quienes quieren crear el futuro de las comunidades abiertas.
+
+**Estado:** Beta `v0.6.0-beta.2` — 19 módulos, 70 tablas y 27 grupos de API. En desarrollo activo.
+
+> **Documentación completa:** [`DOCS.md`](https://github.com/ZyFeronix/Voom/blob/main/DOCS.md) — arquitectura, schema, rutas, componentes, API, configuración, operaciones y roadmap.
 
 > [!NOTE]
 > ### Principios del proyecto y uso de la marca
