@@ -1,6 +1,8 @@
 # Voom! — Una Red Social de Código Abierto con Alma
 
-[Version](https://github.com/ZyFeronix/Voom/blob/main/CHANGELOG.md) · [License: AGPLv3](https://www.gnu.org/licenses/agpl-3.0) · [Tech Stack](https://github.com/ZyFeronix/Voom/blob/main/README.md#tech-stack)
+[![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
+[![Stack](https://img.shields.io/badge/stack-SvelteKit%205%20%2B%20libSQL%20%2B%20Aero%20Engine-orange)](#tech-stack)
 
 Durante años, muchas comunidades han dependido de plataformas y scripts sociales cerrados, difíciles de auditar, modificar y mantener de forma independiente.
 
