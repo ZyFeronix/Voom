@@ -1,4 +1,4 @@
-# Voom! — The Definitive Social Network Script
+# Voom! — El script definitivo para redes sociales.
 
 [![Version](https://img.shields.io/badge/version-0.6.0--beta.2-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-AGPLv3-blue)](https://www.gnu.org/licenses/agpl-3.0)
