@@ -9,6 +9,14 @@
 set -e
 
 DATA_DIR="${DATA_DIR:-/data}"
+
+# ── 0. Como root: arreglar permisos del volumen y bajar a usuario "node" ─────
+# (volúmenes creados por imágenes antiguas pertenecen a root)
+if [ "$(id -u)" = "0" ]; then
+	mkdir -p "$DATA_DIR"
+	[ "$(stat -c %U "$DATA_DIR")" = "node" ] || chown -R node:node "$DATA_DIR"
+	exec su-exec node "$0" "$@"
+fi
 mkdir -p "$DATA_DIR"
 
 # ── 1. JWT_SECRET persistente ────────────────────────────────────────────────

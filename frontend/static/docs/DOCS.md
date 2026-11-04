@@ -100,7 +100,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Capa | Tecnología |
 |------|-----------|
 | Contenedores | Docker + docker-compose (single service + healthcheck) |
-| Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
+| Proxy reverso | Caddy (HTTPS automático, embebido en docker-compose.yml) |
 | Redis | No usado (arquitectura in-memory local) |
 | Tests | Vitest — 17 suites en `tests/` (227 tests, todos en verde) |
 | Linting | ESLint 9 + Prettier 3 + plugin Svelte — `npm run lint` sale verde |
@@ -164,7 +164,7 @@ Vsocial/                     ← raíz del proyecto
 ├── uploads/                 ← directorio de uploads (producción)
 ├── docker-compose.yml       ← orquestación Docker
 ├── Dockerfile               ← build multi-stage (alpine, precompress)
-├── nginx.conf               ← proxy reverso (WebSocket, buffering off)
+├── install.sh               ← instalador de 1 comando (Docker + stack)
 └── .github/workflows/       ← ci.yml (lint+build) y sync.yml (mirror GitLab)
 ```
 
@@ -598,17 +598,14 @@ docker-compose up --build -d
 El contenedor expone puerto `3000`, monta un volumen `voom_data` en `/data` (DB + uploads),
 y tiene healthcheck cada 30s contra `/api/health`.
 
-#### Opción C: Nginx + Node.js
+#### Opción C: Docker + Caddy (recomendada)
+
+El `docker-compose.yml` ya incluye Caddy (HTTPS automático, WebSocket-ready). Instalación
+en un servidor limpio con un solo comando (ver `DEPLOY.md`):
 
 ```bash
-# 1. Arrancar Node.js en puerto 3000
-cd frontend && npm start &
-
-# 2. Nginx como proxy reverso
-nginx -c /path/to/nginx.conf
+curl -fsSL https://raw.githubusercontent.com/zyferonix/voom/main/install.sh | sh
 ```
-
-Nginx maneja WebSocket upgrades, establece headers de IP real, y deshabilita buffering.
 
 ### 12.3 Base de Datos
 
@@ -749,10 +746,9 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 | `svelte.config.js` | Runes mode forzado (excepto node_modules), adapter-node con precompress. |
 | `Dockerfile` | Multi-stage (node:20-slim): layout espejo del dev, CMD sobre `server.js` (SvelteKit + Socket.IO), runtime con deps de producción. |
 | `docker-entrypoint.sh` | Genera/persiste JWT_SECRET en el volumen y aplica migraciones solo en upgrades. |
-| `docker-compose.yml` | Stack de producción: app + Caddy (HTTPS automático) + backups opcionales (profile). |
-| `Caddyfile` | TLS automático de Let's Encrypt para el dominio; proxy al contenedor. |
+| `docker-compose.yml` | Stack de producción: app + Caddy (HTTPS automático, Caddyfile embebido) + backups opcionales (profile). |
 | `DEPLOY.md` | Guía de instalación paso a paso para no avanzados (VPS + Portainer). |
-| `nginx.conf` | Proxy reverso alternativo WebSocket-ready, buffering off. |
+| `install.sh` | Instalador de 1 comando: instala Docker, descarga el compose y arranca. |
 | `server.js` | Entrypoint de producción standalone. |
 
 ---

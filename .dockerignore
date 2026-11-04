@@ -1,11 +1,12 @@
 # Contexto de build mínimo: nada de secretos, BDs ni artefactos locales.
-.git
+**/.git
 .github
+.husky
 .vscode
 .env
 .env.*
+!.env.example
 *.tmp
-qa_token.tmp
 
 # BDs y archivos del desarrollador
 database.sqlite*
@@ -13,24 +14,22 @@ install.lock
 uploads/
 .backups/
 
-# Node / builds locales (se generan dentro de la imagen)
-node_modules
-frontend/node_modules
+# Builds / dependencias locales (se generan dentro de la imagen)
+**/node_modules
 frontend/build
-frontend/.svelte-kit
-.svelte-kit
+**/.svelte-kit
 
-# Docs y material de trabajo no necesarios en la imagen
+# Docs y material de trabajo no necesario en la imagen
 tests/
 docs/
-*.md
-!README.md
+frontend/static/docs
+**/*.md
+**/*.bat
 .agents/
 .claude/
 .zcode/
 .ai-codex/
-
-# Assets pesados one-off del repo
+docker-compose.yml
 VoomMojis.zip
 skype-emoticons/
 download_emoticons.mjs
