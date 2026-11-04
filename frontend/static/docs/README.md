@@ -62,7 +62,7 @@ Para quienes buscan el futuro, no el pasado.
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
 | Testing | Vitest (12 suites, 126 tests) |
-| DevOps | Docker + docker-compose + nginx + Husky hooks |
+| DevOps | Docker + docker-compose + Caddy + Husky hooks |
 
 ---
 

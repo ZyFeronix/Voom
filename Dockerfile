@@ -1,54 +1,66 @@
+# syntax=docker/dockerfile:1
 # =============================================================================
-# Voom! — Imagen de producción
+# Voom! — Imagen de producción (Alpine, multi-stage, mínima)
 #
-# El stage final ESPEJA el layout de desarrollo (/app/frontend + /app/schema…)
-# para que el cálculo de rootDir resuelva en /app y todo (BD, uploads,
-# schema_sqlite.sql, migraciones) caiga donde el código espera.
-#
-# El CMD ejecuta frontend/server.js (NO build/index.js): es quien arranca
-# Socket.IO — chat, presencia, notificaciones push y llamadas WebRTC.
+# Layout espejo del de desarrollo (/app/frontend + /app/schema_sqlite.sql…) para
+# que rootDir resuelva en /app. CMD = frontend/server.js (SvelteKit + Socket.IO).
+# Solo se instalan dependencias de runtime (ver "dependencies" en package.json:
+# lo que se empaqueta en el cliente vive en devDependencies y NO entra aquí).
 # =============================================================================
 
-# ── Stage 1: build de la aplicación SvelteKit ────────────────────────────────
-FROM node:20-slim AS builder
+# ── 1. Build de la aplicación ────────────────────────────────────────────────
+# El build produce JS independiente de la arquitectura: corre SIEMPRE nativo
+# (rápido) aunque se publique para arm64.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 WORKDIR /app/frontend
-
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-# ── Stage 2: runtime (solo dependencias de producción) ──────────────────────
-FROM node:20-slim AS runner
-ENV NODE_ENV=production \
-	PORT=3000 \
-	HOST=0.0.0.0
+# ── 2. Dependencias de producción (podadas) ──────────────────────────────────
+FROM node:22-alpine AS deps
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund \
+	&& find node_modules \( -name '*.md' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' \
+		-o -name '*.d.cts' -o -name '.github' -o -name 'test' -o -name 'tests' -o -name 'example*' \) \
+		-not -iname 'LICENSE*' -prune -exec rm -rf {} + \
+	&& rm -rf node_modules/@types node_modules/@libsql/*-gnu*   # alpine = musl
+
+# ── 3. Runtime ───────────────────────────────────────────────────────────────
+# Alpine pelada + solo el binario de node (sin npm/yarn/corepack): ~100 MB menos
+# que node:22-alpine. Los volúmenes antiguos (uid 1000 = "node") siguen valiendo.
+FROM alpine:3.24 AS runner
+ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 \
+	DATA_DIR=/data DB_PATH=/data/database.sqlite UPLOAD_DIR=/data/uploads
+# su-exec (~10 KB): el entrypoint arranca como root solo para arreglar permisos
+# del volumen (upgrades desde imágenes antiguas) y baja a "node".
+RUN apk add --no-cache libstdc++ su-exec \
+	&& addgroup -g 1000 node && adduser -u 1000 -G node -s /bin/sh -D node
+COPY --from=deps /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app/frontend
-
-# Dependencias de producción (ffmpeg-static, socket.io, libsql…)
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Servidor con Socket.IO + módulos server que importa por ruta relativa
+COPY --from=deps    /app/frontend/node_modules ./node_modules
+COPY --from=builder /app/frontend/package.json ./package.json
 COPY --from=builder /app/frontend/build ./build
 COPY --from=builder /app/frontend/server.js ./server.js
 COPY --from=builder /app/frontend/src/lib/server ./src/lib/server
 
-# Contrato de instalación/actualización (el instalador lee schema_sqlite.sql)
 WORKDIR /app
 COPY schema_sqlite.sql ./
 COPY migrations/ ./migrations/
-COPY scripts/ ./scripts/
-
+COPY scripts/migrate-up.js scripts/migrate-down.js scripts/seed.js scripts/backup.sh ./scripts/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /app/scripts/backup.sh \
+	&& mkdir -p /data && chown node:node /data
 
+VOLUME /data
 EXPOSE 3000
+WORKDIR /app/frontend
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-	CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+	CMD wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

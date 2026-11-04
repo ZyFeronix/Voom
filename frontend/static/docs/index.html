@@ -519,7 +519,7 @@ Para quienes buscan el futuro, no el pasado.
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
 | Testing | Vitest (12 suites, 126 tests) |
-| DevOps | Docker + docker-compose + nginx + Husky hooks |
+| DevOps | Docker + docker-compose + Caddy + Husky hooks |
 
 ---
 
@@ -701,7 +701,7 @@ grupos, notificaciones push, gamificación y panel administrativo.
 | Capa | Tecnología |
 |------|-----------|
 | Contenedores | Docker + docker-compose (single service + healthcheck) |
-| Proxy reverso | nginx.conf (WebSocket-ready, buffering off) |
+| Proxy reverso | Caddy (HTTPS automático, embebido en docker-compose.yml) |
 | Redis | No usado (arquitectura in-memory local) |
 | Tests | Vitest — 17 suites en `tests/` (227 tests, todos en verde) |
 | Linting | ESLint 9 + Prettier 3 + plugin Svelte — `npm run lint` sale verde |
@@ -765,7 +765,7 @@ Vsocial/                     ← raíz del proyecto
 ├── uploads/                 ← directorio de uploads (producción)
 ├── docker-compose.yml       ← orquestación Docker
 ├── Dockerfile               ← build multi-stage (alpine, precompress)
-├── nginx.conf               ← proxy reverso (WebSocket, buffering off)
+├── install.sh               ← instalador de 1 comando (Docker + stack)
 └── .github/workflows/       ← ci.yml (lint+build) y sync.yml (mirror GitLab)
 ```
 
@@ -1199,17 +1199,9 @@ docker-compose up --build -d
 El contenedor expone puerto `3000`, monta un volumen `voom_data` en `/data` (DB + uploads),
 y tiene healthcheck cada 30s contra `/api/health`.
 
-#### Opción C: Nginx + Node.js
+#### Opción C: Docker + Caddy (recomendada)
 
-```bash
-# 1. Arrancar Node.js en puerto 3000
-cd frontend && npm start &
-
-# 2. Nginx como proxy reverso
-nginx -c /path/to/nginx.conf
-```
-
-Nginx maneja WebSocket upgrades, establece headers de IP real, y deshabilita buffering.
+El `docker-compose.yml` ya incluye Caddy (HTTPS automático). Instalación con un comando: ver `DEPLOY.md`.
 
 ### 12.3 Base de Datos
 
@@ -1353,7 +1345,7 @@ Ejecutados en el mismo proceso Node.js, disparados en el primer request:
 | `docker-compose.yml` | Stack de producción: app + Caddy (HTTPS automático) + backups opcionales (profile). |
 | `Caddyfile` | TLS automático de Let's Encrypt para el dominio; proxy al contenedor. |
 | `DEPLOY.md` | Guía de instalación paso a paso para no avanzados (VPS + Portainer). |
-| `nginx.conf` | Proxy reverso alternativo WebSocket-ready, buffering off. |
+| `install.sh` | Instalador de 1 comando: instala Docker, descarga el compose y arranca. |
 | `server.js` | Entrypoint de producción standalone. |
 
 ---
