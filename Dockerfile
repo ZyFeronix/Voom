@@ -26,14 +26,19 @@ RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund 
 	&& find node_modules \( -name '*.md' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' \
 		-o -name '*.d.cts' -o -name '.github' -o -name 'test' -o -name 'tests' -o -name 'example*' \) \
 		-not -iname 'LICENSE*' -prune -exec rm -rf {} + \
-	&& rm -rf node_modules/@types
+	&& rm -rf node_modules/@types node_modules/@libsql/*-gnu*   # alpine = musl
 
 # ── 3. Runtime ───────────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
-ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 DATA_DIR=/data
+# Alpine pelada + solo el binario de node (sin npm/yarn/corepack): ~100 MB menos
+# que node:22-alpine. Los volúmenes antiguos (uid 1000 = "node") siguen valiendo.
+FROM alpine:3.24 AS runner
+ENV NODE_ENV=production PORT=3000 HOST=0.0.0.0 \
+	DATA_DIR=/data DB_PATH=/data/database.sqlite UPLOAD_DIR=/data/uploads
 # su-exec (~10 KB): el entrypoint arranca como root solo para arreglar permisos
 # del volumen (upgrades desde imágenes antiguas) y baja a "node".
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache libstdc++ su-exec \
+	&& addgroup -g 1000 node && adduser -u 1000 -G node -s /bin/sh -D node
+COPY --from=deps /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app/frontend
 COPY --from=deps    /app/frontend/node_modules ./node_modules
