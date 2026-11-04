@@ -45,7 +45,7 @@ jobs:
             type=raw,value=beta,enable=${{ contains(github.ref, 'beta') }}
 
       - name: Build & Push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
