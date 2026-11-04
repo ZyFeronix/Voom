@@ -1,0 +1,47 @@
+name: Branch flow
+
+on:
+  pull_request:
+    branches: [main, beta, dev]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Ruta de promoción
+    runs-on: ubuntu-slim
+    steps:
+      - name: Comprobar origen y destino
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+        run: |
+          echo "PR: $HEAD -> $BASE"
+          case "$BASE" in
+            dev)
+              case "$HEAD" in
+                main|beta)
+                  echo "::error::main y beta no pueden abrir PR hacia dev. Abre una rama de trabajo contra dev."
+                  exit 1
+                  ;;
+              esac
+              ;;
+            beta)
+              if [ "$HEAD" != "dev" ]; then
+                echo "::error::Solo dev promociona a beta. Origen recibido: $HEAD."
+                exit 1
+              fi
+              ;;
+            main)
+              if [ "$HEAD" != "beta" ]; then
+                echo "::error::Solo beta promociona a main. Origen recibido: $HEAD."
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Rama base sin reglas: $BASE"
+              ;;
+          esac
+          echo "Ruta válida: $HEAD -> $BASE"
