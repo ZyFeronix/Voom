@@ -59,7 +59,7 @@ voom-*.zip
 vsocial-*.zip
 
 # ─── Docs y notas internas de agentes (no van al repo oficial) ───
-/AGENTS.md
+# AGENTS.md se versiona a propósito: define el flujo de ramas y entrega.
 /CLAUDE.md
 /opencode.jsonc
 /PACKAGING.md
