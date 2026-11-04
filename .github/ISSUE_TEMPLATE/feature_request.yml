@@ -1,0 +1,61 @@
+name: Propuesta de mejora
+description: Una idea para Voom! o el Aero Engine
+title: "[idea]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Voom! prioriza privacidad, control del usuario y ausencia de mecánicas adictivas. Las propuestas que encajan con esos principios se evalúan primero.
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: Situación actual y por qué resulta limitante.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Comportamiento esperado, desde el punto de vista de quien lo usa.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modulo
+    attributes:
+      label: Módulo
+      options:
+        - Feed
+        - Posts y comentarios
+        - Mensajería
+        - Reels / Stories
+        - Notificaciones
+        - Gamificación
+        - Marketplace / Gigs
+        - Admin y moderación
+        - Diseño y temas
+        - Rendimiento
+        - Despliegue y operación
+        - Otro
+    validations:
+      required: true
+
+  - type: textarea
+    id: privacidad
+    attributes:
+      label: Impacto en privacidad y datos
+      description: Qué datos nuevos se guardarían, quién podría verlos y durante cuánto tiempo.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmaciones
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: He buscado propuestas duplicadas
+          required: true
