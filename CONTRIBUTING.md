@@ -60,9 +60,19 @@ npm run dev
 
 ## Branch Strategy
 
-- `main` — production-ready code. Protected.
-- Feature branches: `feature/<name>` or `fix/<name>`.
-- No direct commits to `main`. Always via PR.
+| Branch | Purpose |
+| --- | --- |
+| `main` | Production-ready code. Protected. |
+| `beta` | Testing. Code being validated before production. |
+| `dev` | Integration. Every change lands here first. |
+
+- No direct commits to `main` or `beta`.
+- Every change goes through a pull request into `dev`.
+- Promotion is one-way: `dev` → `beta` → `main`. A PR into `beta` must come from `dev`; a PR into `main` must come from `beta`. The `Branch flow` workflow enforces this.
+- Work branches come from `dev` and are named `feat/<name>`, `fix/<name>`, `docs/<name>`, `ci/<name>`.
+- `delete_branch_on_merge` is intentionally off — automatic deletion would remove `dev` and `beta` during promotions.
+
+See [`AGENTS.md`](./AGENTS.md) for the operational rules agents must follow.
 
 ---
 
