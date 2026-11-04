@@ -1236,7 +1236,7 @@
 					<span class="v-about-kbd"><kbd>Doble toque</kbd> ±10 s</span>
 				</div>
 				<div class="v-about-info" class:closing={aboutClosing}>
-					<div class="v-about-version">Versión v0.6.0-beta.2</div>
+					<div class="v-about-version">Versión v0.7.0</div>
 					<div class="v-about-copy">© 2026 Voom! · AGPLv3</div>
 				</div>
 			</div>

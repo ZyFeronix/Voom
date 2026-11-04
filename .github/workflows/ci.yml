@@ -34,10 +34,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -53,12 +53,12 @@ jobs:
         run: npm run build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voom-build
           path: frontend/build
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3 # nadie descarga el artefacto; evita acumular ~14 MB por run
 
   # --- Tests (disabled until the test environment is fixed) -----------------
   # Uncomment once `npm run test` passes locally. The blocker today:
@@ -74,8 +74,8 @@ jobs:
   #     run:
   #       working-directory: frontend
   #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
+  #     - uses: actions/checkout@v7
+  #     - uses: actions/setup-node@v7
   #       with:
   #         node-version: 22
   #         cache: npm
