@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - beta
     # El mirror replica el repositorio completo; este filtro solo evita
     # re-mirrorar cuando lo único que cambia es la configuración de Actions.
     paths-ignore:
@@ -30,8 +31,9 @@ jobs:
         run: |
           git clone --mirror "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" repo
           cd repo
-          # Solo ramas y etiquetas: los refs/pull/* de GitHub no existen en GitLab
-          # y hacen que el push falle con "deny updating a hidden ref".
+          # Solo main y beta: dev puede llevar código desechable y no debe ocupar
+          # espacio en GitLab. Los refs/pull/* de GitHub tampoco existen allí.
           git push --prune "https://${GITLAB_USER}:${GITLAB_TOKEN}@${TARGET_REPO_URL}" \
-            "+refs/heads/*:refs/heads/*" \
+            "+refs/heads/main:refs/heads/main" \
+            "+refs/heads/beta:refs/heads/beta" \
             "+refs/tags/*:refs/tags/*"
