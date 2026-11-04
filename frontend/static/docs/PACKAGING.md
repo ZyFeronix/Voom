@@ -37,7 +37,7 @@ schema_sqlite.sql      ← REQUERIDO en runtime (instalador + db.js)
 start.bat              ← launcher de desarrollo
 .gitignore  .gitattributes  .env.example
 LICENSE  README.md  CONTRIBUTING.md  CHANGELOG.md  ARCHITECTURE.md  DOCS.md
-nginx.conf  Dockerfile  docker-compose.yml
+Dockerfile  docker-compose.yml
 migrations/            ← 001_schema.sql, 002_phase2.sql, 003_gdpr.sql (tooling opcional)
 scripts/               ← build_docs.js, migrate-up.js, migrate-down.js, seed.js
 .husky/                ← pre-commit (útil para quienes clonen el repo)
@@ -135,7 +135,7 @@ New-Item -ItemType Directory -Force -Path $target | Out-Null
 # Raíz: archivos IN (uno por uno, explícito)
 $rootFiles = 'schema_sqlite.sql','start.bat','.gitignore',
  '.gitattributes','.env.example','LICENSE','README.md','CONTRIBUTING.md',
- 'CHANGELOG.md','ARCHITECTURE.md','DOCS.md','nginx.conf','Dockerfile','docker-compose.yml'
+ 'CHANGELOG.md','ARCHITECTURE.md','DOCS.md','Dockerfile','docker-compose.yml'
 foreach ($f in $rootFiles) { Copy-Item (Join-Path $root $f) $target -Force }
 
 # Raíz: dirs IN (árboles completos)

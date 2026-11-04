@@ -1,89 +1,91 @@
 # =============================================================================
-# Voom! — Stack de producción (Docker / Portainer)
+# Voom! — Stack de producción (Docker / Portainer). UN SOLO ARCHIVO.
 #
-# Instrucciones completas para NO avanzados: DEPLOY.md
+#   Mínimo:   DOMAIN=voom.example.com docker compose up -d
+#   Guía:     DEPLOY.md   ·   Instalador 1-comando: install.sh
 #
-# Resumen:
-#   1. Apunta el DNS (A record) de tu dominio a la IP del servidor.
-#   2. Levanta el stack y define la variable DOMAIN (ej. voom.social).
-#      - JWT_SECRET es opcional: si no lo pones, se genera y guarda solo.
-#   3. Abre https://tu-dominio → el asistente de instalación crea la BD y el
-#      admin. En /admin/settings activa «Registro Solo con Invitación».
+# Variables (en .env junto a este archivo, o en la UI de Portainer):
+#   DOMAIN      (obligatoria) dominio con DNS A → IP del servidor
+#   VOOM_TAG    (opcional) versión de la imagen: latest | beta | 1.2.3
+#   JWT_SECRET  (opcional) si falta se genera y persiste en el volumen
 #
-# El servicio caddy obtiene el certificado TLS automáticamente (Let's Encrypt)
-# y mantiene los websockets de Socket.IO sin configuración extra.
+# Caddy emite el certificado TLS (Let's Encrypt) solo y su Caddyfile va
+# embebido abajo: no hay que copiar ni montar ningún otro archivo.
 # =============================================================================
 
+name: voom
+
 services:
-  # ── Aplicación Voom! (SvelteKit + Socket.IO) ─────────────────────────────
   voom:
-    image: ghcr.io/dannydevsys/voom:latest # o build: . si compilas localmente
-    container_name: voom_app
+    image: ghcr.io/zyferonix/voom:${VOOM_TAG:-latest}
+    init: true
+    restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      # URL pública ABSOLUTA (cookies Secure, CSRF, links de email):
-      - ORIGIN=https://${DOMAIN}
-      # Confía en las cabeceras X-Forwarded-* de Caddy:
-      - TRUST_PROXY=1
-      # Límite de cuerpo = máx. subida (50 MB por archivo):
-      - BODY_SIZE_LIMIT=52428800
-      # Persistencia (todo dentro del volumen /data):
-      - DB_PATH=/data/database.sqlite
-      - UPLOAD_DIR=/data/uploads
-      - DATA_DIR=/data
-      - MIGRATIONS_DIR=/app/migrations
-      # Opcional: pégalo en la UI del stack o se genera y persiste solo.
-      - JWT_SECRET=${JWT_SECRET:-}
-      # Opcional (Turso remoto en vez de SQLite local):
-      # - DATABASE_URL=libsql://tu-db.turso.io
-      # - DATABASE_AUTH_TOKEN=tu-token
+      ORIGIN: https://${DOMAIN:?Define DOMAIN (ej. voom.example.com)}
+      TRUST_PROXY: '1'
+      BODY_SIZE_LIMIT: '52428800' # máx. subida: 50 MB
+      DB_PATH: /data/database.sqlite
+      UPLOAD_DIR: /data/uploads
+      MIGRATIONS_DIR: /app/migrations
+      JWT_SECRET: ${JWT_SECRET:-}
+      # Turso remoto en vez de SQLite local (opcional):
+      # DATABASE_URL: libsql://tu-db.turso.io
+      # DATABASE_AUTH_TOKEN: tu-token
     volumes:
       - voom_data:/data
-    restart: unless-stopped
+    # Sin puertos publicados: solo Caddy lo alcanza por la red interna.
+    expose: ['3000']
+    security_opt: ['no-new-privileges:true']
+    logging: &logging
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
 
-  # ── Proxy inverso con HTTPS automático (Let's Encrypt) ───────────────────
   caddy:
     image: caddy:2-alpine
-    container_name: voom_caddy
+    restart: unless-stopped
     depends_on:
-      - voom
+      voom: { condition: service_healthy }
     ports:
-      - '80:80' # necesario para la validación del certificado
+      - '80:80' # validación ACME + redirección a HTTPS
       - '443:443'
       - '443:443/udp' # HTTP/3
     environment:
-      - DOMAIN=${DOMAIN}
+      DOMAIN: ${DOMAIN}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
+      - caddy_data:/data # certificados: NO borrar (límites de Let's Encrypt)
       - caddy_config:/config
-    restart: unless-stopped
-
-  # ── Backups diarios (opcional): activa el perfil "backup" ────────────────
-  # Copia la BD (snapshot consistente) y los uploads a /data/backups;
-  # conserva los últimos 7. Corre a diario a las 03:30.
-  backup:
-    image: alpine:3.20
-    container_name: voom_backup
-    profiles: ['backup']
-    depends_on:
-      - voom
-    volumes:
-      - voom_data:/data
-      - ./scripts/backup.sh:/backup.sh:ro
     entrypoint: ['/bin/sh', '-c']
     command:
       - |
-        apk add --no-cache sqlite >/dev/null 2>&1
+        printf '{$$DOMAIN} {\n\tencode zstd gzip\n\treverse_proxy voom:3000\n}\n' > /tmp/Caddyfile
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    security_opt: ['no-new-privileges:true']
+    logging: *logging
+
+  # ── Backups diarios (opcional): docker compose --profile backup up -d ─────
+  # Reutiliza la imagen de Voom (nada extra que descargar). 03:30 cada día,
+  # conserva 7 en /data/backups (ver DEPLOY.md para copiarlos fuera).
+  backup:
+    image: ghcr.io/zyferonix/voom:${VOOM_TAG:-latest}
+    profiles: ['backup']
+    init: true
+    restart: unless-stopped
+    depends_on: [voom]
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - voom_data:/data
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
         while true; do
           if [ "$$(date +%H:%M)" = "03:30" ]; then
-            sh /backup.sh /data || true
+            sh /app/scripts/backup.sh /data || true
             sleep 60
           fi
           sleep 30
         done
-    restart: unless-stopped
+    logging: *logging
 
 volumes:
   voom_data:
