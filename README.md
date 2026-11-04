@@ -62,7 +62,8 @@ Construido para quienes quieren crear el futuro de las comunidades abiertas.
 | **Seguridad** | JWT (localStorage + cookie `Secure; SameSite=Strict`), rate limiting (1000 req/min por IP / 2000 por usuario), CSRF, headers HSTS, bloqueos, snooze, anti-bots (reputación + heurísticas) |
 | **PWA** | Service worker cache-first, install prompt, manifest.json |
 | **Diseño** | Glassmorphism 2.0 + Neo-Aero tokenizado (CSS puro), temas light/dark/midnight, perfiles customizables con CSS sanitizado, **apariencia global por usuario** + **Frutiger Aero Engine** (presets, cristal, radios, gloss, wallpaper) y perfiles de rendimiento lite/balanced/high |
-| **Feed Inteligente (Anti-Ragebait)** | Algoritmo 100% transparente y controlable por el usuario.	| Algoritmo 100% transparente y controlable por el usuario. Ajuste de pesos visual (recencia, interacciones, viralidad) y detección automática de toxicidad. Adiós a la caja negra.
+| **Feed Inteligente (Anti-Ragebait)** | Algoritmo 100% transparente y controlable por el usuario: ajuste de pesos visual (recencia, interacciones, viralidad) y detección automática de toxicidad. Adiós a la caja negra |
+
 ---
 
 ## Tech Stack
@@ -78,7 +79,7 @@ Construido para quienes quieren crear el futuro de las comunidades abiertas.
 | Tiempo real | Socket.io (chat, presencia, notificaciones push) + WebRTC (llamadas) |
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
-| Testing | Vitest (12 suites, 126 tests) |
+| Testing | Vitest configurado — suite en restauración (ver [Estado de las pruebas](#estado-de-las-pruebas)) |
 | DevOps | Docker + docker-compose + nginx + Husky hooks |
 
 ---
@@ -110,12 +111,18 @@ Primera visita → wizard de instalación en `/install` → crea tablas y admin 
 | `npm run dev` | Servidor de desarrollo (Vite) |
 | `npm run build` | Build de producción |
 | `npm start` | Servidor producción (adapter-node) |
-| `npm run test` | Vitest (17 suites, 227 tests) |
+| `npm run test` | Vitest (suite en restauración, ver abajo) |
 | `npm run lint` | ESLint + Prettier check |
 | `npm run format` | ESLint + Prettier fix |
 | `node scripts/migrate-up.js` | Aplicar migraciones pendientes |
 | `node scripts/migrate-down.js [N]` | Revertir últimas N migraciones |
 | `node scripts/seed.js` | Sembrar system_settings + marketplace_categories |
+
+### Estado de las pruebas
+
+`vitest` está configurado, pero la suite todavía no se ejecuta en CI: el arranque del servidor de Vite falla y aún no hay archivos de prueba en el árbol. El job está desactivado en [`.github/workflows/ci.yml`](.github/workflows/ci.yml), donde está anotado el bloqueo y cómo reintroducirlo.
+
+Mientras tanto, la puerta de calidad es `npm run lint` + `npm run build`, que sí corren en cada push y pull request contra `main`.
 
 ---
 

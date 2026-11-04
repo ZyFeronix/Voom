@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentación técnica
+    url: https://github.com/ZyFeronix/Voom/blob/main/DOCS.md
+    about: Arquitectura, schema, rutas, API y operación.
+  - name: Preguntas y debate
+    url: https://github.com/ZyFeronix/Voom/discussions
+    about: Dudas de uso, ideas abiertas y despliegue.
