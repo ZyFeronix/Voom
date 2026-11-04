@@ -9,7 +9,9 @@
 # =============================================================================
 
 # ── 1. Build de la aplicación ────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+# El build produce JS independiente de la arquitectura: corre SIEMPRE nativo
+# (rápido) aunque se publique para arm64.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
