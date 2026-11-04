@@ -58,6 +58,7 @@ jobs:
           name: voom-build
           path: frontend/build
           if-no-files-found: error
+          retention-days: 3 # nadie descarga el artefacto; evita acumular ~14 MB por run (cuota de Actions)
           retention-days: 7
 
   # --- Tests (disabled until the test environment is fixed) -----------------
