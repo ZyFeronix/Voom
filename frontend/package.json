@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"@libsql/client": "^0.17.4",
-		"@sveltejs/adapter-node": "^2.1.0",
+		"@sveltejs/adapter-node": "^6.0.1",
 		"bcryptjs": "^2.4.3",
 		"compression": "^1.8.1",
 		"dompurify": "^3.1.0",
@@ -38,7 +38,7 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.0.0",
-		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/kit": "^3.1.1",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@testing-library/svelte": "^5.0.0",
 		"eslint": "^9.0.0",
