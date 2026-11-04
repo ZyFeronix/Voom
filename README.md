@@ -80,7 +80,7 @@ Construido para quienes quieren crear el futuro de las comunidades abiertas.
 | Email | Nodemailer (verificación, reset password) |
 | Logging | Pino (structured JSON) |
 | Testing | Vitest configurado — suite en restauración (ver [Estado de las pruebas](#estado-de-las-pruebas)) |
-| DevOps | Docker + docker-compose + nginx + Husky hooks |
+| DevOps | Docker + docker-compose + Caddy + Husky hooks |
 
 ---
 

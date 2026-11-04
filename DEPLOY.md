@@ -11,6 +11,23 @@ Esta guía te lleva de cero a **https://tudominio.com funcionando** en unos
 
 ---
 
+## ⚡ Instalación rápida (1 comando)
+
+Con un VPS Ubuntu/Debian y el DNS (registro **A**) de tu dominio ya apuntando
+a su IP, conéctate por SSH y ejecuta:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zyferonix/voom/main/install.sh | sh
+```
+
+Te pregunta el dominio, instala Docker si falta, descarga el stack y lo
+arranca. Después abre `https://tudominio.com` (asistente de instalación).
+Volver a ejecutarlo **actualiza** a la última versión. Salta al
+[Paso 6](#paso-6--asistente-de-instalación-en-tu-navegador) cuando termine.
+Los pasos 1-5 son la versión manual, por si prefieres Portainer o control total.
+
+---
+
 ## Paso 1 — Crear el servidor y apuntar el dominio
 
 1. Crea un VPS con Ubuntu 24.04 y anota su **IP pública** (ej. `203.0.113.10`).
@@ -46,33 +63,24 @@ Abre `https://IP-del-servidor:9443`, crea el usuario admin y entra en
 (Stacks → Add stack → Web editor). Si prefieres terminal, usa
 `docker compose` directamente como se muestra abajo.
 
-## Paso 3 — Copiar los 3 archivos del stack
+## Paso 3 — Copiar el archivo del stack
 
-En el servidor crea una carpeta, ej. `/opt/voom`, con estos tres archivos
-(cópiolos tal cual del repositorio):
+Todo el stack (app + Caddy con HTTPS automático + backups) está en **un solo
+archivo**: `docker-compose.yml`. Guárdalo en el servidor, ej. `/opt/voom/`.
+No hay `Caddyfile` ni scripts que copiar.
 
-| Archivo              | Para qué                                        |
-| -------------------- | ----------------------------------------------- |
-| `docker-compose.yml` | La definición de los servicios (app + Caddy)    |
-| `Caddyfile`          | Configuración del HTTPS automático              |
-| `scripts/backup.sh`  | Script de backups diarios (opcional, recomendado) |
-
-Con Portainer: al pegar el stack, **marca "Web editor"** y pega el contenido
-de `docker-compose.yml`. Después, usa el mismo stack → Editor para revisar que
-el `Caddyfile` esté montado (o súbelo a `/opt/voom/Caddyfile` con
-`Files` del stack en Portainer).
+Con Portainer: **Stacks → Add stack → Web editor** y pega su contenido.
 
 ## Paso 4 — Definir la variable única: DOMAIN
 
-En Portainer (Create stack → Environment variables) o en un archivo `.env`
-junto al compose, define **una sola variable**:
+En Portainer (Environment variables) o en un archivo `.env` junto al compose:
 
 ```
 DOMAIN=voom.social
 ```
 
-`JWT_SECRET` no hace falta: si no lo defines, el servidor genera uno el
-primer arranque y lo guarda cifrado en el volumen de datos.
+Opcionales: `VOOM_TAG` (`latest` por defecto; `beta` o una versión `1.2.3`)
+y `JWT_SECRET` (si falta, se genera y se guarda en el volumen de datos).
 
 ## Paso 5 — Levantar
 
@@ -84,8 +92,7 @@ docker compose up -d
 docker compose logs -f voom   # espera a ver "Production server running"
 ```
 
-**Portainer:** Stacks → Add stack → pega el compose → Define la variable
-`DOMAIN` → **Deploy the stack**.
+**Portainer:** **Deploy the stack**.
 
 La primera vez Caddy puede tardar ~1 minuto en obtener el certificado TLS.
 
@@ -121,14 +128,14 @@ Crea `/data/backups/voom-FECHA.tar.gz` (BD + uploads) cada día a las 03:30 y
 conserva los últimos 7. Para descargar uno:
 
 ```bash
-docker cp voom_backup:/data/backups/voom-20260901.tar.gz .
+docker compose cp backup:/data/backups/voom-20260901.tar.gz .
 ```
 
 **Backup manual inmediato:**
 
 ```bash
-docker exec voom_app sh -c "sqlite3 /data/database.sqlite '.backup /data/manual.sqlite'"
-docker cp voom_app:/data/manual.sqlite ./backup-manual.sqlite
+docker compose run --rm --no-deps -e DATA_DIR=/data --entrypoint sh voom /app/scripts/backup.sh /data
+docker compose cp voom:/data/backups ./backups
 ```
 
 ### Actualizar a una versión nueva
@@ -137,6 +144,7 @@ docker cp voom_app:/data/manual.sqlite ./backup-manual.sqlite
 cd /opt/voom
 docker compose pull        # descarga la imagen nueva
 docker compose up -d       # reinicia con la nueva versión
+docker image prune -f      # libera el disco de imágenes antiguas
 ```
 
 El entrypoint aplica las migraciones de base de datos pendientes
@@ -169,9 +177,9 @@ normalmente) mientras arreglas lo que sea.
 ### Comandos útiles
 
 ```bash
-docker exec -it voom_app sh                        # terminal dentro del contenedor
-docker exec voom_app node /app/scripts/seed.js     # re-sembrar ajustes base
-docker exec voom_app node /app/scripts/migrate-up.js  # forzar migraciones
+docker compose exec voom sh                        # terminal dentro del contenedor
+docker compose exec voom node /app/scripts/seed.js     # re-sembrar ajustes base
+docker compose exec voom node /app/scripts/migrate-up.js  # forzar migraciones
 docker compose exec voom node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.json()).then(console.log)"  # salud
 ```
 
