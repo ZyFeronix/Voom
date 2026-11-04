@@ -1,3 +1,6 @@
+> **Rama base:** todo entra por `dev`. Promoción: `dev` → `beta` → `main`.
+> Un PR a `beta` solo puede abrirse desde `dev`, y uno a `main` solo desde `beta`.
+
 ## Qué cambia
 
 <!-- Resumen en una o dos frases. -->
