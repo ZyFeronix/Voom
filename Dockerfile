@@ -10,7 +10,7 @@
 # =============================================================================
 
 # ── Stage 1: build de la aplicación SvelteKit ────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:26-slim AS builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
@@ -20,7 +20,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ── Stage 2: runtime (solo dependencias de producción) ──────────────────────
-FROM node:20-slim AS runner
+FROM node:26-slim AS runner
 ENV NODE_ENV=production \
 	PORT=3000 \
 	HOST=0.0.0.0
