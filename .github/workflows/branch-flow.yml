@@ -1,5 +1,8 @@
 name: Branch flow
 
+# Enforces the promotion path: work branches -> dev -> beta -> main.
+# Runs on a 1-vCPU slim runner and takes a few seconds per event.
+
 on:
   pull_request:
     branches: [main, beta, dev]
@@ -8,12 +11,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: branch-flow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
-    name: Ruta de promoción
+    name: Promotion path
     runs-on: ubuntu-slim
+    timeout-minutes: 2
     steps:
-      - name: Comprobar origen y destino
+      - name: Check source and target branches
         env:
           BASE: ${{ github.base_ref }}
           HEAD: ${{ github.head_ref }}
@@ -23,25 +31,25 @@ jobs:
             dev)
               case "$HEAD" in
                 main|beta)
-                  echo "::error::main y beta no pueden abrir PR hacia dev. Abre una rama de trabajo contra dev."
+                  echo "::error::main and beta cannot open PRs into dev. Open a work branch against dev instead."
                   exit 1
                   ;;
               esac
               ;;
             beta)
               if [ "$HEAD" != "dev" ]; then
-                echo "::error::Solo dev promociona a beta. Origen recibido: $HEAD."
+                echo "::error::Only dev can be promoted to beta. Received source: $HEAD."
                 exit 1
               fi
               ;;
             main)
               if [ "$HEAD" != "beta" ]; then
-                echo "::error::Solo beta promociona a main. Origen recibido: $HEAD."
+                echo "::error::Only beta can be promoted to main. Received source: $HEAD."
                 exit 1
               fi
               ;;
             *)
-              echo "Rama base sin reglas: $BASE"
+              echo "Base branch has no rules: $BASE"
               ;;
           esac
-          echo "Ruta válida: $HEAD -> $BASE"
+          echo "Valid path: $HEAD -> $BASE"
