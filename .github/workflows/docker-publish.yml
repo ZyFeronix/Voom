@@ -1,25 +1,31 @@
 name: Docker Publish
 
-# Publica ghcr.io/zyferonix/voom:
-#   - push a `beta`  → :beta (se sobrescribe siempre)
-#   - push a `main`  → crea el tag git vX.Y.Z (X.Y.Z = frontend/package.json),
-#                      publica :X.Y.Z y sobrescribe :latest.
-#                      Falla si vX.Y.Z ya existe: sube la versión antes de promover.
-#   - a demanda      → :manual
-# Multi-arch (amd64 + arm64 para Oracle Ampere/Raspberry). Para no agotar la
-# cuota del registro: el build JS se comparte entre arquitecturas, sin
-# attestations (provenance/SBOM crean manifiestos extra). No se podan versiones
-# "sin etiqueta": en una imagen multi-arch los manifiestos por arquitectura
-# también lo están y borrarlos rompería la imagen.
+# Publishes ghcr.io/zyferonix/voom:
+#   - push to `beta`  -> :beta (always overwritten)
+#   - push to `main`  -> creates the git tag vX.Y.Z (X.Y.Z = frontend/package.json),
+#                        publishes :X.Y.Z and overwrites :latest.
+#                        Fails if vX.Y.Z already exists: bump the version before promoting.
+#   - on demand       -> :manual
+# Multi-arch (amd64 + arm64 for Oracle Ampere/Raspberry Pi). To stay inside the
+# registry and Actions quotas (private repo, Free plan: 2,000 min/month, 500 MB of
+# Packages): the JS build is shared between architectures, layers are cached in
+# Actions (never in the registry), docs-only changes are ignored, and no
+# attestations are produced (provenance/SBOM create extra manifests). "Untagged"
+# versions are not pruned: in a multi-arch image the per-architecture manifests
+# are untagged too, and deleting them would break the image.
 
 on:
   push:
     branches: [main, beta]
+    paths-ignore:
+      - '**/*.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
   workflow_dispatch:
 
 concurrency:
   group: docker-publish-${{ github.ref }}
-  # En main nunca cancelar: cortar a medias dejaría :latest publicado sin tag git.
+  # Never cancel on main: stopping halfway could leave :latest published without a git tag.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -28,20 +34,21 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
-      contents: write # crear el tag git de versión en main
+      contents: write # create the version git tag on main
       packages: write
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Versión (solo main)
+      - name: Version (main only)
         id: ver
         if: github.ref == 'refs/heads/main'
         run: |
           VERSION="$(node -p "require('./frontend/package.json').version")"
           if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::El tag v${VERSION} ya existe. Sube la versión en frontend/package.json antes de promover a main."
+            echo "::error::Tag v${VERSION} already exists. Bump the version in frontend/package.json before promoting to main."
             exit 1
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -58,11 +65,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # GHCR exige el nombre en minúsculas (el owner es ZyFeronix).
-      - name: Nombre de imagen en minúsculas
+      # GHCR requires lowercase names (the owner is ZyFeronix).
+      - name: Lowercase image name
         run: echo "IMAGE=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - name: Metadatos (tags, labels)
+      - name: Metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v6
         with:
@@ -86,8 +93,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Tag git solo cuando la imagen ya se publicó con éxito.
-      - name: Crear tag git
+      # Create the git tag only once the image has been published successfully.
+      - name: Create git tag
         if: github.ref == 'refs/heads/main'
         run: |
           git tag "v${{ steps.ver.outputs.version }}"
