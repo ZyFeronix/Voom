@@ -1,16 +1,9 @@
 name: Sync to GitLab
 
-# Mirrors main, beta and tags to GitLab after every push.
-# Runs on a 1-vCPU slim runner; only the needed refs are fetched (no refs/pull/*),
-# so each run takes well under a minute.
-
 on:
   push:
-    branches:
-      - main
-      - beta
-    # The mirror replicates the whole repository; this filter only avoids
-    # re-mirroring when the sole change is the Actions configuration.
+    branches: [main, beta]
+    # The mirror replicates the whole repository; skip it when only Actions config changed.
     paths-ignore:
       - '.github/**'
   workflow_dispatch:
@@ -18,39 +11,15 @@ on:
 permissions:
   contents: read
 
-# Never cancel a running mirror (a half-finished push is worse than a queued one);
-# queued runs are collapsed to the latest.
+# Never cancel a running mirror; queued runs collapse to the latest.
 concurrency:
   group: sync-gitlab
   cancel-in-progress: false
 
 jobs:
   sync:
-    name: Mirror to GitLab
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
-
-    env:
-      TARGET_REPO_URL: "git.alexdevuwu.com/organizations/zyferonix/voom.git"
-      GITLAB_USER: "oauth2"
-
-    steps:
-      - name: Mirror to GitLab
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Only main, beta and tags: dev may carry throwaway code and must not take
-          # up space on GitLab, and GitHub's refs/pull/* do not exist there anyway.
-          git init --bare --quiet repo
-          cd repo
-          git fetch --quiet --no-tags \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" \
-            "+refs/heads/main:refs/heads/main" \
-            "+refs/heads/beta:refs/heads/beta" \
-            "+refs/tags/*:refs/tags/*"
-          git push --prune "https://${GITLAB_USER}:${GITLAB_TOKEN}@${TARGET_REPO_URL}" \
-            "+refs/heads/main:refs/heads/main" \
-            "+refs/heads/beta:refs/heads/beta" \
-            "+refs/tags/*:refs/tags/*"
+    uses: ZyFeronix/utils/.github/workflows/sync-gitlab.yml@main
+    with:
+      gitlab-repo: voom
+    secrets:
+      GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
