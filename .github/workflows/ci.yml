@@ -1,18 +1,13 @@
 # Voom! — Continuous Integration
 #
-# Runs the same gates the Husky pre-commit hook enforces locally
-# (prettier --check + eslint + production build) on every pull request,
-# so a broken change can't reach main unnoticed. Every branch in the
-# dev -> beta -> main flow is covered.
+# Same gates as the Husky pre-commit hook (prettier --check + eslint + production build) on every
+# PR of the dev -> beta -> main flow, plus the Docker image smoke test when packaging changes.
 #
-# Tests are intentionally omitted for now: `npm run test` (vitest) is currently
-# broken in this repo — vitest fails to create the Vite server and better-sqlite3
-# (the DB driver the test assumes) isn't installed. Once the test environment is
-# fixed, re-enable the `test` job below.
+# Tests are intentionally omitted: `npm run test` (vitest) is currently broken — vitest fails to
+# create the Vite server and tests/auth.test.js uses the better-sqlite3 sync API while only
+# @libsql/client (async) is installed. Add a `test` job here once that is fixed.
 name: CI
 
-# PR-only (plus manual runs): pushes to main/beta are merges of PRs that were
-# already checked, so re-running there would only burn Actions minutes.
 on:
   pull_request:
     branches: [main, beta, dev]
@@ -22,7 +17,6 @@ on:
       - '.github/PULL_REQUEST_TEMPLATE.md'
   workflow_dispatch:
 
-# Cancel superseded runs on the same ref — saves CI minutes.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -32,55 +26,27 @@ permissions:
 
 jobs:
   lint-and-build:
-    name: Lint & Build
+    name: Lint & Build # required status check on main: keep the name
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build
 
-      - name: Lint (prettier --check + eslint)
-        run: npm run lint
-
-      # The build output is not uploaded as an artifact: nobody downloads it and it
-      # would eat into the Free-plan storage quota (~14 MB per run).
-      - name: Build (Vite production build + SvelteKit adapter-node)
-        run: npm run build
-
-  # --- Tests (disabled until the test environment is fixed) -----------------
-  # Uncomment once `npm run test` passes locally. The blocker today:
-  #   1. vitest fails at Vite-server creation (vite-plugin-svelte hot-update).
-  #   2. tests/auth.test.js uses the better-sqlite3 sync API but only @libsql/client
-  #      is installed (async). Either install better-sqlite3 as a devDep or
-  #      migrate the test to `await db.prepare(...).get()`.
-  #
-  # test:
-  #   name: Tests
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-  #   defaults:
-  #     run:
-  #       working-directory: frontend
-  #   steps:
-  #     - uses: actions/checkout@v7
-  #     - uses: actions/setup-node@v7
-  #       with:
-  #         node-version: 22
-  #         cache: npm
-  #         cache-dependency-path: frontend/package-lock.json
-  #     - run: npm ci --no-audit --no-fund
-  #     - run: npm run test
+  docker:
+    uses: ZyFeronix/utils/.github/workflows/docker-smoke.yml@main
+    with:
+      packaging-paths: '^(Dockerfile|\.dockerignore|docker-entrypoint\.sh|docker-compose\.yml|install\.sh|scripts/|schema_sqlite\.sql|migrations/|frontend/(package(-lock)?\.json|server.*\.js|src/lib/server/)|\.github/workflows/(ci|docker-publish)\.yml)'
+      compose-profiles: default backup
