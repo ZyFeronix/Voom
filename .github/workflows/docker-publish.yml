@@ -1,18 +1,10 @@
-name: Docker Publish
+name: Docker publish
 
-# Publishes ghcr.io/zyferonix/voom:
-#   - push to `beta`  -> :beta (always overwritten)
-#   - push to `main`  -> creates the git tag vX.Y.Z (X.Y.Z = frontend/package.json),
-#                        publishes :X.Y.Z and overwrites :latest.
-#                        Fails if vX.Y.Z already exists: bump the version before promoting.
-#   - on demand       -> :manual
-# Multi-arch (amd64 + arm64 for Oracle Ampere/Raspberry Pi). To stay inside the
-# registry and Actions quotas (private repo, Free plan: 2,000 min/month, 500 MB of
-# Packages): the JS build is shared between architectures, layers are cached in
-# Actions (never in the registry), docs-only changes are ignored, and no
-# attestations are produced (provenance/SBOM create extra manifests). "Untagged"
-# versions are not pruned: in a multi-arch image the per-architecture manifests
-# are untagged too, and deleting them would break the image.
+# Smoke-tests the image, then publishes ghcr.io/zyferonix/voom (details in the shared workflow):
+#   push to `beta` -> :beta
+#   push to `main` -> :latest + :X.Y.Z (from frontend/package.json) + git tag vX.Y.Z;
+#                     fails early if that tag already exists, so bump the version before promoting.
+#   on demand      -> :manual
 
 on:
   push:
@@ -25,77 +17,17 @@ on:
 
 concurrency:
   group: docker-publish-${{ github.ref }}
-  # Never cancel on main: stopping halfway could leave :latest published without a git tag.
+  # Never cancel on main: stopping halfway could leave :latest published without its git tag.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-env:
-  REGISTRY: ghcr.io
+permissions:
+  contents: read
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+  publish:
     permissions:
-      contents: write # create the version git tag on main
+      contents: write
       packages: write
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Version (main only)
-        id: ver
-        if: github.ref == 'refs/heads/main'
-        run: |
-          VERSION="$(node -p "require('./frontend/package.json').version")"
-          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${VERSION} already exists. Bump the version in frontend/package.json before promoting to main."
-            exit 1
-          fi
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm64
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # GHCR requires lowercase names (the owner is ZyFeronix).
-      - name: Lowercase image name
-        run: echo "IMAGE=${REGISTRY}/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-
-      - name: Metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=raw,value=${{ steps.ver.outputs.version || 'none' }},enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' }}
-            type=raw,value=manual,enable=${{ github.event_name == 'workflow_dispatch' }}
-
-      - name: Build & Push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          provenance: false
-          sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Create the git tag only once the image has been published successfully.
-      - name: Create git tag
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git tag "v${{ steps.ver.outputs.version }}"
-          git push origin "v${{ steps.ver.outputs.version }}"
+    uses: ZyFeronix/utils/.github/workflows/docker-publish.yml@main
+    with:
+      release-version: true
