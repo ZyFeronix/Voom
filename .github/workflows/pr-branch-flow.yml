@@ -1,4 +1,8 @@
-name: Branch flow
+# WHEN:   A pull request targets dev, beta or main.
+# WHAT:   Blocks PRs that skip the promotion path (work branch -> dev -> beta -> main).
+# WRITES: Nothing (read-only).
+#
+name: PR - Branch flow
 
 on:
   pull_request:
