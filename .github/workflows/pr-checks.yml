@@ -1,3 +1,7 @@
+# WHEN:   A pull request targets dev, beta or main (docs-only changes are skipped), or manually.
+# WHAT:   Lint & Build (required check on main) + Docker image smoke test and compose validation when packaging files change.
+# WRITES: Nothing (read-only). Publishing happens AFTER the merge, in release-docker-image.yml.
+#
 # Voom! — Continuous Integration
 #
 # Same gates as the Husky pre-commit hook (prettier --check + eslint + production build) on every
@@ -6,7 +10,7 @@
 # Tests are intentionally omitted: `npm run test` (vitest) is currently broken — vitest fails to
 # create the Vite server and tests/auth.test.js uses the better-sqlite3 sync API while only
 # @libsql/client (async) is installed. Add a `test` job here once that is fixed.
-name: CI
+name: PR - Checks
 
 on:
   pull_request:
@@ -48,5 +52,5 @@ jobs:
   docker:
     uses: ZyFeronix/utils/.github/workflows/docker-smoke.yml@main
     with:
-      packaging-paths: '^(Dockerfile|\.dockerignore|docker-entrypoint\.sh|docker-compose\.yml|install\.sh|scripts/|schema_sqlite\.sql|migrations/|frontend/(package(-lock)?\.json|server.*\.js|src/lib/server/)|\.github/workflows/(ci|docker-publish)\.yml)'
+      packaging-paths: '^(Dockerfile|\.dockerignore|docker-entrypoint\.sh|docker-compose\.yml|install\.sh|scripts/|schema_sqlite\.sql|migrations/|frontend/(package(-lock)?\.json|server.*\.js|src/lib/server/)|\.github/workflows/(pr-checks|release-docker-image)\.yml)'
       compose-profiles: default backup

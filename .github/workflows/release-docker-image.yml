@@ -1,4 +1,8 @@
-name: Docker publish
+# WHEN:   A push to beta or main (after a merge), or manually.
+# WHAT:   Smoke-tests the image on amd64 + arm64, then publishes it to GHCR. main -> :latest + :X.Y.Z + git tag; beta -> :beta; manual -> :manual. Fails early if the tag already exists, so bump the version first.
+# WRITES: GHCR image tags and the git tag vX.Y.Z on main.
+#
+name: Release - Docker image
 
 # Smoke-tests the image, then publishes ghcr.io/zyferonix/voom (details in the shared workflow):
 #   push to `beta` -> :beta
