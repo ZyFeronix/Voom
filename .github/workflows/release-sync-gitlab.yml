@@ -1,4 +1,8 @@
-name: Sync to GitLab
+# WHEN:   A push to main or beta (after a merge), or manually.
+# WHAT:   Mirrors main, beta and tags to GitLab.
+# WRITES: The GitLab mirror only.
+#
+name: Release - Sync to GitLab
 
 on:
   push:
